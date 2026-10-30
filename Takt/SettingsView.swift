@@ -170,7 +170,7 @@ struct SettingsView: View {
   var body: some View {
     HStack(spacing: 0) {
       sidebar
-        .frame(width: 228)
+        .frame(width: 200)
         .background(theme.paper.ignoresSafeArea())
       Rectangle().fill(theme.border).frame(width: theme.hairline).ignoresSafeArea()
       detail

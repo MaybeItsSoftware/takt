@@ -303,15 +303,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       .environment(navState)
       .themed(checkvistManager.theme)
       .frame(
-        minWidth: Self.preferencesMinContentSize.width, idealWidth: 940,
-        minHeight: Self.preferencesMinContentSize.height, idealHeight: 700)
+        minWidth: Self.preferencesMinContentSize.width, idealWidth: 760,
+        minHeight: Self.preferencesMinContentSize.height, idealHeight: 560)
     let hostingController = NSHostingController(rootView: rootView)
 
     // A sidebar window, the way System Settings, Linear and Raycast are: the
     // content runs under a transparent title bar, the sidebar sits beneath the
     // traffic lights, and there is no toolbar of tabs.
     let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 940, height: 700),
+      contentRect: NSRect(x: 0, y: 0, width: 760, height: 560),
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered,
       defer: false
@@ -325,9 +325,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     window.tabbingMode = .disallowed
     window.delegate = self
     window.contentViewController = hostingController
-    // The autosave name is storage: it keeps the old one so a window someone
-    // has placed stays where they put it.
-    window.setFrameAutosaveName("PriorityPreferencesWindowV2")
+    // The autosave name is storage. V3 since the window got smaller, so a
+    // frame saved at the old size doesn't keep it large.
+    window.setFrameAutosaveName("PriorityPreferencesWindowV3")
     WindowContentSizing.enforce(
       on: window,
       minContentSize: Self.preferencesMinContentSize,
@@ -339,7 +339,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   /// Minimum *content* size the settings root asks for, matching the
   /// `.frame(minWidth:minHeight:)` on `SettingsView` above.
-  private static let preferencesMinContentSize = NSSize(width: 820, height: 560)
+  private static let preferencesMinContentSize = NSSize(width: 640, height: 440)
   private static let preferencesMaxContentSize = NSSize(width: 1400, height: 1100)
 
   func windowWillClose(_ notification: Notification) {
