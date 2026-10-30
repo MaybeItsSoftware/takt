@@ -49,19 +49,19 @@ struct TaskNotesEditor: View {
       if let title = taskTitle, !title.isEmpty {
         HStack(spacing: theme.space.xs) {
           Text(title)
-            .font(theme.type.headline)
+            .font(theme.type.bodyMedium)
             .foregroundStyle(theme.ink)
             .lineLimit(1)
           Spacer()
           if wordCount > 0 {
             Text("\(wordCount) \(wordCount == 1 ? "word" : "words")")
-              .font(theme.type.monoSmall)
+              .font(theme.type.mono(12))
               .foregroundStyle(theme.dim)
           }
         }
         .padding(.horizontal, theme.space.lg)
         .padding(.vertical, theme.space.sm)
-        .background(theme.surface)
+        .background(theme.raised)
         .overlay(alignment: .bottom) { Hairline(role: .borderMuted) }
       }
 
