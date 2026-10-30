@@ -364,6 +364,10 @@ subcommands go through. It exists so that a tool argument the CLI has no flag
 for is still reachable, and so `takt call` can be used to reproduce exactly
 what an assistant did.
 
+`takt tools --json` prints the definitions as the MCP server's `tools/list`
+returns them, input schemas included. The agent panel reads it to give
+Antigravity the parameters it cannot otherwise see (`docs/agent-panel.md`).
+
 ## As an MCP server
 
 This binary *is* Takt's MCP server. There is no other — the app ships a copy

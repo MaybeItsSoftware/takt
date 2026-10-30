@@ -55,7 +55,7 @@ fn main() -> std::process::ExitCode {
             Ok(())
         }
         Some(cli::Command::Tools) => {
-            cli::print_tools();
+            cli::print_tools(parsed.json);
             Ok(())
         }
         Some(cli::Command::Auth { command }) => cli::run_auth(config, command),

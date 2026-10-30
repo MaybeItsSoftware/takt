@@ -1404,8 +1404,15 @@ fn insert_if_some(arguments: &mut Map<String, Value>, key: &str, value: Option<&
 
 // -- rendering ---------------------------------------------------------------
 
-pub fn print_tools() {
+/// `takt tools`: a line per tool, or with `--json` the definitions exactly
+/// as the MCP server's `tools/list` returns them, schemas included — which
+/// the app reads to tell an agent that cannot see them what each one takes.
+pub fn print_tools(as_json: bool) {
     let definitions = mcp::tool_definitions();
+    if as_json {
+        println!("{}", json!({ "tools": definitions }));
+        return;
+    }
     println!("{} tools\n", definitions.len());
     for tool in &definitions {
         let name = tool.get("name").and_then(Value::as_str).unwrap_or("");
