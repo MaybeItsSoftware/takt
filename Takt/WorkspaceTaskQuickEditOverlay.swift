@@ -268,6 +268,13 @@ struct WorkspaceTaskQuickEditOverlay: View {
 
   private func save(clear: Bool = false) {
     guard let store = model.store else { return }
+    // A title goes the way an in-row rename does, so a repeating task asks
+    // whether the new name is today's alone or every day's.
+    if request.kind == .title {
+      model.dismissOverlay()
+      model.commitTaskTitleEdit(request.task, text: text)
+      return
+    }
     do {
       var draft = TaskEditorDraft(snapshot: try store.taskEditorSnapshot(for: request.task.id))
       switch request.kind {
