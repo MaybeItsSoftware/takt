@@ -266,7 +266,19 @@ extension WorkspaceViewModel {
     let capture = TaskCapture.parse(text)
     guard !capture.title.isEmpty else { return }
     guard capture.title != task.title || capture.hasDetails else { return }
-    editTaskValues(of: task) { values in
+    // A repeating task asks first whether the new name is this turn's alone.
+    if capture.title != task.title, let schedule = try? store?.periodicSchedule(for: task.id) {
+      presentOverlay(.seriesRename(WorkspaceSeriesRenameRequest(task: task, capture: capture, schedule: schedule)))
+      return
+    }
+    saveTitleEdit(capture, of: task)
+  }
+
+  /// Saves a parsed in-row title edit; `afterSave` runs inside the same write.
+  func saveTitleEdit(
+    _ capture: TaskCapture, of task: WorkspaceTask, afterSave: ((WorkspaceStore) throws -> Void)? = nil
+  ) {
+    editTaskValues(of: task, afterSave: afterSave) { values in
       values.title = capture.title
       if let dueAt = capture.dueAt { values.dueAt = dueAt; values.dueDate = nil }
       if let startAt = capture.startAt { values.startAt = startAt }
@@ -310,7 +322,10 @@ extension WorkspaceViewModel {
   /// One change saved straight away — asking first what the deadline does
   /// when it starts the task on a later day, and when it moves a repeating
   /// task onto the day it comes round again anyway.
-  func editTaskValues(of task: WorkspaceTask, _ change: (inout TaskEditorValues) -> Void) {
+  func editTaskValues(
+    of task: WorkspaceTask, afterSave: ((WorkspaceStore) throws -> Void)? = nil,
+    _ change: (inout TaskEditorValues) -> Void
+  ) {
     guard let store else { return }
     var draft: TaskEditorDraft
     do {
@@ -321,20 +336,24 @@ extension WorkspaceViewModel {
     }
     change(&draft.values)
     if askAboutStartingLater(draft, title: task.title, proceed: { [weak self] answered, keepingDue in
-      self?.saveEditedValues(answered, of: task, keepingDue: keepingDue)
+      self?.saveEditedValues(answered, of: task, keepingDue: keepingDue, afterSave: afterSave)
     }) {
       return
     }
-    saveEditedValues(draft, of: task, keepingDue: false)
+    saveEditedValues(draft, of: task, keepingDue: false, afterSave: afterSave)
   }
 
-  private func saveEditedValues(_ draft: TaskEditorDraft, of task: WorkspaceTask, keepingDue: Bool) {
+  private func saveEditedValues(
+    _ draft: TaskEditorDraft, of task: WorkspaceTask, keepingDue: Bool,
+    afterSave: ((WorkspaceStore) throws -> Void)?
+  ) {
     guard let store else { return }
     let save: @MainActor () -> Bool = { [weak self, draft] in
       guard let self else { return false }
       var saved = false
       perform {
         _ = try store.saveTaskEditor(draft, keepingDue: keepingDue)
+        try afterSave?(store)
         saved = true
         self.reloadOutline(refreshSidebar: task.isList)
         self.reloadDailies()

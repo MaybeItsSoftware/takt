@@ -120,6 +120,8 @@ struct WorkspaceOverlayContent: View {
       WorkspaceDeleteColumnOverlay(overlayID: overlay.id, columnID: id)
     case .recurrenceClash(let request):
       WorkspaceRecurrenceClashOverlay(overlayID: overlay.id, request: request)
+    case .seriesRename(let request):
+      WorkspaceSeriesRenameOverlay(overlayID: overlay.id, request: request)
     case .startLater(let request):
       WorkspaceStartLaterOverlay(overlayID: overlay.id, request: request)
     }

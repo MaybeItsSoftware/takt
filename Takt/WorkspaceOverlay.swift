@@ -50,6 +50,8 @@ enum WorkspaceOverlay: Identifiable {
   case quickAsk(WorkspaceQuickAskRequest)
   /// A save moving a repeating task onto its next turn, held for a choice.
   case recurrenceClash(WorkspaceRecurrenceClashRequest)
+  /// A rename of a repeating task, held for whether it is this turn's alone.
+  case seriesRename(WorkspaceSeriesRenameRequest)
   /// A save starting a task on a later day while it has a deadline, held
   /// for what the deadline does.
   case startLater(WorkspaceStartLaterRequest)
@@ -77,6 +79,7 @@ enum WorkspaceOverlay: Identifiable {
     case .deleteBoardColumn(let id): "column-delete:\(id)"
     case .quickAsk(let request): "quick-ask:\(request.id)"
     case .recurrenceClash(let request): "recurrence-clash:\(request.id)"
+    case .seriesRename(let request): "series-rename:\(request.id)"
     case .startLater(let request): "start-later:\(request.id)"
     }
   }
