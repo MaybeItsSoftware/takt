@@ -40,6 +40,7 @@ extension WorkspaceViewModel {
     quickAgent.newThread()
     quickAgent.clientSetting = agent.clientSetting
     quickAgent.userExecutablePaths = agent.userExecutablePaths
+    quickAgent.customWireSetting = agent.customWireSetting
     quickAgent.asksBeforeChangesSetting = agent.asksBeforeChangesSetting
     quickAgent.endsAfterTurn = true
     quickAgent.currentValues = { [weak self] tool, input in self?.agentCurrentValues(tool: tool, input: input) ?? [:] }

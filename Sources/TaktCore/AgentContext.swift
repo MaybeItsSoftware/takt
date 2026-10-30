@@ -150,17 +150,36 @@ public enum AgentFailureAdvice {
     let name = client.displayName
     if has("/login", "not logged in", "invalid api key", "please log in", "authentication", "oauth token", "codex login")
     {
-      let command = client == .codex ? "`codex login`" : "`claude`, type `/login`"
+      let command =
+        switch client {
+        case .claudeCode: "`claude`, type `/login`"
+        case .codex: "`codex login`"
+        case .antigravity: "`agy`"
+        case .custom: "the command"
+        }
       return "\(name) is not signed in. Open Terminal, run \(command) and finish signing in, "
         + "then send your message again here."
     }
-    if has("unknown option", "unknown argument", "unrecognized option", "unexpected argument", "unknown configuration field")
+    if has("unknown option", "unknown argument", "unrecognized option", "unexpected argument", "unknown configuration field",
+      "unknown setting", "flag provided but not defined")
     {
-      let update = client == .codex ? "Update it (`brew upgrade codex` or `npm install -g @openai/codex`)" : "Run `claude update` in Terminal"
+      let update =
+        switch client {
+        case .claudeCode: "Run `claude update` in Terminal"
+        case .codex: "Update it (`brew upgrade codex` or `npm install -g @openai/codex`)"
+        case .antigravity: "Run `agy update` in Terminal"
+        case .custom: "Update it, or check it speaks the format chosen for it in Settings ▸ Agent"
+        }
       return "This \(name) is too old for the agent panel. \(update), then start a new thread."
     }
     if has("usage limit", "rate limit", "limit reached", "credit balance", "quota") {
-      let check = client == .codex ? "`codex` in Terminal says when" : "`claude` in Terminal says when"
+      let check =
+        switch client {
+        case .claudeCode: "`claude` in Terminal says when"
+        case .codex: "`codex` in Terminal says when"
+        case .antigravity: "`agy` in Terminal says when"
+        case .custom: "the command, run in Terminal, says when"
+        }
       return "\(name) has hit a usage limit. Wait for it to reset (\(check)), then try again."
     }
     if has("enotfound", "econnrefused", "econnreset", "connection error", "fetch failed", "network error") {

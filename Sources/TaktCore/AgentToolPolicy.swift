@@ -172,7 +172,7 @@ public enum AgentSystemPrompt {
   /// The system prompt for a thread. Replaces Claude Code's own, which is
   /// about writing software with tools this process does not have. With
   /// `canChange` false the thread has only the reads: the user asks before
-  /// changes and the agent has no way to ask (`AgentClient.canAskBeforeChanges`).
+  /// changes and the agent has no way to ask (`AgentWire.canAskBeforeChanges`).
   public static func text(
     today: Date, timeZone: TimeZone = .current, asksBeforeChanges: Bool = false, canChange: Bool = true
   ) -> String {

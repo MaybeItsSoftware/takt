@@ -13,7 +13,11 @@ import os
 /// It stays up for the thread, so a follow-up is one more line on its stdin,
 /// and it goes when the thread does: Stop and New thread both end it. Codex
 /// runs a process per turn instead (`AgentCodexInvocation`), each one resuming
-/// the thread by its id, and Stop and New thread forget the id.
+/// the thread by its id, and Stop and New thread forget the id. Antigravity
+/// (`agy`) is like Claude Code, a process per thread, but takes its tools and
+/// system prompt from files in its working directory
+/// (`AgentAntigravityInvocation`). A typed command speaks whichever of Claude
+/// Code's and Antigravity's formats the user picked for it (`AgentWire`).
 ///
 /// **Changes apply at once and each can be taken back.** The reads and the
 /// writes are pre-allowed on the command line, and every write shows as a
@@ -133,6 +137,19 @@ import os
   /// The agent this thread runs: the setting as it was when it started.
   private(set) var client = AgentClient.stored(UserDefaults.standard.string(forKey: AgentClient.defaultsKey))
 
+  /// The format the typed command speaks (Settings ▸ Agent). Read when a
+  /// thread starts, like the agent itself.
+  var customWireSetting = AgentWire.storedCustom(UserDefaults.standard.string(forKey: AgentClient.customWireDefaultsKey))
+  {
+    didSet { UserDefaults.standard.set(customWireSetting.rawValue, forKey: AgentClient.customWireDefaultsKey) }
+  }
+
+  /// The format this thread speaks, fixed when it started.
+  private(set) var wire = AgentWire.claudeCode
+
+  /// The format a thread on `client` would speak if it started now.
+  func wire(for client: AgentClient) -> AgentWire { client.wire(custom: customWireSetting) }
+
   /// "Ask before changing tasks" (Settings ▸ Agent). Off by default. Read
   /// when a thread starts, so it applies from the next one.
   var asksBeforeChangesSetting = UserDefaults.standard.bool(forKey: AgentToolPolicy.asksBeforeChangesKey) {
@@ -172,6 +189,12 @@ import os
 
   var executableCandidates: [String] { executableCandidates(for: clientSetting) }
 
+  /// `client` as the pickers list it, saying when it cannot run.
+  func menuLabel(for client: AgentClient) -> String {
+    guard executablePath(for: client) == nil else { return client.displayName }
+    return "\(client.displayName) — \(client == .custom ? "not set" : "not installed")"
+  }
+
   /// The binary a new thread would launch, or nil when there is none.
   var executablePath: String? { executablePath(for: clientSetting) }
 
@@ -182,11 +205,13 @@ import os
     }
   }
 
-  /// A thread is under way: Claude Code's process is up, or a Codex thread
-  /// has an id to resume between its turns' processes.
+  /// A thread is under way: its process is up, or a Codex thread has an id
+  /// to resume between its turns' processes.
   var isRunning: Bool { process != nil || codexThreadID != nil }
 
   @ObservationIgnored private var process: Process?
+  /// Holds `agy`'s text between its deltas; a new one per process.
+  @ObservationIgnored private var antigravityParser = AgentAntigravityStreamParser()
   /// The Codex thread the next turn resumes; nil before its first turn.
   private var codexThreadID: String?
   @ObservationIgnored private var input: FileHandle?
@@ -220,7 +245,7 @@ import os
     undoneSinceLastMessage = []
     let message = (ledger.changes(blocks) + [undone, context, trimmed].compactMap { $0 }).joined(separator: "\n\n")
     let sent: Bool
-    switch client {
+    switch wire {
     case .claudeCode:
       sent = write(AgentStreamEncoder.userMessage(message))
     case .codex:
@@ -228,6 +253,8 @@ import os
       sent = write(message)
       try? input?.close()
       input = nil
+    case .antigravity:
+      sent = write(AgentAntigravityEncoder.userMessage(message))
     }
     if sent { isWorking = true }
   }
@@ -317,8 +344,9 @@ import os
   /// the panel's setup state already says in its place, with the paths it
   /// tried and a field for one.
   private func start() -> Bool {
-    let continuing = client == .codex && codexThreadID != nil
+    let continuing = wire == .codex && codexThreadID != nil
     let client = continuing ? self.client : clientSetting
+    let wire = continuing ? self.wire : wire(for: client)
     guard let executable = executablePath(for: client) else { return false }
     guard let helper = Self.mcpHelperPath() else {
       items.append(
@@ -339,18 +367,30 @@ import os
     let process = Process()
     process.executableURL = URL(fileURLWithPath: executable)
     let asks = continuing ? asksBeforeChanges : asksBeforeChangesSetting
-    switch client {
+    let systemPrompt = AgentSystemPrompt.text(
+      today: .now, asksBeforeChanges: asks, canChange: wire.canAskBeforeChanges || !asks)
+    var arguments = client.leadingArguments(userPath: userExecutablePaths[client])
+    switch wire {
     case .claudeCode:
-      process.arguments = AgentInvocation.arguments(
-        helperPath: helper, systemPrompt: AgentSystemPrompt.text(today: .now, asksBeforeChanges: asks),
-        asksBeforeChanges: asks)
+      arguments += AgentInvocation.arguments(
+        helperPath: helper, systemPrompt: systemPrompt, asksBeforeChanges: asks)
+      process.currentDirectoryURL = Self.workingDirectory()
     case .codex:
-      process.arguments = AgentCodexInvocation.arguments(
-        helperPath: helper,
-        systemPrompt: AgentSystemPrompt.text(today: .now, asksBeforeChanges: asks, canChange: !asks),
-        resumeThreadID: codexThreadID, asksBeforeChanges: asks)
+      arguments += AgentCodexInvocation.arguments(
+        helperPath: helper, systemPrompt: systemPrompt, resumeThreadID: codexThreadID, asksBeforeChanges: asks)
+      process.currentDirectoryURL = Self.workingDirectory()
+    case .antigravity:
+      do {
+        process.currentDirectoryURL = try Self.antigravityDirectory(helperPath: helper, systemPrompt: systemPrompt)
+      } catch {
+        items.append(
+          Item(entry: .notice("Could not set up \(client.displayName): \(error.localizedDescription)", isError: true)))
+        return false
+      }
+      arguments += AgentAntigravityInvocation.arguments(asksBeforeChanges: asks)
+      antigravityParser = AgentAntigravityStreamParser()
     }
-    process.currentDirectoryURL = Self.workingDirectory()
+    process.arguments = arguments
     process.environment = Self.environment()
 
     let stdin = Pipe()
@@ -403,13 +443,14 @@ import os
     input = stdin.fileHandleForWriting
     if !continuing {
       self.client = client
+      self.wire = wire
       ledger = AgentContextLedger()
       asksBeforeChanges = asks
       undoneSinceLastMessage = []
     }
     // Codex numbers a turn's items from zero again, so the last turn's ids
     // would match this one's.
-    if client == .codex { toolItems = [:] }
+    if wire == .codex { toolItems = [:] }
     stoppedOnPurpose = false
     return true
   }
@@ -508,7 +549,11 @@ import os
   private func receive(_ line: String, generation: Int) {
     guard generation == self.generation else { return }
     let events =
-      client == .codex ? AgentCodexStreamParser.events(fromLine: line) : AgentStreamParser.events(fromLine: line)
+      switch wire {
+      case .claudeCode: AgentStreamParser.events(fromLine: line)
+      case .codex: AgentCodexStreamParser.events(fromLine: line)
+      case .antigravity: antigravityParser.events(fromLine: line)
+      }
     for event in events {
       handle(event)
     }
@@ -518,7 +563,7 @@ import os
     switch event {
     case .started(let session, let model, _):
       Self.log.info("Agent session \(session, privacy: .public) on \(model ?? "the default model", privacy: .public)")
-      if client == .codex { codexThreadID = session }
+      if wire == .codex { codexThreadID = session }
 
     case .text(let text):
       items.append(Item(entry: .assistant(text)))
@@ -604,7 +649,7 @@ import os
       }
       // A Codex turn's process exits by itself now; the thread lives on in
       // its id, and the next message starts the next turn's.
-      if client == .codex {
+      if wire == .codex {
         process = nil
         input = nil
       }
@@ -630,6 +675,24 @@ import os
     let directory = AppIdentity.applicationSupportDirectory()
       .appendingPathComponent("Agent", isDirectory: true)
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
+  }
+
+  /// `agy`'s working directory, with the two files that give it Takt's
+  /// server and the panel's agent (`AgentAntigravityInvocation`), rewritten
+  /// for this thread: the system prompt carries today's date and whether it
+  /// may change things. A directory of its own, beside Claude Code's, so the
+  /// `.agents` folder is never where another agent looks.
+  private static func antigravityDirectory(helperPath: String, systemPrompt: String) throws -> URL {
+    let directory = workingDirectory().appendingPathComponent("Antigravity", isDirectory: true)
+    let agents = directory.appendingPathComponent(".agents/agents", isDirectory: true)
+    try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+    try AgentAntigravityInvocation.mcpConfig(helperPath: helperPath)
+      .write(to: directory.appendingPathComponent(".agents/mcp_config.json"), atomically: true, encoding: .utf8)
+    try AgentAntigravityInvocation.agentFile(systemPrompt: systemPrompt)
+      .write(
+        to: agents.appendingPathComponent("\(AgentAntigravityInvocation.agentName).md"), atomically: true,
+        encoding: .utf8)
     return directory
   }
 

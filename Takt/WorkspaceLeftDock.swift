@@ -148,8 +148,7 @@ struct WorkspaceAgentActions: View {
         selection: Binding(get: { agent.clientSetting }, set: { model.useAgentClient($0) })
       ) {
         ForEach(AgentClient.allCases) { client in
-          Text(agent.executablePath(for: client) == nil ? "\(client.displayName) — not installed" : client.displayName)
-            .tag(client)
+          Text(agent.menuLabel(for: client)).tag(client)
         }
       }
       .pickerStyle(.inline)

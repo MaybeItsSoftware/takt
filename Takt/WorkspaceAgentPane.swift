@@ -567,7 +567,10 @@ struct WorkspaceAgentSetup: View {
   var body: some View {
     let client = model.agent.clientSetting
     VStack(alignment: .leading, spacing: theme.space.md) {
-      Text("The agent panel is set to run \(client.displayName), which isn't installed where Takt looked.")
+      Text(
+        client == .custom
+          ? "The agent panel is set to run a typed command, and Takt can't find what it starts."
+          : "The agent panel is set to run \(client.displayName), which isn't installed where Takt looked.")
         .font(theme.bodyFont())
         .foregroundStyle(theme.ink)
       Text(client.installHint)
@@ -590,7 +593,7 @@ struct WorkspaceAgentSetup: View {
         }
       }
       HStack(spacing: theme.space.xs) {
-        TextField("/path/to/\(client.executableName)", text: $path)
+        TextField(client == .custom ? "dense claude" : "/path/to/\(client.executableName)", text: $path)
           .textFieldStyle(.plain)
           .font(theme.monoFont(size: theme.scale.caption))
           .padding(.horizontal, theme.space.sm)
@@ -599,13 +602,16 @@ struct WorkspaceAgentSetup: View {
             RoundedRectangle(cornerRadius: theme.controlRadius)
               .strokeBorder(theme.inputBorder, lineWidth: theme.hairline))
           .onSubmit(usePath)
-          .help("↩ uses this path")
+          .help(client == .custom ? "↩ uses this command" : "↩ uses this path")
         Button("Use", action: usePath)
           .buttonStyle(WorkspaceAgentCardButtonStyle(tint: nil))
-          .help("Use this path · ↩ in the field")
+          .help(client == .custom ? "Use this command · ↩ in the field" : "Use this path · ↩ in the field")
       }
       if !model.agent.userExecutablePath.isEmpty {
-        Text("\(model.agent.userExecutablePath) is not an executable file.")
+        Text(
+          client == .custom
+            ? "\(AgentClient.words(of: model.agent.userExecutablePath).first ?? "") is not an executable Takt can find."
+            : "\(model.agent.userExecutablePath) is not an executable file.")
           .font(theme.captionFont)
           .foregroundStyle(theme.danger)
       }
@@ -616,7 +622,10 @@ struct WorkspaceAgentSetup: View {
     .onChange(of: client) { _, _ in path = model.agent.userExecutablePath }
   }
 
+  /// A typed command is kept as typed; `AgentClient.candidates` expands its
+  /// binary's `~` when it looks.
   private func usePath() {
-    model.agent.userExecutablePath = (path as NSString).expandingTildeInPath
+    model.agent.userExecutablePath =
+      model.agent.clientSetting == .custom ? path : (path as NSString).expandingTildeInPath
   }
 }

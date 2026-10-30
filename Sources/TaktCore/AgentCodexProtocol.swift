@@ -10,7 +10,7 @@ import Foundation
 /// message is `codex exec resume <thread id>`, which picks the conversation
 /// up from Codex's own session store. There are no control requests: nothing
 /// asks the host anything, which is why a Codex thread cannot wait for
-/// Approve (`AgentClient.canAskBeforeChanges`).
+/// Approve (`AgentWire.canAskBeforeChanges`).
 ///
 /// The lines are turned into the same `AgentStreamEvent`s as Claude Code's,
 /// so the session, its cards and their Undo are the same for both. See

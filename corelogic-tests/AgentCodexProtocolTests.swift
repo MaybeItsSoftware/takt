@@ -89,8 +89,9 @@ final class AgentCodexProtocolTests: XCTestCase {
     XCTAssertEqual(AgentClient.stored("gemini"), .claudeCode)
     XCTAssertEqual(AgentClient.stored("codex"), .codex)
     XCTAssertEqual(AgentClient.claudeCode.userPathDefaultsKey, AgentCLILocator.userPathDefaultsKey)
-    XCTAssertTrue(AgentClient.claudeCode.canAskBeforeChanges)
-    XCTAssertFalse(AgentClient.codex.canAskBeforeChanges)
+    XCTAssertEqual(AgentClient.stored("agy"), .antigravity)
+    XCTAssertTrue(AgentClient.claudeCode.wire(custom: .antigravity).canAskBeforeChanges)
+    XCTAssertFalse(AgentClient.codex.wire(custom: .claudeCode).canAskBeforeChanges)
   }
 
   func testCodexIsLookedForWhereItsInstallersPutIt() {

@@ -2,10 +2,11 @@
 
 The left dock's **Agent** tab (`Cmd+Shift+A` as in Zed, or `Cmd+Ctrl+A`, or the sparkles glyph at the left
 of the status bar) is a conversation with an assistant about your tasks, laid
-out like Zed's agent panel. The assistant is the user's own **Claude Code** or
-**Codex**, run headless, the way Zed runs its external agents: no API key, no
-account of Takt's own, just the `claude` or `codex` login already on the
-machine. Which one is a setting (below, "Choosing the agent").
+out like Zed's agent panel. The assistant is the user's own **Claude Code**,
+**Codex** or **Antigravity** (`agy`), or a command they type, run headless,
+the way Zed runs its external agents: no API key, no account of Takt's own,
+just the login already on the machine. Which one is a setting (below,
+"Choosing the agent").
 
 The rule it is built around:
 
@@ -29,6 +30,7 @@ thread.
 | `Sources/TaktCore/AgentClient.swift` | The agents the panel can run, where each is looked for, and the stored choice |
 | `Sources/TaktCore/AgentStreamProtocol.swift` | The stream-json wire format: lines in to `AgentStreamEvent`s, and the user messages and `control_response`s out |
 | `Sources/TaktCore/AgentCodexProtocol.swift` | Codex's `exec --json` lines to the same `AgentStreamEvent`s, and the `codex exec` invocation |
+| `Sources/TaktCore/AgentAntigravityProtocol.swift` | `agy`'s stream-json lines to the same `AgentStreamEvent`s, the user message going in, and the `agy` invocation with the two files it reads |
 | `Sources/TaktCore/AgentToolPolicy.swift` | Which tools are pre-allowed, the exact `claude` invocation, where `claude` is looked for, the system prompt |
 | `Sources/TaktCore/AgentToolSummary.swift` | A tool call in words, for the change card and the read lines |
 | `Sources/TaktCore/AgentContext.swift` | The standing instructions' block and folder chain, and the ledger that sends a block only when it changed |
@@ -44,13 +46,15 @@ thread.
 | `Takt/WorkspaceViewModel+QuickAsk.swift` | Its thread, subject and card keys |
 
 The `Sources/TaktCore` files are pure and tested in `corelogic-tests/AgentStreamProtocolTests.swift`,
-`AgentToolPolicyTests.swift` and `AgentCodexProtocolTests.swift`; the fixtures
+`AgentToolPolicyTests.swift`, `AgentCodexProtocolTests.swift` and
+`AgentAntigravityProtocolTests.swift`; the fixtures
 there are lines from real sessions.
 
 ## Choosing the agent
 
 The panel runs one of the agents in `AgentClient`: **Claude Code** (the
-default, and the only one before there was a choice) or **Codex**. These are
+default, and the only one before there was a choice), **Codex**,
+**Antigravity**, or a **typed command**. These are
 not the MCP client catalogue (`MCPClientCatalog`, Settings ▸ MCP): most of
 those — Claude Desktop, Cursor, VS Code, Zed — are editors with an agent
 inside, not a command the panel can start and talk to over a pipe.
@@ -59,13 +63,16 @@ The choice is in three places, all the same setting
 (`WorkspaceAgentSession.clientSetting`, `UserDefaults` key `agentClientV1`):
 
 - **Settings ▸ Agent ▸ Agent**: a picker, with a row per agent saying whether
-  it is installed and where.
+  it is installed and where. Choosing the typed command adds its field and a
+  **Speaks** picker (below).
 - The **chip glyph** on the agent tab's bar: the same choice as a menu, a
   "New thread on …" item while a thread runs on the other agent, and a way to
   the settings page.
 - The palette's **Use agent: Claude Code** and **Use agent: Codex**
   (`windowUseClaudeCode`, `windowUseCodex`; no default keys), which also say
-  in the status bar what happens next.
+  in the status bar what happens next. Antigravity and the typed command have
+  no palette command yet: one is a catalogue entry in the Rust core, which
+  every client reads.
 
 It is read when a thread starts. A thread under way keeps the agent it
 started with, and switching says so in its transcript; the next thread — New
@@ -73,6 +80,25 @@ thread, or the next message after Stop — uses the new one. The quick ask
 (`aa`) copies the panel's choice at each ask. When the chosen agent is not
 installed the setup state names it, takes a path to it, and offers the other
 one if that is installed.
+
+### The typed command
+
+For an agent the others do not cover, or one reached through a wrapper
+(`dense claude`, which is what the user's `claude` alias runs), the user
+types the command as they would in a terminal. It is kept whole in
+`agentCustomCommandV1`, where the others keep a hand-set path, and split the
+way a shell splits words (`AgentClient.words`: quotes and backslashes, no
+expansion). Its first word is the binary — a path as it stands, `~`
+expanded, or a bare name looked for in `~/.local/bin`, `/opt/homebrew/bin`,
+`/usr/local/bin`, `/usr/bin` and `/bin`, since an alias and the shell's
+`PATH` are not visible. The rest go first on the command line, ahead of the
+arguments of the format it speaks.
+
+That format is `AgentWire` (`agentCustomWireV1`): **Claude Code's** (the
+default) or **Antigravity's**. Everything below the launch — the
+arguments, the parser, whether a write can wait for Approve — follows the
+wire, not the agent, so a typed command is fenced in exactly as the agent
+whose format it speaks.
 
 ## Finding the agent
 
@@ -89,6 +115,10 @@ alias — so the binary is looked for directly, first match wins
 For Codex: a path set by hand (`agentCodexExecutablePathV1`), then
 `/opt/homebrew/bin/codex`, `/usr/local/bin/codex`, `~/.local/bin/codex` and
 `~/.npm-global/bin/codex`.
+
+For Antigravity: a path set by hand (`agentAntigravityExecutablePathV1`),
+then `~/.local/bin/agy` (where its installer puts it),
+`/opt/homebrew/bin/agy` and `/usr/local/bin/agy`.
 
 If none is executable the panel says so, lists the paths it tried, and takes a
 path. That setup state stays at the top of the panel, transcript or not, for as
@@ -216,6 +246,59 @@ Verified on Codex 0.156.
   the switch.
 - Codex keeps its sessions (`~/.codex/sessions`) — it needs them to resume —
   so unlike Claude Code's, a Codex thread is written to disk.
+
+### Antigravity
+
+`agy` is a process per thread, like Claude Code, but takes no MCP
+configuration, tool list or system prompt on its command line. What it reads
+is the working directory's `.agents/` folder, so the panel runs it in a
+directory of its own (`~/Library/Application Support/Takt/Agent/Antigravity`)
+holding exactly two files, rewritten at the start of every thread
+(`AgentAntigravityInvocation`):
+
+- `.agents/mcp_config.json`: Takt's server, and nothing else.
+- `.agents/agents/takt-panel.md`: an agent with `tools: []` and
+  `subagent: false`, whose body is `AgentSystemPrompt.text`.
+
+```text
+agy --agent takt-panel
+  --input-format stream-json --output-format stream-json
+  --disable-slash-commands
+  --settings '{"permissions":{"allow":["mcp(takt/task_lists)",…],"deny":["command(*)","read_file(*)","write_file(*)","read_url(*)","execute_url(*)"]}}'
+```
+
+Each message is a line on stdin (`{"event":"user","message":{"content":…}}`);
+the turn comes back as `step_update` events, a step each for the user's
+input, every response and every tool call, numbered across the whole
+conversation, each `ACTIVE` then `DONE` or `ERROR`, closed by a `result`.
+Takt's tools arrive as `call_mcp_tool` with `ServerName` and `ToolName`;
+response text arrives as `text_delta`s, which `AgentAntigravityStreamParser`
+keeps per step until it is done. Verified on `agy` 1.4.9 (2026-10-30).
+
+How it is fenced in, each part checked against a live `agy`:
+
+- **`tools: []`** leaves the agent no built-in tool: asked to run `ls` or
+  read `/etc/hosts`, it reports that it has no tool to. `init` still lists
+  every built-in — it lists what exists, not what the agent may use.
+- **`--settings`** applies to the session alone and is never saved. Its deny
+  rules block commands, files and the web outright, in case a release stops
+  honouring the empty tool list.
+- **Its allow rules are every tool the thread has.** Headless `agy` refuses
+  outright any call no rule allows ("headless mode cannot prompt"), so Takt's
+  reads and writes are allowed by name — only the reads when the user asks
+  before changes — and any other MCP server in the user's global
+  `~/.gemini/config/mcp_config.json` can be called but is always refused.
+- **Ask before changing tasks** therefore works as it does for Codex: the
+  writes are left off the allow-list, the thread is told it can only read,
+  and a write it tries anyway comes back refused.
+- **`--disable-slash-commands`**: a message starting `/` is text; a
+  slash command would end a stream-json session.
+- The user's global rules (`~/.gemini/GEMINI.md`, `AGENTS.md` and
+  `~/.gemini/config/rules/`) still load — `agy` has no switch to skip them,
+  as `--setting-sources ""` does for Claude Code. They can change how it
+  writes, not what it can reach.
+- `agy` keeps its conversations (`~/.gemini/antigravity-cli/conversations`),
+  so like a Codex thread, an Antigravity one is written to disk.
 
 ## Standing instructions
 

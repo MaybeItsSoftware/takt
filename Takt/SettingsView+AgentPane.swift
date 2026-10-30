@@ -32,7 +32,7 @@ extension SettingsView {
     } footer: {
       Text(
         agent.asksBeforeChangesSetting
-          ? agent.clientSetting.canAskBeforeChanges
+          ? agent.wire(for: agent.clientSetting).canAskBeforeChanges
             ? "Each change the agent wants to make waits for Approve. Takes effect from the next thread."
             : "\(agent.clientSetting.displayName) cannot stop to ask, so with this on it only reads: it says what "
               + "it would change and leaves the change to you. Takes effect from the next thread."
@@ -67,13 +67,12 @@ extension SettingsView {
         ThemedMenuPicker(
           "Agent",
           selection: Binding(get: { agent.clientSetting }, set: { agent.clientSetting = $0 }),
-          options: AgentClient.allCases.map { client in
-            ThemedPickerOption(
-              agent.executablePath(for: client) == nil ? "\(client.displayName) — not installed" : client.displayName,
-              value: client)
-          })
+          options: AgentClient.allCases.map { ThemedPickerOption(agent.menuLabel(for: $0), value: $0) })
       }
-      ForEach(AgentClient.allCases) { client in
+      if agent.clientSetting == .custom {
+        customCommandRows
+      }
+      ForEach(AgentClient.allCases.filter { $0 != .custom }) { client in
         SettingsRow(client.displayName, detail: agent.executablePath(for: client) ?? "Not found where Takt looks") {
           ThemedTag(
             agent.executablePath(for: client) == nil ? "Not installed" : "Installed",
@@ -90,10 +89,53 @@ extension SettingsView {
     }
   }
 
+  /// The typed command and the format it speaks. The command is stored
+  /// whole, arguments and all, where the others keep a hand-set path.
+  @ViewBuilder
+  private var customCommandRows: some View {
+    let agent = workspace.agent
+    let command = agent.userExecutablePaths[.custom] ?? ""
+    let resolved = agent.executablePath(for: .custom)
+    VStack(alignment: .leading, spacing: theme.space.xs) {
+      Text("Command")
+        .font(theme.bodyFont())
+        .foregroundStyle(theme.ink)
+      TextField(
+        "",
+        text: Binding(get: { command }, set: { agent.userExecutablePaths[.custom] = $0 }),
+        prompt: Text("dense claude"))
+        .themedTextField()
+        .font(theme.monoFont(size: theme.scale.caption))
+        .labelsHidden()
+        .autocorrectionDisabled()
+      Text(
+        command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? "What you would type in a terminal. Aliases aren't seen, so name what the alias runs."
+          : resolved.map { "Runs \($0)" }
+            ?? "\(AgentClient.words(of: command).first ?? command) isn't an executable Takt can find. "
+            + "Give its full path, or put it in ~/.local/bin.")
+        .font(theme.captionFont)
+        .foregroundStyle(command.isEmpty || resolved != nil ? theme.muted : theme.danger)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    SettingsRow(
+      "Speaks",
+      detail: "The format the command reads and writes. Takt adds that format's arguments after what you typed."
+    ) {
+      ThemedMenuPicker(
+        "Speaks",
+        selection: Binding(get: { agent.customWireSetting }, set: { agent.customWireSetting = $0 }),
+        options: AgentWire.forCustomCommands.map { ThemedPickerOption($0.displayName, value: $0) })
+    }
+  }
+
   private var agentClientDetail: String {
     let agent = workspace.agent
     if agent.isRunning, agent.client != agent.clientSetting {
       return "The thread in the panel stays on \(agent.client.displayName) until you start a new one."
+    }
+    if agent.clientSetting == .custom {
+      return "Runs the command below, speaking \(agent.customWireSetting.displayName)'s format."
     }
     if agent.executablePath == nil {
       return "\(agent.clientSetting.displayName) isn't installed where Takt looks. The agent panel takes a path to it."
