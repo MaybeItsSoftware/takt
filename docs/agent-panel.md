@@ -258,7 +258,18 @@ holding exactly two files, rewritten at the start of every thread
 
 - `.agents/mcp_config.json`: Takt's server, and nothing else.
 - `.agents/agents/takt-panel.md`: an agent with `tools: []` and
-  `subagent: false`, whose body is `AgentSystemPrompt.text`.
+  `subagent: false`, whose body is `AgentSystemPrompt.text` followed by a
+  reference to Takt's tools (`toolReference`, from the helper's
+  `takt tools --json`).
+
+The reference is there because `agy` loads MCP tools lazily: the model sees
+their names, and their schemas sit in files under
+`~/.gemini/antigravity-cli/mcp/` for it to open with `read_file`, which the
+panel denies. Without it the model guessed, and asked what
+`workspace_task_update` took it answered "NONE" and sent `{}` — or wrapped the
+whole call inside its own `Arguments`, which the parser now unwraps to the
+innermost. With it, the same question gets all fifteen parameters and
+`task_id` marked required.
 
 ```text
 agy --agent takt-panel

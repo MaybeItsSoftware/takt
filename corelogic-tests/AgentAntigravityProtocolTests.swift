@@ -121,6 +121,58 @@ final class AgentAntigravityProtocolTests: XCTestCase {
     XCTAssertTrue(file.hasSuffix("---\nBe brief.\n"))
   }
 
+  func testTheAgentFileCarriesTheToolReferenceAfterThePrompt() {
+    let file = AgentAntigravityInvocation.agentFile(systemPrompt: "Be brief.", toolReference: "## Takt's tools")
+    XCTAssertTrue(file.hasSuffix("---\nBe brief.\n\n## Takt's tools\n"))
+  }
+
+  func testTheToolReferenceSpellsOutEachToolsParameters() throws {
+    let definitions = #"""
+      {"tools":[
+        {"name":"workspace_task_update","description":"Change a task.","inputSchema":{"type":"object",
+          "required":["task_id"],"properties":{
+            "task_id":{"type":"string","description":"From workspace_tasks."},
+            "due":{"type":["string","null"]},
+            "status":{"type":"string","enum":["open","completed"]},
+            "priority":{"type":["integer","null"],"minimum":-4,"maximum":4},
+            "external_links":{"type":"array","items":{"type":"object","required":["url"],
+              "properties":{"url":{"type":"string"},"title":{"type":"string"}}}}}}},
+        {"name":"workspace_tree","description":"The folders.","inputSchema":{"type":"object","properties":{}}},
+        {"name":"task_lists","description":"Checkvist.","inputSchema":{"type":"object","properties":{}}}
+      ]}
+      """#
+    let reference = try XCTUnwrap(
+      AgentAntigravityInvocation.toolReference(
+        definitions: definitions, tools: ["workspace_task_update", "workspace_tree"]))
+    XCTAssertTrue(reference.contains("Never put ServerName, ToolName or Arguments inside Arguments"))
+    XCTAssertTrue(
+      reference.contains(
+        """
+        ### workspace_task_update
+        Change a task.
+        - task_id: string, required — From workspace_tasks.
+        - due: string or null
+        - external_links: array of object {title?, url}s
+        - priority: integer or null (-4 to 4)
+        - status: "open" | "completed"
+        """))
+    XCTAssertTrue(reference.contains("### workspace_tree\nThe folders.\nNo parameters: Arguments is {}."))
+    XCTAssertFalse(reference.contains("task_lists"))
+    XCTAssertNil(AgentAntigravityInvocation.toolReference(definitions: "not json", tools: ["workspace_tree"]))
+  }
+
+  func testACallWrappedInItselfShowsItsInnermostArguments() {
+    var parser = AgentAntigravityStreamParser()
+    let events = parser.events(
+      fromLine: #"{"event":"step_update","step_update":{"conversation_id":"c1","step_index":2,"state":"DONE","step_type":"tool","tool_name":"call_mcp_tool","tool_info":{"name":"call_mcp_tool","parameters":{"Arguments":{"Arguments":{"task_id":"t1"},"ServerName":"takt","ToolName":"workspace_task_update"},"ServerName":"takt","ToolName":"workspace_task_update"},"output":"ok"}}}"#
+    )
+    XCTAssertEqual(
+      events.first,
+      .toolUse(
+        AgentToolUse(
+          id: "step-2", name: "mcp__takt__workspace_task_update", input: .object(["task_id": .string("t1")]))))
+  }
+
   func testTheMCPConfigIsTaktsServerAlone() throws {
     let config = try XCTUnwrap(JSONValue.parse(AgentAntigravityInvocation.mcpConfig(helperPath: "/h/takt")))
     XCTAssertEqual(config["mcpServers"]?.objectValue?.keys.sorted(), ["takt"])

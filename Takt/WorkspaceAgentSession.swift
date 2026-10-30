@@ -689,11 +689,35 @@ import os
     try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
     try AgentAntigravityInvocation.mcpConfig(helperPath: helperPath)
       .write(to: directory.appendingPathComponent(".agents/mcp_config.json"), atomically: true, encoding: .utf8)
-    try AgentAntigravityInvocation.agentFile(systemPrompt: systemPrompt)
+    let reference = toolDefinitions(helperPath: helperPath).flatMap {
+      AgentAntigravityInvocation.toolReference(
+        definitions: $0, tools: AgentToolPolicy.readOnlyTools + AgentToolPolicy.writeTools)
+    }
+    try AgentAntigravityInvocation.agentFile(systemPrompt: systemPrompt, toolReference: reference)
       .write(
         to: agents.appendingPathComponent("\(AgentAntigravityInvocation.agentName).md"), atomically: true,
         encoding: .utf8)
     return directory
+  }
+
+  /// `takt tools --json` from the bundled helper, read once: it changes only
+  /// when the app does. `nil` if the helper will not say, and the agent then
+  /// goes without its tool reference rather than without a panel.
+  private static var cachedToolDefinitions: String?
+  private static func toolDefinitions(helperPath: String) -> String? {
+    if let cachedToolDefinitions { return cachedToolDefinitions }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: helperPath)
+    process.arguments = ["tools", "--json"]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    guard (try? process.run()) != nil else { return nil }
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0, let text = String(data: data, encoding: .utf8) else { return nil }
+    cachedToolDefinitions = text
+    return text
   }
 
   /// The app's environment with a usable `PATH` — a GUI app's is the bare

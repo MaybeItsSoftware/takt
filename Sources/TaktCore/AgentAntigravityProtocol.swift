@@ -57,7 +57,7 @@ public struct AgentAntigravityStreamParser {
           let tool = parameters["ToolName"]?.stringValue
         else { return [] }
         let use = AgentToolUse(
-          id: "step-\(index)", name: "mcp__\(server)__\(tool)", input: parameters["Arguments"] ?? .object([:]))
+          id: "step-\(index)", name: "mcp__\(server)__\(tool)", input: Self.arguments(of: parameters))
         guard finished else { return [.toolUse(use)] }
         // The call again with its result: the session draws a call once.
         let failed = state == "ERROR" || info["error"] != nil
@@ -83,6 +83,16 @@ public struct AgentAntigravityStreamParser {
     default:
       return []
     }
+  }
+
+  /// A call's own arguments. Gemini sometimes wraps the whole call in
+  /// itself — `Arguments` holding `ServerName`, `ToolName` and an
+  /// `Arguments` of its own — and the card shows the innermost, which is
+  /// what the call amounted to, not three rows of envelope.
+  static func arguments(of parameters: JSONValue) -> JSONValue {
+    var arguments = parameters["Arguments"] ?? .object([:])
+    while arguments["ToolName"] != nil, let inner = arguments["Arguments"] { arguments = inner }
+    return arguments
   }
 }
 
@@ -170,17 +180,90 @@ public enum AgentAntigravityInvocation {
   }
 
   /// `.agents/agents/<agentName>.md`: no built-in tools, not offered as a
-  /// subagent, and the system prompt as its body.
-  public static func agentFile(systemPrompt: String) -> String {
-    """
-    ---
-    name: \(agentName)
-    description: "The assistant in Takt's agent panel: Takt's own tools and nothing else."
-    tools: []
-    subagent: false
-    ---
-    \(systemPrompt)
+  /// subagent, and the system prompt as its body, followed by the tool
+  /// reference when there is one.
+  public static func agentFile(systemPrompt: String, toolReference: String? = nil) -> String {
+    let body = [systemPrompt, toolReference].compactMap { $0 }.joined(separator: "\n\n")
+    return """
+      ---
+      name: \(agentName)
+      description: "The assistant in Takt's agent panel: Takt's own tools and nothing else."
+      tools: []
+      subagent: false
+      ---
+      \(body)
 
-    """
+      """
+  }
+
+  /// What each of `tools` takes, from `takt tools --json`, written out for
+  /// the agent file.
+  ///
+  /// `agy` loads MCP tools lazily: the model is shown their names, and their
+  /// schemas sit in files under `~/.gemini/antigravity-cli/mcp/` for it to
+  /// read with `read_file` — which the panel denies. Without this the model
+  /// guesses, and a call like `workspace_task_update` goes out with `{}`.
+  /// `nil` when the definitions cannot be read or name none of `tools`.
+  public static func toolReference(definitions json: String, tools: [String]) -> String? {
+    guard let definitions = JSONValue.parse(json)?["tools"]?.arrayValue else { return nil }
+    let wanted = Set(tools)
+    let sections = definitions.compactMap { tool -> String? in
+      guard let name = tool["name"]?.stringValue, wanted.contains(name) else { return nil }
+      var lines = ["### \(name)"]
+      if let description = tool["description"]?.stringValue { lines.append(description) }
+      let schema = tool["inputSchema"]
+      let required = Set(schema?["required"]?.arrayValue?.compactMap(\.stringValue) ?? [])
+      let properties = schema?["properties"]?.objectValue ?? [:]
+      if properties.isEmpty { lines.append("No parameters: Arguments is {}.") }
+      // The required ones first, then by name: a dictionary keeps no order.
+      let names = properties.keys.sorted().filter(required.contains) + properties.keys.sorted().filter { !required.contains($0) }
+      for parameter in names {
+        guard let property = properties[parameter] else { continue }
+        var line = "- \(parameter): \(typeText(property))"
+        if required.contains(parameter) { line += ", required" }
+        if let description = property["description"]?.stringValue { line += " — \(description)" }
+        lines.append(line)
+      }
+      return lines.joined(separator: "\n")
+    }
+    guard !sections.isEmpty else { return nil }
+    let example = #"{"ServerName":"takt","ToolName":"workspace_task_update","Arguments":{"task_id":"…","due":"2026-11-04"}}"#
+    return """
+      ## Takt's tools
+
+      Call each through call_mcp_tool with ServerName "takt", ToolName the name below and Arguments a flat \
+      JSON object of its parameters, for example \(example). Never put ServerName, ToolName or Arguments \
+      inside Arguments. Pass every required parameter; leave out what you are not changing.
+
+      \(sections.joined(separator: "\n\n"))
+      """
+  }
+
+  /// A schema's type in a few words: `string or null`, `"open" | "done"`,
+  /// `array of objects {url, title?}`.
+  static func typeText(_ schema: JSONValue) -> String {
+    if let choices = (schema["oneOf"] ?? schema["anyOf"])?.arrayValue {
+      return choices.map(typeText).joined(separator: " or ")
+    }
+    if let values = schema["enum"]?.arrayValue {
+      return values.map { $0.stringValue.map { "\"\($0)\"" } ?? $0.jsonString() }.joined(separator: " | ")
+    }
+    let types = schema["type"]?.arrayValue?.compactMap(\.stringValue) ?? schema["type"]?.stringValue.map { [$0] } ?? []
+    var text = types.map { type -> String in
+      switch type {
+      case "array": return "array of " + (schema["items"].map(typeText).map { $0 + "s" } ?? "values")
+      case "object":
+        guard let properties = schema["properties"]?.objectValue, !properties.isEmpty else { return "object" }
+        let required = Set(schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [])
+        let fields = properties.keys.sorted().map { required.contains($0) ? $0 : $0 + "?" }
+        return "object {\(fields.joined(separator: ", "))}"
+      default: return type
+      }
+    }.joined(separator: " or ")
+    if text.isEmpty { text = "any" }
+    if let minimum = schema["minimum"]?.intValue, let maximum = schema["maximum"]?.intValue {
+      text += " (\(minimum) to \(maximum))"
+    }
+    return text
   }
 }
