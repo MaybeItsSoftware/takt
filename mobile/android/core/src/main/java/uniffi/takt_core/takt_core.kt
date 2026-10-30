@@ -1373,6 +1373,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_kanban_board_baseline(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_keep_series_title(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_latest_sync_outbox_seq(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_linked_task_ids(
@@ -1893,6 +1895,8 @@ internal object UniffiLib {
     ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_kanban_board_baseline(`ptr`: Long,`legacy`: RustBuffer.ByValue,`currentKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_keep_series_title(`ptr`: Long,`taskId`: RustBuffer.ByValue,`previousTitle`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_latest_sync_outbox_seq(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_linked_task_ids(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -3663,6 +3667,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_kanban_board_baseline() and 0xFFFF) != 21099) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_keep_series_title() and 0xFFFF) != 38191) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_latest_sync_outbox_seq() and 0xFFFF) != 11156) {
@@ -5646,6 +5653,14 @@ public interface CoreWorkspaceInterface {
      * returns every board.
      */
     fun `kanbanBoardBaseline`(`legacy`: List<BoardBaseline>, `currentKey`: kotlin.String): List<BoardBaseline>
+    
+    /**
+     * Says whether a rename just saved for a repeating task was for this
+     * occurrence alone (`previous_title`, the title before it) or for every
+     * turn (`None`); see `tasks::keep_series_title`. It joins the rename's
+     * step, so one undo takes back both (`journal::begin_joining_last`).
+     */
+    fun `keepSeriesTitle`(`taskId`: kotlin.String, `previousTitle`: kotlin.String?, `nowMs`: kotlin.Long): kotlin.Boolean
     
     /**
      * The newest outbox entry, or nothing when nothing is waiting.
@@ -8744,6 +8759,29 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         
         FfiConverterSequenceTypeBoardBaseline.lower(`legacy`),
         FfiConverterString.lower(`currentKey`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Says whether a rename just saved for a repeating task was for this
+     * occurrence alone (`previous_title`, the title before it) or for every
+     * turn (`None`); see `tasks::keep_series_title`. It joins the rename's
+     * step, so one undo takes back both (`journal::begin_joining_last`).
+     */
+    @Throws(CoreException::class)override fun `keepSeriesTitle`(`taskId`: kotlin.String, `previousTitle`: kotlin.String?, `nowMs`: kotlin.Long): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_keep_series_title(
+        it,
+        
+        FfiConverterString.lower(`taskId`),
+        FfiConverterOptionalString.lower(`previousTitle`),
+        FfiConverterLong.lower(`nowMs`),_status)
 }
     }
     )

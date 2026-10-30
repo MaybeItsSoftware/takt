@@ -1650,6 +1650,14 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func kanbanBoardBaseline(legacy: [BoardBaseline], currentKey: String) throws  -> [BoardBaseline]
     
     /**
+     * Says whether a rename just saved for a repeating task was for this
+     * occurrence alone (`previous_title`, the title before it) or for every
+     * turn (`None`); see `tasks::keep_series_title`. It joins the rename's
+     * step, so one undo takes back both (`journal::begin_joining_last`).
+     */
+    func keepSeriesTitle(taskId: String, previousTitle: String?, nowMs: Int64) throws  -> Bool
+    
+    /**
      * The newest outbox entry, or nothing when nothing is waiting.
      */
     func latestSyncOutboxSeq() throws  -> Int64?
@@ -4066,6 +4074,24 @@ open func kanbanBoardBaseline(legacy: [BoardBaseline], currentKey: String)throws
             self.uniffiCloneHandle(),
         FfiConverterSequenceTypeBoardBaseline.lower(legacy),
         FfiConverterString.lower(currentKey),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Says whether a rename just saved for a repeating task was for this
+     * occurrence alone (`previous_title`, the title before it) or for every
+     * turn (`None`); see `tasks::keep_series_title`. It joins the rename's
+     * step, so one undo takes back both (`journal::begin_joining_last`).
+     */
+open func keepSeriesTitle(taskId: String, previousTitle: String?, nowMs: Int64)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_keep_series_title(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),
+        FfiConverterOptionString.lower(previousTitle),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
     )
 })
 }
@@ -32911,6 +32937,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_kanban_board_baseline() != 21099) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_keep_series_title() != 38191) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_latest_sync_outbox_seq() != 11156) {

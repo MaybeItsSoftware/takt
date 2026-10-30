@@ -714,6 +714,7 @@ fn follow_start(
 /// - With no start, a deadline on or before today is Today's, one later this
 ///   week This week's, and anything later files it nowhere.
 /// - With neither start nor deadline, the task is filed nowhere.
+///
 /// Only a task in one of those two columns moves; one in progress, waiting or
 /// filed anywhere else stays put, and so does one in the backlog, which a
 /// schedule does not plan. Leaving Today drops the task's place in the day.

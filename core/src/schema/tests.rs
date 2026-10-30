@@ -53,10 +53,10 @@ fn a_new_database_has_exactly_the_fixtures_schema() {
 fn every_migration_is_recorded_in_order_under_grdbs_identifiers() {
     let connection = migrated();
     assert_eq!(ledger(&connection), workspace_migrations());
-    assert_eq!(workspace_migrations().len(), 34);
+    assert_eq!(workspace_migrations().len(), 35);
     assert_eq!(
         workspace_migrations().last().map(String::as_str),
-        Some("v34_condition_provides")
+        Some("v35_series_title")
     );
 }
 
@@ -69,7 +69,7 @@ fn migrating_again_applies_nothing_and_keeps_the_work() {
         )
         .unwrap();
     let before = dump_schema(&connection).unwrap();
-    assert_eq!(migrate(&mut connection).unwrap(), "v34_condition_provides");
+    assert_eq!(migrate(&mut connection).unwrap(), "v35_series_title");
     assert_eq!(dump_schema(&connection).unwrap(), before);
     let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM workspaces", [], |row| row.get(0))
@@ -96,9 +96,9 @@ fn a_file_database_is_created_and_closed_again() {
     std::fs::create_dir_all(&directory).unwrap();
     let path = directory.join("workspace.sqlite");
     let latest = migrate_workspace(path.to_string_lossy().into_owned()).unwrap();
-    assert_eq!(latest, "v34_condition_provides");
+    assert_eq!(latest, "v35_series_title");
     let reopened = Connection::open(&path).unwrap();
-    assert_eq!(ledger(&reopened).len(), 34);
+    assert_eq!(ledger(&reopened).len(), 35);
     std::fs::remove_dir_all(directory).unwrap();
 }
 
@@ -885,6 +885,51 @@ fn v34_adds_provides_and_overrides_journalled_and_synced() {
         count(
             "SELECT COUNT(*) FROM sync_outbox WHERE tableName = 'focus_contexts' AND rowId = 'w'
                AND changedJSON LIKE '%offIdsJSON%'"
+        ),
+        1
+    );
+}
+
+/// v35: the title a repeating task's next turn takes is a column on
+/// `task_metadata`, journalled and synced like the rest of the row. Nothing
+/// existing carries one.
+#[test]
+fn v35_adds_the_series_title_journalled_and_synced() {
+    let mut connection = migrated_through("v34_condition_provides");
+    seed_workspace(&connection);
+    seed_list(&connection, "l", "Inbox", T0);
+    connection
+        .execute_batch(&format!(
+            "INSERT INTO tasks (id, listId, title, sortOrder, createdAt, updatedAt)
+               VALUES ('t', 'l', 'Stretch', 0, '{T0}', '{T0}');
+             INSERT INTO task_metadata (taskId, updatedAt) VALUES ('t', '{T0}');"
+        ))
+        .unwrap();
+    migrate_through(&mut connection, Some("v35_series_title")).unwrap();
+    let count = |sql: &str| -> i64 { connection.query_row(sql, [], |row| row.get(0)).unwrap() };
+    assert_eq!(
+        count("SELECT COUNT(*) FROM task_metadata WHERE seriesTitle IS NULL"),
+        1
+    );
+    connection
+        .execute_batch(
+            "UPDATE undo_control SET suppressed = 0, groupId = 'g', label = 'x' WHERE id = 0;
+             UPDATE sync_control SET recording = 1 WHERE id = 0;
+             UPDATE task_metadata SET seriesTitle = 'Stretch' WHERE taskId = 't';",
+        )
+        .unwrap();
+    let count = |sql: &str| -> i64 { connection.query_row(sql, [], |row| row.get(0)).unwrap() };
+    assert_eq!(
+        count(
+            "SELECT COUNT(*) FROM change_log WHERE tableName = 'task_metadata' AND rowId = 't'
+               AND afterJSON LIKE '%seriesTitle%'"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            "SELECT COUNT(*) FROM sync_outbox WHERE tableName = 'task_metadata' AND rowId = 't'
+               AND changedJSON LIKE '%seriesTitle%'"
         ),
         1
     );

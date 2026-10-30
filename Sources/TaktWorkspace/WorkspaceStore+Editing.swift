@@ -53,6 +53,16 @@ extension WorkspaceStore {
     }
   }
 
+  /// Says whether a rename just saved for a repeating task was for this
+  /// occurrence alone — `previousTitle`, the title before it, is what the
+  /// next turn goes back to — or, with nil, for every turn. Joins the
+  /// rename's undo step: the Rust core's `tasks::keep_series_title`.
+  public func keepSeriesTitle(for taskId: String, previousTitle: String?, now: Date = .now) throws {
+    try coreWrite {
+      _ = try core.keepSeriesTitle(taskId: taskId, previousTitle: previousTitle, nowMs: now.coreMilliseconds)
+    }
+  }
+
   /// The folders a folder may move into: the Rust core's `records::valid_parent_folders`.
   public func validParentFolders(for folderId: String) throws -> [ListFolder] {
     try Self.mappingCoreErrors { try core.validParentFolders(folderId: folderId) }.map(ListFolder.init)

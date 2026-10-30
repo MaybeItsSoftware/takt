@@ -892,6 +892,27 @@ impl CoreWorkspace {
         Ok(id)
     }
 
+    /// Says whether a rename just saved for a repeating task was for this
+    /// occurrence alone (`previous_title`, the title before it) or for every
+    /// turn (`None`); see `tasks::keep_series_title`. It joins the rename's
+    /// step, so one undo takes back both (`journal::begin_joining_last`).
+    pub fn keep_series_title(
+        &self,
+        task_id: String,
+        previous_title: Option<String>,
+        now_ms: i64,
+    ) -> Result<bool, CoreError> {
+        let mut connection = self.lock();
+        let transaction =
+            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let group = journal::begin_joining_last(&transaction, "Edit Task", &task_id)?;
+        let wrote =
+            tasks::keep_series_title(&transaction, &task_id, previous_title.as_deref(), now_ms)?;
+        journal::finish(&transaction, &group)?;
+        transaction.commit()?;
+        Ok(wrote)
+    }
+
     /// Copies a task's planning onto its subtasks as one step.
     pub fn apply_planning_to_descendants(
         &self,

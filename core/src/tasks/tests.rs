@@ -1423,3 +1423,124 @@ fn a_new_tasks_start_is_checked_and_filed_as_a_save_of_it_would_be() {
         .unwrap();
     assert!(start.is_some());
 }
+
+fn title_of(connection: &Connection, id: &str) -> String {
+    connection
+        .query_row("SELECT title FROM tasks WHERE id = ?1", [id], |row| {
+            row.get(0)
+        })
+        .unwrap()
+}
+
+fn series_title_of(connection: &Connection, id: &str) -> Option<String> {
+    connection
+        .query_row(
+            "SELECT seriesTitle FROM task_metadata WHERE taskId = ?1",
+            [id],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
+fn rename(connection: &mut Connection, id: &str, title: &str, now_ms: i64) {
+    journalled(connection, "Edit Task", |tx| {
+        crate::editor::update_task(tx, id, title, "", Some(MONDAY_9), None, now_ms, "UTC")
+    })
+    .unwrap();
+}
+
+#[test]
+fn a_rename_for_this_occurrence_alone_hands_the_old_title_to_the_next_turn() {
+    let mut connection = workspace();
+    repeating(&connection, "daily", Some("2024-01-01 09:00:00.000"), None);
+    rename(&mut connection, "o", "Other, just today", MONDAY_9);
+    journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "o", Some("Other"), MONDAY_9)
+    })
+    .unwrap();
+    // Renamed again for today, it still goes back to the first title.
+    rename(&mut connection, "o", "Other, today again", MONDAY_9 + 1);
+    journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "o", Some("Other, just today"), MONDAY_9 + 1)
+    })
+    .unwrap();
+    assert_eq!(series_title_of(&connection, "o").as_deref(), Some("Other"));
+
+    journalled(&mut connection, "Change Status", |tx| {
+        set_status(tx, "o", "completed", MONDAY_9 + 2, "UTC")
+    })
+    .unwrap();
+    let next = next_of(&connection, "o");
+    assert_eq!(title_of(&connection, &next), "Other");
+    assert_eq!(
+        series_title_of(&connection, &next),
+        None,
+        "for one turn only"
+    );
+    assert_eq!(title_of(&connection, "o"), "Other, today again");
+}
+
+#[test]
+fn a_rename_for_every_turn_or_back_to_the_series_title_lets_go_of_it() {
+    let mut connection = workspace();
+    repeating(&connection, "daily", Some("2024-01-01 09:00:00.000"), None);
+    rename(&mut connection, "o", "Today's", MONDAY_9);
+    journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "o", Some("Other"), MONDAY_9)
+    })
+    .unwrap();
+    rename(&mut connection, "o", "Other", MONDAY_9 + 1);
+    journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "o", Some("Today's"), MONDAY_9 + 1)
+    })
+    .unwrap();
+    assert_eq!(series_title_of(&connection, "o"), None, "renamed back");
+
+    rename(&mut connection, "o", "Today's", MONDAY_9 + 2);
+    journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "o", Some("Other"), MONDAY_9 + 2)
+    })
+    .unwrap();
+    rename(&mut connection, "o", "Renamed for good", MONDAY_9 + 3);
+    journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "o", None, MONDAY_9 + 3)
+    })
+    .unwrap();
+    assert_eq!(series_title_of(&connection, "o"), None);
+    journalled(&mut connection, "Change Status", |tx| {
+        set_status(tx, "o", "completed", MONDAY_9 + 4, "UTC")
+    })
+    .unwrap();
+    assert_eq!(
+        title_of(&connection, &next_of(&connection, "o")),
+        "Renamed for good"
+    );
+}
+
+#[test]
+fn a_task_that_does_not_repeat_keeps_no_series_title() {
+    let mut connection = workspace();
+    let wrote = journalled(&mut connection, "Edit Task", |tx| {
+        keep_series_title(tx, "c", Some("Was"), MONDAY_9)
+    })
+    .unwrap();
+    assert!(!wrote);
+    assert_eq!(series_title_of(&connection, "c"), None);
+}
+
+#[test]
+fn keeping_the_series_title_joins_the_renames_step_so_one_undo_takes_back_both() {
+    let mut connection = workspace();
+    repeating(&connection, "daily", Some("2024-01-01 09:00:00.000"), None);
+    rename(&mut connection, "o", "Today's", MONDAY_9);
+    let transaction = connection.transaction().unwrap();
+    let group = crate::journal::begin_joining_last(&transaction, "Edit Task", "o").unwrap();
+    keep_series_title(&transaction, "o", Some("Other"), MONDAY_9).unwrap();
+    crate::journal::finish(&transaction, &group).unwrap();
+    transaction.commit().unwrap();
+
+    assert_eq!(undo(&mut connection).unwrap().as_deref(), Some("Edit Task"));
+    assert_eq!(title_of(&connection, "o"), "Other");
+    assert_eq!(series_title_of(&connection, "o"), None);
+    assert_eq!(undo(&mut connection).unwrap(), None);
+}

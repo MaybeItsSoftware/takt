@@ -1036,16 +1036,24 @@ pub fn schedule_next_occurrence(
     if kind == "list" {
         return Ok(None);
     }
-    let metadata: Option<(Option<String>, Option<String>, Option<String>)> = transaction
+    type Metadata = (
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    );
+    let metadata: Option<Metadata> = transaction
         .query_row(
-            "SELECT recurrenceRule, startAt, planningJSON FROM task_metadata WHERE taskId = ?1",
+            "SELECT recurrenceRule, startAt, planningJSON, seriesTitle FROM task_metadata WHERE taskId = ?1",
             [task_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()?;
-    let Some((Some(rule), start_at, planning_json)) = metadata else {
+    let Some((Some(rule), start_at, planning_json, series_title)) = metadata else {
         return Ok(None);
     };
+    // An occurrence renamed for itself alone hands the series' title on.
+    let title = series_title.unwrap_or(title);
     let Some(cadence) = Cadence::parse(&rule) else {
         return Ok(None);
     };
@@ -1286,6 +1294,42 @@ fn effective_due(snapshot: &EditorSnapshot, zone: chrono_tz::Tz) -> Option<i64> 
         let midnight = crate::editor::calendar_date(day)?;
         Some(crate::periodic::resolve(zone, midnight).timestamp_millis())
     })
+}
+
+/// Whether a rename of a repeating task is for this occurrence alone, set
+/// once the rename is saved. `previous_title` is the title before it: the
+/// next turn goes back to it (or to the one an earlier rename for this
+/// occurrence alone kept), unless the rename put that title back. `None` is
+/// a rename for every turn, which lets go of any title kept. Returns
+/// whether it wrote anything.
+pub fn keep_series_title(
+    transaction: &Transaction,
+    task_id: &str,
+    previous_title: Option<&str>,
+    now_ms: i64,
+) -> Result<bool, CoreError> {
+    let current: Option<(String, Option<String>)> = transaction
+        .query_row(
+            "SELECT t.title, m.seriesTitle FROM tasks t JOIN task_metadata m ON m.taskId = t.id
+             WHERE t.id = ?1 AND m.recurrenceRule IS NOT NULL",
+            [task_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((title, kept)) = current else {
+        return Ok(false);
+    };
+    let wanted = previous_title
+        .map(|previous| kept.clone().unwrap_or_else(|| previous.to_string()))
+        .filter(|series| series != &title);
+    if wanted == kept {
+        return Ok(false);
+    }
+    transaction.execute(
+        "UPDATE task_metadata SET seriesTitle = ?1, updatedAt = ?2 WHERE taskId = ?3",
+        params![wanted, stored(now_ms), task_id],
+    )?;
+    Ok(true)
 }
 
 /// Writes a one-off copy of a repeating task just after it, carrying the

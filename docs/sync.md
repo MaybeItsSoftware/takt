@@ -261,6 +261,15 @@ a newer device sent: one whose provider the older device turned off is
 dropped when a newer device next saves the context, but one whose provider
 it turned off and on again survives until then.
 
+`v35_series_title` adds `task_metadata.seriesTitle TEXT`: the title a
+repeating task's next turn takes when this occurrence was renamed for
+itself alone ("just today"), NULL otherwise. Closing the occurrence writes
+the next turn with that title and NULL here, so the rename lasts one turn;
+a rename for every turn, or back to that title, clears it. It merges like
+the rest of the row and reinstalls every journal and outbox trigger. A
+client older than v35 drops it on pull, so an occurrence it closes hands on
+its own title, as before. See `core/src/tasks.rs` `keep_series_title`.
+
 Negative priorities (-1 to -4, behind every task with none) came with no
 migration: `task_metadata.priority` was already an `INTEGER`, so a value
 arrives on every client. A client built before them (core before
