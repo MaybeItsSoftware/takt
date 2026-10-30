@@ -45,39 +45,13 @@ struct WorkspaceDesktopView: View {
     // panes had the same problem the other way: on a window with nothing
     // spare they were laid out at no width at all. An explicit width changes
     // only when you drag it.
-    HStack(spacing: 0) {
-      // The sidebar stays through the timeline: reading a day back often means
-      // looking at which list something came from, and losing your place in the
-      // workspace to do that is its own distraction.
-      if model.isSidebarVisible {
-        WorkspaceLeftDock(focusedArea: $focusedArea)
-          .focusSection()
-          .frame(width: model.sidebarWidth)
-        WorkspaceResizeHandle(
-          width: Bindable(model).sidebarWidth, grows: .trailing,
-          range: WorkspaceViewModel.minSidebarWidth...WorkspaceViewModel.maxSidebarWidth)
-      }
-      // The bottom dock spans the main pane only, as Zed's does by default:
-      // the side docks run the window's full height beside it.
-      VStack(spacing: 0) {
-        mainPane
-        if model.isBottomDockVisible {
-          WorkspaceHeightHandle(
-            height: Bindable(model).bottomDockHeight,
-            range: WorkspaceViewModel.minBottomDockHeight...WorkspaceViewModel.maxBottomDockHeight)
-          WorkspaceBottomDock(focusedArea: $focusedArea)
-            .focusSection()
-            .frame(height: model.bottomDockHeight)
-        }
-      }
-      if model.isRightDockVisible {
-        WorkspaceResizeHandle(
-          width: Bindable(model).rightDockWidth, grows: .leading,
-          range: WorkspaceViewModel.minRightDockWidth...WorkspaceViewModel.maxRightDockWidth)
-        WorkspaceRightDock(focusedArea: $focusedArea)
-          .focusSection()
-          .frame(width: model.rightDockWidth)
-      }
+    //
+    // Those widths are what you asked for, not what the window must hold: a
+    // window narrower than the three columns together fits the docks into it
+    // (`WorkspaceColumnFit`) rather than laying out a row wider than itself,
+    // which SwiftUI centred and clipped at both edges.
+    GeometryReader { proxy in
+      columns(fit: fit(available: proxy.size.width), available: proxy.size.width)
     }
     .frame(minWidth: 760, minHeight: 520)
     // One flat surface under every column. The panes are told apart by the
@@ -99,6 +73,81 @@ struct WorkspaceDesktopView: View {
     }
   }
 
+  /// The main pane's minimum before the docks have given way to their own.
+  private static let mainPaneMinimum: CGFloat = 420
+
+  @ViewBuilder
+  private func columns(fit: WorkspaceColumnFit.Widths, available: CGFloat) -> some View {
+    HStack(spacing: 0) {
+      // The sidebar stays through the timeline: reading a day back often means
+      // looking at which list something came from, and losing your place in the
+      // workspace to do that is its own distraction.
+      if model.isSidebarVisible {
+        WorkspaceLeftDock(focusedArea: $focusedArea)
+          .focusSection()
+          .frame(width: fit.sidebar)
+        WorkspaceResizeHandle(
+          width: dockBinding(\.sidebarWidth, fitted: fit.sidebar), grows: .trailing,
+          range: WorkspaceViewModel.minSidebarWidth...largest(
+            available: available, other: fit.rightDock,
+            minimum: WorkspaceViewModel.minSidebarWidth, maximum: WorkspaceViewModel.maxSidebarWidth))
+      }
+      // The bottom dock spans the main pane only, as Zed's does by default:
+      // the side docks run the window's full height beside it.
+      VStack(spacing: 0) {
+        mainPane
+        if model.isBottomDockVisible {
+          WorkspaceHeightHandle(
+            height: Bindable(model).bottomDockHeight,
+            range: WorkspaceViewModel.minBottomDockHeight...WorkspaceViewModel.maxBottomDockHeight)
+          WorkspaceBottomDock(focusedArea: $focusedArea)
+            .focusSection()
+            .frame(height: model.bottomDockHeight)
+        }
+      }
+      if model.isRightDockVisible {
+        WorkspaceResizeHandle(
+          width: dockBinding(\.rightDockWidth, fitted: fit.rightDock), grows: .leading,
+          range: WorkspaceViewModel.minRightDockWidth...largest(
+            available: available, other: fit.sidebar,
+            minimum: WorkspaceViewModel.minRightDockWidth, maximum: WorkspaceViewModel.maxRightDockWidth))
+        WorkspaceRightDock(focusedArea: $focusedArea)
+          .focusSection()
+          .frame(width: fit.rightDock)
+      }
+    }
+  }
+
+  /// What the resize handles take: a hairline each, for each dock shown.
+  private var handleChrome: CGFloat {
+    CGFloat((model.isSidebarVisible ? 1 : 0) + (model.isRightDockVisible ? 1 : 0)) * theme.hairline
+  }
+
+  private func fit(available: CGFloat) -> WorkspaceColumnFit.Widths {
+    let fitted = WorkspaceColumnFit.fit(
+      available: available, chrome: handleChrome,
+      sidebar: model.isSidebarVisible
+        ? .init(width: model.sidebarWidth, minimum: WorkspaceViewModel.minSidebarWidth) : nil,
+      rightDock: model.isRightDockVisible
+        ? .init(width: model.rightDockWidth, minimum: WorkspaceViewModel.minRightDockWidth) : nil,
+      mainMinimum: Self.mainPaneMinimum)
+    return WorkspaceColumnFit.Widths(sidebar: fitted.sidebar.rounded(), rightDock: fitted.rightDock.rounded())
+  }
+
+  private func largest(available: CGFloat, other: CGFloat, minimum: CGFloat, maximum: CGFloat) -> CGFloat {
+    WorkspaceColumnFit.largest(
+      available: available, chrome: handleChrome, other: other,
+      mainMinimum: Self.mainPaneMinimum, minimum: minimum, maximum: maximum)
+  }
+
+  /// A drag starts from the width on screen, which a narrow window may have
+  /// fitted below the remembered one, and writes the remembered one.
+  private func dockBinding(
+    _ keyPath: ReferenceWritableKeyPath<WorkspaceViewModel, CGFloat>, fitted: CGFloat
+  ) -> Binding<CGFloat> {
+    Binding(get: { fitted }, set: { model[keyPath: keyPath] = $0 })
+  }
+
   private var mainPane: some View {
     // The work. The timeline used to take this pane over; it is a tab of
     // the bottom dock now, read under the list rather than instead of it.
@@ -114,7 +163,7 @@ struct WorkspaceDesktopView: View {
     // new list's whole board in over 140 ms.
     .animation(WorkspaceMotion.quick, value: model.viewModeFadeToken)
     .focusSection()
-    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private var workspaceAlerts: some View {
