@@ -9,4 +9,5 @@ let featureInstallers: [(WorkspaceModel) -> Void] = [
   { WatchBridge.shared.install(on: $0) },
   { QuickAddRouting.install(on: $0) },
   GoogleCalendarController.install(on:),
+  { ReminderService.shared.install(on: $0) },
 ]

@@ -3,6 +3,7 @@ import Foundation
 import UserNotifications
 import os
 import TaktCore
+import TaktWorkspace
 
 /// Dispatches focus session local notifications via `UNUserNotificationCenter`.
 /// Safe degradation: checks and requests authorization, silently degrading when
@@ -85,8 +86,11 @@ final class FocusNotificationManager: NSObject, UNUserNotificationCenterDelegate
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
+    // A due-time reminder carries its task (`ReminderScheduler.taskIDKey`).
+    let taskID = response.notification.request.content.userInfo[ReminderScheduler.taskIDKey] as? String
     Task { @MainActor in
       NSApp.activate(ignoringOtherApps: true)
+      if let taskID { ReminderCoordinator.shared.openTask(taskID) }
     }
     completionHandler()
   }

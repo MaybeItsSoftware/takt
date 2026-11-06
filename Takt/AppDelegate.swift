@@ -80,6 +80,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     workspace = WorkspaceViewModel()
+    ReminderCoordinator.shared.store = { [weak workspace] in workspace?.store }
+    ReminderCoordinator.shared.openTask = { [weak self] id in self?.openTaskFromReminder(id) }
+    ReminderCoordinator.shared.schedule()
     checkvistManager.importCheckvistNow = { [weak self] in
       await self?.importFromCheckvist(restoringDeleted: true)
     }
@@ -548,5 +551,14 @@ extension AppDelegate {
       let more = errors.count > 1 ? " — and \(errors.count - 1) more in Diagnostics" : ""
       self.workspace?.errorMessage = "themes/\(first.description)\(more)"
     }
+  }
+}
+
+extension AppDelegate {
+  /// A tapped due-time reminder: the window up, the task selected in place.
+  fileprivate func openTaskFromReminder(_ id: String) {
+    showMainWindow()
+    guard let task = (try? workspace.store?.task(id: id)) ?? nil else { return }
+    workspace.revealTask(task)
   }
 }

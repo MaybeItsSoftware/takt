@@ -133,6 +133,8 @@ extension WorkspaceViewModel {
     // vanished from the screen it was typed on until something else asked for
     // a ranking. Off the main thread, and coalesced with any other request.
     if wrote { scheduleNextUp() }
+    // What is due may have changed, and a reminder's text is fixed when set.
+    if wrote { ReminderCoordinator.shared.schedule() }
     // The outermost refresh: a switch's leave to draw kept state ends here.
     if refreshDepth == 1 { scopeReadMayBeStale = false }
   }

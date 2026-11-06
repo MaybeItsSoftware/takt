@@ -89,6 +89,8 @@ struct SettingsScreen: View {
         }
         .listRowBackground(theme.raised)
 
+        ReminderSettingsSection()
+
         CalendarSettingsRow()
 
         #if DEBUG

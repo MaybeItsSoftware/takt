@@ -10,6 +10,7 @@ import Observation
   enum Pane: String, CaseIterable, Identifiable {
     case general
     case focus
+    case reminders
     case appearance
     case keyboard
     case agent
@@ -23,6 +24,7 @@ import Observation
       switch self {
       case .general: "General"
       case .focus: "Focus"
+      case .reminders: "Reminders"
       case .appearance: "Appearance"
       case .keyboard: "Keyboard"
       case .agent: "Agent"
@@ -38,6 +40,8 @@ import Observation
         "How the app starts, confirms and celebrates."
       case .focus:
         "Where a focus block runs and how it is scored."
+      case .reminders:
+        "What this Mac reminds you about: due times, what is due today, dailies left."
       case .appearance:
         "Theme, light or dark, and the faces and size the app is set in."
       case .keyboard:
@@ -57,6 +61,7 @@ import Observation
       switch self {
       case .general: "gearshape"
       case .focus: "scope"
+      case .reminders: "bell"
       case .appearance: "paintpalette"
       case .keyboard: "keyboard"
       case .agent: "sparkles"
@@ -72,6 +77,7 @@ import Observation
       switch self {
       case .general: ["login", "launch", "delete", "confirm", "celebration", "sound", "completing"]
       case .focus: ["panel", "menu bar", "score", "quality", "multiplier", "block", "timer"]
+      case .reminders: ["notification", "notifications", "alert", "due", "deadline", "dailies", "remind"]
       case .appearance:
         ["theme", "dark", "light", "font", "typeface", "text size", "colour", "color", "zed", "grape", "priority"]
       case .keyboard: ["hotkey", "shortcut", "quick add", "capture", "keymap", "keybinding"]
@@ -82,7 +88,7 @@ import Observation
       }
     }
 
-    static let appPanes: [Pane] = [.general, .focus, .appearance, .keyboard, .agent]
+    static let appPanes: [Pane] = [.general, .focus, .reminders, .appearance, .keyboard, .agent]
     static let accountPanes: [Pane] = [.sync, .advanced]
   }
 

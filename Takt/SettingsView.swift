@@ -426,6 +426,7 @@ struct SettingsView: View {
     switch navState.destination {
     case .pane(.general): generalPane
     case .pane(.focus): focusPane
+    case .pane(.reminders): SettingsRemindersPane()
     case .pane(.appearance): appearancePane
     case .pane(.keyboard): keyboardPane
     case .pane(.agent): agentPane
