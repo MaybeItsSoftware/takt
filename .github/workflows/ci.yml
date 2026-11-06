@@ -254,6 +254,33 @@ jobs:
       - name: Test
         run: cargo test --manifest-path cli/Cargo.toml
 
+  # The Rust desktop app on GPUI (docs/rust-desktop-plan.md), which is to
+  # replace the Swift one under Takt/.
+  desktop:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/target
+          key: cargo-desktop-${{ runner.os }}-${{ hashFiles('desktop/Cargo.lock', 'core/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path desktop/Cargo.toml --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path desktop/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path desktop/Cargo.toml
+
   # The app no longer implements MCP itself: it bundles the `takt` CLI at
   # Contents/Helpers/takt and `--mcp-server` execs it. This checks the seam,
   # and specifically that a client configuration written *before* that change —

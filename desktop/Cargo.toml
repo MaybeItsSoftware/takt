@@ -1,0 +1,23 @@
+[package]
+name = "takt-desktop"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+description = "Takt's desktop app, in Rust on GPUI: the replacement for the Swift app under Takt/. See docs/rust-desktop-plan.md."
+
+[[bin]]
+name = "takt-desktop"
+path = "src/main.rs"
+
+[dependencies]
+takt-core = { path = "../core" }
+chrono = "0.4"
+iana-time-zone = "0.1"
+# Zed's UI framework. `runtime_shaders` compiles the Metal shaders when the
+# app starts rather than at build time, so a build needs no Metal toolchain;
+# a release build should drop it once the toolchain is installed.
+gpui = { version = "0.2.2", default-features = false, features = ["font-kit", "runtime_shaders"] }
+
+[profile.release]
+strip = true

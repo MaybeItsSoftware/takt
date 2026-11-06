@@ -106,6 +106,26 @@ python3 scripts/mcp_smoke_check.py
 
 There used to be two implementations of the same MCP server — one in Swift inside the app, one in the CLI — held equal from the outside by `scripts/mcp_parity_check.py`, because neither could import the other. The Swift one is gone: the app bundles the CLI and `--mcp-server` execs it, so there is one implementation to be right instead of two to keep equal. `cargo test` covers the server; the smoke check covers the seam, and specifically that a client configuration written before that change — naming the app's executable with `--mcp-server` and credentials in `env` — still reaches a working server. It checks `Takt --mcp-server`; a configuration naming the pre-rename `Priority.app` works only while that bundle exists, and the app's MCP setup replaces such an entry with a `takt` one. Needs a Debug app build; reads no real data and needs no credentials.
 
+### The Rust desktop app
+
+`desktop/` (`takt-desktop`) is the Mac app being rebuilt in Rust on GPUI,
+beside the Swift one, which stays. `docs/rust-desktop-plan.md` is the plan and
+says which stage it is on. It links `takt-core` as a Rust crate, and it is
+styled after Zed (One Dark / One Light, IBM Plex Sans, Zed's chrome), not
+after the Swift app or a house style. A write patches the rows held in
+memory; it never rereads the scope. After changing it:
+
+```bash
+cargo test --manifest-path desktop/Cargo.toml
+cargo clippy --manifest-path desktop/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path desktop/Cargo.toml --check
+TAKT_DESKTOP_DB=<a copy of priority.sqlite> TAKT_DESKTOP_SMOKE=1 TAKT_DESKTOP_SMOKE_WRITE=1 \
+  cargo run --release --manifest-path desktop/Cargo.toml   # draws a frame, prints timings, quits
+```
+
+Never drive it with simulated keystrokes (`osascript … keystroke`): they go to
+whatever is frontmost, which is usually the user's terminal.
+
 ### The Rust core
 
 `core/` is `takt-core`, the shared Rust crate the workspace logic is moving
