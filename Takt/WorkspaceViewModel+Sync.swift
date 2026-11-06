@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import TaktSync
 
 /// The Mac's end of multi-device sync (`docs/sync.md`). The session watches
@@ -16,6 +16,27 @@ extension WorkspaceViewModel {
       store: store, deviceName: Host.current().localizedName ?? "Mac", platform: "macos")
     session.onRemoteChanges = { [weak self] in self?.reloadAfterExternalWrite() }
     syncSession = session
+    session.setInFront(NSApp?.isActive ?? true)
     session.activate()
+    watchActivationForSync()
+  }
+
+  /// Long-polls only while Takt is the active app. Behind other windows, or
+  /// with the Mac left on overnight, it syncs every couple of minutes
+  /// instead: the hosted server is billed for every second a long-poll is
+  /// held, and a Mac app that never quits held one all day. Local edits
+  /// (the quick-capture panel's included) still go up at once.
+  private func watchActivationForSync() {
+    guard syncActivationObservers.isEmpty else { return }
+    let center = NotificationCenter.default
+    for (name, inFront) in [
+      (NSApplication.didBecomeActiveNotification, true),
+      (NSApplication.didResignActiveNotification, false),
+    ] {
+      let observer = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+        MainActor.assumeIsolated { self?.syncSession?.setInFront(inFront) }
+      }
+      syncActivationObservers.append(observer)
+    }
   }
 }

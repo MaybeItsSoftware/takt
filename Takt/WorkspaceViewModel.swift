@@ -190,6 +190,8 @@ enum WorkspaceSidebarItem: Identifiable {
   /// `WorkspaceViewModel+ExternalWrites.swift`.
   /// Nil until the store opens. Observed, so the status bar follows it.
   var syncSession: SyncSession?
+  /// Tells `syncSession` whether Takt is in front. See `startSync()`.
+  @ObservationIgnored var syncActivationObservers: [NSObjectProtocol] = []
   @ObservationIgnored var externalWriteToken: Int?
   @ObservationIgnored var externalWriteTimer: Timer?
   @ObservationIgnored var externalWriteCheckInFlight = false

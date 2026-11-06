@@ -62,6 +62,10 @@ public final class SyncSession {
   @ObservationIgnored private let platform: String
   @ObservationIgnored private var scheduler: SyncScheduler?
   @ObservationIgnored private var outboxWatch: Task<Void, Never>?
+  /// From `setInFront(_:interval:)`, so a scheduler made later (after a
+  /// sign-in) starts in the right rhythm.
+  @ObservationIgnored private var isInFront = true
+  @ObservationIgnored private var backgroundInterval: Duration = .seconds(120)
   /// A reset email was asked for here, so the link coming back is one.
   @ObservationIgnored private var isResettingPassword = false
   /// Called on the main actor after a pull has changed the workspace.
@@ -142,8 +146,24 @@ public final class SyncSession {
       await self?.report(status, outcome)
     }
     self.scheduler = scheduler
-    Task { await scheduler.start() }
+    let background = isInFront ? nil : backgroundInterval
+    Task {
+      await scheduler.background(every: background)
+      await scheduler.start()
+    }
     watchOutbox()
+  }
+
+  /// For an app that keeps running out of sight (the Mac): with `false`, the
+  /// long-poll gives way to a quick cycle every `interval`, while local
+  /// writes still go up at once; `true` goes back to the long-poll. Unlike
+  /// `deactivate()`, sync never stops. The phones, which iOS suspends, use
+  /// `deactivate()` and a background refresh task instead.
+  public func setInFront(_ inFront: Bool, interval: Duration = .seconds(120)) {
+    isInFront = inFront
+    backgroundInterval = interval
+    guard let scheduler else { return }
+    Task { await scheduler.background(every: inFront ? nil : interval) }
   }
 
   /// Stops the long-poll, for when the app goes to the background. Local

@@ -438,6 +438,42 @@ final class SyncTransportTests: XCTestCase {
   }
 }
 
+extension SyncTransportTests {
+  func testTheSchedulerHoldsNoLongPollInTheBackground() async throws {
+    let transport = RecordingTransport()
+    let store = try store()
+    try store.beginSync(deviceId: "dev-1", serverURL: "memory://")
+    let engine = SyncEngine(store: store, transport: transport, deviceId: "dev-1")
+    let scheduler = SyncScheduler(engine: engine) { _, _ in }
+
+    await scheduler.background(every: .seconds(60))
+    await scheduler.start()
+    try await Task.sleep(for: .milliseconds(300))
+    XCTAssertEqual(transport.waits, [0], "one quick cycle, then nothing until the interval")
+
+    await scheduler.background(every: nil)
+    try await Task.sleep(for: .milliseconds(300))
+    XCTAssertEqual(transport.waits, [0, 25], "back in front: a sync, held open as a long-poll")
+    await scheduler.stop()
+  }
+}
+
+/// A quiet server that records each pull's `wait`, and holds a long-poll
+/// open until it is cancelled.
+private final class RecordingTransport: SyncTransport, @unchecked Sendable {
+  private let lock = NSLock()
+  private var log: [Int] = []
+  var waits: [Int] { lock.withLock { log } }
+
+  func push(body: Data) async throws {}
+
+  func changes(since cursor: Int64, limit: Int, wait: Int) async throws -> Data {
+    lock.withLock { log.append(wait) }
+    if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
+    return Data(#"{"rows":[],"cursor":0,"hasMore":false}"#.utf8)
+  }
+}
+
 /// Supabase, as far as the session needs it, without the network.
 final class FakeAuth: SyncAuthenticating, @unchecked Sendable {
   private let lock = NSLock()

@@ -6,6 +6,11 @@ import TaktWorkspace
 /// demand, a couple of seconds after the last local write, and in a long-poll
 /// loop while the app is in front, so another device's edit appears within a
 /// second or two without polling a quiet server.
+///
+/// The long-poll keeps a request open on the server the whole time, and the
+/// hosted server is billed for every second one is open. So a Mac app that
+/// stays running behind other windows drops to `background(every:)`: a quick
+/// cycle every few minutes, with local writes still pushed at once.
 public actor SyncScheduler {
   public typealias Listener = @Sendable (SyncEngine.Status, SyncEngine.Outcome?) async -> Void
 
@@ -15,6 +20,9 @@ public actor SyncScheduler {
   private var loop: Task<Void, Never>?
   private var pending: Task<Void, Never>?
   private var failures = 0
+  /// Nil while the app is in front (long-poll); otherwise the gap between
+  /// quick cycles.
+  private var backgroundInterval: Duration?
   /// Set when the server refuses the token. Nothing runs after that: every
   /// cycle would get the same 401, so the scheduler waits to be replaced by
   /// one with a fresh sign-in.
@@ -33,10 +41,22 @@ public actor SyncScheduler {
     loop = Task { [weak self] in
       while !Task.isCancelled {
         guard let self, await !self.isSignedOut else { return }
-        let delay = await self.runOnce(wait: 25)
-        if let delay { try? await Task.sleep(for: delay) }
+        let interval = await self.backgroundInterval
+        let delay = await self.runOnce(wait: interval == nil ? 25 : 0)
+        if let wait = delay ?? interval { try? await Task.sleep(for: wait) }
       }
     }
+  }
+
+  /// Polls quickly every `interval` instead of holding a long-poll, or goes
+  /// back to the long-poll with nil. A running loop restarts in the new
+  /// rhythm: coming back to the front syncs at once.
+  public func background(every interval: Duration?) {
+    guard interval != backgroundInterval else { return }
+    backgroundInterval = interval
+    guard loop != nil else { return }
+    stop()
+    start()
   }
 
   /// Stops the long-poll. Call when the app goes to the background.
