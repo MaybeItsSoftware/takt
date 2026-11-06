@@ -10,13 +10,16 @@ pub mod actions;
 pub mod board;
 pub mod columns;
 pub mod commands;
+pub mod conditions;
 pub mod details;
+pub mod docks;
 pub mod focus;
 pub mod inspector;
 pub mod navigation;
 pub mod outline;
 pub mod pickers;
 pub mod prefs;
+pub mod review;
 pub mod rules;
 pub mod sidebar;
 pub mod store;
@@ -76,6 +79,12 @@ pub enum Region {
     Sidebar,
     Tasks,
     Inspector,
+    /// The right dock's Conditions tab.
+    Conditions,
+    /// The bottom dock's done rail.
+    Done,
+    /// The bottom dock's timeline.
+    Timeline,
 }
 
 /// Something drawn over the panes that owns the keyboard while it is up.
@@ -118,6 +127,12 @@ pub enum Editing {
     ColumnName(columns::ColumnName),
     /// A filter list's or a rule column's rules, as text.
     Rules(columns::RulesTarget),
+    /// The Conditions tab's free time, typed.
+    ConditionTime,
+    /// A condition's name; none for a new one.
+    ConditionName(Option<String>),
+    /// A condition category's new name; the category, none for "Other".
+    CategoryName(Option<String>),
     /// A field of the inspector, by its stop.
     InspectorField {
         task_id: String,
@@ -154,6 +169,12 @@ pub struct App {
     // The tasks on screen: every row the scope holds, and those drawn.
     /// Blocked, buried, waiting, linked, priority and tags, by task.
     pub details: details::Details,
+    /// The Conditions tab: the conditions, what holds, the cursor.
+    pub conditions: conditions::Conditions,
+    /// The done rail's cursor.
+    pub done_cursor: Option<String>,
+    pub timeline: review::Timeline,
+    pub progress: review::Progress,
     /// `:` typed: the digits so far of a row to jump to.
     pub number_jump: Option<String>,
     pub all_rows: Vec<OutlineRow>,
@@ -226,6 +247,10 @@ impl App {
             forward_stack: Vec::new(),
             walking_history: false,
             details: Default::default(),
+            conditions: Default::default(),
+            done_cursor: None,
+            timeline: Default::default(),
+            progress: None,
             number_jump: None,
             all_rows: Vec::new(),
             rows: Vec::new(),
@@ -256,6 +281,7 @@ impl App {
         };
         app.reload_sidebar();
         app.reload_details();
+        app.reload_conditions();
         app.reload_focus();
         app.reload_done();
         app.restore_scope();
@@ -268,6 +294,9 @@ impl App {
         match self.region {
             Region::Sidebar => CommandSurface::Sidebar,
             Region::Inspector => CommandSurface::Inspector,
+            Region::Conditions => CommandSurface::Conditions,
+            Region::Done => CommandSurface::Done,
+            Region::Timeline => CommandSurface::Timeline,
             Region::Tasks => match self.view_mode {
                 ViewMode::Today => CommandSurface::Today,
                 ViewMode::Board => CommandSurface::Board,
@@ -432,6 +461,7 @@ impl App {
         self.reload_done();
         self.reload_sidebar();
         self.reload_details();
+        self.reload_conditions();
         self.reload_rows();
         self.refresh_history();
     }

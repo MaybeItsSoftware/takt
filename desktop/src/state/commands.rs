@@ -139,13 +139,29 @@ impl App {
             "focusStop" => self.stop_focus(),
 
             // The done rail
-            "windowToggleDoneRail" => self.toggle_right_dock_tab("done"),
-            "doneReopen" => self.reopen_selected(),
-            "doneClose" => {
-                if self.prefs.right_dock_tab == "done" {
-                    self.toggle_right_dock();
+            "windowToggleDoneRail" => self.toggle_bottom_tab("done"),
+            "doneReopen" => {
+                if self.region == Region::Done {
+                    self.reopen_done()
+                } else {
+                    self.reopen_selected()
                 }
             }
+            "doneClose" => {
+                if self.region == Region::Done {
+                    self.region = Region::Tasks;
+                }
+            }
+            "goTimeline" => self.go_timeline(),
+            "timelinePreviousDay" => self.step_timeline_day(-1),
+            "timelineNextDay" => self.step_timeline_day(1),
+            "timelineToday" => self.timeline_today(),
+            "motionTimelineSelect" => self.move_timeline_cursor(key),
+            "timelineReveal" => self.reveal_timeline(),
+            "timelineClose" => self.leave_timeline(),
+            "windowToggleProgressDock" => self.toggle_bottom_dock(),
+            "windowDockNextTab" => self.cycle_dock_tab(1),
+            "windowDockPreviousTab" => self.cycle_dock_tab(-1),
 
             // Task
             "taskNew" => self.begin_new_task(NewPlacement::Below),
@@ -167,7 +183,7 @@ impl App {
             "taskSendToBack" => self.edit_selected(|edit| edit.metadata.priority = Some(-1)),
             "taskClearStart" => self.schedule_selected(None),
             "taskTogglePlannedToday" => self.toggle_planned_today(),
-            "taskToggleInspector" => self.toggle_right_dock(),
+            "taskToggleInspector" => self.toggle_right_tab("inspector"),
             "taskGoToList" => self.go_to_selected_list(),
             "taskIndent" => self.indent_selected(false),
             "taskOutdent" => self.indent_selected(true),
@@ -207,7 +223,8 @@ impl App {
             "windowUndo" => self.undo(false),
             "windowRedo" => self.undo(true),
             "windowToggleSidebar" => self.toggle_sidebar(),
-            "windowToggleInspectorPane" | "windowToggleRightDock" => self.toggle_right_dock(),
+            "windowToggleInspectorPane" => self.toggle_right_tab("inspector"),
+            "windowToggleRightDock" => self.toggle_right_dock(),
             "windowCloseAllDocks" => self.close_all_docks(),
 
             // Motions
@@ -264,6 +281,36 @@ impl App {
                 self.pick_for_selected_task(|task_id| super::pickers::Picker::Waiting { task_id })
             }
             "listIcon" => self.begin_icon_pick(),
+            "taskConditions" => self.edit_task_conditions(),
+            "focusSetAvailable" => self.open_conditions_tab(false),
+            "focusManageConditions" => self.open_conditions_tab(true),
+            "focusSetPlace" => {
+                self.reload_conditions();
+                self.open_picker(super::pickers::Picker::Place);
+            }
+            "motionConditionsSelect"
+            | "conditionsToggle"
+            | "conditionsAdjust"
+            | "conditionsTypeTime"
+            | "conditionsEdit"
+            | "conditionsNew"
+            | "conditionsCategory"
+            | "conditionsProvides"
+            | "conditionsArchive"
+            | "conditionsMoveUp"
+            | "conditionsMoveDown"
+            | "conditionsMoveCategoryUp"
+            | "conditionsMoveCategoryDown"
+            | "conditionsRenameCategory"
+            | "conditionsMerge"
+            | "conditionsShowTasks"
+            | "conditionsFold"
+            | "conditionsFoldAll"
+            | "conditionsClear"
+            | "conditionsUseAgain"
+            | "conditionsClose" => self.run_conditions(id, key),
+            "motionDoneSelect" => self.move_done_cursor(key),
+            "doneReveal" => self.reveal_done(),
             "planBoardNewColumn" => self.begin_new_column(None),
             "planBoardAddColumnLeft" => self.begin_new_column(Some(-1)),
             "planBoardAddColumnRight" => self.begin_new_column(Some(1)),
@@ -308,34 +355,6 @@ impl App {
         self.overlay = None;
     }
 
-    fn toggle_sidebar(&mut self) {
-        self.prefs.sidebar_visible = !self.prefs.sidebar_visible;
-        if !self.prefs.sidebar_visible && self.region == Region::Sidebar {
-            self.region = Region::Tasks;
-        }
-        self.prefs.save();
-    }
-
-    fn toggle_right_dock(&mut self) {
-        self.prefs.right_dock_visible = !self.prefs.right_dock_visible;
-        if !self.prefs.right_dock_visible && self.region == Region::Inspector {
-            self.region = Region::Tasks;
-        }
-        self.prefs.save();
-    }
-
-    /// Shows a tab of the right dock, or hides the dock when that tab is
-    /// already up.
-    fn toggle_right_dock_tab(&mut self, tab: &str) {
-        if self.prefs.right_dock_visible && self.prefs.right_dock_tab == tab {
-            self.prefs.right_dock_visible = false;
-        } else {
-            self.prefs.right_dock_visible = true;
-            self.prefs.right_dock_tab = tab.into();
-        }
-        self.prefs.save();
-    }
-
     fn reopen_selected(&mut self) {
         let Some(task) = self.selected().cloned().or_else(|| {
             let id = self.selected_task.clone()?;
@@ -347,14 +366,6 @@ impl App {
             self.set_status(&task.id, "open");
             self.message = Some(format!("Reopened \u{201c}{}\u{201d}.", task.title));
         }
-    }
-
-    fn close_all_docks(&mut self) {
-        self.prefs.sidebar_visible = false;
-        self.prefs.right_dock_visible = false;
-        self.prefs.bottom_dock_visible = false;
-        self.region = Region::Tasks;
-        self.prefs.save();
     }
 
     /// Esc: closes what is open, innermost first.
@@ -856,6 +867,43 @@ pub const PORTED: &[&str] = &[
     "planBoardRemoveColumn",
     "planBoardRenameColumn",
     "planBoardResetColumns",
+    "conditionsAdjust",
+    "conditionsArchive",
+    "conditionsCategory",
+    "conditionsClear",
+    "conditionsClose",
+    "conditionsEdit",
+    "conditionsFold",
+    "conditionsFoldAll",
+    "conditionsMerge",
+    "conditionsMoveCategoryDown",
+    "conditionsMoveCategoryUp",
+    "conditionsMoveDown",
+    "conditionsMoveUp",
+    "conditionsNew",
+    "conditionsProvides",
+    "conditionsRenameCategory",
+    "conditionsShowTasks",
+    "conditionsToggle",
+    "conditionsTypeTime",
+    "conditionsUseAgain",
+    "doneReveal",
+    "focusManageConditions",
+    "focusSetAvailable",
+    "focusSetPlace",
+    "goTimeline",
+    "motionConditionsSelect",
+    "motionDoneSelect",
+    "motionTimelineSelect",
+    "taskConditions",
+    "timelineClose",
+    "timelineNextDay",
+    "timelinePreviousDay",
+    "timelineReveal",
+    "timelineToday",
+    "windowDockNextTab",
+    "windowDockPreviousTab",
+    "windowToggleProgressDock",
 ];
 
 #[cfg(test)]

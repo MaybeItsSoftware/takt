@@ -85,7 +85,10 @@ impl OverlayState {
 /// Runs a pick on the app, closing the overlay first so the command lands
 /// on the panes.
 pub fn apply(app: &mut App, pick: Pick) {
-    app.close_overlay();
+    // A picker you tick through stays up for the next tick.
+    if !matches!(&pick, Pick::Choice(picker, _) if picker.stays_open()) {
+        app.close_overlay();
+    }
     match pick {
         Pick::Typed(input) => app.apply_typed(&input),
         Pick::Command(id) => {

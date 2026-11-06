@@ -170,6 +170,23 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             }
         ));
     }
+    {
+        let started = Instant::now();
+        app.run("focusSetAvailable", None);
+        let rows = app.condition_views().len();
+        app.run("motionConditionsSelect", Some("j"));
+        app.run("windowToggleDoneRail", None);
+        app.run("goTimeline", None);
+        let tasks = app.timeline.summaries().len();
+        app.run("windowDockNextTab", Some("]"));
+        let progress = app.progress.as_ref().map_or(0, |p| p.days.len());
+        app.run("windowToggleProgressDock", None);
+        app.run("windowToggleRightDock", None);
+        report.push(format!(
+            "conditions {rows} rows, timeline {tasks} tasks, progress {progress} days {:.2} ms",
+            started.elapsed().as_secs_f64() * 1000.0
+        ));
+    }
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));
     }

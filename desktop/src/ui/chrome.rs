@@ -204,6 +204,9 @@ impl Takt {
                 Region::Sidebar => "Sidebar".into(),
                 Region::Tasks => self.app.view_mode.title().into(),
                 Region::Inspector => "Inspector".into(),
+                Region::Conditions => "Conditions".into(),
+                Region::Done => "Done".into(),
+                Region::Timeline => "Timeline".into(),
             }
         };
         let right = [

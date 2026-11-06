@@ -83,7 +83,14 @@ impl Takt {
                         this.rank_today(cx);
                         cx.notify();
                     } else if this.app.focus_running() {
-                        // The clock in the status bar.
+                        // The clock in the status bar, and the running
+                        // block on the timeline once a minute.
+                        if this.app.prefs.bottom_dock_visible
+                            && this.app.prefs.bottom_dock_tab == "timeline"
+                            && crate::state::store::now_ms() / 1000 % 60 == 0
+                        {
+                            this.app.reload_timeline();
+                        }
                         cx.notify();
                     }
                 });
@@ -326,6 +333,18 @@ impl Takt {
                             self.app.editing = None;
                         }
                     }
+                    Some(Editing::ConditionTime) => {
+                        self.app.editing = None;
+                        self.app.commit_typed_time(&text);
+                    }
+                    Some(Editing::ConditionName(id)) => {
+                        self.app.editing = None;
+                        self.app.commit_condition_name(id, &text);
+                    }
+                    Some(Editing::CategoryName(from)) => {
+                        self.app.editing = None;
+                        self.app.commit_category_name(from, &text);
+                    }
                     Some(_) => self.app.commit_sidebar_name(&text),
                     None => {}
                 }
@@ -447,6 +466,21 @@ impl Takt {
                 TextField::selecting_all(&title)
             }
             Some(Editing::Rules(target)) => TextField::multiline(&self.app.rules_text(target)),
+            Some(Editing::ConditionTime) => TextField::new(
+                self.app
+                    .conditions
+                    .time_entry
+                    .as_deref()
+                    .unwrap_or_default(),
+            ),
+            Some(Editing::ConditionName(Some(id))) => TextField::selecting_all(
+                &self
+                    .app
+                    .condition(id)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default(),
+            ),
+            Some(Editing::CategoryName(Some(category))) => TextField::selecting_all(category),
             Some(Editing::InspectorField { stop, .. }) => {
                 let stop = *stop;
                 let text = self.app.inspector_field_text(stop);
@@ -602,6 +636,9 @@ impl Render for Takt {
                     .child(self.centre(t, cx))
                     .when_some(inspector, |d, stops| d.child(self.right_dock(t, stops, cx))),
             )
+            .when(self.app.prefs.bottom_dock_visible, |d| {
+                d.child(self.bottom_dock(t, cx))
+            })
             .child(self.status_bar(t))
             .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
                 d.child(self.rules_sheet(t))

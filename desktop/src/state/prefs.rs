@@ -20,6 +20,7 @@ pub struct Prefs {
     pub right_dock_width: f32,
     pub right_dock_tab: String,
     pub bottom_dock_visible: bool,
+    pub bottom_dock_tab: String,
     pub hide_completed: bool,
     /// Tasks whose start is still to come, left out.
     pub hide_later: bool,
@@ -27,6 +28,8 @@ pub struct Prefs {
     pub icons: HashMap<String, String>,
     /// In a folder, the list a new task lands in.
     pub folder_destinations: HashMap<String, String>,
+    /// The Conditions tab's folded headings.
+    pub folded_conditions: HashSet<String>,
     pub recent_lists: Vec<String>,
     pub recent_commands: Vec<String>,
     pub theme: String,
@@ -45,10 +48,12 @@ impl Default for Prefs {
             right_dock_width: 320.0,
             right_dock_tab: "inspector".into(),
             bottom_dock_visible: false,
+            bottom_dock_tab: "done".into(),
             hide_completed: false,
             hide_later: false,
             icons: HashMap::new(),
             folder_destinations: HashMap::new(),
+            folded_conditions: HashSet::new(),
             recent_lists: Vec::new(),
             recent_commands: Vec::new(),
             theme: "system".into(),
