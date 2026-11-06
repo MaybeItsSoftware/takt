@@ -27,6 +27,7 @@ import uk.co.maybeitsadam.takt.core.Workspace
 import uk.co.maybeitsadam.takt.data.db.WorkspaceDatabase
 import uk.co.maybeitsadam.takt.data.workspace.WorkspaceRepository
 import uk.co.maybeitsadam.takt.focus.FocusServiceLauncher
+import uk.co.maybeitsadam.takt.reminders.ReminderController
 import uk.co.maybeitsadam.takt.settings.GoogleCalendarController
 import uk.co.maybeitsadam.takt.settings.SyncController
 import uk.co.maybeitsadam.takt.ui.actions.RecurrenceClashes
@@ -103,6 +104,7 @@ class AppContainer(
     val clashes = RecurrenceClashes(this)
     val sync = SyncController(this)
     val calendar = GoogleCalendarController(this)
+    val reminders = ReminderController(this)
     private val engines = ForegroundEngines(this)
 
     init {
@@ -110,6 +112,7 @@ class AppContainer(
         FocusServiceLauncher.attach(this)
         sync.attach()
         calendar.attach()
+        reminders.attach()
         engines.attach()
         // The widget is drawn from the theme in force, so a new one redraws it.
         scope.launch {

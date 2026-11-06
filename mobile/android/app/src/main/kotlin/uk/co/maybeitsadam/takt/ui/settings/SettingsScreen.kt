@@ -104,6 +104,7 @@ fun SettingsScreen() {
             TypeSection(model)
             CelebrationSection(model)
             FocusSection(model)
+            ReminderSection(shell.container.reminders)
             SyncSection(shell.container.sync)
             CalendarSection(shell.container.calendar)
             DataSection(model)
