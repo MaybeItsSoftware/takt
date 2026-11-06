@@ -391,14 +391,21 @@ impl Takt {
     /// The rules editor: the rules as lines, what they read as, and every
     /// field the core knows. ⌘↩ saves, Esc leaves it.
     pub(super) fn rules_sheet(&self, t: Tokens) -> impl IntoElement {
-        let title = match &self.app.editing {
-            Some(Editing::Rules(crate::state::columns::RulesTarget::Column(_))) => "Column rules",
-            Some(Editing::Rules(crate::state::columns::RulesTarget::NewFilterList)) => {
-                "New filter list"
-            }
-            _ => "Filter list",
+        let Some(Editing::Rules(target)) = self.app.editing.clone() else {
+            return div();
         };
-        let reading = crate::state::rules::describe(&self.field.text);
+        let title = target.title();
+        let (reading, help) = if target.is_form() {
+            (
+                self.app.form_describe(&target, &self.field.text),
+                App::form_help(&target),
+            )
+        } else {
+            (
+                crate::state::rules::describe(&self.field.text),
+                crate::state::rules::catalogue_help(),
+            )
+        };
         div()
             .absolute()
             .top(px(TITLE_BAR_HEIGHT + 8.))
@@ -462,7 +469,7 @@ impl Takt {
                             .text_color(t.placeholder)
                             .flex()
                             .flex_col()
-                            .children(crate::state::rules::catalogue_help()),
+                            .children(help),
                     ),
             )
     }

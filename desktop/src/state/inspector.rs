@@ -310,7 +310,27 @@ impl App {
             .list(&task.list_id)
             .map(|list| list.name.clone())
             .unwrap_or_default();
-        stops(&snapshot, &task, &list, self.focus_session.is_some())
+        let mut stops = stops(&snapshot, &task, &list, self.focus_session.is_some());
+        // The commitment it has, or carries, in place of the offer to make one.
+        let commitment = self.commitment_of(&task.id);
+        if let Some(stop) = stops.iter_mut().find(|s| s.id == "commit")
+            && let Some(c) = commitment
+        {
+            stop.label = "Commitment";
+            stop.empty = false;
+            stop.value = format!("{} · {} · x stops it", c.title, c.rule);
+        }
+        stops
+    }
+
+    /// The commitment a task carries, or its first.
+    pub fn commitment_of(&self, task_id: &str) -> Option<takt_core::commitments::Commitment> {
+        let core = &self.store.core;
+        core.commitment(task_id.into()).ok().flatten().or_else(|| {
+            core.commitments(task_id.into())
+                .ok()
+                .and_then(|c| c.into_iter().next())
+        })
     }
 
     pub fn inspector_stop(&mut self) -> Option<Stop> {
@@ -499,6 +519,17 @@ impl App {
                 self.edit_planning(|planning| planning.requires_single_sitting = None)
             }
             "notes" => self.edit_selected(|edit| edit.notes.clear()),
+            "commit" => {
+                if let Some(id) = self.selected_task.clone()
+                    && let Some(c) = self.commitment_of(&id)
+                {
+                    self.stop_commitment(&c.task_id);
+                    self.message = Some(format!(
+                        "Stopped \u{201c}{}\u{201d}; what was logged is kept.",
+                        c.title
+                    ));
+                }
+            }
             "priority" => self.edit_selected(|edit| edit.metadata.priority = None),
             "tags" => self.edit_selected(|edit| edit.metadata.tags.clear()),
             "repeat" => self.edit_selected(|edit| edit.metadata.recurrence_rule = None),

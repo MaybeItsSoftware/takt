@@ -281,6 +281,16 @@ impl App {
                 self.pick_for_selected_task(|task_id| super::pickers::Picker::Waiting { task_id })
             }
             "listIcon" => self.begin_icon_pick(),
+            "listSettings" => self.begin_list_settings(),
+            "taskToggleDaily" => self.begin_commitment(),
+            "taskHabit" => self.begin_habit(),
+            "todayStart" => {
+                if self.focus_running() {
+                    self.finish_focus_block()
+                } else {
+                    self.start_focus_on_selected(false)
+                }
+            }
             "taskConditions" => self.edit_task_conditions(),
             "focusSetAvailable" => self.open_conditions_tab(false),
             "focusManageConditions" => self.open_conditions_tab(true),
@@ -904,6 +914,10 @@ pub const PORTED: &[&str] = &[
     "windowDockNextTab",
     "windowDockPreviousTab",
     "windowToggleProgressDock",
+    "listSettings",
+    "taskHabit",
+    "taskToggleDaily",
+    "todayStart",
 ];
 
 #[cfg(test)]

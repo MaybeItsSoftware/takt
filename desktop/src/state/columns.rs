@@ -26,6 +26,49 @@ pub enum RulesTarget {
     Column(String),
     FilterList(String),
     NewFilterList,
+    /// A periodic commitment to `task_id`, or editing the one on `editing`.
+    Commitment {
+        task_id: String,
+        editing: Option<String>,
+    },
+    /// A habit: editing the one on `habit_task_id`, or a new one, made from
+    /// `source` when there is one.
+    Habit {
+        habit_task_id: Option<String>,
+        source: Option<String>,
+    },
+    List(String),
+    Folder(String),
+}
+
+impl RulesTarget {
+    /// A form of `key value` lines rather than filter rules.
+    pub fn is_form(&self) -> bool {
+        matches!(
+            self,
+            RulesTarget::Commitment { .. }
+                | RulesTarget::Habit { .. }
+                | RulesTarget::List(_)
+                | RulesTarget::Folder(_)
+        )
+    }
+
+    pub fn title(&self) -> &'static str {
+        match self {
+            RulesTarget::Column(_) => "Column rules",
+            RulesTarget::NewFilterList => "New filter list",
+            RulesTarget::FilterList(_) => "Filter list",
+            RulesTarget::Commitment { editing: None, .. } => "Commit periodically",
+            RulesTarget::Commitment { .. } => "Commitment",
+            RulesTarget::Habit {
+                habit_task_id: None,
+                ..
+            } => "New habit",
+            RulesTarget::Habit { .. } => "Habit",
+            RulesTarget::List(_) => "List settings",
+            RulesTarget::Folder(_) => "Folder settings",
+        }
+    }
 }
 
 impl App {
@@ -240,6 +283,9 @@ impl App {
 
     /// What the rules editor opens with.
     pub fn rules_text(&self, target: &RulesTarget) -> String {
+        if target.is_form() {
+            return self.form_text(target);
+        }
         match target {
             RulesTarget::Column(id) => {
                 let definition = self
@@ -258,12 +304,16 @@ impl App {
                 .map(|f| rules::write(Some(&f.name), &f.definition))
                 .unwrap_or_default(),
             RulesTarget::NewFilterList => rules::write(Some("New filter"), &Default::default()),
+            _ => String::new(),
         }
     }
 
     /// Saves typed rules; false (with the reason in the status bar) when
     /// they don't read.
     pub fn commit_rules(&mut self, target: RulesTarget, text: &str) -> bool {
+        if target.is_form() {
+            return self.commit_form(target, text);
+        }
         let reading = match rules::read(text) {
             Ok(reading) => reading,
             Err(error) => {
@@ -315,6 +365,7 @@ impl App {
                     self.select_filter_list(&row.id);
                 }
             }
+            _ => {}
         }
         true
     }

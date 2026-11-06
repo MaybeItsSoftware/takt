@@ -14,6 +14,7 @@ pub mod conditions;
 pub mod details;
 pub mod docks;
 pub mod focus;
+pub mod forms;
 pub mod inspector;
 pub mod navigation;
 pub mod outline;
