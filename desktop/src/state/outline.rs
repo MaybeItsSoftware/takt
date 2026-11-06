@@ -399,6 +399,7 @@ impl App {
         }
         self.layout_rows();
         self.reload_today();
+        self.reload_done();
     }
 
     /// Saves a title typed in place. Patched in place.
@@ -596,6 +597,9 @@ impl App {
             self.lingering.clear();
             self.reload_sidebar();
             self.reload_rows();
+            self.reload_focus();
+            self.reload_done();
+            self.reload_today();
         }
     }
 

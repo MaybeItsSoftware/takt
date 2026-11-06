@@ -123,6 +123,16 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             "tick and untick {:.2} ms",
             started.elapsed().as_secs_f64() * 1000.0 / 2.0
         ));
+        let started = Instant::now();
+        app.start_focus_on_selected(true);
+        let running = app.focus_status().map(|(title, clock, _)| format!("{title} {clock}"));
+        app.stop_focus();
+        report.push(format!(
+            "focus start and stop {:.2} ms (ran: {}, after: {})",
+            started.elapsed().as_secs_f64() * 1000.0,
+            running.unwrap_or_else(|| "nothing".into()),
+            if app.focus_session.is_some() { "still running" } else { "stopped" }
+        ));
     }
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));

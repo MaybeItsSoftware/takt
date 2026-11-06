@@ -27,6 +27,9 @@ pub enum KeyOutcome {
 impl App {
     /// A spelled key press with no text field or overlay open.
     pub fn handle_key(&mut self, key: &str, at: Instant) -> KeyOutcome {
+        if self.confirm_pending_focus(key) {
+            return KeyOutcome::Handled;
+        }
         if self.pending_delete.is_some() {
             if key == "enter" {
                 self.delete_selected();
@@ -122,6 +125,24 @@ impl App {
             "goListNavigator" => self.open_overlay(Overlay::ListNavigator),
             "goSearch" => self.open_overlay(Overlay::Search),
             "goKeyboardReference" => self.open_overlay(Overlay::KeyboardReference),
+
+            // Focus
+            "goFocus" => match self.focus_status() {
+                Some((title, clock, _)) => self.message = Some(format!("{title}  {clock}")),
+                None => self.start_focus_on_selected(false),
+            },
+            "taskStartFocus" => self.start_focus_on_selected(false),
+            "focusFinish" => self.finish_focus_block(),
+            "focusStop" => self.stop_focus(),
+
+            // The done rail
+            "windowToggleDoneRail" => self.toggle_right_dock_tab("done"),
+            "doneReopen" => self.reopen_selected(),
+            "doneClose" => {
+                if self.prefs.right_dock_tab == "done" {
+                    self.toggle_right_dock();
+                }
+            }
 
             // Task
             "taskNew" => self.begin_new_task(NewPlacement::Below),
@@ -245,6 +266,31 @@ impl App {
             self.region = Region::Tasks;
         }
         self.prefs.save();
+    }
+
+    /// Shows a tab of the right dock, or hides the dock when that tab is
+    /// already up.
+    fn toggle_right_dock_tab(&mut self, tab: &str) {
+        if self.prefs.right_dock_visible && self.prefs.right_dock_tab == tab {
+            self.prefs.right_dock_visible = false;
+        } else {
+            self.prefs.right_dock_visible = true;
+            self.prefs.right_dock_tab = tab.into();
+        }
+        self.prefs.save();
+    }
+
+    fn reopen_selected(&mut self) {
+        let Some(task) = self.selected().cloned().or_else(|| {
+            let id = self.selected_task.clone()?;
+            self.done.iter().find(|task| task.id == id).cloned()
+        }) else {
+            return;
+        };
+        if task.status != "open" {
+            self.set_status(&task.id, "open");
+            self.message = Some(format!("Reopened \u{201c}{}\u{201d}.", task.title));
+        }
     }
 
     fn close_all_docks(&mut self) {

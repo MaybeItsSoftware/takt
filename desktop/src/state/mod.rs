@@ -8,6 +8,7 @@
 
 pub mod board;
 pub mod commands;
+pub mod focus;
 pub mod navigation;
 pub mod outline;
 pub mod prefs;
@@ -146,6 +147,11 @@ pub struct App {
     pub combined_cards: Vec<TaskRow>,
     pub board_card_ids: Vec<String>,
     pub board: board::Board,
+    /// The running focus session, and a task waiting on "start anyway".
+    pub focus_session: Option<takt_core::rows::SessionRow>,
+    pub pending_focus: Option<String>,
+    /// The done rail: what was finished in the last fortnight, newest first.
+    pub done: Vec<TaskRow>,
     pub selected_task: Option<String>,
     pub pending_delete: Option<String>,
     /// `f`/`F` waiting for the letter to find (true: forward).
@@ -194,6 +200,9 @@ impl App {
             combined_cards: Vec::new(),
             board_card_ids: Vec::new(),
             board: board::Board::default(),
+            focus_session: None,
+            pending_focus: None,
+            done: Vec::new(),
             today: today::Today::default(),
             today_stale: true,
             selected_task: None,
@@ -208,6 +217,8 @@ impl App {
             prefs,
         };
         app.reload_sidebar();
+        app.reload_focus();
+        app.reload_done();
         app.restore_scope();
         app.refresh_history();
         Ok(app)
@@ -343,6 +354,16 @@ impl App {
         }
     }
 
+    /// The done rail's rows: finished in the last fourteen days.
+    pub fn reload_done(&mut self) {
+        let since = store::now_ms() - 14 * 24 * 3600 * 1000;
+        self.done = self
+            .store
+            .core
+            .completed_tasks_since(since, 300)
+            .unwrap_or_default();
+    }
+
     pub fn refresh_history(&mut self) {
         self.undo_label = self.store.core.undoable_label().ok().flatten();
         self.redo_label = self.store.core.redoable_label().ok().flatten();
@@ -365,6 +386,8 @@ impl App {
     /// Reads the sidebar and the scope again, keeping the cursor and the
     /// selection where they were when they still exist.
     pub fn reload_all(&mut self) {
+        self.reload_focus();
+        self.reload_done();
         self.reload_sidebar();
         self.reload_rows();
         self.refresh_history();
