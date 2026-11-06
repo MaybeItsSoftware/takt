@@ -961,6 +961,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_func_workspace_daily_is_due(
     ): Int
+    external fun uniffi_takt_core_checksum_func_default_reminder_settings(
+    ): Int
     external fun uniffi_takt_core_checksum_func_review_timeline(
     ): Int
     external fun uniffi_takt_core_checksum_func_summarise_review_progress(
@@ -1260,6 +1262,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_method_coreworkspace_work_blocks_between(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_work_blocks_for_task(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_reminders(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_review_progress(
     ): Int
@@ -1782,6 +1786,8 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_method_coreworkspace_work_blocks_between(`ptr`: Long,`fromMs`: Long,`toMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_work_blocks_for_task(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_reminders(`ptr`: Long,`settings`: RustBuffer.ByValue,`nowMs`: Long,`zone`: RustBuffer.ByValue,`days`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_review_progress(`ptr`: Long,`days`: Int,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2375,6 +2381,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_workspace_daily_is_due(`weekdaysMask`: Long,`intervalDays`: RustBuffer.ByValue,`anchorMs`: Long,`dayMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
+    external fun uniffi_takt_core_fn_func_default_reminder_settings(uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_review_timeline(`blocks`: RustBuffer.ByValue,`awards`: RustBuffer.ByValue,`dayMs`: Long,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_summarise_review_progress(`days`: Int,`completionsMs`: RustBuffer.ByValue,`creationsMs`: RustBuffer.ByValue,`blocks`: RustBuffer.ByValue,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -3051,6 +3059,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_func_workspace_daily_is_due() and 0xFFFF) != 26735) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_func_default_reminder_settings() and 0xFFFF) != 44774) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_func_review_timeline() and 0xFFFF) != 40278) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -3499,6 +3510,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_work_blocks_for_task() and 0xFFFF) != 6070) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_reminders() and 0xFFFF) != 29169) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_review_progress() and 0xFFFF) != 23968) {
@@ -5350,6 +5364,11 @@ public interface CoreWorkspaceInterface {
      * A task's work blocks, oldest first.
      */
     fun `workBlocksForTask`(`taskId`: kotlin.String): List<WorkBlockRow>
+    
+    /**
+     * The reminders a device sets now (`reminders::reminders`).
+     */
+    fun `reminders`(`settings`: ReminderSettings, `nowMs`: kotlin.Long, `zone`: kotlin.String, `days`: kotlin.UInt, `limit`: kotlin.UInt): List<Reminder>
     
     /**
      * The progress charts over the `days` ending today, read and bucketed
@@ -7675,6 +7694,28 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         it,
         
         FfiConverterString.lower(`taskId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The reminders a device sets now (`reminders::reminders`).
+     */
+    @Throws(CoreException::class)override fun `reminders`(`settings`: ReminderSettings, `nowMs`: kotlin.Long, `zone`: kotlin.String, `days`: kotlin.UInt, `limit`: kotlin.UInt): List<Reminder> {
+            return FfiConverterSequenceTypeReminder.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_reminders(
+        it,
+        
+        FfiConverterTypeReminderSettings.lower(`settings`),
+        FfiConverterLong.lower(`nowMs`),
+        FfiConverterString.lower(`zone`),
+        FfiConverterUInt.lower(`days`),
+        FfiConverterUInt.lower(`limit`),_status)
 }
     }
     )
@@ -20072,6 +20113,133 @@ public object FfiConverterTypeRecurrenceClash: FfiConverterRustBuffer<Recurrence
 
 
 /**
+ * One notification to set.
+ */
+data class Reminder (
+    /**
+     * Stable for the same reminder across reads (`due.<task>`,
+     * `today.<yyyy-MM-dd>`, `dailies.<yyyy-MM-dd>`), so a client can
+     * replace one in place.
+     */
+    var `id`: kotlin.String
+    , 
+    var `kind`: ReminderKind
+    , 
+    var `fireAtMs`: kotlin.Long
+    , 
+    var `title`: kotlin.String
+    , 
+    var `body`: kotlin.String
+    , 
+    /**
+     * The task a due-time reminder is for, to open on a tap.
+     */
+    var `taskId`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeReminder: FfiConverterRustBuffer<Reminder> {
+    override fun read(buf: ByteBuffer): Reminder {
+        return Reminder(
+            FfiConverterString.read(buf),
+            FfiConverterTypeReminderKind.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Reminder) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterTypeReminderKind.allocationSize(value.`kind`) +
+            FfiConverterLong.allocationSize(value.`fireAtMs`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterString.allocationSize(value.`body`) +
+            FfiConverterOptionalString.allocationSize(value.`taskId`)
+    )
+
+    override fun write(value: Reminder, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterTypeReminderKind.write(value.`kind`, buf)
+            FfiConverterLong.write(value.`fireAtMs`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterString.write(value.`body`, buf)
+            FfiConverterOptionalString.write(value.`taskId`, buf)
+    }
+}
+
+
+
+/**
+ * What a device reminds about, and when. Times are minutes after local
+ * midnight. Kept per device by each client, not synced: they are about
+ * which device buzzes.
+ */
+data class ReminderSettings (
+    var `dueTime`: kotlin.Boolean
+    , 
+    var `dueToday`: kotlin.Boolean
+    , 
+    var `dueTodayMinute`: kotlin.Int
+    , 
+    var `dailiesLeft`: kotlin.Boolean
+    , 
+    var `dailiesLeftMinute`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeReminderSettings: FfiConverterRustBuffer<ReminderSettings> {
+    override fun read(buf: ByteBuffer): ReminderSettings {
+        return ReminderSettings(
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ReminderSettings) = (
+            FfiConverterBoolean.allocationSize(value.`dueTime`) +
+            FfiConverterBoolean.allocationSize(value.`dueToday`) +
+            FfiConverterInt.allocationSize(value.`dueTodayMinute`) +
+            FfiConverterBoolean.allocationSize(value.`dailiesLeft`) +
+            FfiConverterInt.allocationSize(value.`dailiesLeftMinute`)
+    )
+
+    override fun write(value: ReminderSettings, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`dueTime`, buf)
+            FfiConverterBoolean.write(value.`dueToday`, buf)
+            FfiConverterInt.write(value.`dueTodayMinute`, buf)
+            FfiConverterBoolean.write(value.`dailiesLeft`, buf)
+            FfiConverterInt.write(value.`dailiesLeftMinute`, buf)
+    }
+}
+
+
+
+/**
  * An open task that requires a condition.
  */
 data class RequiringTask (
@@ -26832,6 +27000,41 @@ public object FfiConverterTypePlanningError: FfiConverterRustBuffer<PlanningErro
 
 
 
+
+enum class ReminderKind {
+    
+    DUE_TIME,
+    DUE_TODAY,
+    DAILIES_LEFT;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeReminderKind: FfiConverterRustBuffer<ReminderKind> {
+    override fun read(buf: ByteBuffer) = try {
+        ReminderKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ReminderKind) = 4UL
+
+    override fun write(value: ReminderKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 /**
  * What a row is, and which input its `subject` indexes.
  */
@@ -31411,6 +31614,34 @@ public object FfiConverterSequenceTypeQueueEntry: FfiConverterRustBuffer<List<Qu
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeReminder: FfiConverterRustBuffer<List<Reminder>> {
+    override fun read(buf: ByteBuffer): List<Reminder> {
+        val len = buf.getInt()
+        return List<Reminder>(len) {
+            FfiConverterTypeReminder.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<Reminder>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeReminder.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<Reminder>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeReminder.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeRequiringTask: FfiConverterRustBuffer<List<RequiringTask>> {
     override fun read(buf: ByteBuffer): List<RequiringTask> {
         val len = buf.getInt()
@@ -34806,6 +35037,20 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
         FfiConverterLong.lower(`anchorMs`),
         FfiConverterLong.lower(`dayMs`),
         FfiConverterString.lower(`zone`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Everything off, at the default times: what a client shows before the
+         * user has chosen.
+         */ fun `defaultReminderSettings`(): ReminderSettings {
+            return FfiConverterTypeReminderSettings.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_default_reminder_settings(
+    
+        _status)
 }
     )
     }

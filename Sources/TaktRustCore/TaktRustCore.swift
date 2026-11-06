@@ -1347,6 +1347,11 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func workBlocksForTask(taskId: String) throws  -> [WorkBlockRow]
     
     /**
+     * The reminders a device sets now (`reminders::reminders`).
+     */
+    func reminders(settings: ReminderSettings, nowMs: Int64, zone: String, days: UInt32, limit: UInt32) throws  -> [Reminder]
+    
+    /**
      * The progress charts over the `days` ending today, read and bucketed
      * in the core. `ReviewModel.readProgress`.
      */
@@ -3270,6 +3275,23 @@ open func workBlocksForTask(taskId: String)throws  -> [WorkBlockRow]  {
     uniffi_takt_core_fn_method_coreworkspace_work_blocks_for_task(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(taskId),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The reminders a device sets now (`reminders::reminders`).
+     */
+open func reminders(settings: ReminderSettings, nowMs: Int64, zone: String, days: UInt32, limit: UInt32)throws  -> [Reminder]  {
+    return try  FfiConverterSequenceTypeReminder.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_reminders(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeReminderSettings_lower(settings),
+        FfiConverterInt64.lower(nowMs),
+        FfiConverterString.lower(zone),
+        FfiConverterUInt32.lower(days),
+        FfiConverterUInt32.lower(limit),uniffiCallStatus
     )
 })
 }
@@ -17442,6 +17464,166 @@ public func FfiConverterTypeRecurrenceClash_lower(_ value: RecurrenceClash) -> R
 
 
 /**
+ * One notification to set.
+ */
+public struct Reminder: Equatable, Hashable {
+    /**
+     * Stable for the same reminder across reads (`due.<task>`,
+     * `today.<yyyy-MM-dd>`, `dailies.<yyyy-MM-dd>`), so a client can
+     * replace one in place.
+     */
+    public var id: String
+    public var kind: ReminderKind
+    public var fireAtMs: Int64
+    public var title: String
+    public var body: String
+    /**
+     * The task a due-time reminder is for, to open on a tap.
+     */
+    public var taskId: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Stable for the same reminder across reads (`due.<task>`,
+         * `today.<yyyy-MM-dd>`, `dailies.<yyyy-MM-dd>`), so a client can
+         * replace one in place.
+         */id: String, kind: ReminderKind, fireAtMs: Int64, title: String, body: String, 
+        /**
+         * The task a due-time reminder is for, to open on a tap.
+         */taskId: String?) {
+        self.id = id
+        self.kind = kind
+        self.fireAtMs = fireAtMs
+        self.title = title
+        self.body = body
+        self.taskId = taskId
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Reminder: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeReminder: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Reminder {
+        return
+            try Reminder(
+                id: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterTypeReminderKind.read(from: &buf), 
+                fireAtMs: FfiConverterInt64.read(from: &buf), 
+                title: FfiConverterString.read(from: &buf), 
+                body: FfiConverterString.read(from: &buf), 
+                taskId: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Reminder, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterTypeReminderKind.write(value.kind, into: &buf)
+        FfiConverterInt64.write(value.fireAtMs, into: &buf)
+        FfiConverterString.write(value.title, into: &buf)
+        FfiConverterString.write(value.body, into: &buf)
+        FfiConverterOptionString.write(value.taskId, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReminder_lift(_ buf: RustBuffer) throws -> Reminder {
+    return try FfiConverterTypeReminder.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReminder_lower(_ value: Reminder) -> RustBuffer {
+    return FfiConverterTypeReminder.lower(value)
+}
+
+
+/**
+ * What a device reminds about, and when. Times are minutes after local
+ * midnight. Kept per device by each client, not synced: they are about
+ * which device buzzes.
+ */
+public struct ReminderSettings: Equatable, Hashable {
+    public var dueTime: Bool
+    public var dueToday: Bool
+    public var dueTodayMinute: Int32
+    public var dailiesLeft: Bool
+    public var dailiesLeftMinute: Int32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dueTime: Bool, dueToday: Bool, dueTodayMinute: Int32, dailiesLeft: Bool, dailiesLeftMinute: Int32) {
+        self.dueTime = dueTime
+        self.dueToday = dueToday
+        self.dueTodayMinute = dueTodayMinute
+        self.dailiesLeft = dailiesLeft
+        self.dailiesLeftMinute = dailiesLeftMinute
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ReminderSettings: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeReminderSettings: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReminderSettings {
+        return
+            try ReminderSettings(
+                dueTime: FfiConverterBool.read(from: &buf), 
+                dueToday: FfiConverterBool.read(from: &buf), 
+                dueTodayMinute: FfiConverterInt32.read(from: &buf), 
+                dailiesLeft: FfiConverterBool.read(from: &buf), 
+                dailiesLeftMinute: FfiConverterInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ReminderSettings, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.dueTime, into: &buf)
+        FfiConverterBool.write(value.dueToday, into: &buf)
+        FfiConverterInt32.write(value.dueTodayMinute, into: &buf)
+        FfiConverterBool.write(value.dailiesLeft, into: &buf)
+        FfiConverterInt32.write(value.dailiesLeftMinute, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReminderSettings_lift(_ buf: RustBuffer) throws -> ReminderSettings {
+    return try FfiConverterTypeReminderSettings.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReminderSettings_lower(_ value: ReminderSettings) -> RustBuffer {
+    return FfiConverterTypeReminderSettings.lower(value)
+}
+
+
+/**
  * An open task that requires a condition.
  */
 public struct RequiringTask: Equatable, Hashable {
@@ -24367,6 +24549,79 @@ public func FfiConverterTypePlanningError_lower(_ value: PlanningError) -> RustB
 
 
 
+
+public enum ReminderKind: Equatable, Hashable {
+    
+    case dueTime
+    case dueToday
+    case dailiesLeft
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ReminderKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeReminderKind: FfiConverterRustBuffer {
+    typealias SwiftType = ReminderKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReminderKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .dueTime
+        
+        case 2: return .dueToday
+        
+        case 3: return .dailiesLeft
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ReminderKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .dueTime:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .dueToday:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .dailiesLeft:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReminderKind_lift(_ buf: RustBuffer) throws -> ReminderKind {
+    return try FfiConverterTypeReminderKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReminderKind_lower(_ value: ReminderKind) -> RustBuffer {
+    return FfiConverterTypeReminderKind.lower(value)
+}
+
+
+
 /**
  * What a row is, and which input its `subject` indexes.
  */
@@ -28235,6 +28490,31 @@ fileprivate struct FfiConverterSequenceTypeQueueEntry: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeReminder: FfiConverterRustBuffer {
+    typealias SwiftType = [Reminder]
+
+    public static func write(_ value: [Reminder], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeReminder.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Reminder] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Reminder]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeReminder.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeRequiringTask: FfiConverterRustBuffer {
     typealias SwiftType = [RequiringTask]
 
@@ -31046,6 +31326,17 @@ public func workspaceDailyIsDue(weekdaysMask: Int64, intervalDays: Int64?, ancho
 })
 }
 /**
+ * Everything off, at the default times: what a client shows before the
+ * user has chosen.
+ */
+public func defaultReminderSettings() -> ReminderSettings  {
+    return try!  FfiConverterTypeReminderSettings_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_default_reminder_settings(uniffiCallStatus
+    )
+})
+}
+/**
  * Lays out the day containing `day_ms` from its blocks, groups them by
  * task and adds up their points. `TimelineDay.build`.
  */
@@ -32321,6 +32612,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_func_workspace_daily_is_due() != 26735) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_func_default_reminder_settings() != 44774) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_func_review_timeline() != 40278) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -32769,6 +33063,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_work_blocks_for_task() != 6070) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_reminders() != 29169) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_review_progress() != 23968) {
