@@ -14,6 +14,7 @@ pub enum PendingDelete {
     Task(String),
     List(String),
     Folder(String),
+    Column(String),
 }
 
 impl App {
@@ -388,6 +389,7 @@ impl App {
         self.message = None;
         match pending {
             PendingDelete::Task(id) => self.delete_task(&id),
+            PendingDelete::Column(id) => self.delete_column(&id),
             PendingDelete::List(id) => {
                 if self.write(|s| s.core.delete_list(id.clone())).is_some() {
                     self.reload_sidebar();

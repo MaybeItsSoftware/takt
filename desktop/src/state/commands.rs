@@ -264,6 +264,18 @@ impl App {
                 self.pick_for_selected_task(|task_id| super::pickers::Picker::Waiting { task_id })
             }
             "listIcon" => self.begin_icon_pick(),
+            "planBoardNewColumn" => self.begin_new_column(None),
+            "planBoardAddColumnLeft" => self.begin_new_column(Some(-1)),
+            "planBoardAddColumnRight" => self.begin_new_column(Some(1)),
+            "planBoardRenameColumn" => self.begin_rename_column(),
+            "planBoardRemoveColumn" => self.ask_to_delete_column(),
+            "planBoardMoveColumnLeft" => self.move_column(-1),
+            "planBoardMoveColumnRight" => self.move_column(1),
+            "planBoardEditColumnRules" => self.begin_column_rules(),
+            "planBoardMakeDefaultColumns" => self.make_default_columns(),
+            "planBoardResetColumns" => self.reset_columns(),
+            "filterListNew" => self.begin_filter_list_edit(true),
+            "filterListEdit" => self.begin_filter_list_edit(false),
             "listRestore" => self.restore_last_archived(),
             "listComplete" => self.toggle_list_completed(),
             "listDelete" => self.ask_to_delete_list(),
@@ -832,6 +844,18 @@ pub const PORTED: &[&str] = &[
     "taskStartFocus",
     "taskWaiting",
     "windowToggleDoneRail",
+    "filterListEdit",
+    "filterListNew",
+    "planBoardAddColumnLeft",
+    "planBoardAddColumnRight",
+    "planBoardEditColumnRules",
+    "planBoardMakeDefaultColumns",
+    "planBoardMoveColumnLeft",
+    "planBoardMoveColumnRight",
+    "planBoardNewColumn",
+    "planBoardRemoveColumn",
+    "planBoardRenameColumn",
+    "planBoardResetColumns",
 ];
 
 #[cfg(test)]

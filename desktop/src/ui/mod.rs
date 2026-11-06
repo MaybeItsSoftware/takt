@@ -288,6 +288,13 @@ impl Takt {
     }
 
     fn editing_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        // The rules editor's Esc leaves it unsaved: rules that don't read
+        // yet would otherwise hold it open.
+        if keystroke.key == "escape" && matches!(self.app.editing, Some(Editing::Rules(_))) {
+            self.app.editing = None;
+            self.app.message = None;
+            return true;
+        }
         let outcome = self.field.handle(keystroke);
         if Self::clipboard_key(&mut self.field, &outcome, cx) {
             return true;
@@ -309,6 +316,15 @@ impl Takt {
                     Some(Editing::InspectorField { stop, .. }) => {
                         self.app.editing = None;
                         self.app.commit_inspector_field(stop, &text);
+                    }
+                    Some(Editing::ColumnName(target)) => {
+                        self.app.editing = None;
+                        self.app.commit_column_name(target, &text);
+                    }
+                    Some(Editing::Rules(target)) => {
+                        if self.app.commit_rules(target, &text) {
+                            self.app.editing = None;
+                        }
                     }
                     Some(_) => self.app.commit_sidebar_name(&text),
                     None => {}
@@ -419,6 +435,18 @@ impl Takt {
                     .unwrap_or_default();
                 TextField::selecting_all(&name)
             }
+            Some(Editing::ColumnName(crate::state::columns::ColumnName::Rename(id))) => {
+                let title = self
+                    .app
+                    .board
+                    .layout
+                    .iter()
+                    .find(|c| c.id == *id)
+                    .map(|c| c.title.clone())
+                    .unwrap_or_default();
+                TextField::selecting_all(&title)
+            }
+            Some(Editing::Rules(target)) => TextField::multiline(&self.app.rules_text(target)),
             Some(Editing::InspectorField { stop, .. }) => {
                 let stop = *stop;
                 let text = self.app.inspector_field_text(stop);
@@ -575,6 +603,9 @@ impl Render for Takt {
                     .when_some(inspector, |d, stops| d.child(self.right_dock(t, stops, cx))),
             )
             .child(self.status_bar(t))
+            .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
+                d.child(self.rules_sheet(t))
+            })
             .when(self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))
             })

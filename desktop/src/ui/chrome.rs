@@ -384,4 +384,83 @@ impl Takt {
             .min_w_0()
             .child(field_text(&self.field, placeholder, t, self.input_hook()))
     }
+
+    /// The rules editor: the rules as lines, what they read as, and every
+    /// field the core knows. ⌘↩ saves, Esc leaves it.
+    pub(super) fn rules_sheet(&self, t: Tokens) -> impl IntoElement {
+        let title = match &self.app.editing {
+            Some(Editing::Rules(crate::state::columns::RulesTarget::Column(_))) => "Column rules",
+            Some(Editing::Rules(crate::state::columns::RulesTarget::NewFilterList)) => {
+                "New filter list"
+            }
+            _ => "Filter list",
+        };
+        let reading = crate::state::rules::describe(&self.field.text);
+        div()
+            .absolute()
+            .top(px(TITLE_BAR_HEIGHT + 8.))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .id("rules-sheet")
+                    .occlude()
+                    .w(px(620.))
+                    .flex()
+                    .flex_col()
+                    .rounded(px(8.))
+                    .bg(t.surface)
+                    .border_1()
+                    .border_color(t.border)
+                    .child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .flex()
+                            .justify_between()
+                            .border_b_1()
+                            .border_color(t.border_variant)
+                            .child(div().text_color(t.text).child(title))
+                            .child(
+                                div()
+                                    .font_family(MONO_FONT)
+                                    .text_size(px(11.))
+                                    .text_color(t.muted)
+                                    .child("⌘↩ save · esc cancel"),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .min_h(px(120.))
+                            .font_family(MONO_FONT)
+                            .child(field_text(&self.field, "show open", t, self.input_hook())),
+                    )
+                    .child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .border_t_1()
+                            .border_color(t.border_variant)
+                            .text_color(t.accent)
+                            .child(reading),
+                    )
+                    .child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .border_t_1()
+                            .border_color(t.border_variant)
+                            .font_family(MONO_FONT)
+                            .text_size(px(11.))
+                            .text_color(t.placeholder)
+                            .flex()
+                            .flex_col()
+                            .children(crate::state::rules::catalogue_help()),
+                    ),
+            )
+    }
 }

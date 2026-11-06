@@ -8,6 +8,7 @@
 
 pub mod actions;
 pub mod board;
+pub mod columns;
 pub mod commands;
 pub mod details;
 pub mod focus;
@@ -16,6 +17,7 @@ pub mod navigation;
 pub mod outline;
 pub mod pickers;
 pub mod prefs;
+pub mod rules;
 pub mod sidebar;
 pub mod store;
 pub mod today;
@@ -112,6 +114,10 @@ pub enum Editing {
     NewFolder {
         parent_id: Option<String>,
     },
+    /// A board column's name, new or renamed.
+    ColumnName(columns::ColumnName),
+    /// A filter list's or a rule column's rules, as text.
+    Rules(columns::RulesTarget),
     /// A field of the inspector, by its stop.
     InspectorField {
         task_id: String,

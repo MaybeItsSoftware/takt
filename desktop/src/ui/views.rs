@@ -1,4 +1,5 @@
 use super::*;
+use crate::state::columns::ColumnName;
 
 impl Takt {
     pub(super) fn centre(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
@@ -141,6 +142,11 @@ impl Takt {
             .children(board.columns.iter().enumerate().map(|(column_ix, column)| {
                 let cards = board.cards.get(column_ix).cloned().unwrap_or_default();
                 let focused = column_ix == board.column && active;
+                let renaming = matches!(
+                    &self.app.editing,
+                    Some(Editing::ColumnName(ColumnName::Rename(id))) if *id == column.id
+                );
+                let ruled = column.rules.is_some();
                 div()
                     .id(("column", column_ix))
                     .w(px(272.))
@@ -160,7 +166,18 @@ impl Takt {
                             .justify_between()
                             .border_b_1()
                             .border_color(t.border_variant)
-                            .child(div().text_color(t.muted).child(column.title.clone()))
+                            .child(if renaming {
+                                self.field_inline(t, "Column name").into_any_element()
+                            } else {
+                                div()
+                                    .text_color(t.muted)
+                                    .child(if ruled {
+                                        format!("{} ⚙", column.title)
+                                    } else {
+                                        column.title.clone()
+                                    })
+                                    .into_any_element()
+                            })
                             .child(
                                 div()
                                     .text_size(px(11.))
@@ -183,6 +200,25 @@ impl Takt {
                             })),
                     )
             }))
+            .when(
+                matches!(
+                    self.app.editing,
+                    Some(Editing::ColumnName(ColumnName::New(_)))
+                ),
+                |d| {
+                    d.child(
+                        div()
+                            .w(px(272.))
+                            .flex_none()
+                            .p_2()
+                            .rounded(px(6.))
+                            .border_1()
+                            .border_color(t.accent)
+                            .bg(t.surface)
+                            .child(self.field_inline(t, "New column")),
+                    )
+                },
+            )
             .into_any_element()
     }
 

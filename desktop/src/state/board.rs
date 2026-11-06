@@ -13,6 +13,8 @@ use takt_core::records::TaskRow;
 #[derive(Debug, Clone, Default)]
 pub struct Board {
     pub key: String,
+    /// The columns as saved, hidden ones included: what an edit changes.
+    pub layout: Vec<BoardColumn>,
     pub columns: Vec<BoardColumn>,
     /// Each drawn column's cards, in the order drawn.
     pub cards: Vec<Vec<TaskRow>>,
@@ -92,6 +94,7 @@ impl App {
             .iter()
             .map(|p| (p.task_id.clone(), p.column_id.clone()))
             .collect();
+        let layout = columns.layout;
         let drawn: Vec<BoardColumn> = columns.columns;
         let cards = self.cards();
         let mut by_column: Vec<Vec<TaskRow>> = vec![Vec::new(); drawn.len().max(1)];
@@ -128,6 +131,7 @@ impl App {
         };
         self.board = Board {
             key,
+            layout,
             columns: drawn,
             cards: by_column,
             quadrants: quadrants
