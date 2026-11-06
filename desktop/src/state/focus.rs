@@ -113,6 +113,25 @@ impl App {
         }
     }
 
+    /// Adds the selection to the running session's queue, to come after
+    /// the block in hand.
+    pub fn add_selected_to_focus_queue(&mut self) {
+        let (Some(session), Some(task)) = (self.focus_session.clone(), self.selected().cloned())
+        else {
+            return;
+        };
+        if self
+            .write(|store| {
+                store
+                    .core
+                    .add_to_focus_queue(session.id, task.id.clone(), None, now_ms())
+            })
+            .is_some()
+        {
+            self.message = Some(format!("Queued \u{201c}{}\u{201d}.", task.title));
+        }
+    }
+
     /// Finishes the block: the task ticked off and the time logged.
     pub fn finish_focus_block(&mut self) {
         self.end_block(true);

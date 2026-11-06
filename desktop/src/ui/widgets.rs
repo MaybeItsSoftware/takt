@@ -1,29 +1,104 @@
 use super::*;
 
-/// The field's text with its cursor, or the placeholder.
-pub(super) fn field_text(field: &TextField, placeholder: &str, t: Tokens) -> impl IntoElement {
-    let cursor = || div().w(px(1.5)).h(px(15.)).bg(t.accent);
-    if field.text.is_empty() {
-        return div().flex().items_center().child(cursor()).child(
+/// What a drawn field needs to take the input method's text: the window's
+/// view and its focus.
+pub(super) type InputHook = (gpui::WeakEntity<Takt>, gpui::FocusHandle);
+
+/// The field's text with its caret, selection and what is being composed,
+/// or the placeholder. With a hook, the field registers itself with the
+/// input method while it is drawn.
+pub(super) fn field_text(
+    field: &TextField,
+    placeholder: &str,
+    t: Tokens,
+    hook: Option<InputHook>,
+) -> AnyElement {
+    let caret = || div().w(px(1.5)).h(px(15.)).flex_none().bg(t.accent);
+    let body = if field.text.is_empty() {
+        div().flex().items_center().child(caret()).child(
             div()
                 .text_color(t.placeholder)
                 .child(placeholder.to_string()),
-        );
-    }
-    if field.all_selected {
-        return div()
-            .flex()
-            .items_center()
-            .child(div().bg(t.accent.opacity(0.3)).child(field.text.clone()));
-    }
-    let (before, after) = field.split();
+        )
+    } else {
+        let selection = field.selection();
+        let marked = field.marked.clone().unwrap_or(0..0);
+        let mut lines = Vec::new();
+        let mut line_start = 0;
+        for line in field.text.split('\n') {
+            let line_end = line_start + line.len();
+            let mut cuts = vec![
+                line_start,
+                line_end,
+                selection.start,
+                selection.end,
+                marked.start,
+                marked.end,
+                field.cursor,
+            ];
+            cuts.retain(|cut| (line_start..=line_end).contains(cut));
+            cuts.sort_unstable();
+            cuts.dedup();
+            let mut pieces: Vec<AnyElement> = Vec::new();
+            for pair in cuts.windows(2) {
+                let (from, to) = (pair[0], pair[1]);
+                if from == field.cursor && selection.is_empty() {
+                    pieces.push(caret().into_any_element());
+                }
+                let selected = from >= selection.start && to <= selection.end && from < to;
+                let composing = from >= marked.start && to <= marked.end && from < to;
+                pieces.push(
+                    div()
+                        .when(selected, |d| d.bg(t.accent.opacity(0.3)))
+                        .when(composing, |d| d.underline())
+                        .child(SharedString::from(field.text[from..to].to_string()))
+                        .into_any_element(),
+                );
+            }
+            if field.cursor == line_end && selection.is_empty() {
+                pieces.push(caret().into_any_element());
+            }
+            if pieces.is_empty() {
+                pieces.push(div().h(px(18.)).into_any_element());
+            }
+            lines.push(
+                div()
+                    .flex()
+                    .items_center()
+                    .whitespace_nowrap()
+                    .min_h(px(18.))
+                    .children(pieces)
+                    .into_any_element(),
+            );
+            line_start = line_end + 1;
+        }
+        div().flex().flex_col().children(lines)
+    };
+    let Some((view, focus)) = hook else {
+        return body.into_any_element();
+    };
     div()
-        .flex()
-        .items_center()
-        .whitespace_nowrap()
-        .child(SharedString::from(before.to_string()))
-        .child(cursor())
-        .child(SharedString::from(after.to_string()))
+        .relative()
+        .child(body)
+        .child(
+            gpui::canvas(
+                |bounds, _, _| bounds,
+                move |bounds, _, window, cx| {
+                    if let Some(view) = view.upgrade() {
+                        window.handle_input(
+                            &focus,
+                            gpui::ElementInputHandler::new(bounds, view),
+                            cx,
+                        );
+                    }
+                },
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full(),
+        )
+        .into_any_element()
 }
 
 pub(super) fn check(task: &TaskRow, t: Tokens) -> impl IntoElement {
@@ -119,23 +194,6 @@ pub(super) fn format_day(ms: i64) -> String {
     }
 }
 
-pub(super) fn format_duration(seconds: i64) -> String {
-    let minutes = seconds / 60;
-    match (minutes / 60, minutes % 60) {
-        (0, m) => format!("{m}m"),
-        (h, 0) => format!("{h}h"),
-        (h, m) => format!("{h}h {m}m"),
-    }
-}
-
-pub(super) fn status_title(status: &str) -> &'static str {
-    match status {
-        "completed" => "Done",
-        "cancelled" => "Invalidated",
-        _ => "Open",
-    }
-}
-
 pub(super) fn reason_title(reason: &str) -> &'static str {
     match reason {
         "running" => "running",
@@ -153,17 +211,5 @@ pub(super) fn reason_title(reason: &str) -> &'static str {
         "started" => "started",
         "deadlineRisk" => "deadline at risk",
         _ => "",
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn durations_read_as_hours_and_minutes() {
-        assert_eq!(format_duration(25 * 60), "25m");
-        assert_eq!(format_duration(2 * 3600), "2h");
-        assert_eq!(format_duration(90 * 60), "1h 30m");
     }
 }

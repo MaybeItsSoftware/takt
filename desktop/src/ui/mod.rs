@@ -14,6 +14,7 @@ use crate::keys::{Press, spell};
 use crate::overlay::{self, OverlayState};
 use crate::state::board::QUADRANT_TITLES;
 use crate::state::commands::{EditCursor, KeyOutcome};
+use crate::state::inspector::{Stop, StopKind};
 use crate::state::outline::OutlineRow;
 use crate::state::sidebar::RowKind;
 use crate::state::today::DayRow;
@@ -21,12 +22,12 @@ use crate::state::{App, Editing, Overlay, Region, Scope, ViewMode};
 use crate::text_field::{FieldKey, TextField};
 use crate::theme::Tokens;
 use gpui::{
-    AnyElement, App as GpuiApp, ClickEvent, Context, FocusHandle, Focusable, FontWeight, Hsla,
-    KeyDownEvent, ScrollStrategy, SharedString, UniformListScrollHandle, Window, div, prelude::*,
-    px, uniform_list,
+    AnyElement, App as GpuiApp, Bounds, ClickEvent, ClipboardItem, Context, EntityInputHandler,
+    FocusHandle, Focusable, FontWeight, Hsla, KeyDownEvent, Pixels, ScrollStrategy, SharedString,
+    UTF16Selection, UniformListScrollHandle, WeakEntity, Window, div, prelude::*, px, uniform_list,
 };
+use std::ops::Range;
 use std::time::{Duration, Instant};
-use takt_core::editor::EditorSnapshot;
 use takt_core::records::TaskRow;
 use widgets::*;
 
@@ -38,13 +39,12 @@ const TITLE_BAR_HEIGHT: f32 = 34.;
 pub struct Takt {
     pub app: App,
     focus: FocusHandle,
+    /// Itself, for the text fields' input handler to reach.
+    this: WeakEntity<Self>,
     field: TextField,
     overlay: OverlayState,
     sidebar_scroll: UniformListScrollHandle,
     main_scroll: UniformListScrollHandle,
-    /// The inspector's read of the selection, kept until it or the data
-    /// changes.
-    inspector: Option<(String, i64, EditorSnapshot)>,
     last_key_ms: Option<f64>,
 }
 
@@ -59,11 +59,11 @@ impl Takt {
         let mut this = Takt {
             app,
             focus: cx.focus_handle(),
+            this: cx.entity().downgrade(),
             field: TextField::default(),
             overlay: OverlayState::default(),
             sidebar_scroll: UniformListScrollHandle::new(),
             main_scroll: UniformListScrollHandle::new(),
-            inspector: None,
             last_key_ms: None,
         };
         this.rank_today(cx);
@@ -149,10 +149,9 @@ impl Takt {
         }
         let editing_before = self.app.editing.clone();
         let handled = if self.app.overlay.is_some() {
-            self.overlay_key(keystroke);
-            true
+            self.overlay_key(keystroke, cx)
         } else if self.app.editing.is_some() {
-            self.editing_key(keystroke)
+            self.editing_key(keystroke, cx)
         } else {
             self.command_key(keystroke, cx)
         };
@@ -201,14 +200,55 @@ impl Takt {
         self.overlay.refresh(&self.app);
     }
 
-    fn overlay_key(&mut self, keystroke: &gpui::Keystroke) {
+    /// What the field did with a key that was the clipboard's: true when it
+    /// changed.
+    fn clipboard_key(field: &mut TextField, key: &FieldKey, cx: &mut Context<Self>) -> bool {
+        match key {
+            FieldKey::Copy | FieldKey::Cut => {
+                let selected = field.selected_text().to_string();
+                if !selected.is_empty() {
+                    cx.write_to_clipboard(ClipboardItem::new_string(selected));
+                    if *key == FieldKey::Cut {
+                        field.insert("");
+                        return true;
+                    }
+                }
+                false
+            }
+            FieldKey::Paste => {
+                if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
+                    field.insert(&text);
+                    return true;
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns false for a printable key, which the input method types.
+    fn overlay_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
         let ctrl = keystroke.modifiers.control;
         match (keystroke.key.as_str(), ctrl) {
-            ("n", true) | ("j", true) => return self.overlay.step(1),
-            ("p", true) | ("k", true) => return self.overlay.step(-1),
+            ("n", true) | ("j", true) => {
+                self.overlay.step(1);
+                return true;
+            }
+            ("p", true) | ("k", true) => {
+                self.overlay.step(-1);
+                return true;
+            }
             _ => {}
         }
-        match self.overlay.field.handle(keystroke) {
+        let outcome = self.overlay.field.handle(keystroke);
+        if Self::clipboard_key(&mut self.overlay.field, &outcome, cx) {
+            self.overlay.index = 0;
+            self.overlay.refresh(&self.app);
+            return true;
+        }
+        match outcome {
+            FieldKey::Text(_) => return false,
+            FieldKey::Copy | FieldKey::Cut | FieldKey::Paste => {}
             FieldKey::Commit => {
                 let pick = self.overlay.picked().unwrap_or(overlay::Pick::Nothing);
                 self.overlay.reset();
@@ -244,10 +284,17 @@ impl Takt {
                 }
             }
         }
+        true
     }
 
-    fn editing_key(&mut self, keystroke: &gpui::Keystroke) -> bool {
-        match self.field.handle(keystroke) {
+    fn editing_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        let outcome = self.field.handle(keystroke);
+        if Self::clipboard_key(&mut self.field, &outcome, cx) {
+            return true;
+        }
+        match outcome.clone() {
+            FieldKey::Text(_) => false,
+            FieldKey::Copy | FieldKey::Cut | FieldKey::Paste => true,
             FieldKey::Commit => {
                 let text = self.field.text.clone();
                 match self.app.editing.clone() {
@@ -259,6 +306,10 @@ impl Takt {
                         self.app.create_task(&text);
                         self.field = TextField::default();
                     }
+                    Some(Editing::InspectorField { stop, .. }) => {
+                        self.app.editing = None;
+                        self.app.commit_inspector_field(stop, &text);
+                    }
                     Some(_) => self.app.commit_sidebar_name(&text),
                     None => {}
                 }
@@ -266,6 +317,29 @@ impl Takt {
             }
             FieldKey::Cancel => {
                 self.app.editing = None;
+                true
+            }
+            FieldKey::Tab { .. } | FieldKey::Up | FieldKey::Down
+                if matches!(self.app.editing, Some(Editing::InspectorField { .. })) =>
+            {
+                // In the inspector Tab, and ↑↓ in a one-line field, save
+                // and move on.
+                let by = match outcome {
+                    FieldKey::Tab { shift } => {
+                        if shift {
+                            -1
+                        } else {
+                            1
+                        }
+                    }
+                    FieldKey::Up => -1,
+                    _ => 1,
+                };
+                if let Some(Editing::InspectorField { stop, .. }) = self.app.editing.take() {
+                    let text = self.field.text.clone();
+                    self.app.commit_inspector_field(stop, &text);
+                }
+                self.app.step_inspector(by);
                 true
             }
             FieldKey::Tab { shift } => {
@@ -344,6 +418,15 @@ impl Takt {
                     .map(|row| self.row_title(&row.kind))
                     .unwrap_or_default();
                 TextField::selecting_all(&name)
+            }
+            Some(Editing::InspectorField { stop, .. }) => {
+                let stop = *stop;
+                let text = self.app.inspector_field_text(stop);
+                if matches!(stop, "notes" | "links") {
+                    TextField::multiline(&text)
+                } else {
+                    TextField::new(&text)
+                }
             }
             _ => TextField::default(),
         };
@@ -448,23 +531,6 @@ impl Takt {
         }
         display
     }
-
-    // MARK: Inspector data
-
-    fn inspector_snapshot(&mut self) -> Option<EditorSnapshot> {
-        let id = self.app.selected_task.clone()?;
-        let version = self.app.seen_version;
-        if let Some((held, at, snapshot)) = &self.inspector
-            && *held == id
-            && *at == version
-            && self.app.undo_label.is_some() == self.app.undo_label.is_some()
-        {
-            return Some(snapshot.clone());
-        }
-        let snapshot = self.app.store.core.editor_snapshot(id.clone()).ok()?;
-        self.inspector = Some((id, version, snapshot.clone()));
-        Some(snapshot)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -478,13 +544,8 @@ enum Display {
 impl Render for Takt {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Tokens::for_appearance(window.appearance());
-        // Our own writes move the version too; reading the inspector fresh
-        // after any key keeps it right without a second cache.
-        if self.last_key_ms.is_some() {
-            self.inspector = None;
-        }
         let inspector = if self.app.prefs.right_dock_visible {
-            Some(self.inspector_snapshot())
+            Some(self.app.inspector_stops())
         } else {
             None
         };
@@ -511,13 +572,177 @@ impl Render for Takt {
                         d.child(self.sidebar(t, cx))
                     })
                     .child(self.centre(t, cx))
-                    .when_some(inspector, |d, snapshot| {
-                        d.child(self.right_dock(t, snapshot, cx))
-                    }),
+                    .when_some(inspector, |d, stops| d.child(self.right_dock(t, stops, cx))),
             )
             .child(self.status_bar(t))
             .when(self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))
             })
+    }
+}
+
+// MARK: The input method
+
+impl Takt {
+    /// The field the keyboard types into: the overlay's, or the one open in
+    /// a row or the inspector.
+    fn active_field(&mut self) -> Option<&mut TextField> {
+        if self.app.overlay.is_some() {
+            Some(&mut self.overlay.field)
+        } else if self.app.editing.is_some() {
+            Some(&mut self.field)
+        } else {
+            None
+        }
+    }
+
+    /// After the input method changed the field: what typing would do.
+    fn typed(&mut self, cx: &mut Context<Self>) {
+        if self.app.overlay.is_some() {
+            self.overlay.index = 0;
+            self.overlay.refresh(&self.app);
+        }
+        cx.notify();
+    }
+}
+
+impl Takt {
+    pub(super) fn input_hook(&self) -> Option<InputHook> {
+        Some((self.this.clone(), self.focus.clone()))
+    }
+}
+
+impl EntityInputHandler for Takt {
+    fn text_for_range(
+        &mut self,
+        range: Range<usize>,
+        actual: &mut Option<Range<usize>>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<String> {
+        let field = self.active_field()?;
+        let range = field.range_from_utf16(&range);
+        actual.replace(field.range_to_utf16(&range));
+        field.text.get(range).map(str::to_string)
+    }
+
+    fn selected_text_range(
+        &mut self,
+        _: bool,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
+        let field = self.active_field()?;
+        let selection = field.selection();
+        Some(UTF16Selection {
+            range: field.range_to_utf16(&selection),
+            reversed: field.anchor.is_some_and(|anchor| anchor > field.cursor),
+        })
+    }
+
+    fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> {
+        let field = if self.app.overlay.is_some() {
+            &self.overlay.field
+        } else if self.app.editing.is_some() {
+            &self.field
+        } else {
+            return None;
+        };
+        field
+            .marked
+            .as_ref()
+            .map(|range| field.range_to_utf16(range))
+    }
+
+    fn unmark_text(&mut self, _: &mut Window, _: &mut Context<Self>) {
+        if let Some(field) = self.active_field() {
+            field.marked = None;
+        }
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(field) = self.active_field() else {
+            return;
+        };
+        match range {
+            Some(range) => {
+                let range = field.range_from_utf16(&range);
+                field.replace(range, text);
+            }
+            None => field.insert(text),
+        }
+        self.typed(cx);
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        selected: Option<Range<usize>>,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(field) = self.active_field() else {
+            return;
+        };
+        let range = range
+            .map(|range| field.range_from_utf16(&range))
+            .or_else(|| field.marked.clone())
+            .unwrap_or_else(|| field.selection());
+        // The selection inside the new text is counted in its UTF-16.
+        let selected = selected.map(|selected| {
+            let probe = TextField::new(text);
+            probe.range_from_utf16(&selected)
+        });
+        field.mark(range, text, selected);
+        self.typed(cx);
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        range: Range<usize>,
+        bounds: Bounds<Pixels>,
+        window: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        let field = self.active_field()?;
+        let start = field.offset_from_utf16(range.start);
+        let line_start = field.text[..start].rfind('\n').map_or(0, |ix| ix + 1);
+        let line = field.text[..start].matches('\n').count();
+        let before = field.text[line_start..start].to_string();
+        let style = window.text_style();
+        let run = gpui::TextRun {
+            len: before.len(),
+            font: style.font(),
+            color: style.color,
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+        };
+        let x = window
+            .text_system()
+            .shape_line(before.into(), px(13.), &[run], None)
+            .width;
+        let line_height = px(18.);
+        let top = bounds.top() + line_height * line as f32;
+        Some(Bounds::new(
+            gpui::point(bounds.left() + x, top),
+            gpui::size(px(2.), line_height),
+        ))
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        _: gpui::Point<Pixels>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<usize> {
+        None
     }
 }

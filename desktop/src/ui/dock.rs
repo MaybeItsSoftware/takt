@@ -4,7 +4,7 @@ impl Takt {
     pub(super) fn right_dock(
         &self,
         t: Tokens,
-        snapshot: Option<EditorSnapshot>,
+        stops: Vec<Stop>,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let tab = self.app.prefs.right_dock_tab.clone();
@@ -57,7 +57,7 @@ impl Takt {
             .child(if done {
                 self.done_rail(t, cx).into_any_element()
             } else {
-                self.inspector_pane(t, snapshot).into_any_element()
+                self.inspector_pane(t, stops, cx).into_any_element()
             })
     }
 
@@ -137,107 +137,129 @@ impl Takt {
     pub(super) fn inspector_pane(
         &self,
         t: Tokens,
-        snapshot: Option<EditorSnapshot>,
+        stops: Vec<Stop>,
+        cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let body: AnyElement = match (snapshot, self.app.selected()) {
-            (Some(snapshot), Some(task)) => {
-                let list = self
-                    .app
-                    .list(&task.list_id)
-                    .map(|list| list.name.clone())
-                    .unwrap_or_default();
-                let field = |label: &str, value: String| {
+        let active = self.app.region == Region::Inspector;
+        let cursor = self.app.inspector_cursor.min(stops.len().saturating_sub(1));
+        let editing = match &self.app.editing {
+            Some(Editing::InspectorField { stop, .. }) => Some(*stop),
+            _ => None,
+        };
+        let body: Vec<AnyElement> = if stops.is_empty() {
+            vec![
+                div()
+                    .text_color(t.placeholder)
+                    .child("Nothing selected")
+                    .into_any_element(),
+            ]
+        } else {
+            stops
+                .iter()
+                .enumerate()
+                .map(|(ix, stop)| {
+                    let ringed = active && ix == cursor;
+                    let open = editing == Some(stop.id);
+                    let value: AnyElement = if open {
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .px_1()
+                            .rounded(px(4.))
+                            .border_1()
+                            .border_color(t.accent)
+                            .bg(t.background)
+                            .child(field_text(&self.field, "", t, self.input_hook()))
+                            .into_any_element()
+                    } else {
+                        let tone = if stop.empty {
+                            t.placeholder
+                        } else if stop.kind == StopKind::Action && stop.label.is_empty() {
+                            t.muted
+                        } else {
+                            t.text
+                        };
+                        let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .px_1()
+                            .text_color(tone)
+                            .when(stop.id == "title", |d| {
+                                d.text_size(px(16.)).font_weight(FontWeight::MEDIUM)
+                            })
+                            .when(!multiline, |d| d.truncate())
+                            .when(multiline && !stop.empty, |d| {
+                                d.flex().flex_col().children(
+                                    stop.value
+                                        .lines()
+                                        .map(|line| {
+                                            div()
+                                                .min_h(px(18.))
+                                                .child(SharedString::from(line.to_string()))
+                                        })
+                                        .collect::<Vec<_>>(),
+                                )
+                            })
+                            .when(!multiline || stop.empty, |d| d.child(stop.value.clone()))
+                            .into_any_element()
+                    };
                     div()
-                        .flex()
-                        .gap_2()
-                        .py_1()
-                        .border_b_1()
-                        .border_color(t.border_variant)
+                        .id(("inspector-stop", ix))
+                        .when(stop.group && ix > 0, |d| {
+                            d.mt_1().pt_1().border_t_1().border_color(t.border_variant)
+                        })
                         .child(
                             div()
-                                .w(px(80.))
-                                .flex_none()
-                                .text_color(t.placeholder)
-                                .child(label.to_string()),
+                                .id(("inspector-row", ix))
+                                .flex()
+                                .items_start()
+                                .gap_2()
+                                .py(px(3.))
+                                .px_1()
+                                .rounded(px(4.))
+                                .border_1()
+                                .border_color(if ringed && !open {
+                                    t.accent
+                                } else {
+                                    gpui::transparent_black()
+                                })
+                                .when(ringed, |d| d.bg(t.hover))
+                                .hover(|d| d.bg(t.hover))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    this.app.region = Region::Inspector;
+                                    this.app.inspector_cursor = ix;
+                                    let before = this.app.editing.clone();
+                                    this.app.activate_inspector();
+                                    if this.app.editing != before {
+                                        this.begin_editing();
+                                    }
+                                    this.after_change(cx);
+                                    cx.notify();
+                                }))
+                                .when(!stop.label.is_empty(), |d| {
+                                    d.child(
+                                        div()
+                                            .w(px(84.))
+                                            .flex_none()
+                                            .text_color(t.muted)
+                                            .child(stop.label),
+                                    )
+                                })
+                                .child(value),
                         )
-                        .child(div().flex_1().min_w_0().child(value))
-                };
-                let dash = || "—".to_string();
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(
-                        div()
-                            .text_size(px(16.))
-                            .font_weight(FontWeight::MEDIUM)
-                            .pb_2()
-                            .child(snapshot.title.clone()),
-                    )
-                    .child(field("List", list))
-                    .child(field("Status", status_title(&task.status).into()))
-                    .child(field(
-                        "Due",
-                        snapshot.due_at_ms.map(format_day).unwrap_or_else(dash),
-                    ))
-                    .child(field(
-                        "Estimate",
-                        snapshot
-                            .estimate_seconds
-                            .map(format_duration)
-                            .unwrap_or_else(dash),
-                    ))
-                    .child(field(
-                        "Priority",
-                        snapshot
-                            .metadata
-                            .priority
-                            .map(|p| format!("P{p}"))
-                            .unwrap_or_else(dash),
-                    ))
-                    .child(field(
-                        "Tags",
-                        if snapshot.metadata.tags.is_empty() {
-                            dash()
-                        } else {
-                            snapshot.metadata.tags.join(", ")
-                        },
-                    ))
-                    .child(field(
-                        "Repeats",
-                        snapshot
-                            .metadata
-                            .recurrence_rule
-                            .clone()
-                            .unwrap_or_else(dash),
-                    ))
-                    .child(
-                        div()
-                            .pt_2()
-                            .text_color(if snapshot.notes.is_empty() {
-                                t.placeholder
-                            } else {
-                                t.text
-                            })
-                            .child(if snapshot.notes.is_empty() {
-                                "No notes".to_string()
-                            } else {
-                                snapshot.notes.clone()
-                            }),
-                    )
-                    .into_any_element()
-            }
-            _ => div()
-                .text_color(t.placeholder)
-                .child("Nothing selected")
-                .into_any_element(),
+                        .into_any_element()
+                })
+                .collect()
         };
         div()
             .id("inspector")
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
-            .p_3()
-            .child(body)
+            .p_2()
+            .flex()
+            .flex_col()
+            .children(body)
     }
 }

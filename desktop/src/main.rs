@@ -139,6 +139,21 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 .is_some_and(|s| s.metadata.tags.iter().any(|t| t == "smoke")),
         ));
         let started = Instant::now();
+        let stops = app.inspector_stops().len();
+        app.edit_in_inspector("estimate");
+        app.editing = None;
+        app.commit_inspector_field("estimate", "45");
+        app.commit_inspector_field("notes", "first line\nsecond");
+        let snapshot = app.inspected();
+        app.undo(false);
+        app.undo(false);
+        report.push(format!(
+            "inspector {stops} stops, estimate and notes {:.2} ms (estimate {:?}, notes lines {})",
+            started.elapsed().as_secs_f64() * 1000.0 / 2.0,
+            snapshot.as_ref().and_then(|s| s.estimate_seconds),
+            snapshot.as_ref().map_or(0, |s| s.notes.lines().count()),
+        ));
+        let started = Instant::now();
         app.start_focus_on_selected(true);
         let running = app
             .focus_status()

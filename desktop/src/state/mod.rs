@@ -9,6 +9,7 @@
 pub mod board;
 pub mod commands;
 pub mod focus;
+pub mod inspector;
 pub mod navigation;
 pub mod outline;
 pub mod prefs;
@@ -106,6 +107,11 @@ pub enum Editing {
     NewFolder {
         parent_id: Option<String>,
     },
+    /// A field of the inspector, by its stop.
+    InspectorField {
+        task_id: String,
+        stop: &'static str,
+    },
 }
 
 pub struct App {
@@ -163,6 +169,14 @@ pub struct App {
     /// Where the cursor starts when a title opens for editing.
     pub edit_cursor: commands::EditCursor,
 
+    /// The inspector's row cursor, and its read of the selection keyed by
+    /// the task and the write generation.
+    pub inspector_cursor: usize,
+    pub inspected: Option<((String, u64), takt_core::editor::EditorSnapshot)>,
+    /// Bumped by every write and reload, so caches of what was read know
+    /// to read again. Our own writes do not move `data_version`.
+    pub generation: u64,
+
     // The chrome.
     pub undo_label: Option<String>,
     pub redo_label: Option<String>,
@@ -214,6 +228,9 @@ impl App {
             pending_find: None,
             last_find: None,
             edit_cursor: commands::EditCursor::default(),
+            inspector_cursor: 0,
+            inspected: None,
+            generation: 0,
             undo_label: None,
             redo_label: None,
             message: None,
@@ -345,6 +362,7 @@ impl App {
         match work(&self.store) {
             Ok(value) => {
                 self.message = None;
+                self.generation += 1;
                 self.refresh_history();
                 // Our own write: note the version so the poll does not take
                 // it for another process's.
@@ -390,6 +408,7 @@ impl App {
     /// Reads the sidebar and the scope again, keeping the cursor and the
     /// selection where they were when they still exist.
     pub fn reload_all(&mut self) {
+        self.generation += 1;
         self.reload_focus();
         self.reload_done();
         self.reload_sidebar();

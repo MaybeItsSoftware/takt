@@ -233,6 +233,16 @@ impl App {
             "motionFindRepeat" => self.repeat_find(),
             "motionDismiss" => self.dismiss(),
 
+            // The inspector's cursor
+            "motionInspectorNext" => self.step_inspector(1),
+            "motionInspectorPrevious" => self.step_inspector(-1),
+            "motionInspectorEnds" => self.inspector_to_end(!(key == "gg" || key == "home")),
+            "motionInspectorEdit" => self.activate_inspector(),
+            "motionInspectorClear" => self.clear_inspector_stop(),
+            "motionInspectorLeave" => self.inspector_left(key == "left"),
+            "taskEditNotes" => self.edit_in_inspector("notes"),
+            "taskEditEstimate" => self.edit_in_inspector("estimate"),
+
             other => {
                 let title = self
                     .bindings

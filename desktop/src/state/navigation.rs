@@ -276,6 +276,7 @@ impl App {
         }
         if region == Region::Inspector {
             self.prefs.right_dock_visible = true;
+            self.prefs.right_dock_tab = "inspector".into();
             self.prefs.save();
         }
         self.region = region;

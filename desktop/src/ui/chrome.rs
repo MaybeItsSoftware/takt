@@ -291,7 +291,12 @@ impl Takt {
                             .py_2()
                             .border_b_1()
                             .border_color(t.border_variant)
-                            .child(field_text(&self.overlay.field, placeholder, t)),
+                            .child(field_text(
+                                &self.overlay.field,
+                                placeholder,
+                                t,
+                                self.input_hook(),
+                            )),
                     )
                     .child(
                         uniform_list(
@@ -360,13 +365,13 @@ impl Takt {
             .border_1()
             .border_color(t.accent)
             .bg(t.background)
-            .child(field_text(&self.field, placeholder, t))
+            .child(field_text(&self.field, placeholder, t, self.input_hook()))
     }
 
     pub(super) fn field_inline(&self, t: Tokens, placeholder: &str) -> impl IntoElement {
         div()
             .flex_1()
             .min_w_0()
-            .child(field_text(&self.field, placeholder, t))
+            .child(field_text(&self.field, placeholder, t, self.input_hook()))
     }
 }
