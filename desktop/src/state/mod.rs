@@ -1,0 +1,372 @@
+//! What the window shows and where the keyboard is, held in memory.
+//!
+//! The Swift app's `WorkspaceViewModel`, rebuilt around one rule it never
+//! kept: a write patches what is held, and only another process's write
+//! (`data_version`) reads a scope again. Each concern is its own file:
+//! `sidebar` the left dock's rows and cursor, `outline` the task rows,
+//! `navigation` where you are, `commands` what each catalogue command does.
+
+pub mod board;
+pub mod commands;
+pub mod navigation;
+pub mod outline;
+pub mod prefs;
+pub mod sidebar;
+pub mod store;
+pub mod today;
+
+use crate::keys::{Bindings, Sequence};
+use outline::OutlineRow;
+use prefs::Prefs;
+use sidebar::SidebarRow;
+use std::collections::HashSet;
+use store::Store;
+use takt_core::filter_lists::FilterListRow;
+use takt_core::keymap::CommandSurface;
+use takt_core::records::{FolderRow, ListRow, OutlineItem, TaskRow};
+
+/// Where you are: what the main pane draws its tasks from.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Scope {
+    /// One list, or a task inside it entered as though it were a list.
+    List {
+        list_id: String,
+        entered: Option<String>,
+    },
+    /// Every active list.
+    Everything,
+    /// A folder's lists, its sub-folders' included.
+    Folder(String),
+    /// A saved filter list's matches.
+    FilterList(String),
+}
+
+/// How the main pane draws the scope. Today is a mode, not a scope: the day,
+/// from every list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewMode {
+    Today,
+    Board,
+    Outline,
+    Matrix,
+}
+
+impl ViewMode {
+    pub fn title(self) -> &'static str {
+        match self {
+            ViewMode::Today => "Today",
+            ViewMode::Board => "Board",
+            ViewMode::Outline => "Outline",
+            ViewMode::Matrix => "Matrix",
+        }
+    }
+}
+
+/// Which region has the keyboard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Region {
+    Sidebar,
+    Tasks,
+    Inspector,
+}
+
+/// Something drawn over the panes that owns the keyboard while it is up.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Overlay {
+    CommandPalette,
+    ListNavigator,
+    Search,
+    KeyboardReference,
+}
+
+/// A text field in a row, open for typing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Editing {
+    /// Renaming a task in place.
+    TaskTitle {
+        task_id: String,
+    },
+    /// A new task, drafted in place below, above or under `anchor`.
+    NewTask {
+        list_id: String,
+        parent_id: Option<String>,
+        /// Inserted after this sibling; at the start when absent.
+        after: Option<String>,
+    },
+    /// Renaming a list or folder in the sidebar.
+    SidebarName {
+        row_id: String,
+    },
+    /// A new list or folder, named in the sidebar.
+    NewList {
+        folder_id: Option<String>,
+    },
+    NewFolder {
+        parent_id: Option<String>,
+    },
+}
+
+pub struct App {
+    pub store: Store,
+    pub bindings: Bindings,
+    pub sequence: Sequence,
+    pub prefs: Prefs,
+
+    // What the sidebar is made of.
+    pub folders: Vec<FolderRow>,
+    pub lists: Vec<ListRow>,
+    pub archived_lists: Vec<ListRow>,
+    pub nested_lists: Vec<OutlineItem>,
+    pub filter_lists: Vec<FilterListRow>,
+    pub task_counts: std::collections::HashMap<String, i64>,
+    pub sidebar_rows: Vec<SidebarRow>,
+    pub sidebar_cursor: Option<String>,
+
+    // Where you are.
+    pub scope: Scope,
+    pub view_mode: ViewMode,
+    pub region: Region,
+    pub overlay: Option<Overlay>,
+    pub editing: Option<Editing>,
+    pub back_stack: Vec<String>,
+    pub forward_stack: Vec<String>,
+    walking_history: bool,
+
+    // The tasks on screen: every row the scope holds, and those drawn.
+    pub all_rows: Vec<OutlineRow>,
+    pub rows: Vec<OutlineRow>,
+    /// The day and the ladder, and whether they want ranking again.
+    pub today: today::Today,
+    pub today_stale: bool,
+    /// Ticked off this visit, kept on screen while finished tasks are hidden.
+    pub lingering: HashSet<String>,
+    /// Each task's board column and matrix place, from the scope's board read.
+    pub placements: std::collections::HashMap<String, outline::Placement>,
+    /// A combined scope's cards (every open task) and those its board draws.
+    pub combined_cards: Vec<TaskRow>,
+    pub board_card_ids: Vec<String>,
+    pub board: board::Board,
+    pub selected_task: Option<String>,
+    pub pending_delete: Option<String>,
+    /// `f`/`F` waiting for the letter to find (true: forward).
+    pub pending_find: Option<bool>,
+    pub last_find: Option<(char, bool)>,
+    /// Where the cursor starts when a title opens for editing.
+    pub edit_cursor: commands::EditCursor,
+
+    // The chrome.
+    pub undo_label: Option<String>,
+    pub redo_label: Option<String>,
+    pub message: Option<String>,
+    /// The `data_version` last read, to tell another process's write.
+    pub seen_version: i64,
+}
+
+impl App {
+    pub fn open() -> Result<Self, String> {
+        let store = Store::open()?;
+        let prefs = Prefs::load();
+        let seen_version = store.core.data_version().unwrap_or_default();
+        let mut app = App {
+            store,
+            bindings: Bindings::shipped(),
+            sequence: Sequence::default(),
+            folders: Vec::new(),
+            lists: Vec::new(),
+            archived_lists: Vec::new(),
+            nested_lists: Vec::new(),
+            filter_lists: Vec::new(),
+            task_counts: Default::default(),
+            sidebar_rows: Vec::new(),
+            sidebar_cursor: None,
+            scope: Scope::Everything,
+            view_mode: ViewMode::Outline,
+            region: Region::Tasks,
+            overlay: None,
+            editing: None,
+            back_stack: Vec::new(),
+            forward_stack: Vec::new(),
+            walking_history: false,
+            all_rows: Vec::new(),
+            rows: Vec::new(),
+            lingering: HashSet::new(),
+            placements: Default::default(),
+            combined_cards: Vec::new(),
+            board_card_ids: Vec::new(),
+            board: board::Board::default(),
+            today: today::Today::default(),
+            today_stale: true,
+            selected_task: None,
+            pending_delete: None,
+            pending_find: None,
+            last_find: None,
+            edit_cursor: commands::EditCursor::default(),
+            undo_label: None,
+            redo_label: None,
+            message: None,
+            seen_version,
+            prefs,
+        };
+        app.reload_sidebar();
+        app.restore_scope();
+        app.refresh_history();
+        Ok(app)
+    }
+
+    /// The surface the catalogue resolves keys against.
+    pub fn surface(&self) -> CommandSurface {
+        match self.region {
+            Region::Sidebar => CommandSurface::Sidebar,
+            Region::Inspector => CommandSurface::Inspector,
+            Region::Tasks => match self.view_mode {
+                ViewMode::Today => CommandSurface::Today,
+                ViewMode::Board => CommandSurface::Board,
+                ViewMode::Outline => CommandSurface::Outline,
+                ViewMode::Matrix => CommandSurface::Matrix,
+            },
+        }
+    }
+
+    pub fn list(&self, id: &str) -> Option<&ListRow> {
+        self.lists.iter().find(|list| list.id == id)
+    }
+
+    pub fn folder(&self, id: &str) -> Option<&FolderRow> {
+        self.folders.iter().find(|folder| folder.id == id)
+    }
+
+    pub fn inbox(&self) -> Option<&ListRow> {
+        self.lists
+            .iter()
+            .find(|list| list.system_role.as_deref() == Some("inbox"))
+    }
+
+    pub fn task(&self, id: &str) -> Option<&TaskRow> {
+        self.rows
+            .iter()
+            .map(|row| &row.task)
+            .chain(self.today.rows().map(|row| &row.task))
+            .chain(self.nested_lists.iter().map(|item| &item.task))
+            .find(|task| task.id == id)
+    }
+
+    pub fn selected(&self) -> Option<&TaskRow> {
+        self.selected_task.as_deref().and_then(|id| self.task(id))
+    }
+
+    /// The list a new task goes in: the scope's, or the inbox.
+    pub fn scope_list_id(&self) -> Option<String> {
+        match &self.scope {
+            Scope::List { list_id, .. } => Some(list_id.clone()),
+            _ => self
+                .selected()
+                .map(|task| task.list_id.clone())
+                .or_else(|| self.inbox().map(|inbox| inbox.id.clone())),
+        }
+    }
+
+    /// The list ids a combined scope reads.
+    pub fn scope_list_ids(&self) -> Vec<String> {
+        match &self.scope {
+            Scope::List { list_id, .. } => vec![list_id.clone()],
+            Scope::Everything | Scope::FilterList(_) => {
+                self.lists.iter().map(|list| list.id.clone()).collect()
+            }
+            Scope::Folder(folder_id) => takt_core::sidebar::outline::sidebar_list_ids_in_folder(
+                folder_id.clone(),
+                self.sidebar_folders(),
+                self.sidebar_lists(),
+            ),
+        }
+    }
+
+    /// The scope's name, for the title bar and the tab.
+    pub fn scope_title(&self) -> String {
+        if self.view_mode == ViewMode::Today {
+            return "Today".into();
+        }
+        match &self.scope {
+            Scope::Everything => "Everything".into(),
+            Scope::List { list_id, entered } => {
+                let list = self
+                    .list(list_id)
+                    .map(|list| list.name.clone())
+                    .unwrap_or_default();
+                match entered.as_deref().and_then(|id| self.entered_title(id)) {
+                    Some(title) => format!("{list} › {title}"),
+                    None => list,
+                }
+            }
+            Scope::Folder(id) => self
+                .folder(id)
+                .map(|folder| folder.name.clone())
+                .unwrap_or_default(),
+            Scope::FilterList(id) => self
+                .filter_lists
+                .iter()
+                .find(|filter| &filter.id == id)
+                .map(|filter| filter.name.clone())
+                .unwrap_or_default(),
+        }
+    }
+
+    fn entered_title(&self, id: &str) -> Option<String> {
+        self.task(id).map(|task| task.title.clone()).or_else(|| {
+            self.store
+                .core
+                .task(id.into())
+                .ok()
+                .flatten()
+                .map(|t| t.title)
+        })
+    }
+
+    /// Runs a write through the core and, on success, `patch` on what is
+    /// held. Errors land in the status bar rather than in a dialog.
+    pub fn write<T>(
+        &mut self,
+        work: impl FnOnce(&Store) -> Result<T, takt_core::CoreError>,
+    ) -> Option<T> {
+        match work(&self.store) {
+            Ok(value) => {
+                self.message = None;
+                self.refresh_history();
+                // Our own write: note the version so the poll does not take
+                // it for another process's.
+                self.seen_version = self.store.core.data_version().unwrap_or(self.seen_version);
+                Some(value)
+            }
+            Err(error) => {
+                self.message = Some(error.to_string());
+                None
+            }
+        }
+    }
+
+    pub fn refresh_history(&mut self) {
+        self.undo_label = self.store.core.undoable_label().ok().flatten();
+        self.redo_label = self.store.core.redoable_label().ok().flatten();
+    }
+
+    /// Polled about once a second: another process (the CLI, the MCP
+    /// server, the Swift app, sync) wrote, so what is held is read again.
+    pub fn check_external_writes(&mut self) -> bool {
+        let Ok(version) = self.store.core.data_version() else {
+            return false;
+        };
+        if version == self.seen_version {
+            return false;
+        }
+        self.seen_version = version;
+        self.reload_all();
+        true
+    }
+
+    /// Reads the sidebar and the scope again, keeping the cursor and the
+    /// selection where they were when they still exist.
+    pub fn reload_all(&mut self) {
+        self.reload_sidebar();
+        self.reload_rows();
+        self.refresh_history();
+    }
+}

@@ -20,6 +20,10 @@ pub struct Tokens {
     pub hover: Hsla,
     pub selected: Hsla,
     pub accent: Hsla,
+    /// Zed's status colours: `error`, `success`, `warning`.
+    pub error: Hsla,
+    pub success: Hsla,
+    pub warning: Hsla,
 }
 
 impl Tokens {
@@ -43,6 +47,9 @@ impl Tokens {
             hover: rgba(0x363c46ff).into(),
             selected: rgb(0x454a56).into(),
             accent: rgb(0x74ade8).into(),
+            error: rgb(0xd07277).into(),
+            success: rgb(0xa1c181).into(),
+            warning: rgb(0xdec184).into(),
         }
     }
 
@@ -59,6 +66,9 @@ impl Tokens {
             hover: rgba(0xdfdfe0ff).into(),
             selected: rgb(0xcacaca).into(),
             accent: rgb(0x5c78e2).into(),
+            error: rgb(0xd36151).into(),
+            success: rgb(0x669f59).into(),
+            warning: rgb(0xa48819).into(),
         }
     }
 }

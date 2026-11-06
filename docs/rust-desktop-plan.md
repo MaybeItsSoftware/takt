@@ -56,18 +56,33 @@ keeps working throughout.
    workspace (29 lists): a list switch 0.4 ms median, a tick 2.5–12 ms (all
    of it the core's `set_status` reaching the disk), first frame about 90 ms after launch.
    `TAKT_DESKTOP_SMOKE=1` checks this without anyone at the screen.
-1. **Shell.** Window state persisted; left dock (sidebar with folders and
-   nested lists from `core::sidebar`), right dock, status bar, mode strip;
-   the theme switcher, with Zed's themes; the keymap from the catalogue, with two-key
-   sequences; the command palette (`core::palette`) as the first overlay.
-2. **Editing the outline.** A text input (GPUI ships none; build on its
-   `input.rs` example, with IME), add, rename, indent, move, delete, undo and
-   redo through the core's journal; folding; external writes by polling
-   `data_version`; the write-returns-what-changed patch for every write kind.
-3. **The other views.** Board and matrix, Everything and folders, Today and
-   next up (`core::next_up`, re-ranked only for what a write touched), search,
-   filter lists.
-4. **The inspector.** `core::editor` drafts, conditions, dependencies, links,
+1. **Shell — mostly done.** The sidebar from `core::sidebar` (Today,
+   Everything, the inbox, folders opening and closing, nested and pinned
+   lists, filter lists), its cursor, the mode strip, the right dock, the
+   status bar; where you were, the folds and the docks remembered in
+   `Application Support/Takt/desktop.json` (the Swift app's preferences are
+   left alone). Every key goes through the catalogue (`desktop/src/keys.rs`
+   ports the Swift dispatch rules: which surfaces inherit which keys, the
+   two-key sequences with their 1.2 s hold, chords that reach out of a text
+   field). The command palette, the list navigator, search and the keyboard
+   reference are overlays ranked by `core::palette`. Left: the theme
+   switcher and the user keymap file.
+2. **Editing the outline — mostly done.** A one-line text field
+   (`desktop/src/text_field.rs`; no IME yet); new tasks below, above and as
+   children with Tab and ⇧Tab in the draft; rename (select-all, insert,
+   append); complete, invalidate, delete with Return to confirm; indent,
+   outdent, move up and down, to the next or previous list; due today,
+   tomorrow and cleared; undo and redo through the core's journal; folding;
+   `f`/`F`/`;` find; other processes' writes picked up within a second by
+   `data_version`. A title or status change patches the rows held; a move
+   reads the one list again (about half a millisecond).
+3. **The other views — mostly done.** The board (columns from
+   `core::board_columns`, rule columns included, cards moved with ⌘←/⌘→),
+   the matrix (⌥1–⌥4 to place), Everything and folders, filter lists, and
+   Today (`core::next_up` ranked on a background thread). Left: dragging,
+   column editing, and the board's cross-column subtasks.
+4. **The inspector.** Read-only now: title, list, status, due, estimate,
+   priority, tags, recurrence and notes. Left: editing it through `core::editor` drafts, conditions, dependencies, links,
    recurrence, reminders.
 5. **Focus and the day.** Focus sessions and the focus panel, timeline, done
    rail, dailies, day view, habits, celebrations.
