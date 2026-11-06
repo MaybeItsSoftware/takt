@@ -27,6 +27,9 @@ pub enum KeyOutcome {
 impl App {
     /// A spelled key press with no text field or overlay open.
     pub fn handle_key(&mut self, key: &str, at: Instant) -> KeyOutcome {
+        if self.focus_prompt_key(key) {
+            return KeyOutcome::Handled;
+        }
         if self.confirm_pending_focus(key) {
             return KeyOutcome::Handled;
         }
@@ -130,12 +133,9 @@ impl App {
             "goKeyboardReference" => self.open_overlay(Overlay::KeyboardReference),
 
             // Focus
-            "goFocus" => match self.focus_status() {
-                Some((title, clock, _)) => self.message = Some(format!("{title}  {clock}")),
-                None => self.start_focus_on_selected(false),
-            },
+            "goFocus" => self.wants_panel = Some(true),
             "taskStartFocus" => self.start_focus_on_selected(false),
-            "focusFinish" => self.finish_focus_block(),
+            "focusFinish" => self.request_focus_completion(true),
             "focusStop" => self.stop_focus(),
 
             // The done rail
@@ -307,10 +307,16 @@ impl App {
             "taskToggleDaily" => self.begin_commitment(),
             "taskHabit" => self.begin_habit(),
             "todayStart" => {
-                if self.focus_running() {
-                    self.finish_focus_block()
-                } else {
-                    self.start_focus_on_selected(false)
+                let running = self
+                    .focus_session
+                    .as_ref()
+                    .and_then(|s| s.active_task_id.clone());
+                match (running, self.selected_task.clone()) {
+                    (Some(running), Some(selected)) if running == selected => {
+                        self.request_focus_completion(true)
+                    }
+                    (_, _) if self.focus_running() => self.add_selected_to_focus_queue(),
+                    _ => self.start_focus_on_selected(true),
                 }
             }
             "taskConditions" => self.edit_task_conditions(),

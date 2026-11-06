@@ -132,13 +132,9 @@ impl App {
         }
     }
 
-    /// Finishes the block: the task ticked off and the time logged.
-    pub fn finish_focus_block(&mut self) {
-        self.end_block(true);
-    }
-
     /// Stops the session, logging the time so far without ticking the task.
     pub fn stop_focus(&mut self) {
+        self.focus_prompt = None;
         if !self.end_block(false) {
             return;
         }

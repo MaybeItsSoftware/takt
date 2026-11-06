@@ -377,7 +377,15 @@ impl Takt {
     pub(super) fn status_bar(&self, t: Tokens) -> impl IntoElement {
         let prefix = self.app.sequence.prefix().to_string();
         let pending = !prefix.is_empty() || self.app.pending_delete.is_some();
-        let left = if let Some(digits) = &self.app.number_jump {
+        let celebrated = self
+            .app
+            .celebration
+            .as_ref()
+            .filter(|(_, at)| crate::state::store::now_ms() - at < 5000)
+            .map(|(title, _)| format!("✓ Finished \u{201c}{title}\u{201d}"));
+        let left = if let Some(text) = celebrated {
+            text
+        } else if let Some(digits) = &self.app.number_jump {
             format!(":{digits}")
         } else if !prefix.is_empty() {
             format!("{prefix}…")
@@ -657,6 +665,111 @@ impl Takt {
                             .flex()
                             .flex_col()
                             .children(help),
+                    ),
+            )
+    }
+}
+
+impl Takt {
+    pub(super) fn focus_prompt_sheet(&self, t: Tokens) -> impl IntoElement {
+        let Some(prompt) = self.app.focus_prompt.clone() else {
+            return div();
+        };
+        let selected = prompt.selected();
+        let note_open = matches!(self.app.editing, Some(Editing::FocusNote));
+        let minutes = prompt.seconds / 60;
+        div()
+            .absolute()
+            .top(px(TITLE_BAR_HEIGHT + 48.))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .id("focus-prompt")
+                    .occlude()
+                    .w(px(480.))
+                    .p_4()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .rounded(px(8.))
+                    .bg(t.surface)
+                    .border_1()
+                    .border_color(t.border)
+                    .child(div().text_size(px(15.)).child(if prompt.time_is_up {
+                        "Time's up. How did it go?"
+                    } else {
+                        "How did it go?"
+                    }))
+                    .child(div().text_color(t.muted).child(format!(
+                        "{minutes} minutes on \u{201c}{}\u{201d}",
+                        prompt.title
+                    )))
+                    .when(prompt.scores, |d| {
+                        d.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_3()
+                                .child(
+                                    div()
+                                        .font_family(MONO_FONT)
+                                        .text_size(px(28.))
+                                        .text_color(t.accent)
+                                        .child(format!("×{:.1}", prompt.multiplier())),
+                                )
+                                .child(div().text_color(t.muted).child(format!(
+                                    "{:.1} pts · ↑↓ to change · r resets · \\ scores nothing",
+                                    prompt.points()
+                                ))),
+                        )
+                    })
+                    .child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(4.))
+                            .border_1()
+                            .border_color(if note_open {
+                                t.accent
+                            } else {
+                                t.border_variant
+                            })
+                            .child(if note_open {
+                                field_text(&self.field, "A note for the task", t, self.input_hook())
+                                    .into_any_element()
+                            } else if prompt.note.is_empty() {
+                                div()
+                                    .text_color(t.placeholder)
+                                    .child("n adds a note to the task")
+                                    .into_any_element()
+                            } else {
+                                div().child(prompt.note.clone()).into_any_element()
+                            }),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .children(prompt.choices().into_iter().map(|choice| {
+                                let on = choice == selected;
+                                div()
+                                    .px_2()
+                                    .py_1()
+                                    .rounded(px(4.))
+                                    .border_1()
+                                    .border_color(if on { t.accent } else { t.border_variant })
+                                    .when(on, |d| d.bg(t.selected))
+                                    .child(format!("{}  {}", choice.title(&prompt), choice.key()))
+                            })),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(t.placeholder)
+                            .child("←→ choose · ↩ takes it · esc keeps working"),
                     ),
             )
     }

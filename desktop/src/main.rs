@@ -69,6 +69,10 @@ fn main() {
                 cx.activate(true);
                 if smoke {
                     smoke_test(&mut view.app, window, launched);
+                    if std::env::var_os("TAKT_DESKTOP_SMOKE_PANEL").is_some() {
+                        view.app.wants_panel = Some(true);
+                        view.open_requested_windows(cx);
+                    }
                 }
             })
             .ok();
@@ -216,12 +220,29 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));
     }
+    let shot = std::env::var("TAKT_DESKTOP_SMOKE_SHOT").ok();
     window.on_next_frame(move |_, cx| {
         println!(
             "smoke: {}; first frame {:.0} ms after launch",
             report.join("; "),
             launched.elapsed().as_secs_f64() * 1000.0
         );
-        cx.quit();
+        match shot {
+            // A picture of the screen a moment after, for checking the
+            // drawing by eye; the screen only, never a key sent.
+            Some(path) => {
+                cx.spawn(async move |cx| {
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(1500))
+                        .await;
+                    let _ = std::process::Command::new("/usr/sbin/screencapture")
+                        .args(["-x", &path])
+                        .status();
+                    cx.update(|cx| cx.quit()).ok();
+                })
+                .detach();
+            }
+            None => cx.quit(),
+        }
     });
 }

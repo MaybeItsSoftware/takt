@@ -15,6 +15,7 @@ pub mod conditions;
 pub mod details;
 pub mod docks;
 pub mod focus;
+pub mod focus_prompt;
 pub mod forms;
 pub mod inspector;
 pub mod integrations;
@@ -145,6 +146,8 @@ pub enum Editing {
     CategoryName(Option<String>),
     /// The agent panel's message box.
     AgentMessage,
+    /// The note on the focus prompt.
+    FocusNote,
     /// A field of the inspector, by its stop.
     InspectorField {
         task_id: String,
@@ -210,6 +213,15 @@ pub struct App {
     /// The running focus session, and a task waiting on "start anyway".
     pub focus_session: Option<takt_core::rows::SessionRow>,
     pub pending_focus: Option<String>,
+    /// "How did it go?", while it is asked.
+    pub focus_prompt: Option<focus_prompt::FocusPrompt>,
+    /// The block (or break) whose end has been announced.
+    pub focus_notified: Option<String>,
+    pub focus_checkpointed_at: i64,
+    /// A task just finished, and when: drawn in the status bar a moment.
+    pub celebration: Option<(String, i64)>,
+    /// The floating focus panel asked for (true) or away (false).
+    pub wants_panel: Option<bool>,
     /// The done rail: what was finished in the last fortnight, newest first.
     pub done: Vec<TaskRow>,
     /// Text the palette opens with: an edit's word (`due `, `tag `).
@@ -281,6 +293,11 @@ impl App {
             board: board::Board::default(),
             focus_session: None,
             pending_focus: None,
+            focus_prompt: None,
+            focus_notified: None,
+            focus_checkpointed_at: 0,
+            celebration: None,
+            wants_panel: None,
             done: Vec::new(),
             palette_prefill: None,
             today: today::Today::default(),

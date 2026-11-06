@@ -7,6 +7,7 @@
 
 mod chrome;
 mod dock;
+pub mod panel;
 mod views;
 mod widgets;
 
@@ -46,6 +47,8 @@ pub struct Takt {
     sidebar_scroll: UniformListScrollHandle,
     main_scroll: UniformListScrollHandle,
     last_key_ms: Option<f64>,
+    /// The floating focus panel, while it is open.
+    panel: Option<gpui::WindowHandle<panel::FocusPanel>>,
 }
 
 impl Focusable for Takt {
@@ -65,6 +68,7 @@ impl Takt {
             sidebar_scroll: UniformListScrollHandle::new(),
             main_scroll: UniformListScrollHandle::new(),
             last_key_ms: None,
+            panel: None,
         };
         this.rank_today(cx);
         this.poll_external_writes(cx);
@@ -81,6 +85,8 @@ impl Takt {
                     if this.app.check_external_writes() {
                         this.app.reload_today();
                         this.rank_today(cx);
+                        cx.notify();
+                    } else if this.app.tick_focus() {
                         cx.notify();
                     } else if this.app.focus_running() {
                         // The clock in the status bar, and the running
@@ -100,6 +106,32 @@ impl Takt {
             }
         })
         .detach();
+    }
+
+    /// What the state asked for that only the window can do: the focus
+    /// panel opened or put away.
+    pub fn open_requested_windows(&mut self, cx: &mut Context<Self>) {
+        if let Some(wanted) = self.app.wants_panel.take() {
+            let open = self
+                .panel
+                .as_ref()
+                .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
+            if open && !wanted {
+                if let Some(handle) = self.panel.take() {
+                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                }
+            } else if !open && wanted {
+                // Opened once this update ends: the panel's first draw reads
+                // this entity, which is leased while it updates.
+                let takt = cx.entity();
+                cx.defer(move |cx| {
+                    let handle = panel::open(takt.clone(), cx);
+                    takt.update(cx, |this, _| this.panel = handle);
+                });
+            } else if open && let Some(handle) = &self.panel {
+                let _ = handle.update(cx, |_, window, _| window.activate_window());
+            }
+        }
     }
 
     /// While the agent works, its output is read ten times a second.
@@ -199,6 +231,7 @@ impl Takt {
             self.begin_editing();
         }
         self.after_change(cx);
+        self.open_requested_windows(cx);
         self.last_key_ms = Some(started.elapsed().as_secs_f64() * 1000.0);
         cx.notify();
     }
@@ -408,6 +441,12 @@ impl Takt {
                         self.app.editing = None;
                         self.app.commit_condition_name(id, &text);
                     }
+                    Some(Editing::FocusNote) => {
+                        self.app.editing = None;
+                        if let Some(prompt) = self.app.focus_prompt.as_mut() {
+                            prompt.note = text;
+                        }
+                    }
                     Some(Editing::AgentMessage) => {
                         self.app.send_to_agent(&text);
                         self.field = TextField::multiline("");
@@ -553,6 +592,14 @@ impl Takt {
                     .unwrap_or_default(),
             ),
             Some(Editing::CategoryName(Some(category))) => TextField::selecting_all(category),
+            Some(Editing::FocusNote) => TextField::new(
+                &self
+                    .app
+                    .focus_prompt
+                    .as_ref()
+                    .map(|p| p.note.clone())
+                    .unwrap_or_default(),
+            ),
             Some(Editing::AgentMessage) => {
                 TextField::multiline(&self.app.agent_draft.take().unwrap_or_default())
             }
@@ -721,6 +768,9 @@ impl Render for Takt {
             .child(self.status_bar(t))
             .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
                 d.child(self.rules_sheet(t))
+            })
+            .when(self.app.focus_prompt.is_some(), |d| {
+                d.child(self.focus_prompt_sheet(t))
             })
             .when(self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))
