@@ -72,7 +72,10 @@ keeps working throughout.
    children with Tab and ⇧Tab in the draft; rename (select-all, insert,
    append); complete, invalidate, delete with Return to confirm; indent,
    outdent, move up and down, to the next or previous list; due today,
-   tomorrow and cleared; undo and redo through the core's journal; folding;
+   tomorrow and cleared; the edit commands open the palette with `due `,
+   `start `, `repeat ` or `tag ` typed, and any palette command the core
+   parses (`priority 2`, `untag x`, `list groceries`) runs on the
+   selection; undo and redo through the core's journal; folding;
    `f`/`F`/`;` find; other processes' writes picked up within a second by
    `data_version`. A title or status change patches the rows held; a move
    reads the one list again (about half a millisecond).
@@ -84,7 +87,11 @@ keeps working throughout.
 4. **The inspector.** Read-only now: title, list, status, due, estimate,
    priority, tags, recurrence and notes. Left: editing it through `core::editor` drafts, conditions, dependencies, links,
    recurrence, reminders.
-5. **Focus and the day.** Focus sessions and the focus panel, timeline, done
+5. **Focus and the day — started.** Done: starting a session on a task
+   (the core suggests the length; a task ruled out now asks for Return),
+   the clock in the status bar, finishing the block and stopping; the done
+   rail as a tab of the right dock. Left: the "how did it go?" prompt,
+   breaks, the queue, the focus panel, timeline, done
    rail, dailies, day view, habits, celebrations.
 6. **The platform.** Menu bar status item and its menu, global hotkeys, the
    quick-capture panel, notifications for reminders, keychain, sync
