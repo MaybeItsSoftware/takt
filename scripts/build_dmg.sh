@@ -63,7 +63,13 @@ if [[ -n "$VERSION" ]]; then
   XCODEBUILD_ARGS+=("MARKETING_VERSION=$VERSION")
 fi
 if [[ $DISTRIBUTABLE -eq 1 ]]; then
-  XCODEBUILD_ARGS+=("CODE_SIGN_IDENTITY=$SIGN_IDENTITY")
+  # The team too: a forced identity also reaches the Swift packages' resource
+  # bundles (swift-crypto's), which have no team of their own and are signed
+  # automatically unless told otherwise; both fail the build.
+  XCODEBUILD_ARGS+=("CODE_SIGN_IDENTITY=$SIGN_IDENTITY" "DEVELOPMENT_TEAM=6NQNU5YSC2" "CODE_SIGN_STYLE=Manual")
+  # Notarization refuses a binary with the debugger entitlement Xcode adds
+  # (get-task-allow) or without a secure timestamp.
+  XCODEBUILD_ARGS+=("CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO" "OTHER_CODE_SIGN_FLAGS=--timestamp")
 fi
 
 xcodebuild "${XCODEBUILD_ARGS[@]}" build
@@ -143,11 +149,33 @@ if [[ $DISTRIBUTABLE -eq 1 ]]; then
   # Notarization is what actually clears Gatekeeper; a Developer ID signature
   # on its own still trips "cannot be opened" on a machine that has never seen
   # the app. Stapling then lets it launch without a network round trip.
+  # The keychain profile if there is one, else the App Store Connect API key
+  # scripts/build_app_store.sh uses (~/.config/takt/asc.env), which notarytool
+  # takes as well.
+  notary=()
   if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+    notary=(--keychain-profile "$NOTARY_PROFILE")
+  elif [[ -f "$HOME/.config/takt/asc.env" ]]; then
+    set -a; source "$HOME/.config/takt/asc.env"; set +a
+    key_id="${ASC_KEY_ID:-${APP_STORE_CONNECT_API_KEY_ID:-}}"
+    issuer="${ASC_ISSUER_ID:-${APP_STORE_CONNECT_API_KEY_ISSUER_ID:-}}"
+    content="${ASC_KEY_CONTENT:-${APP_STORE_CONNECT_API_KEY_CONTENT:-}}"
+    if [[ -n "$key_id" && -n "$issuer" && -n "$content" ]]; then
+      key_dir="$(mktemp -d)"; chmod 700 "$key_dir"
+      trap 'rm -rf "$key_dir"' EXIT
+      key_path="$key_dir/AuthKey_$key_id.p8"
+      if [[ "$content" == *"BEGIN PRIVATE KEY"* ]]; then
+        printf '%b\n' "$content" > "$key_path"
+      else
+        printf '%s' "$content" | base64 -D > "$key_path"
+      fi
+      notary=(--key "$key_path" --key-id "$key_id" --issuer "$issuer")
+    fi
+  fi
+
+  if [[ ${#notary[@]} -gt 0 ]]; then
     echo "Submitting to Apple for notarization (this usually takes a few minutes)..."
-    xcrun notarytool submit "$FINAL_DMG" \
-      --keychain-profile "$NOTARY_PROFILE" \
-      --wait
+    xcrun notarytool submit "$FINAL_DMG" "${notary[@]}" --wait
     xcrun stapler staple "$FINAL_DMG"
     xcrun stapler validate "$FINAL_DMG"
     echo "Notarized and stapled."
