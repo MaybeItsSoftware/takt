@@ -3,7 +3,7 @@
 
 use super::store::app_support;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +21,12 @@ pub struct Prefs {
     pub right_dock_tab: String,
     pub bottom_dock_visible: bool,
     pub hide_completed: bool,
+    /// Tasks whose start is still to come, left out.
+    pub hide_later: bool,
+    /// A sidebar row's icon, by list, nested list or folder id.
+    pub icons: HashMap<String, String>,
+    /// In a folder, the list a new task lands in.
+    pub folder_destinations: HashMap<String, String>,
     pub recent_lists: Vec<String>,
     pub recent_commands: Vec<String>,
     pub theme: String,
@@ -40,6 +46,9 @@ impl Default for Prefs {
             right_dock_tab: "inspector".into(),
             bottom_dock_visible: false,
             hide_completed: false,
+            hide_later: false,
+            icons: HashMap::new(),
+            folder_destinations: HashMap::new(),
             recent_lists: Vec::new(),
             recent_commands: Vec::new(),
             theme: "system".into(),

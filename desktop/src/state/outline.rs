@@ -183,6 +183,15 @@ impl App {
                 }
                 continue;
             }
+            let later = self.prefs.hide_later
+                && row.task.status == "open"
+                && self.details.buried.contains(&row.task.id);
+            if later && !self.lingering.contains(&row.task.id) {
+                if row.has_children {
+                    folded_below = Some(row.depth);
+                }
+                continue;
+            }
             if row.has_children && self.prefs.folded_tasks.contains(&row.task.id) {
                 folded_below = Some(row.depth);
             }
@@ -518,8 +527,12 @@ impl App {
             .map(|row| row.task.id.clone())
     }
 
-    pub fn delete_selected(&mut self) {
-        let Some(task) = self.selected().cloned() else {
+    pub fn delete_task(&mut self, id: &str) {
+        let Some(task) = self
+            .task(id)
+            .cloned()
+            .or_else(|| self.store.core.task(id.into()).ok().flatten())
+        else {
             return;
         };
         let index = self.selected_index().unwrap_or(0);
@@ -533,6 +546,9 @@ impl App {
             self.select_row(index);
             if task.item_kind.as_deref() == Some("list") {
                 self.reload_sidebar();
+                if matches!(&self.scope, Scope::List { entered: Some(e), .. } if *e == task.id) {
+                    self.leave_entered_task();
+                }
             }
         }
     }

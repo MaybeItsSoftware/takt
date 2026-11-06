@@ -117,13 +117,67 @@ pub(super) fn check(task: &TaskRow, t: Tokens) -> impl IntoElement {
 }
 
 pub(super) fn title(task: &TaskRow, t: Tokens) -> impl IntoElement {
+    title_greyed(task, false, t)
+}
+
+/// The title, stepped back when the task is blocked or buried.
+pub(super) fn title_greyed(task: &TaskRow, greyed: bool, t: Tokens) -> impl IntoElement {
     let done = task.status != "open";
     div()
         .flex_1()
         .min_w_0()
         .truncate()
         .when(done, |d| d.text_color(t.placeholder).line_through())
+        .when(greyed && !done, |d| d.text_color(t.placeholder))
         .child(task.title.clone())
+}
+
+/// What the details say about a task: priority, waiting on, tags, a link,
+/// blocked or buried.
+pub(super) fn detail_chips(app: &crate::state::App, task: &TaskRow, t: Tokens) -> Vec<AnyElement> {
+    let mut chips: Vec<AnyElement> = Vec::new();
+    let small = |text: String, colour: Hsla| {
+        div()
+            .text_size(px(11.))
+            .text_color(colour)
+            .flex_none()
+            .child(text)
+            .into_any_element()
+    };
+    if app.details.blocked.contains(&task.id) && task.status == "open" {
+        chips.push(small("blocked".into(), t.warning));
+    } else if app.details.buried.contains(&task.id) && task.status == "open" {
+        chips.push(small("later".into(), t.placeholder));
+    }
+    if let Some(meta) = app.meta(&task.id) {
+        if let Some(who) = &meta.waiting_on {
+            chips.push(small(format!("⌛ {who}"), t.muted));
+        }
+        for tag in meta.tags.iter().take(3) {
+            chips.push(small(format!("#{tag}"), t.accent));
+        }
+        if meta.recurrence.is_some() {
+            chips.push(small("↻".into(), t.placeholder));
+        }
+        if meta.linked {
+            chips.push(small("↗".into(), t.placeholder));
+        }
+        if let Some(priority) = meta.priority {
+            let colour = match priority {
+                1 => t.error,
+                2 => t.warning,
+                p if p < 0 => t.placeholder,
+                _ => t.muted,
+            };
+            let label = if priority < 0 {
+                format!("↓{}", -priority)
+            } else {
+                format!("P{priority}")
+            };
+            chips.push(small(label, colour));
+        }
+    }
+    chips
 }
 
 pub(super) fn task_chips(

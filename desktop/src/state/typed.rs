@@ -55,6 +55,15 @@ fn when(raw: &str, zone: &str) -> Option<When> {
         .map(|moment| When::Moment(moment.timestamp_millis()))
 }
 
+/// A moment typed as `fri 4pm` or `tomorrow`: a day alone is nine in the
+/// morning of it, when a follow-up or a reminder is wanted.
+pub fn moment(raw: &str, zone: &str) -> Option<i64> {
+    match when(raw, zone)? {
+        When::Moment(ms) => Some(ms),
+        When::Day(day) => day_start_ms(&day).map(|ms| ms + 9 * 3600 * 1000),
+    }
+}
+
 /// Local midnight of a `yyyy-MM-dd` day, in milliseconds.
 fn day_start_ms(day: &str) -> Option<i64> {
     use chrono::{Local, TimeZone};

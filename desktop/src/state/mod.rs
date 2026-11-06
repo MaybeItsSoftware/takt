@@ -6,12 +6,15 @@
 //! `sidebar` the left dock's rows and cursor, `outline` the task rows,
 //! `navigation` where you are, `commands` what each catalogue command does.
 
+pub mod actions;
 pub mod board;
 pub mod commands;
+pub mod details;
 pub mod focus;
 pub mod inspector;
 pub mod navigation;
 pub mod outline;
+pub mod pickers;
 pub mod prefs;
 pub mod sidebar;
 pub mod store;
@@ -80,6 +83,8 @@ pub enum Overlay {
     ListNavigator,
     Search,
     KeyboardReference,
+    /// A choice about one thing: where it goes, what it waits on.
+    Picker(pickers::Picker),
 }
 
 /// A text field in a row, open for typing.
@@ -141,6 +146,10 @@ pub struct App {
     walking_history: bool,
 
     // The tasks on screen: every row the scope holds, and those drawn.
+    /// Blocked, buried, waiting, linked, priority and tags, by task.
+    pub details: details::Details,
+    /// `:` typed: the digits so far of a row to jump to.
+    pub number_jump: Option<String>,
     pub all_rows: Vec<OutlineRow>,
     pub rows: Vec<OutlineRow>,
     /// The day and the ladder, and whether they want ranking again.
@@ -162,7 +171,7 @@ pub struct App {
     /// Text the palette opens with: an edit's word (`due `, `tag `).
     pub palette_prefill: Option<String>,
     pub selected_task: Option<String>,
-    pub pending_delete: Option<String>,
+    pub pending_delete: Option<actions::PendingDelete>,
     /// `f`/`F` waiting for the letter to find (true: forward).
     pub pending_find: Option<bool>,
     pub last_find: Option<(char, bool)>,
@@ -210,6 +219,8 @@ impl App {
             back_stack: Vec::new(),
             forward_stack: Vec::new(),
             walking_history: false,
+            details: Default::default(),
+            number_jump: None,
             all_rows: Vec::new(),
             rows: Vec::new(),
             lingering: HashSet::new(),
@@ -238,6 +249,7 @@ impl App {
             prefs,
         };
         app.reload_sidebar();
+        app.reload_details();
         app.reload_focus();
         app.reload_done();
         app.restore_scope();
@@ -290,6 +302,7 @@ impl App {
     pub fn scope_list_id(&self) -> Option<String> {
         match &self.scope {
             Scope::List { list_id, .. } => Some(list_id.clone()),
+            Scope::Folder(_) if self.folder_destination().is_some() => self.folder_destination(),
             _ => self
                 .selected()
                 .map(|task| task.list_id.clone())
@@ -412,6 +425,7 @@ impl App {
         self.reload_focus();
         self.reload_done();
         self.reload_sidebar();
+        self.reload_details();
         self.reload_rows();
         self.refresh_history();
     }

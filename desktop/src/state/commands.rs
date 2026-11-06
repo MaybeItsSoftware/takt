@@ -32,11 +32,14 @@ impl App {
         }
         if self.pending_delete.is_some() {
             if key == "enter" {
-                self.delete_selected();
+                self.delete_pending();
             } else {
                 self.pending_delete = None;
                 self.message = None;
             }
+            return KeyOutcome::Handled;
+        }
+        if self.number_jump_key(key) {
             return KeyOutcome::Handled;
         }
         if let Some(forward) = self.pending_find.take() {
@@ -241,6 +244,34 @@ impl App {
             "motionInspectorClear" => self.clear_inspector_stop(),
             "motionInspectorLeave" => self.inspector_left(key == "left"),
             "taskEditNotes" => self.edit_in_inspector("notes"),
+            "taskBury" => self.bury_selected(),
+            "planHideLater" => self.toggle_hide_later(),
+            "planGrowTask" => self.grow_selected(),
+            "planShrinkTask" => self.shrink_selected(),
+            "motionSetPriority" => self.set_priority_from_key(key),
+            "motionGoToNumber" => self.begin_number_jump(),
+            "taskMove" => self.begin_move(),
+            "taskConvertToList" => self.convert_selected(),
+            "taskPromoteList" => self.toggle_promoted(),
+            "taskExtractBranch" => self.extract_branch(),
+            "taskOpenLink" => self.open_first_link(),
+            "taskAddLink" => self.begin_add_link(),
+            "taskShowProgress" => self.show_progress(),
+            "taskAddBlocker" => {
+                self.pick_for_selected_task(|task_id| super::pickers::Picker::Blocker { task_id })
+            }
+            "taskWaiting" => {
+                self.pick_for_selected_task(|task_id| super::pickers::Picker::Waiting { task_id })
+            }
+            "listIcon" => self.begin_icon_pick(),
+            "listRestore" => self.restore_last_archived(),
+            "listComplete" => self.toggle_list_completed(),
+            "listDelete" => self.ask_to_delete_list(),
+            "folderSelectPrevious" => self.select_adjacent_folder(-1),
+            "folderSelectNext" => self.select_adjacent_folder(1),
+            "listNewTaskDestination" => {
+                self.step_new_task_destination(if key.contains('[') { -1 } else { 1 })
+            }
             "taskEditEstimate" => self.edit_in_inspector("estimate"),
 
             other => {
@@ -341,7 +372,7 @@ impl App {
         let Some(task) = self.selected().cloned() else {
             return;
         };
-        self.pending_delete = Some(task.id);
+        self.pending_delete = Some(super::actions::PendingDelete::Task(task.id));
         self.message = Some(format!(
             "Delete \u{201c}{}\u{201d}? Return deletes, any other key keeps it.",
             task.title
@@ -379,6 +410,7 @@ impl App {
                 row.task.due_at_ms = saved.due_at_ms;
                 row.task.estimate_seconds = saved.estimate_seconds;
             }
+            self.patch_details(&id);
             self.layout_rows();
             self.reload_today();
         }
@@ -661,7 +693,7 @@ pub enum EditCursor {
 }
 
 /// Local midnight, `days` from today, in milliseconds.
-fn start_of_local_day(days: i64) -> i64 {
+pub fn start_of_local_day(days: i64) -> i64 {
     use chrono::{Duration, Local, TimeZone};
     let date = Local::now().date_naive() + Duration::days(days);
     let midnight = date.and_hms_opt(0, 0, 0).unwrap_or_default();
@@ -759,6 +791,47 @@ pub const PORTED: &[&str] = &[
     "motionFindBackward",
     "motionFindRepeat",
     "motionDismiss",
+    "doneClose",
+    "doneReopen",
+    "focusFinish",
+    "focusStop",
+    "folderSelectNext",
+    "folderSelectPrevious",
+    "goFocus",
+    "listComplete",
+    "listDelete",
+    "listIcon",
+    "listNewTaskDestination",
+    "listRestore",
+    "motionGoToNumber",
+    "motionInspectorClear",
+    "motionInspectorEdit",
+    "motionInspectorEnds",
+    "motionInspectorLeave",
+    "motionInspectorNext",
+    "motionInspectorPrevious",
+    "motionSetPriority",
+    "planGrowTask",
+    "planHideLater",
+    "planShrinkTask",
+    "taskAddBlocker",
+    "taskAddLink",
+    "taskBury",
+    "taskConvertToList",
+    "taskEditDue",
+    "taskEditEstimate",
+    "taskEditNotes",
+    "taskEditRecurrence",
+    "taskEditStart",
+    "taskEditTags",
+    "taskExtractBranch",
+    "taskMove",
+    "taskOpenLink",
+    "taskPromoteList",
+    "taskShowProgress",
+    "taskStartFocus",
+    "taskWaiting",
+    "windowToggleDoneRail",
 ];
 
 #[cfg(test)]

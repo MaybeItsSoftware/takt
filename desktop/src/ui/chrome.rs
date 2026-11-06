@@ -137,6 +137,13 @@ impl Takt {
             ),
             RowKind::FilterList(_) => ("⌕", None),
         };
+        let custom = match &row.kind {
+            RowKind::List(id) | RowKind::NestedList(id) | RowKind::FilterList(id) => {
+                self.app.prefs.icons.get(id).cloned()
+            }
+            _ => None,
+        };
+        let icon: SharedString = custom.unwrap_or_else(|| icon.to_string()).into();
         let title = self.row_title(&row.kind);
         let target = row.clone();
         div()
@@ -186,7 +193,9 @@ impl Takt {
     pub(super) fn status_bar(&self, t: Tokens) -> impl IntoElement {
         let prefix = self.app.sequence.prefix().to_string();
         let pending = !prefix.is_empty() || self.app.pending_delete.is_some();
-        let left = if !prefix.is_empty() {
+        let left = if let Some(digits) = &self.app.number_jump {
+            format!(":{digits}")
+        } else if !prefix.is_empty() {
             format!("{prefix}…")
         } else if let Some(message) = &self.app.message {
             message.clone()
@@ -261,6 +270,7 @@ impl Takt {
             Some(Overlay::ListNavigator) => "Go to a list…",
             Some(Overlay::Search) => "Search tasks…",
             Some(Overlay::KeyboardReference) => "Filter keys…",
+            Some(Overlay::Picker(ref picker)) => App::picker_prompt(picker),
             None => "",
         };
         let items = self.overlay.items.clone();

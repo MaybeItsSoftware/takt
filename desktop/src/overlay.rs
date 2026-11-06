@@ -21,6 +21,8 @@ pub enum Pick {
         id: String,
         list_id: String,
     },
+    /// A picker's row.
+    Choice(crate::state::pickers::Picker, crate::state::pickers::Choice),
     Nothing,
 }
 
@@ -49,6 +51,16 @@ impl OverlayState {
             Some(Overlay::ListNavigator) => places(app, &query),
             Some(Overlay::Search) => search(app, &query),
             Some(Overlay::KeyboardReference) => reference(app, &query),
+            Some(Overlay::Picker(ref picker)) => app
+                .picker_rows(picker, &query)
+                .into_iter()
+                .map(|row| Item {
+                    title: row.title,
+                    detail: row.detail,
+                    keys: row.keys,
+                    pick: Pick::Choice(picker.clone(), row.choice),
+                })
+                .collect(),
             None => Vec::new(),
         };
         self.index = self.index.min(self.items.len().saturating_sub(1));
@@ -112,6 +124,7 @@ pub fn apply(app: &mut App, pick: Pick) {
             app.selected_task = Some(id);
             app.region = Region::Tasks;
         }
+        Pick::Choice(picker, choice) => app.apply_choice(picker, choice),
         Pick::Nothing => {}
     }
 }

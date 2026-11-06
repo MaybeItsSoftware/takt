@@ -117,8 +117,9 @@ impl Takt {
             .child(if editing {
                 self.field_inline(t, "Task").into_any_element()
             } else {
-                title(&row.task, t).into_any_element()
+                title_greyed(&row.task, self.app.is_greyed(&row.task.id), t).into_any_element()
             })
+            .children(detail_chips(&self.app, &row.task, t))
             .children(task_chips(&row.task, counted, t))
             .into_any_element()
     }
@@ -227,8 +228,9 @@ impl Takt {
                     .child(if editing {
                         self.field_inline(t, "Task").into_any_element()
                     } else {
-                        title(task, t).into_any_element()
-                    }),
+                        title_greyed(task, self.app.is_greyed(&task.id), t).into_any_element()
+                    })
+                    .children(detail_chips(&self.app, task, t)),
             )
             .when(list.is_some() || task.due_at_ms.is_some(), |d| {
                 d.child(
@@ -439,7 +441,8 @@ impl Takt {
                 cx.notify();
             }))
             .child(check(&row.task, t))
-            .child(title(&row.task, t))
+            .child(title_greyed(&row.task, self.app.is_greyed(&row.task.id), t))
+            .children(detail_chips(&self.app, &row.task, t))
             .child(
                 div()
                     .text_size(px(11.))
