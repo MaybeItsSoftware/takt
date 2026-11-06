@@ -102,6 +102,29 @@ impl Takt {
         .detach();
     }
 
+    /// While the agent works, its output is read ten times a second.
+    fn poll_agent(&mut self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(100))
+                    .await;
+                let working = this.update(cx, |this, cx| {
+                    if this.app.drain_agent() {
+                        this.app.reload_today();
+                        this.rank_today(cx);
+                        cx.notify();
+                    }
+                    this.app.agent.working
+                });
+                if !matches!(working, Ok(true)) {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
     /// Ranks the day off the main thread when it has been marked stale.
     fn rank_today(&mut self, cx: &mut Context<Self>) {
         if !self.app.today_stale {
@@ -301,6 +324,44 @@ impl Takt {
     }
 
     fn editing_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        if matches!(self.app.editing, Some(Editing::AgentMessage)) {
+            let m = &keystroke.modifiers;
+            match keystroke.key.as_str() {
+                "enter" if !m.shift && !m.alt => {
+                    let text = std::mem::take(&mut self.field.text);
+                    self.field = TextField::multiline("");
+                    self.app.send_to_agent(&text);
+                    self.poll_agent(cx);
+                    return true;
+                }
+                "enter" => {
+                    self.field.insert("\n");
+                    return true;
+                }
+                "escape" => {
+                    self.app.editing = None;
+                    self.app.region = Region::Tasks;
+                    return true;
+                }
+                "n" if m.platform => {
+                    self.app.agent.reset();
+                    self.field = TextField::multiline("");
+                    return true;
+                }
+                "c" if m.control && self.app.agent.working => {
+                    self.app.agent.end();
+                    self.app
+                        .agent
+                        .entries
+                        .push(crate::state::agent::Entry::Notice {
+                            text: "Stopped.".into(),
+                            error: false,
+                        });
+                    return true;
+                }
+                _ => {}
+            }
+        }
         // The rules editor's Esc leaves it unsaved: rules that don't read
         // yet would otherwise hold it open.
         if keystroke.key == "escape" && matches!(self.app.editing, Some(Editing::Rules(_))) {
@@ -346,6 +407,11 @@ impl Takt {
                     Some(Editing::ConditionName(id)) => {
                         self.app.editing = None;
                         self.app.commit_condition_name(id, &text);
+                    }
+                    Some(Editing::AgentMessage) => {
+                        self.app.send_to_agent(&text);
+                        self.field = TextField::multiline("");
+                        self.poll_agent(cx);
                     }
                     Some(Editing::CategoryName(from)) => {
                         self.app.editing = None;
@@ -487,6 +553,9 @@ impl Takt {
                     .unwrap_or_default(),
             ),
             Some(Editing::CategoryName(Some(category))) => TextField::selecting_all(category),
+            Some(Editing::AgentMessage) => {
+                TextField::multiline(&self.app.agent_draft.take().unwrap_or_default())
+            }
             Some(Editing::InspectorField { stop, .. }) => {
                 let stop = *stop;
                 let text = self.app.inspector_field_text(stop);
@@ -641,7 +710,7 @@ impl Render for Takt {
                     .min_h_0()
                     .flex()
                     .when(self.app.prefs.sidebar_visible, |d| {
-                        d.child(self.sidebar(t, cx))
+                        d.child(self.left_dock(t, cx))
                     })
                     .child(self.centre(t, cx))
                     .when_some(inspector, |d, stops| d.child(self.right_dock(t, stops, cx))),

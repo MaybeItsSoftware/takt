@@ -45,6 +45,10 @@ pub struct Prefs {
     /// The floating panel while a block runs.
     pub focus_panel: bool,
     pub hotkeys_enabled: bool,
+    /// `lists` or `agent`.
+    pub left_dock_tab: String,
+    /// `claude` or `codex`.
+    pub agent_client: String,
 }
 
 impl Default for Prefs {
@@ -78,6 +82,8 @@ impl Default for Prefs {
             focus_sound: true,
             focus_panel: true,
             hotkeys_enabled: true,
+            left_dock_tab: "lists".into(),
+            agent_client: "claude".into(),
         }
     }
 }

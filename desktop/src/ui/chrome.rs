@@ -59,6 +59,194 @@ impl Takt {
             )
     }
 
+    pub(super) fn left_dock(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        let agent = self.app.prefs.left_dock_tab == "agent";
+        let tab = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            let on = self.app.prefs.left_dock_tab == id;
+            div()
+                .id(id)
+                .px_2()
+                .py_1()
+                .text_size(px(12.))
+                .text_color(if on { t.text } else { t.muted })
+                .border_b_1()
+                .border_color(if on {
+                    t.accent
+                } else {
+                    gpui::transparent_black()
+                })
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.app.prefs.left_dock_tab = id.into();
+                    if id == "agent" {
+                        this.app.region = Region::Agent;
+                        this.app.editing = Some(Editing::AgentMessage);
+                        this.begin_editing();
+                    } else if this.app.region == Region::Agent {
+                        this.app.region = Region::Sidebar;
+                        this.app.editing = None;
+                    }
+                    this.app.prefs.save();
+                    cx.notify();
+                }))
+                .child(label)
+        };
+        div()
+            .w(px(
+                self.app.prefs.sidebar_width.clamp(180., 420.) * if agent { 1.5 } else { 1. }
+            ))
+            .flex_none()
+            .h_full()
+            .flex()
+            .flex_col()
+            .bg(t.surface)
+            .border_r_1()
+            .border_color(
+                if matches!(self.app.region, Region::Sidebar | Region::Agent) {
+                    t.accent
+                } else {
+                    t.border
+                },
+            )
+            .child(
+                div()
+                    .flex()
+                    .gap_1()
+                    .px_2()
+                    .border_b_1()
+                    .border_color(t.border_variant)
+                    .child(tab("lists", "Lists", cx))
+                    .child(tab("agent", "Agent", cx)),
+            )
+            .child(if agent {
+                self.agent_pane(t).into_any_element()
+            } else {
+                self.sidebar(t, cx).into_any_element()
+            })
+            .into_any_element()
+    }
+
+    pub(super) fn agent_pane(&self, t: Tokens) -> impl IntoElement {
+        use crate::state::agent::{Client, Entry};
+        let client = self
+            .app
+            .agent
+            .client
+            .unwrap_or_else(|| Client::from_pref(&self.app.prefs.agent_client));
+        let typing = matches!(self.app.editing, Some(Editing::AgentMessage));
+        let entries = self
+            .app
+            .agent
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(ix, entry)| {
+                let base = div().id(("agent-entry", ix)).px_3().py_1();
+                match entry {
+                    Entry::User(text) => base
+                        .bg(t.background)
+                        .border_l_2()
+                        .border_color(t.accent)
+                        .child(text.clone())
+                        .into_any_element(),
+                    Entry::Assistant(text) => base.child(text.clone()).into_any_element(),
+                    Entry::Tool {
+                        name,
+                        summary,
+                        write,
+                        failed,
+                        ..
+                    } => base
+                        .mx_2()
+                        .rounded(px(4.))
+                        .border_1()
+                        .border_color(match failed {
+                            Some(true) => t.error,
+                            _ if *write => t.success,
+                            _ => t.border_variant,
+                        })
+                        .text_size(px(11.))
+                        .child(
+                            div()
+                                .font_family(MONO_FONT)
+                                .text_color(if *write { t.text } else { t.muted })
+                                .child(format!(
+                                    "{}{name}{}",
+                                    if *write { "✎ " } else { "· " },
+                                    match failed {
+                                        None => "…",
+                                        Some(true) => " — failed",
+                                        Some(false) if *write => " — done, ⌘Z undoes",
+                                        Some(false) => "",
+                                    }
+                                )),
+                        )
+                        .when(!summary.is_empty(), |d| {
+                            d.child(div().text_color(t.placeholder).child(summary.clone()))
+                        })
+                        .into_any_element(),
+                    Entry::Notice { text, error } => base
+                        .text_size(px(11.))
+                        .text_color(if *error { t.error } else { t.muted })
+                        .child(text.clone())
+                        .into_any_element(),
+                }
+            });
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .px_3()
+                    .py_1()
+                    .flex()
+                    .justify_between()
+                    .text_size(px(11.))
+                    .text_color(t.placeholder)
+                    .child(client.name())
+                    .child(if self.app.agent.working { "working…" } else { "⌘N new thread" }),
+            )
+            .child(
+                div()
+                    .id("agent-entries")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .when(self.app.agent.entries.is_empty(), |d| {
+                        d.child(
+                            div()
+                                .p_3()
+                                .text_color(t.placeholder)
+                                .child("Ask about your tasks, or ask for a change. Changes apply at once; ⌘Z takes each back."),
+                        )
+                    })
+                    .children(entries),
+            )
+            .child(
+                div()
+                    .m_2()
+                    .px_2()
+                    .py_1()
+                    .min_h(px(54.))
+                    .rounded(px(4.))
+                    .border_1()
+                    .border_color(if typing { t.accent } else { t.border })
+                    .bg(t.background)
+                    .child(if typing {
+                        field_text(&self.field, "Message…", t, self.input_hook()).into_any_element()
+                    } else {
+                        div()
+                            .text_color(t.placeholder)
+                            .child("Message… (click or ⇧⌘A)")
+                            .into_any_element()
+                    }),
+            )
+    }
+
     pub(super) fn sidebar(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
         let active = self.app.region == Region::Sidebar;
         let new_item = match &self.app.editing {
@@ -67,14 +255,10 @@ impl Takt {
             _ => None,
         };
         div()
-            .w(px(self.app.prefs.sidebar_width.clamp(180., 420.)))
-            .flex_none()
-            .h_full()
+            .flex_1()
+            .min_h_0()
             .flex()
             .flex_col()
-            .bg(t.surface)
-            .border_r_1()
-            .border_color(t.border)
             .when_some(new_item, |d, placeholder| {
                 d.child(self.field_row(t, placeholder, 0., true))
             })
@@ -202,6 +386,7 @@ impl Takt {
         } else {
             match self.app.region {
                 Region::Sidebar => "Sidebar".into(),
+                Region::Agent => "Agent".into(),
                 Region::Tasks => self.app.view_mode.title().into(),
                 Region::Inspector => "Inspector".into(),
                 Region::Conditions => "Conditions".into(),

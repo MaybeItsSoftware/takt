@@ -194,6 +194,25 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
         app.settings_rows().len(),
         app.diagnostics_rows().len()
     ));
+    if std::env::var_os("TAKT_DESKTOP_SMOKE_AGENT").is_some() {
+        let started = Instant::now();
+        app.send_to_agent("How many lists are in the sidebar? Answer with the number only.");
+        while app.agent.working && started.elapsed().as_secs() < 120 {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            app.drain_agent();
+        }
+        let said: Vec<String> = app
+            .agent
+            .entries
+            .iter()
+            .map(|entry| format!("{entry:?}").chars().take(120).collect())
+            .collect();
+        report.push(format!(
+            "agent {:.1} s: {}",
+            started.elapsed().as_secs_f64(),
+            said.join(" | ")
+        ));
+    }
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));
     }

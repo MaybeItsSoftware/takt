@@ -282,6 +282,10 @@ impl App {
             }
             "listIcon" => self.begin_icon_pick(),
             "listSettings" => self.begin_list_settings(),
+            "windowToggleAgentPanel" => self.toggle_agent_panel(),
+            "windowUseClaudeCode" => self.use_agent(super::agent::Client::ClaudeCode),
+            "windowUseCodex" => self.use_agent(super::agent::Client::Codex),
+            "taskAskAgent" => self.ask_agent_about_selected(),
             "windowOpenKeymap" => self.open_keymap_file(),
             "windowReloadKeymap" => self.reload_keymap(),
             "windowOpenThemesFolder" => self.open_themes_folder(),
@@ -946,6 +950,10 @@ pub const PORTED: &[&str] = &[
     "windowReloadKeymap",
     "windowReloadThemes",
     "windowShowDiagnostics",
+    "taskAskAgent",
+    "windowToggleAgentPanel",
+    "windowUseClaudeCode",
+    "windowUseCodex",
 ];
 
 #[cfg(test)]

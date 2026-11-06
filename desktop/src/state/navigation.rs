@@ -267,6 +267,9 @@ impl App {
     // MARK: Regions
 
     pub fn focus_region(&mut self, region: Region) {
+        if region == Region::Sidebar && self.prefs.left_dock_tab == "agent" {
+            self.prefs.left_dock_tab = "lists".into();
+        }
         if region == Region::Sidebar {
             self.return_to_sidebar();
             return;

@@ -7,6 +7,7 @@
 //! `navigation` where you are, `commands` what each catalogue command does.
 
 pub mod actions;
+pub mod agent;
 pub mod board;
 pub mod columns;
 pub mod commands;
@@ -89,6 +90,8 @@ pub enum Region {
     Done,
     /// The bottom dock's timeline.
     Timeline,
+    /// The left dock's agent panel.
+    Agent,
 }
 
 /// Something drawn over the panes that owns the keyboard while it is up.
@@ -140,6 +143,8 @@ pub enum Editing {
     ConditionName(Option<String>),
     /// A condition category's new name; the category, none for "Other".
     CategoryName(Option<String>),
+    /// The agent panel's message box.
+    AgentMessage,
     /// A field of the inspector, by its stop.
     InspectorField {
         task_id: String,
@@ -180,6 +185,9 @@ pub struct App {
     pub conditions: conditions::Conditions,
     /// The themes and the keymap file, and what in them could not be read.
     pub library: library::Library,
+    pub agent: agent::Agent,
+    /// Text the agent's message box opens with.
+    pub agent_draft: Option<String>,
     /// The done rail's cursor.
     pub done_cursor: Option<String>,
     pub timeline: review::Timeline,
@@ -258,6 +266,8 @@ impl App {
             details: Default::default(),
             conditions: Default::default(),
             library: Default::default(),
+            agent: Default::default(),
+            agent_draft: None,
             done_cursor: None,
             timeline: Default::default(),
             progress: None,
@@ -312,6 +322,7 @@ impl App {
             Region::Conditions => CommandSurface::Conditions,
             Region::Done => CommandSurface::Done,
             Region::Timeline => CommandSurface::Timeline,
+            Region::Agent => CommandSurface::Anywhere,
             Region::Tasks => match self.view_mode {
                 ViewMode::Today => CommandSurface::Today,
                 ViewMode::Board => CommandSurface::Board,
