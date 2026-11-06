@@ -23,6 +23,7 @@ pub enum Pick {
     },
     /// A picker's row.
     Choice(crate::state::pickers::Picker, crate::state::pickers::Choice),
+    Setting(&'static str),
     Nothing,
 }
 
@@ -51,6 +52,23 @@ impl OverlayState {
             Some(Overlay::ListNavigator) => places(app, &query),
             Some(Overlay::Search) => search(app, &query),
             Some(Overlay::KeyboardReference) => reference(app, &query),
+            Some(Overlay::Settings) => settings(app, &query),
+            Some(Overlay::Diagnostics) => app
+                .diagnostics_rows()
+                .into_iter()
+                .filter(|(title, detail)| {
+                    let q = query.to_lowercase();
+                    q.is_empty()
+                        || title.to_lowercase().contains(&q)
+                        || detail.to_lowercase().contains(&q)
+                })
+                .map(|(title, detail)| Item {
+                    title,
+                    detail,
+                    keys: String::new(),
+                    pick: Pick::Nothing,
+                })
+                .collect(),
             Some(Overlay::Picker(ref picker)) => app
                 .picker_rows(picker, &query)
                 .into_iter()
@@ -127,7 +145,19 @@ pub fn apply(app: &mut App, pick: Pick) {
             app.selected_task = Some(id);
             app.region = Region::Tasks;
         }
-        Pick::Choice(picker, choice) => app.apply_choice(picker, choice),
+        Pick::Choice(picker, choice) => {
+            let back_to_settings = matches!(
+                picker,
+                crate::state::pickers::Picker::Theme
+                    | crate::state::pickers::Picker::Appearance
+                    | crate::state::pickers::Picker::CaptureList
+            );
+            app.apply_choice(picker, choice);
+            if back_to_settings && app.overlay.is_none() {
+                app.open_overlay(Overlay::Settings);
+            }
+        }
+        Pick::Setting(id) => app.change_setting(id),
         Pick::Nothing => {}
     }
 }
@@ -330,6 +360,37 @@ fn reference(app: &App, query: &str) -> Vec<Item> {
                     Pick::Nothing
                 },
             }
+        })
+        .collect()
+}
+
+fn settings(app: &App, query: &str) -> Vec<Item> {
+    let rows = app.settings_rows();
+    let candidates = rows
+        .iter()
+        .map(|row| PaletteCandidate {
+            title: row.title.clone(),
+            detail: row.group.into(),
+            keys: Vec::new(),
+            boost: 0,
+        })
+        .collect();
+    let order: Vec<usize> = if query.trim().is_empty() {
+        (0..rows.len()).collect()
+    } else {
+        palette_rank(query.into(), candidates)
+            .into_iter()
+            .map(|ix| ix as usize)
+            .collect()
+    };
+    order
+        .into_iter()
+        .filter_map(|ix| rows.get(ix))
+        .map(|row| Item {
+            title: row.title.clone(),
+            detail: row.group.into(),
+            keys: row.value.clone(),
+            pick: Pick::Setting(row.id),
         })
         .collect()
 }

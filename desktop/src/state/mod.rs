@@ -16,12 +16,15 @@ pub mod docks;
 pub mod focus;
 pub mod forms;
 pub mod inspector;
+pub mod integrations;
+pub mod library;
 pub mod navigation;
 pub mod outline;
 pub mod pickers;
 pub mod prefs;
 pub mod review;
 pub mod rules;
+pub mod settings;
 pub mod sidebar;
 pub mod store;
 pub mod today;
@@ -97,6 +100,9 @@ pub enum Overlay {
     KeyboardReference,
     /// A choice about one thing: where it goes, what it waits on.
     Picker(pickers::Picker),
+    /// What the app knows about itself: files, problems, timings.
+    Diagnostics,
+    Settings,
 }
 
 /// A text field in a row, open for typing.
@@ -172,6 +178,8 @@ pub struct App {
     pub details: details::Details,
     /// The Conditions tab: the conditions, what holds, the cursor.
     pub conditions: conditions::Conditions,
+    /// The themes and the keymap file, and what in them could not be read.
+    pub library: library::Library,
     /// The done rail's cursor.
     pub done_cursor: Option<String>,
     pub timeline: review::Timeline,
@@ -249,6 +257,7 @@ impl App {
             walking_history: false,
             details: Default::default(),
             conditions: Default::default(),
+            library: Default::default(),
             done_cursor: None,
             timeline: Default::default(),
             progress: None,
@@ -282,6 +291,11 @@ impl App {
         };
         app.reload_sidebar();
         app.reload_details();
+        app.reload_themes();
+        if library::keymap_path().exists() {
+            app.reload_keymap();
+            app.message = None;
+        }
         app.reload_conditions();
         app.reload_focus();
         app.reload_done();

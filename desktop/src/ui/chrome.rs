@@ -274,6 +274,8 @@ impl Takt {
             Some(Overlay::Search) => "Search tasks…",
             Some(Overlay::KeyboardReference) => "Filter keys…",
             Some(Overlay::Picker(ref picker)) => App::picker_prompt(picker),
+            Some(Overlay::Settings) => "Settings…",
+            Some(Overlay::Diagnostics) => "Diagnostics…",
             None => "",
         };
         let items = self.overlay.items.clone();

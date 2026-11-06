@@ -8,6 +8,8 @@ pub struct Store {
     pub core: Arc<CoreWorkspace>,
     pub workspace_id: String,
     pub zone: String,
+    /// The database's path, for diagnostics.
+    pub path: String,
 }
 
 impl Store {
@@ -23,13 +25,14 @@ impl Store {
         }
         let path = path.to_string_lossy().into_owned();
         takt_core::schema::migrate_workspace(path.clone()).map_err(|e| e.to_string())?;
-        let core = CoreWorkspace::open(path).map_err(|e| e.to_string())?;
+        let core = CoreWorkspace::open(path.clone()).map_err(|e| e.to_string())?;
         let workspace_id = core.bootstrap(now_ms()).map_err(|e| e.to_string())?;
         let zone = iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".into());
         Ok(Store {
             core,
             workspace_id,
             zone,
+            path,
         })
     }
 }

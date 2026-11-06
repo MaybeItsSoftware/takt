@@ -2,7 +2,19 @@
 //! Zed's default themes, One Dark and One Light, so the app reads as Zed
 //! does. Components only touch these roles.
 
-use gpui::{Hsla, WindowAppearance, rgb, rgba};
+use crate::state::library::Theme;
+use gpui::{Hsla, Rgba, WindowAppearance, rgb, rgba};
+use takt_core::theme::model::{CoreThemeAppearance, CoreThemeColor, CoreThemeSpecification};
+
+fn colour(c: CoreThemeColor) -> Hsla {
+    Rgba {
+        r: c.red as f32,
+        g: c.green as f32,
+        b: c.blue as f32,
+        a: c.alpha as f32,
+    }
+    .into()
+}
 
 #[derive(Clone, Copy)]
 pub struct Tokens {
@@ -27,10 +39,56 @@ pub struct Tokens {
 }
 
 impl Tokens {
-    pub fn for_appearance(appearance: WindowAppearance) -> Self {
-        match appearance {
-            WindowAppearance::Dark | WindowAppearance::VibrantDark => Self::one_dark(),
-            WindowAppearance::Light | WindowAppearance::VibrantLight => Self::one_light(),
+    /// The tokens of the theme in force, in the appearance asked for
+    /// (`system` follows the window's).
+    pub fn of(theme: &Theme, appearance: WindowAppearance, wanted: &str) -> Self {
+        let dark = match wanted {
+            "light" => false,
+            "dark" => true,
+            _ => matches!(
+                appearance,
+                WindowAppearance::Dark | WindowAppearance::VibrantDark
+            ),
+        };
+        match theme {
+            Theme::Zed => {
+                if dark {
+                    Self::one_dark()
+                } else {
+                    Self::one_light()
+                }
+            }
+            Theme::Spec(spec) => {
+                let appearance = match spec.locked_appearance {
+                    Some(locked) => locked,
+                    None if dark => CoreThemeAppearance::Dark,
+                    None => CoreThemeAppearance::Light,
+                };
+                Self::from_spec(spec, appearance)
+            }
+        }
+    }
+
+    fn from_spec(spec: &CoreThemeSpecification, appearance: CoreThemeAppearance) -> Self {
+        let role = |name: &str| colour(spec.palette.color(name, appearance));
+        let paper = spec.palette.color("paper", appearance);
+        let primary = spec.palette.color("primary", appearance);
+        let selected = takt_core::theme::color::mix(&paper, &primary, 0.16);
+        Tokens {
+            background: role("paper"),
+            surface: role("altRow"),
+            chrome: role("well"),
+            border: role("border"),
+            border_variant: role("borderMuted"),
+            text: role("ink"),
+            muted: role("mutedText"),
+            placeholder: role("dimText"),
+            hover: role("hover"),
+            selected: colour(selected),
+            accent: role("primary"),
+            error: role("danger"),
+            success: role("success"),
+            warning: role("warning"),
         }
     }
 

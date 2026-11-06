@@ -150,6 +150,12 @@ impl Takt {
             cx.quit();
             return;
         }
+        if keystroke.modifiers.platform && keystroke.key == "," && self.app.editing.is_none() {
+            self.app.open_overlay(crate::state::Overlay::Settings);
+            self.open_overlay_field();
+            cx.notify();
+            return;
+        }
         if keystroke.modifiers.platform && keystroke.key == "w" {
             window.remove_window();
             return;
@@ -605,7 +611,11 @@ enum Display {
 
 impl Render for Takt {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = Tokens::for_appearance(window.appearance());
+        let t = Tokens::of(
+            &self.app.theme(),
+            window.appearance(),
+            &self.app.prefs.appearance,
+        );
         let inspector = if self.app.prefs.right_dock_visible {
             Some(self.app.inspector_stops())
         } else {

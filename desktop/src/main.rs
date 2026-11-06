@@ -8,6 +8,7 @@
 
 mod keys;
 mod overlay;
+mod platform;
 mod state;
 mod text_field;
 mod theme;
@@ -187,6 +188,12 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             started.elapsed().as_secs_f64() * 1000.0
         ));
     }
+    report.push(format!(
+        "{} themes, {} settings, {} diagnostics",
+        app.library.themes.len(),
+        app.settings_rows().len(),
+        app.diagnostics_rows().len()
+    ));
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));
     }

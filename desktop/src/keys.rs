@@ -231,6 +231,26 @@ impl Bindings {
         Self::new(workspace_command_catalog(), HashMap::new())
     }
 
+    /// The catalogue with `keymap.json` laid over it, and what in the file
+    /// could not be applied.
+    pub fn with_user_keymap(text: &str) -> (Self, Vec<String>) {
+        let parsed = takt_core::keymap::keymap_parse(text.to_string());
+        let resolved =
+            takt_core::keymap::keymap_resolve(parsed.bindings, workspace_command_catalog());
+        let unbound = resolved
+            .unbound
+            .into_iter()
+            .map(|entry| (entry.surface, entry.keys.into_iter().collect()))
+            .collect();
+        let issues = parsed
+            .issues
+            .into_iter()
+            .chain(resolved.issues)
+            .map(|issue| issue.message)
+            .collect();
+        (Self::new(resolved.commands, unbound), issues)
+    }
+
     pub fn new(
         commands: Vec<CommandEntry>,
         unbound: HashMap<CommandSurface, HashSet<String>>,

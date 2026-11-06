@@ -282,6 +282,24 @@ impl App {
             }
             "listIcon" => self.begin_icon_pick(),
             "listSettings" => self.begin_list_settings(),
+            "windowOpenKeymap" => self.open_keymap_file(),
+            "windowReloadKeymap" => self.reload_keymap(),
+            "windowOpenThemesFolder" => self.open_themes_folder(),
+            "windowReloadThemes" => {
+                self.reload_themes();
+                let issues = self.library.theme_issues.len();
+                self.message = Some(format!(
+                    "{} themes{}.",
+                    self.library.themes.len(),
+                    if issues > 0 {
+                        format!(", {issues} problems: see diagnostics")
+                    } else {
+                        String::new()
+                    }
+                ));
+            }
+            "windowExportTheme" => self.export_theme(),
+            "windowShowDiagnostics" => self.open_overlay(Overlay::Diagnostics),
             "taskToggleDaily" => self.begin_commitment(),
             "taskHabit" => self.begin_habit(),
             "todayStart" => {
@@ -405,6 +423,10 @@ impl App {
         let Some(task) = self.selected().cloned() else {
             return;
         };
+        if !self.prefs.confirm_delete {
+            self.delete_task(&task.id);
+            return;
+        }
         self.pending_delete = Some(super::actions::PendingDelete::Task(task.id));
         self.message = Some(format!(
             "Delete \u{201c}{}\u{201d}? Return deletes, any other key keeps it.",
@@ -918,6 +940,12 @@ pub const PORTED: &[&str] = &[
     "taskHabit",
     "taskToggleDaily",
     "todayStart",
+    "windowExportTheme",
+    "windowOpenKeymap",
+    "windowOpenThemesFolder",
+    "windowReloadKeymap",
+    "windowReloadThemes",
+    "windowShowDiagnostics",
 ];
 
 #[cfg(test)]

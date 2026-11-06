@@ -33,6 +33,18 @@ pub struct Prefs {
     pub recent_lists: Vec<String>,
     pub recent_commands: Vec<String>,
     pub theme: String,
+    /// `system`, `light` or `dark`.
+    pub appearance: String,
+    pub confirm_delete: bool,
+    /// The list quick capture lands in; the inbox when none.
+    pub quick_capture_list: Option<String>,
+    pub launch_at_login: bool,
+    pub scores_each_block: bool,
+    pub focus_notifications: bool,
+    pub focus_sound: bool,
+    /// The floating panel while a block runs.
+    pub focus_panel: bool,
+    pub hotkeys_enabled: bool,
 }
 
 impl Default for Prefs {
@@ -56,7 +68,16 @@ impl Default for Prefs {
             folded_conditions: HashSet::new(),
             recent_lists: Vec::new(),
             recent_commands: Vec::new(),
-            theme: "system".into(),
+            theme: "zed".into(),
+            appearance: "system".into(),
+            confirm_delete: true,
+            quick_capture_list: None,
+            launch_at_login: false,
+            scores_each_block: true,
+            focus_notifications: true,
+            focus_sound: true,
+            focus_panel: true,
+            hotkeys_enabled: true,
         }
     }
 }

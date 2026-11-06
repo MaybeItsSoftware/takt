@@ -13,29 +13,54 @@ use takt_core::tasks::NewTask;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Picker {
     /// Where a task (or a nested list, which is a task) goes.
-    MoveTask { task_id: String },
+    MoveTask {
+        task_id: String,
+    },
     /// Where a sidebar list goes: a folder, the top level, or into a list.
-    MoveList { list_id: String },
+    MoveList {
+        list_id: String,
+    },
     /// A task for `task_id` to wait on, or a new one typed.
-    Blocker { task_id: String },
+    Blocker {
+        task_id: String,
+    },
     /// An address to link, or one of the task's links to open or remove.
-    Link { task_id: String },
+    Link {
+        task_id: String,
+    },
     /// `who, when, every n days`.
-    Waiting { task_id: String },
+    Waiting {
+        task_id: String,
+    },
     /// A sidebar row's icon: a list, a nested list, a folder.
-    Icon { row_id: String },
+    Icon {
+        row_id: String,
+    },
     /// Where you are: a place, or anywhere.
     Place,
     /// The conditions a task needs; stays open while you tick.
-    TaskConditions { task_id: String },
+    TaskConditions {
+        task_id: String,
+    },
     /// What a condition switches on while it holds; stays open.
-    Provides { condition_id: String },
+    Provides {
+        condition_id: String,
+    },
     /// The category a condition is filed under, or a new one typed.
-    Category { condition_id: String },
+    Category {
+        condition_id: String,
+    },
     /// The condition another is merged into.
-    Merge { from: String },
+    Merge {
+        from: String,
+    },
     /// The conditions each day starts with; stays open.
     DayStart,
+    Theme,
+    /// Light, dark, or as the system is.
+    Appearance,
+    /// The list quick capture lands in.
+    CaptureList,
 }
 
 impl Picker {
@@ -80,6 +105,9 @@ pub enum Choice {
     Category(Option<String>),
     MergeInto(String),
     DayStartCondition(String),
+    Theme(String),
+    Appearance(String),
+    CaptureList(Option<String>),
 }
 
 /// A row: title, detail, the key hint, and what picking it does.
@@ -164,6 +192,9 @@ impl App {
             Picker::Category { .. } => "File under a category, or type a new one…",
             Picker::Merge { .. } => "Merge into…",
             Picker::DayStart => "What each day starts with…",
+            Picker::Theme => "Choose a theme…",
+            Picker::Appearance => "Light, dark, or the system's…",
+            Picker::CaptureList => "Where quick capture lands…",
         }
     }
 
@@ -272,6 +303,57 @@ impl App {
                             format!("{} {}", if on { "☑" } else { "☐" }, c.name),
                             takt_core::conditions::effective_category(c).unwrap_or_default(),
                             Choice::DayStartCondition(c.id.clone()),
+                        )
+                    })
+                    .collect();
+                ranked(rows, query)
+            }
+            Picker::Theme => {
+                let current = self.prefs.theme.clone();
+                let rows = self
+                    .library
+                    .themes
+                    .iter()
+                    .map(|theme| {
+                        row(
+                            theme.name(),
+                            if theme.id() == current {
+                                "in force"
+                            } else {
+                                ""
+                            },
+                            Choice::Theme(theme.id()),
+                        )
+                    })
+                    .collect();
+                ranked(rows, query)
+            }
+            Picker::CaptureList => {
+                let rows = std::iter::once(row("Inbox", "", Choice::CaptureList(None)))
+                    .chain(
+                        self.lists_in_sidebar_order()
+                            .into_iter()
+                            .map(|id| row(self.list_name(&id), "", Choice::CaptureList(Some(id)))),
+                    )
+                    .collect();
+                ranked(rows, query)
+            }
+            Picker::Appearance => {
+                let rows = ["system", "light", "dark"]
+                    .into_iter()
+                    .map(|mode| {
+                        row(
+                            match mode {
+                                "light" => "Light",
+                                "dark" => "Dark",
+                                _ => "As the system is",
+                            },
+                            if self.prefs.appearance == mode {
+                                "in force"
+                            } else {
+                                ""
+                            },
+                            Choice::Appearance(mode.into()),
                         )
                     })
                     .collect();
@@ -599,6 +681,18 @@ impl App {
                     self.reload_conditions();
                     self.reload_today();
                 }
+            }
+            (Picker::Theme, Choice::Theme(id)) => {
+                self.prefs.theme = id;
+                self.prefs.save();
+            }
+            (Picker::CaptureList, Choice::CaptureList(id)) => {
+                self.prefs.quick_capture_list = id;
+                self.prefs.save();
+            }
+            (Picker::Appearance, Choice::Appearance(mode)) => {
+                self.prefs.appearance = mode;
+                self.prefs.save();
             }
             (Picker::DayStart, Choice::DayStartCondition(id)) => {
                 self.toggle_day_start_condition(&id)
