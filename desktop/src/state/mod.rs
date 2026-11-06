@@ -15,6 +15,7 @@ pub mod prefs;
 pub mod sidebar;
 pub mod store;
 pub mod today;
+pub mod typed;
 
 use crate::keys::{Bindings, Sequence};
 use outline::OutlineRow;
@@ -152,6 +153,8 @@ pub struct App {
     pub pending_focus: Option<String>,
     /// The done rail: what was finished in the last fortnight, newest first.
     pub done: Vec<TaskRow>,
+    /// Text the palette opens with: an edit's word (`due `, `tag `).
+    pub palette_prefill: Option<String>,
     pub selected_task: Option<String>,
     pub pending_delete: Option<String>,
     /// `f`/`F` waiting for the letter to find (true: forward).
@@ -203,6 +206,7 @@ impl App {
             focus_session: None,
             pending_focus: None,
             done: Vec::new(),
+            palette_prefill: None,
             today: today::Today::default(),
             today_stale: true,
             selected_task: None,

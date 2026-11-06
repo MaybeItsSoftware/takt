@@ -152,6 +152,9 @@ impl App {
             "taskInvalidate" => self.toggle_invalidate(),
             "taskDelete" => self.ask_to_delete(),
             "taskRename" | "taskRenameAppend" | "taskRenameInsert" => self.begin_rename(id),
+            "taskEditDue" | "taskEditStart" | "taskEditRecurrence" | "taskEditTags" => {
+                self.begin_typed_edit(id)
+            }
             "taskDueToday" => self.set_due_in_days(Some(0)),
             "taskDueTomorrow" => self.set_due_in_days(Some(1)),
             "taskClearDue" => self.set_due_in_days(None),
@@ -376,7 +379,7 @@ impl App {
         self.edit_selected(|edit| edit.due_at_ms = due);
     }
 
-    fn schedule_selected(&mut self, start: Option<i64>) {
+    pub fn schedule_selected(&mut self, start: Option<i64>) {
         let Some(id) = self.selected_task.clone() else {
             return;
         };

@@ -124,14 +124,35 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             started.elapsed().as_secs_f64() * 1000.0 / 2.0
         ));
         let started = Instant::now();
+        app.apply_typed("due tomorrow 4pm");
+        app.apply_typed("tag smoke");
+        let id = app.selected_task.clone().unwrap_or_default();
+        let snapshot = app.store.core.editor_snapshot(id).ok();
+        app.undo(false);
+        app.undo(false);
+        report.push(format!(
+            "typed due and tag {:.2} ms (due set: {}, tagged: {})",
+            started.elapsed().as_secs_f64() * 1000.0 / 2.0,
+            snapshot.as_ref().is_some_and(|s| s.due_at_ms.is_some()),
+            snapshot
+                .as_ref()
+                .is_some_and(|s| s.metadata.tags.iter().any(|t| t == "smoke")),
+        ));
+        let started = Instant::now();
         app.start_focus_on_selected(true);
-        let running = app.focus_status().map(|(title, clock, _)| format!("{title} {clock}"));
+        let running = app
+            .focus_status()
+            .map(|(title, clock, _)| format!("{title} {clock}"));
         app.stop_focus();
         report.push(format!(
             "focus start and stop {:.2} ms (ran: {}, after: {})",
             started.elapsed().as_secs_f64() * 1000.0,
             running.unwrap_or_else(|| "nothing".into()),
-            if app.focus_session.is_some() { "still running" } else { "stopped" }
+            if app.focus_session.is_some() {
+                "still running"
+            } else {
+                "stopped"
+            }
         ));
     }
     if let Some(message) = &app.message {

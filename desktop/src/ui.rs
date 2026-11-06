@@ -169,8 +169,7 @@ impl Takt {
         let overlay_before = self.app.overlay.clone();
         let outcome = self.app.handle_key(&key, Instant::now());
         if self.app.overlay.is_some() && self.app.overlay != overlay_before {
-            self.overlay.reset();
-            self.overlay.refresh(&self.app);
+            self.open_overlay_field();
         }
         match outcome {
             // The timeline owns the keyboard: what it does not use is
@@ -185,6 +184,15 @@ impl Takt {
                 true
             }
         }
+    }
+
+    /// A fresh overlay: its field empty, or holding an edit's word.
+    fn open_overlay_field(&mut self) {
+        self.overlay.reset();
+        if let Some(prefill) = self.app.palette_prefill.take() {
+            self.overlay.field = TextField::new(&prefill);
+        }
+        self.overlay.refresh(&self.app);
     }
 
     fn overlay_key(&mut self, keystroke: &gpui::Keystroke) {

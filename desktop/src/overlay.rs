@@ -14,8 +14,13 @@ use takt_core::palette::{PaletteCandidate, palette_rank, palette_rank_commands};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Pick {
     Command(String),
+    /// A command typed in full: `due fri`, `tag errand`.
+    Typed(String),
     Place(RowKind),
-    Task { id: String, list_id: String },
+    Task {
+        id: String,
+        list_id: String,
+    },
     Nothing,
 }
 
@@ -70,6 +75,7 @@ impl OverlayState {
 pub fn apply(app: &mut App, pick: Pick) {
     app.close_overlay();
     match pick {
+        Pick::Typed(input) => app.apply_typed(&input),
         Pick::Command(id) => {
             app.prefs.recent_commands.retain(|other| *other != id);
             app.prefs.recent_commands.insert(0, id.clone());
@@ -119,19 +125,33 @@ fn commands(app: &App, query: &str) -> Vec<Item> {
         .cloned()
         .collect();
     let ranked = palette_rank_commands(query.into(), runnable, app.prefs.recent_commands.clone());
-    ranked
+    let typed = crate::state::typed::describe(query).map(|label| Item {
+        title: label,
+        detail: if app.selected().is_some() {
+            "on the selection".into()
+        } else {
+            String::new()
+        },
+        keys: "↩".into(),
+        pick: Pick::Typed(query.to_string()),
+    });
+    typed
         .into_iter()
-        .filter_map(|id| app.bindings.entry(&id))
-        .map(|entry| Item {
-            title: entry.title.clone(),
-            detail: entry.group.clone(),
-            keys: entry
-                .keys
-                .first()
-                .map(|key| Bindings::glyphs(key))
-                .unwrap_or_default(),
-            pick: Pick::Command(entry.id.clone()),
-        })
+        .chain(
+            ranked
+                .into_iter()
+                .filter_map(|id| app.bindings.entry(&id))
+                .map(|entry| Item {
+                    title: entry.title.clone(),
+                    detail: entry.group.clone(),
+                    keys: entry
+                        .keys
+                        .first()
+                        .map(|key| Bindings::glyphs(key))
+                        .unwrap_or_default(),
+                    pick: Pick::Command(entry.id.clone()),
+                }),
+        )
         .collect()
 }
 
