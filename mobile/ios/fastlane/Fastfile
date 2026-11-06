@@ -42,7 +42,9 @@ platform :ios do
       type:           "appstore",
       app_identifier: TARGETS.values,
       api_key:        api_key,
-      readonly:       true,
+      # As Open Parliament's: CI only reads the match repo (its deploy key is
+      # read-only); run locally once to create a new bundle id's profiles.
+      readonly:       is_ci,
     )
 
     TARGETS.each do |target, bundle_id|
