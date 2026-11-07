@@ -2,8 +2,12 @@
 set -euo pipefail
 
 # Builds the Rust desktop app (desktop/, takt-desktop) as a .app bundle and
-# installs it as /Applications/Takt Desktop.app, beside the Swift Takt.app,
-# then launches it.
+# installs it as /Applications/Takt.app, then launches it. It supersedes the
+# Swift app: same name, same bundle ID (so notification and login-item grants
+# carry over), and the executable is still Contents/MacOS/Takt, so an MCP
+# client configured with `Takt --mcp-server` keeps working. The Swift app
+# and the interim "Takt Desktop.app" are quit and removed, as is an old
+# Priority.app, so two apps never share one workspace.
 #
 # The bundle is the Swift app's shape: the executable, the `takt` CLI as a
 # signed helper at Contents/Helpers/takt (its MCP server: `--mcp-server`
@@ -17,9 +21,12 @@ set -euo pipefail
 # secure timestamp, which notarisation needs.
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="Takt Desktop"
-BUNDLE_ID="uk.co.maybeitssoftware.takt.desktop"
-EXECUTABLE="takt-desktop"
+APP_NAME="Takt"
+BUNDLE_ID="uk.co.maybeitssoftware.takt"
+BINARY="takt-desktop"
+EXECUTABLE="Takt"
+# Earlier installs this one replaces.
+SUPERSEDED=("/Applications/Takt Desktop.app" "/Applications/Priority.app")
 INSTALL_PATH="/Applications/$APP_NAME.app"
 STAGE_DIR="$ROOT_DIR/build/desktop"
 APP_PATH="$STAGE_DIR/$APP_NAME.app"
@@ -35,7 +42,7 @@ cargo build --release --manifest-path "$ROOT_DIR/cli/Cargo.toml"
 echo "==> Assembling $APP_NAME.app ($VERSION, $BUILD_NUMBER)…"
 rm -rf "$APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Helpers" "$APP_PATH/Contents/Resources"
-cp "$ROOT_DIR/desktop/target/release/$EXECUTABLE" "$APP_PATH/Contents/MacOS/$EXECUTABLE"
+cp "$ROOT_DIR/desktop/target/release/$BINARY" "$APP_PATH/Contents/MacOS/$EXECUTABLE"
 cp "$ROOT_DIR/cli/target/release/takt" "$APP_PATH/Contents/Helpers/takt"
 
 # The icon, from the Swift app's asset catalogue.
@@ -117,15 +124,21 @@ if [[ "${TAKT_BUNDLE_ONLY:-0}" == "1" ]]; then
 fi
 
 echo "==> Quitting any running instance…"
-osascript -e "tell application \"$APP_NAME\" to quit" 2>/dev/null || true
+for name in "$APP_NAME" "Takt Desktop" "Priority"; do
+  osascript -e "tell application \"$name\" to quit" 2>/dev/null || true
+done
 sleep 1
 pkill -x "$EXECUTABLE" 2>/dev/null || true
+pkill -x "$BINARY" 2>/dev/null || true
+pkill -x Priority 2>/dev/null || true
 
-if [[ -d "$INSTALL_PATH" ]]; then
-  echo "==> Removing $INSTALL_PATH"
-  "$LSREGISTER" -u "$INSTALL_PATH" 2>/dev/null || true
-  rm -rf "$INSTALL_PATH"
-fi
+for old in "$INSTALL_PATH" "${SUPERSEDED[@]}"; do
+  if [[ -d "$old" ]]; then
+    echo "==> Removing $old"
+    "$LSREGISTER" -u "$old" 2>/dev/null || true
+    rm -rf "$old"
+  fi
+done
 
 echo "==> Installing to $INSTALL_PATH"
 ditto "$APP_PATH" "$INSTALL_PATH"

@@ -2,9 +2,10 @@
 
 The Mac app is to be Rust from end to end: `desktop/` (`takt-desktop`), drawn
 with GPUI, Zed's own UI framework, linking `takt-core` as a Rust crate. It
-is built beside the Swift app under `Takt/` until it does everything that
-app does, and then `install_local.sh` installs it instead. The Swift app is
-not deleted: it stays in the tree and keeps building. The iPhone and Android apps stay native (GPUI has no mobile
+was built beside the Swift app under `Takt/` until it did everything that
+app does; since 2026-11-07 `install_local.sh` installs it as `Takt.app`
+instead. The Swift app is not deleted: it stays in the tree and keeps
+building, and `scripts/install_swift.sh` puts it back. The iPhone and Android apps stay native (GPUI has no mobile
 target) and keep calling the core through UniFFI.
 
 ## Why
@@ -96,20 +97,22 @@ keeps working throughout.
    MCP client installer, and `--mcp-server`, which `exec`s the bundled
    `takt`. User plugins are not ported: the Swift app only installs their
    manifests and stores their settings, and runs nothing.
-7. **Packaging — done but for shaders.** `scripts/install_desktop.sh`
-   builds `/Applications/Takt Desktop.app` with `Contents/Helpers/takt`,
+7. **Packaging — done.** `scripts/install_desktop.sh`
+   builds `/Applications/Takt.app` with `Contents/Helpers/takt`,
    the icon and the `takt://` scheme; `scripts/build_desktop_dmg.sh` makes
    a Developer ID DMG, notarised and stapled. The first launch makes the
    workspace and carries forward the old `Priority` and `Bar Tasker`
    folders. Left: `runtime_shaders` stays until the Metal toolchain is
    installed (`xcodebuild -downloadComponent MetalToolchain`).
-8. **Cutover — waiting on a decision.** `install_local.sh` still installs
-   the Swift app. Switching it means the Rust bundle installing as
-   `Takt.app` in its place; whether it also takes the Swift bundle id
-   (`uk.co.maybeitssoftware.takt`) decides whether macOS treats it as the
-   same app for notifications and the login item. The Swift app and its package
-   targets stay in the tree and keep building; `TaktWorkspace` and the
-   bindings are the iPhone's in any case.
+8. **Cutover — done, 2026-11-07.** `install_local.sh` installs the Rust
+   bundle as `/Applications/Takt.app` under the Swift bundle id
+   (`uk.co.maybeitssoftware.takt`), so macOS treats it as the same app for
+   notifications and the login item, with its executable still at
+   `Contents/MacOS/Takt` so clients configured with `Takt --mcp-server`
+   keep working. It removes the interim `Takt Desktop.app`. The Swift app
+   and its package targets stay in the tree and keep building
+   (`scripts/install_swift.sh` installs it at the same path);
+   `TaktWorkspace` and the bindings are the iPhone's in any case.
 
 ## Risks
 
@@ -118,8 +121,8 @@ keeps working throughout.
 - **Accessibility.** GPUI exposes far less to VoiceOver than AppKit does.
 - **No ready-made widgets.** Text input, menus, the status item and the
   global hotkeys are built here, the latter two on `objc` and Carbon.
-- **Two apps, one database.** Until the cutover, both apps can run at once
-  against the same workspace. Writes are safe (the core serialises them and
-  each sees the other's through `data_version`), but signed in to sync in
-  both they would each push the one outbox; sign in in one of them.
+- **Two apps, one database.** Only if the Swift app is put back beside it
+  under another name: writes are safe (the core serialises them and each
+  sees the other's through `data_version`), but signed in to sync in both
+  they would each push the one outbox; sign in in one of them.
 - **Disk.** GPUI's build output sits beside `core/target`'s 6 GB.

@@ -10,13 +10,13 @@ set -euo pipefail
 #   ./scripts/build_desktop_dmg.sh [version]
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="Takt Desktop"
-VOL_NAME="Takt Desktop"
+APP_NAME="Takt"
+VOL_NAME="Takt"
 VERSION="${1:-}"
 if [[ -n "$VERSION" ]]; then
-  DMG_BASENAME="takt-desktop-v${VERSION}"
+  DMG_BASENAME="takt-v${VERSION}"
 else
-  DMG_BASENAME="takt-desktop-$(date +%Y%m%d-%H%M%S)"
+  DMG_BASENAME="takt-$(date +%Y%m%d-%H%M%S)"
 fi
 
 SIGN_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \

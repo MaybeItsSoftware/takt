@@ -108,9 +108,12 @@ There used to be two implementations of the same MCP server — one in Swift ins
 
 ### The Rust desktop app
 
-`desktop/` (`takt-desktop`) is the Mac app being rebuilt in Rust on GPUI,
-beside the Swift one, which stays. `docs/rust-desktop-plan.md` is the plan and
-says which stage it is on. It links `takt-core` as a Rust crate, and it is
+`desktop/` (`takt-desktop`) is the Mac app, rebuilt in Rust on GPUI; it is
+what `install_local.sh` installs as `Takt.app` (bundle id
+`uk.co.maybeitssoftware.takt`, executable `Contents/MacOS/Takt`). The Swift
+app under `Takt/` stays in the tree and keeps building, but is no longer
+what the user runs. `docs/rust-desktop-plan.md` is the plan and records its
+stages. It links `takt-core` as a Rust crate, and it is
 styled after Zed (One Dark / One Light, IBM Plex Sans, Zed's chrome), not
 after the Swift app or a house style. A write patches the rows held in
 memory; it never rereads the scope. After changing it:
@@ -123,8 +126,8 @@ TAKT_DESKTOP_DB=<a copy of priority.sqlite> TAKT_DESKTOP_SMOKE=1 TAKT_DESKTOP_SM
   cargo run --release --manifest-path desktop/Cargo.toml   # draws a frame, prints timings, quits
 ```
 
-`scripts/install_desktop.sh` installs it as `/Applications/Takt Desktop.app`
-beside the Swift app (with the bundled `takt` helper), and
+`scripts/install_desktop.sh` (which `install_local.sh` runs) installs it as
+`/Applications/Takt.app` with the bundled `takt` helper, and
 `scripts/build_desktop_dmg.sh` makes a notarised DMG of it.
 
 Never drive it with simulated keystrokes (`osascript … keystroke`): they go to
@@ -219,14 +222,16 @@ working tree.
 ```
 
 This is already the standing instruction in `AGENTS.md`, repeated here because
-that file is not always loaded. It builds Release, supersedes
-`/Applications/Takt.app` outright — no backup is kept, and an old
-`/Applications/Priority.app` is removed too — and relaunches. It is part of
-finishing the work, not a step to hand back. A passing `xcodebuild` is not
-completion: what the user actually runs is the installed bundle, and until it
-is replaced every fix is still only a claim. Check the output for
-`** BUILD SUCCEEDED **` and for the `Installed.` line, and report a failure
-rather than a summary. The workflow is authorised; do not ask first.
+that file is not always loaded. Since 2026-11-07 it installs the **Rust app**
+(`desktop/`, via `scripts/install_desktop.sh`): a release build, superseding
+`/Applications/Takt.app` outright — no backup is kept, and the Swift app, an
+interim `/Applications/Takt Desktop.app` and an old `/Applications/Priority.app`
+are removed too — and relaunches. `scripts/install_swift.sh` is the Swift
+app's old installer, the way back. It is part of finishing the work, not a
+step to hand back. A passing build is not completion: what the user actually
+runs is the installed bundle, and until it is replaced every fix is still
+only a claim. Check the output for the `Installed.` line, and report a
+failure rather than a summary. The workflow is authorised; do not ask first.
 
 **Ship phone changes to Play internal testing, yourself.** After anything
 under `mobile/android` (or `core/`, which the phone links), once the Android
