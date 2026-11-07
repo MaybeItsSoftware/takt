@@ -104,7 +104,12 @@ keeps working throughout.
    Swift app's ledger file kept), the agent panel and quick ask (`aa`), the
    MCP client installer, and `--mcp-server`, which `exec`s the bundled
    `takt`. User plugins are not ported: the Swift app only installs their
-   manifests and stores their settings, and runs nothing.
+   manifests and stores their settings, and runs nothing. Nor is the daily
+   log's Obsidian note writer: it renders `daylog.jsonl`, which nothing has
+   appended to since the dailies moved into the workspace (the last event is
+   2026-09-15), so in the Swift app too it writes nothing new. A daily note
+   worth porting would be drawn from the workspace's own dailies and
+   completions, which is a new feature rather than parity.
 7. **Packaging — done.** `scripts/install_desktop.sh`
    builds `/Applications/Takt.app` with `Contents/Helpers/takt`,
    the icon and the `takt://` scheme; `scripts/build_desktop_dmg.sh` makes
