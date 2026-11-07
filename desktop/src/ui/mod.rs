@@ -10,6 +10,7 @@ pub mod capture;
 mod celebrate;
 mod chrome;
 mod dock;
+pub mod icons;
 pub mod panel;
 mod views;
 mod widgets;
@@ -39,6 +40,9 @@ const UI_FONT: &str = "IBM Plex Sans";
 const MONO_FONT: &str = "Lilex";
 const ROW_HEIGHT: f32 = 26.;
 const TITLE_BAR_HEIGHT: f32 = 34.;
+/// The sidebar's rows, as Zed's project panel spaces them.
+const SIDEBAR_INSET: f32 = 10.;
+const SIDEBAR_INDENT: f32 = 20.;
 
 pub struct Takt {
     pub app: App,
@@ -1202,7 +1206,7 @@ impl Render for Takt {
             .when(self.app.prefs.bottom_dock_visible, |d| {
                 d.child(self.bottom_dock(t, cx))
             })
-            .child(self.status_bar(t))
+            .child(self.status_bar(t, cx))
             .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
                 d.child(self.rules_sheet(t))
             })

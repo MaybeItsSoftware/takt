@@ -37,3 +37,6 @@ strip = true
 # `objc`'s macros test a `cargo-clippy` feature in the calling crate.
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
+
+[dev-dependencies]
+usvg = "=0.45.1"

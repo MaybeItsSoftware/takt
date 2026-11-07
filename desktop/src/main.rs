@@ -54,7 +54,7 @@ fn main() {
         }
     };
     let smoke = std::env::var_os("TAKT_DESKTOP_SMOKE").is_some();
-    let application = Application::new();
+    let application = Application::new().with_assets(ui::icons::Assets);
     // The Dock icon clicked with no window: open one.
     application.on_reopen(|cx| {
         if let Some(takt) = cx.try_global::<ui::Shell>().map(|shell| shell.0.clone()) {

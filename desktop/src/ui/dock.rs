@@ -1,49 +1,6 @@
 use super::*;
 
 impl Takt {
-    /// A strip of tabs; clicking one shows it.
-    fn tab_strip(
-        &self,
-        t: Tokens,
-        tabs: &[(&'static str, &'static str)],
-        current: &str,
-        bottom: bool,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        div()
-            .flex()
-            .gap_1()
-            .px_2()
-            .border_b_1()
-            .border_color(t.border_variant)
-            .children(tabs.iter().map(|(id, label)| {
-                let id = *id;
-                let on = current == id;
-                div()
-                    .id(id)
-                    .px_2()
-                    .py_1()
-                    .text_size(px(12.))
-                    .text_color(if on { t.text } else { t.muted })
-                    .border_b_1()
-                    .border_color(if on {
-                        t.accent
-                    } else {
-                        gpui::transparent_black()
-                    })
-                    .hover(|d| d.text_color(t.text))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if bottom {
-                            this.app.show_bottom_tab(id);
-                        } else {
-                            this.app.show_right_tab(id, true);
-                        }
-                        cx.notify();
-                    }))
-                    .child(*label)
-            }))
-    }
-
     pub(super) fn right_dock(
         &self,
         t: Tokens,
@@ -61,13 +18,6 @@ impl Takt {
             .bg(t.surface)
             .border_l_1()
             .border_color(if focused { t.accent } else { t.border })
-            .child(self.tab_strip(
-                t,
-                &[("inspector", "Inspector"), ("conditions", "Conditions")],
-                &tab,
-                false,
-                cx,
-            ))
             .child(if tab == "conditions" {
                 self.conditions_pane(t, cx).into_any_element()
             } else {
@@ -86,17 +36,6 @@ impl Takt {
             .bg(t.surface)
             .border_t_1()
             .border_color(if focused { t.accent } else { t.border })
-            .child(self.tab_strip(
-                t,
-                &[
-                    ("progress", "Progress"),
-                    ("done", "Done"),
-                    ("timeline", "Timeline"),
-                ],
-                &tab,
-                true,
-                cx,
-            ))
             .child(match tab.as_str() {
                 "timeline" => self.timeline_pane(t, cx).into_any_element(),
                 "progress" => self.progress_pane(t).into_any_element(),

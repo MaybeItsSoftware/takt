@@ -61,35 +61,6 @@ impl Takt {
 
     pub(super) fn left_dock(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let agent = self.app.prefs.left_dock_tab == "agent";
-        let tab = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
-            let on = self.app.prefs.left_dock_tab == id;
-            div()
-                .id(id)
-                .px_2()
-                .py_1()
-                .text_size(px(12.))
-                .text_color(if on { t.text } else { t.muted })
-                .border_b_1()
-                .border_color(if on {
-                    t.accent
-                } else {
-                    gpui::transparent_black()
-                })
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    this.app.prefs.left_dock_tab = id.into();
-                    if id == "agent" {
-                        this.app.region = Region::Agent;
-                        this.app.editing = Some(Editing::AgentMessage);
-                        this.begin_editing();
-                    } else if this.app.region == Region::Agent {
-                        this.app.region = Region::Sidebar;
-                        this.app.editing = None;
-                    }
-                    this.app.prefs.save();
-                    cx.notify();
-                }))
-                .child(label)
-        };
         div()
             .w(px(
                 self.app.prefs.sidebar_width.clamp(180., 420.) * if agent { 1.5 } else { 1. }
@@ -106,16 +77,6 @@ impl Takt {
                 } else {
                     t.border
                 },
-            )
-            .child(
-                div()
-                    .flex()
-                    .gap_1()
-                    .px_2()
-                    .border_b_1()
-                    .border_color(t.border_variant)
-                    .child(tab("lists", "Lists", cx))
-                    .child(tab("agent", "Agent", cx)),
             )
             .child(if agent {
                 self.agent_pane(t).into_any_element()
@@ -296,30 +257,30 @@ impl Takt {
             && *row_id == row.id
         {
             return self
-                .field_row(t, "Name", row.depth as f32 * 14., true)
+                .field_row(t, "Name", row.depth as f32 * SIDEBAR_INDENT, true)
                 .into_any_element();
         }
         let (icon, count) = match &row.kind {
-            RowKind::Today => ("◎", None),
-            RowKind::Everything => ("∞", None),
+            RowKind::Today => ("sun", None),
+            RowKind::Everything => ("infinity", None),
             RowKind::List(id) => (
                 if self.app.inbox().is_some_and(|inbox| &inbox.id == id) {
-                    "⇣"
+                    "inbox"
                 } else {
-                    "≡"
+                    "list"
                 },
                 self.app.task_counts.get(id).copied(),
             ),
-            RowKind::NestedList(_) => ("↳", None),
+            RowKind::NestedList(_) => ("corner-down-right", None),
             RowKind::Folder(id) => (
                 if self.app.prefs.expanded_folders.contains(id) {
-                    "▾"
+                    "folder-open"
                 } else {
-                    "▸"
+                    "folder"
                 },
                 None,
             ),
-            RowKind::FilterList(_) => ("⌕", None),
+            RowKind::FilterList(_) => ("filter", None),
         };
         let custom = match &row.kind {
             RowKind::List(id) | RowKind::NestedList(id) | RowKind::FilterList(id) => {
@@ -327,19 +288,19 @@ impl Takt {
             }
             _ => None,
         };
-        let icon: SharedString = custom.unwrap_or_else(|| icon.to_string()).into();
         let title = self.row_title(&row.kind);
         let target = row.clone();
+        let depth = row.depth as f32;
         div()
             .id(("sidebar-row", ix))
+            .relative()
             .h(px(ROW_HEIGHT))
-            .mx_1()
-            .pl(px(8. + row.depth as f32 * 14.))
-            .pr_2()
+            .w_full()
+            .pl(px(SIDEBAR_INSET + depth * SIDEBAR_INDENT))
+            .pr_3()
             .flex()
             .items_center()
-            .gap_2()
-            .rounded(px(4.))
+            .gap(px(8.))
             .border_1()
             .border_color(if cursor {
                 t.accent
@@ -348,6 +309,16 @@ impl Takt {
             })
             .when(current, |d| d.bg(t.selected))
             .when(!current, |d| d.hover(|d| d.bg(t.hover)))
+            // Zed's indent guides: a hairline under each ancestor's icon.
+            .children((0..row.depth).map(|level| {
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left(px(SIDEBAR_INSET + level as f32 * SIDEBAR_INDENT + 7.5))
+                    .w(px(1.))
+                    .bg(t.border_variant)
+            }))
             .when_some(
                 match &target.kind {
                     crate::state::sidebar::RowKind::List(list_id) => Some(list_id.clone()),
@@ -381,14 +352,20 @@ impl Takt {
                 this.after_change(cx);
                 cx.notify();
             }))
-            .child(
-                div()
-                    .w(px(12.))
+            .child(match custom {
+                Some(glyph) => div()
+                    .w(px(16.))
                     .flex_none()
-                    .text_color(t.placeholder)
-                    .text_size(px(11.))
-                    .child(icon),
-            )
+                    .flex()
+                    .justify_center()
+                    .text_size(px(13.))
+                    .text_color(t.muted)
+                    .child(SharedString::from(glyph))
+                    .into_any_element(),
+                None => super::icons::icon(icon, 16.)
+                    .text_color(t.muted)
+                    .into_any_element(),
+            })
             .child(div().flex_1().min_w_0().truncate().child(title))
             .when_some(count.filter(|c| *c > 0), |d, count| {
                 d.child(
@@ -401,7 +378,108 @@ impl Takt {
             .into_any_element()
     }
 
-    pub(super) fn status_bar(&self, t: Tokens) -> impl IntoElement {
+    /// One of the status bar's icon buttons, lit while what it shows is up.
+    fn status_icon(
+        &self,
+        id: &'static str,
+        icon: &'static str,
+        lit: bool,
+        t: Tokens,
+        cx: &mut Context<Self>,
+        click: impl Fn(&mut Self, &mut Context<Self>) + 'static,
+    ) -> AnyElement {
+        div()
+            .id(id)
+            .size(px(24.))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(4.))
+            .hover(|d| d.bg(t.hover))
+            .child(super::icons::icon(icon, 15.).text_color(if lit { t.accent } else { t.muted }))
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                click(this, cx);
+                this.after_change(cx);
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    fn status_divider(t: Tokens) -> impl IntoElement {
+        div().w(px(1.)).h(px(14.)).mx_1().bg(t.border_variant)
+    }
+
+    /// The status bar's icons: what each dock can show, Zed's way.
+    fn status_icons(&self, left: bool, t: Tokens, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let p = &self.app.prefs;
+        if left {
+            let lists = p.sidebar_visible && p.left_dock_tab != "agent";
+            let agent = p.sidebar_visible && p.left_dock_tab == "agent";
+            return vec![
+                self.status_icon("status-lists", "panel-left", lists, t, cx, |this, _| {
+                    let p = &mut this.app.prefs;
+                    if p.sidebar_visible && p.left_dock_tab != "agent" {
+                        this.app.toggle_sidebar();
+                    } else {
+                        p.sidebar_visible = true;
+                        p.left_dock_tab = "lists".into();
+                        if this.app.region == Region::Agent {
+                            this.app.region = Region::Sidebar;
+                            this.app.editing = None;
+                        }
+                        this.app.prefs.save();
+                    }
+                }),
+                Self::status_divider(t).into_any_element(),
+                self.status_icon("status-agent", "sparkles", agent, t, cx, |this, _| {
+                    this.app.toggle_agent_panel();
+                    if matches!(this.app.editing, Some(Editing::AgentMessage)) {
+                        this.begin_editing();
+                    }
+                }),
+                Self::status_divider(t).into_any_element(),
+                self.status_icon("status-search", "search", false, t, cx, |this, _| {
+                    this.app.open_overlay(Overlay::Search);
+                    this.open_overlay_field();
+                }),
+            ];
+        }
+        let bottom = |tab: &str| p.bottom_dock_visible && p.bottom_dock_tab == tab;
+        let right = |tab: &str| p.right_dock_visible && p.right_dock_tab == tab;
+        let bottom_icon =
+            |this: &Self, id: &'static str, tab: &'static str, icon, cx: &mut Context<Self>| {
+                this.status_icon(id, icon, bottom(tab), t, cx, move |this, _| {
+                    let p = &this.app.prefs;
+                    if p.bottom_dock_visible && p.bottom_dock_tab == tab {
+                        this.app.hide_bottom_dock();
+                    } else {
+                        this.app.show_bottom_tab(tab);
+                    }
+                })
+            };
+        let right_icon =
+            |this: &Self, id: &'static str, tab: &'static str, icon, cx: &mut Context<Self>| {
+                this.status_icon(id, icon, right(tab), t, cx, move |this, _| {
+                    let p = &this.app.prefs;
+                    if p.right_dock_visible && p.right_dock_tab == tab {
+                        this.app.hide_right_dock();
+                    } else {
+                        this.app.show_right_tab(tab, true);
+                    }
+                })
+            };
+        vec![
+            bottom_icon(self, "status-progress", "progress", "chart", cx),
+            bottom_icon(self, "status-done", "done", "circle-check", cx),
+            bottom_icon(self, "status-timeline", "timeline", "clock", cx),
+            Self::status_divider(t).into_any_element(),
+            right_icon(self, "status-inspector", "inspector", "info", cx),
+            right_icon(self, "status-conditions", "conditions", "sliders", cx),
+        ]
+    }
+
+    pub(super) fn status_bar(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
         let prefix = self.app.sequence.prefix().to_string();
         let pending = !prefix.is_empty() || self.app.pending_delete.is_some();
         let celebrated = self
@@ -441,10 +519,12 @@ impl Takt {
         .collect::<Vec<_>>()
         .join("   ");
         let focus = self.app.focus_status();
+        let left_icons = self.status_icons(true, t, cx);
+        let right_icons = self.status_icons(false, t, cx);
         div()
-            .h(px(24.))
+            .h(px(30.))
             .flex_none()
-            .px_3()
+            .px_1()
             .gap_3()
             .flex()
             .items_center()
@@ -454,6 +534,7 @@ impl Takt {
             .border_color(t.border)
             .text_size(px(11.))
             .text_color(t.muted)
+            .child(div().flex().items_center().children(left_icons))
             .child(
                 div()
                     .truncate()
@@ -485,6 +566,7 @@ impl Takt {
                 )
             })
             .child(div().font_family(MONO_FONT).child(right))
+            .child(div().flex().items_center().children(right_icons))
     }
 
     pub(super) fn overlay_view(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
