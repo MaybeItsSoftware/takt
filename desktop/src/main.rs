@@ -37,6 +37,12 @@ fn load_fonts(cx: &App) {
 }
 
 fn main() {
+    // Before anything else: an MCP client's process speaks JSON-RPC on
+    // stdio and never needs a window. `MCPServerShim.swift`.
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(ix) = args.iter().position(|arg| arg == "--mcp-server") {
+        platform::exec_mcp_server(&args[ix..]);
+    }
     let launched = Instant::now();
     let app = match state::App::open() {
         Ok(app) => app,

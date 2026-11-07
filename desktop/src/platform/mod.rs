@@ -58,6 +58,26 @@ pub fn notify(title: &str, subtitle: &str, body: &str, sound: bool) {
         .spawn();
 }
 
+/// Hands the process to the bundled `takt` CLI, which is the MCP server:
+/// `exec`, not a child, so the client owns its stdio directly. Client
+/// configurations naming this executable with `--mcp-server` keep working.
+pub fn exec_mcp_server(forwarded: &[String]) -> ! {
+    use std::os::unix::process::CommandExt;
+    let helper = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.parent()?.join("Helpers/takt")))
+        .filter(|path| path.is_file())
+        .map(|path| path.to_string_lossy().into_owned())
+        .or_else(crate::state::agent::helper_path);
+    let Some(helper) = helper else {
+        eprintln!("takt: no MCP server here (Contents/Helpers/takt is missing)");
+        std::process::exit(126);
+    };
+    let error = std::process::Command::new(&helper).args(forwarded).exec();
+    eprintln!("takt: could not start {helper}: {error}");
+    std::process::exit(126);
+}
+
 /// Makes an `NSString` (autoreleased) from Rust text.
 pub(crate) fn ns_string(text: &str) -> *mut objc::runtime::Object {
     let owned = std::ffi::CString::new(text.replace('\0', "")).unwrap_or_default();
