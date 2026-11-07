@@ -1,5 +1,5 @@
-//! The settings rows the integrations add (sync, Checkvist, the daily
-//! notes), what each row does, and what they add to diagnostics.
+//! The settings rows the integrations add (sync, Checkvist, reminders),
+//! what each row does, and what they add to diagnostics.
 
 use super::App;
 use super::ask::Ask;
@@ -114,20 +114,18 @@ impl App {
                 String::new(),
             )),
         }
-        rows.push((
-            "daily-notes",
-            "Daily log",
-            "Write closed days as notes in",
-            self.prefs
-                .daily_notes_folder
-                .clone()
-                .unwrap_or_else(|| "Off".into()),
-        ));
+        rows.extend(self.reminder_rows());
         rows
     }
 
     pub fn change_platform_setting(&mut self, id: &str) {
         self.message = None;
+        if self.change_reminder_setting(id) {
+            if self.editing.is_none() {
+                self.open_overlay(super::Overlay::Settings);
+            }
+            return;
+        }
         match id {
             "sync-now" => {
                 self.sync.sync_now();
@@ -146,7 +144,6 @@ impl App {
             "checkvist-connect" => self.ask(Ask::CheckvistEmail),
             "checkvist-import" => self.import_checkvist(),
             "checkvist-disconnect" => self.disconnect_checkvist(),
-            "daily-notes" => self.ask(Ask::DailyNotesFolder),
             _ => {}
         }
         if self.editing.is_none() {

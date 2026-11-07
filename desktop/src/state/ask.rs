@@ -25,8 +25,10 @@ pub enum Ask {
     CheckvistKey {
         email: String,
     },
-    /// The Obsidian vault's daily-notes folder.
-    DailyNotesFolder,
+    /// The morning or evening reminder's time.
+    ReminderTime {
+        dailies: bool,
+    },
 }
 
 impl Ask {
@@ -42,7 +44,8 @@ impl Ask {
             Ask::SyncServer => "Sync server",
             Ask::SyncDelete => "Delete the sync account",
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
-            Ask::DailyNotesFolder => "Daily notes folder",
+            Ask::ReminderTime { dailies: false } => "Morning reminder at",
+            Ask::ReminderTime { dailies: true } => "Evening reminder at",
         }
     }
 
@@ -53,7 +56,7 @@ impl Ask {
             Ask::SyncServer => "https://… (empty for the hosted server)",
             Ask::SyncDelete => "delete",
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
-            Ask::DailyNotesFolder => "~/Documents/Life/Daily",
+            Ask::ReminderTime { .. } => "09:00",
         }
     }
 
@@ -68,9 +71,6 @@ impl Ask {
                 "A self-hosted server must trust the same Supabase project.".into()
             }
             Ask::CheckvistKey { email } => format!("For {email}. Kept in the keychain."),
-            Ask::DailyNotesFolder => {
-                "Closed days are written here as notes, one file a day.".into()
-            }
             _ => String::new(),
         }
     }
@@ -96,7 +96,11 @@ impl App {
                 self.sync.status().email.unwrap_or_default()
             }
             Ask::SyncServer => self.sync.status().server,
-            Ask::DailyNotesFolder => self.prefs.daily_notes_folder.clone().unwrap_or_default(),
+            Ask::ReminderTime { dailies } => super::reminders::clock(if *dailies {
+                self.prefs.remind_dailies_left_minute
+            } else {
+                self.prefs.remind_due_today_minute
+            }),
             _ => String::new(),
         }
     }
@@ -149,9 +153,8 @@ impl App {
                 self.connect_checkvist(&email, text);
                 self.open_overlay(Overlay::Settings);
             }
-            Ask::DailyNotesFolder => {
-                self.prefs.daily_notes_folder = (!text.is_empty()).then(|| text.to_string());
-                self.prefs.save();
+            Ask::ReminderTime { dailies } => {
+                self.set_reminder_time(dailies, text);
                 self.open_overlay(Overlay::Settings);
             }
         }

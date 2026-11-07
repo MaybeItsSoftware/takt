@@ -144,6 +144,7 @@ impl Takt {
                     this.refresh_status();
                     this.app.sync.set_foreground(this.main.is_some());
                     this.app.sync.note_outbox();
+                    this.app.tick_reminders();
                     if this.app.check_external_writes() {
                         this.app.reload_today();
                         this.rank_today(cx);
@@ -262,6 +263,15 @@ impl Takt {
                     self.open_overlay_field();
                 }
                 "quit" => cx.quit(),
+                // A reminder clicked: the task, in the window.
+                open if open.starts_with("open:") => {
+                    let id = &open["open:".len()..];
+                    self.show_main_window(cx);
+                    let list = self.app.store.core.task(id.into()).ok().flatten();
+                    if let Some(task) = list {
+                        self.app.reveal_task(id, &task.list_id);
+                    }
+                }
                 other => {
                     self.app.status_action(other);
                 }

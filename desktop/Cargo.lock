@@ -4896,6 +4896,7 @@ name = "takt-desktop"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "block",
  "chrono",
  "gpui",
  "iana-time-zone",

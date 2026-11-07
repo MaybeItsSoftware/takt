@@ -28,6 +28,7 @@ pub mod navigation;
 pub mod outline;
 pub mod pickers;
 pub mod prefs;
+pub mod reminders;
 pub mod review;
 pub mod rules;
 pub mod settings;
@@ -199,6 +200,8 @@ pub struct App {
     pub agent: agent::Agent,
     /// Sync with the account's other devices.
     pub sync: crate::sync::Sync,
+    /// When reminders were last read.
+    pub reminders_looked_ms: i64,
     /// Text the agent's message box opens with.
     pub agent_draft: Option<String>,
     /// The done rail's cursor.
@@ -297,6 +300,7 @@ impl App {
             library: Default::default(),
             agent: Default::default(),
             sync,
+            reminders_looked_ms: 0,
             agent_draft: None,
             done_cursor: None,
             timeline: Default::default(),

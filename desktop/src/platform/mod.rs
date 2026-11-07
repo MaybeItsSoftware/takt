@@ -7,6 +7,7 @@
 //! milliseconds.
 
 pub mod hotkeys;
+pub mod notifications;
 pub mod status_item;
 
 use std::sync::Mutex;
@@ -44,22 +45,9 @@ pub fn drain() -> Vec<Event> {
         .unwrap_or_default()
 }
 
-/// Posts a notification: the system's own when the app is bundled, else
-/// through `osascript`, which works from a bare binary.
+/// Posts a notification about the focus block.
 pub fn notify(title: &str, subtitle: &str, body: &str, sound: bool) {
-    let quote = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
-    let mut script = format!(
-        "display notification \"{}\" with title \"{}\" subtitle \"{}\"",
-        quote(body),
-        quote(title),
-        quote(subtitle)
-    );
-    if sound {
-        script.push_str(" sound name \"Glass\"");
-    }
-    let _ = std::process::Command::new("/usr/bin/osascript")
-        .args(["-e", &script])
-        .spawn();
+    notifications::post("focus", title, subtitle, body, sound, None);
 }
 
 /// Hands the process to the bundled `takt` CLI, which is the MCP server:

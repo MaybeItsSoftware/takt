@@ -53,8 +53,14 @@ pub struct Prefs {
     pub left_dock_tab: String,
     /// `claude` or `codex`.
     pub agent_client: String,
-    /// Where closed days are written as Obsidian notes; none, not written.
-    pub daily_notes_folder: Option<String>,
+    /// Which reminders this Mac shows, and when (minutes after midnight).
+    pub remind_due_time: bool,
+    pub remind_due_today: bool,
+    pub remind_due_today_minute: i32,
+    pub remind_dailies_left: bool,
+    pub remind_dailies_left_minute: i32,
+    /// Reminders up to here have been shown.
+    pub reminders_checked_ms: i64,
 }
 
 impl Default for Prefs {
@@ -93,7 +99,12 @@ impl Default for Prefs {
             hotkey_focus_panel: Some("cmd+ctrl+option+shift+f".into()),
             left_dock_tab: "lists".into(),
             agent_client: "claude".into(),
-            daily_notes_folder: None,
+            remind_due_time: true,
+            remind_due_today: false,
+            remind_due_today_minute: 9 * 60,
+            remind_dailies_left: false,
+            remind_dailies_left_minute: 20 * 60,
+            reminders_checked_ms: 0,
         }
     }
 }
