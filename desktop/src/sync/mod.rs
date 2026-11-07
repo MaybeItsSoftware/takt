@@ -244,6 +244,38 @@ impl Sync {
     }
 
     /// Email and password; `create` makes the account first.
+    /// The Swift app's sign-in, carried over once at the cutover: its
+    /// Supabase session, from the keychain item this app can now read, is
+    /// refreshed and registered as the device the database already names.
+    /// Nothing when this app is signed in or the database never synced.
+    pub fn adopt_swift_session(&self) {
+        if lock(&self.inner.credentials).is_some()
+            || keychain::load::<Credentials>("credentials").is_some()
+        {
+            return;
+        }
+        let Some(state) = self.inner.core.sync_state().ok().flatten() else {
+            return;
+        };
+        let inner = self.inner.clone();
+        std::thread::spawn(move || {
+            let Some(refresh) = keychain::swift_refresh_token() else {
+                return;
+            };
+            if let Some(server) = state.server_url {
+                lock(&inner.status).server = current_server(&server);
+            }
+            inner.working("Carrying over the Swift app's sign-in…");
+            match supabase().refresh(&refresh) {
+                Ok(session) => inner.finish_sign_in(session),
+                Err(_) => {
+                    inner.settle_unpaired();
+                    inner.say("Sign in to sync again in Settings: the old session had ended.");
+                }
+            }
+        });
+    }
+
     pub fn sign_in(&self, email: &str, password: &str, create: bool) {
         let email = email.trim().to_string();
         let password = password.to_string();

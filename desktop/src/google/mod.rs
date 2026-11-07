@@ -82,12 +82,7 @@ pub fn disconnect() {
 
 /// The Swift app's client ID, for a first prefill.
 pub fn swift_client_id() -> Option<String> {
-    let out = std::process::Command::new("/usr/bin/defaults")
-        .args(["read", "uk.co.maybeitssoftware.takt", "googleOAuthClientID"])
-        .output()
-        .ok()?;
-    let id = String::from_utf8(out.stdout).ok()?.trim().to_string();
-    (!id.is_empty()).then_some(id)
+    crate::state::adopt::swift_default("googleOAuthClientID")
 }
 
 /// A token good for now with `scopes`, refreshed first when spent.

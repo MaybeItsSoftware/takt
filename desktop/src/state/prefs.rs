@@ -65,6 +65,8 @@ pub struct Prefs {
     pub remind_dailies_left_minute: i32,
     /// Reminders up to here have been shown.
     pub reminders_checked_ms: i64,
+    /// The Swift app's settings and sign-in were carried over (`adopt.rs`).
+    pub adopted_swift: bool,
 }
 
 impl Default for Prefs {
@@ -112,6 +114,7 @@ impl Default for Prefs {
             remind_dailies_left: false,
             remind_dailies_left_minute: 20 * 60,
             reminders_checked_ms: 0,
+            adopted_swift: false,
         }
     }
 }

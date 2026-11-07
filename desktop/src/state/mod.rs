@@ -7,6 +7,7 @@
 //! `navigation` where you are, `commands` what each catalogue command does.
 
 pub mod actions;
+pub mod adopt;
 pub mod agent;
 pub mod ask;
 pub mod board;
@@ -368,6 +369,7 @@ impl App {
         app.reload_done();
         app.restore_scope();
         app.refresh_history();
+        app.adopt_swift_app();
         app.start_google();
         Ok(app)
     }

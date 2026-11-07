@@ -42,30 +42,40 @@ fn load_mapping() -> HashMap<String, String> {
         .unwrap_or_default()
 }
 
-/// The keychain's, else the `takt` command's own (`~/.config/takt`).
+/// The keychain's, else the `takt` command's own (`~/.config/takt`), else
+/// the Swift app's.
 pub fn credentials() -> Option<Credentials> {
-    keychain::load::<Credentials>("checkvist").or_else(|| {
-        if std::env::var_os("TAKT_DESKTOP_PREFS").is_some() {
-            return None;
-        }
-        let home = std::env::var_os("HOME").map(PathBuf::from)?;
-        ["takt", "priority"].iter().find_map(|dir| {
-            let bytes = std::fs::read(home.join(".config").join(dir).join("config.json")).ok()?;
-            let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-            let text = |key: &str| {
-                value
-                    .get(key)
-                    .and_then(|v| v.as_str())
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_string)
-            };
-            Some(Credentials {
-                username: text("username")?,
-                remote_key: text("remote_key")?,
+    keychain::load::<Credentials>("checkvist")
+        .or_else(|| {
+            if std::env::var_os("TAKT_DESKTOP_PREFS").is_some() {
+                return None;
+            }
+            let home = std::env::var_os("HOME").map(PathBuf::from)?;
+            ["takt", "priority"].iter().find_map(|dir| {
+                let bytes =
+                    std::fs::read(home.join(".config").join(dir).join("config.json")).ok()?;
+                let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+                let text = |key: &str| {
+                    value
+                        .get(key)
+                        .and_then(|v| v.as_str())
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                };
+                Some(Credentials {
+                    username: text("username")?,
+                    remote_key: text("remote_key")?,
+                })
             })
         })
-    })
+        .or_else(|| {
+            // The Swift app's, which kept them in its preferences.
+            Some(Credentials {
+                username: super::adopt::swift_default("checkvistUsername")?,
+                remote_key: super::adopt::swift_default("checkvistRemoteKey")?,
+            })
+        })
 }
 
 fn send(call: CheckvistCall, token: Option<String>) -> Result<String, String> {
