@@ -564,24 +564,73 @@ impl Takt {
             this.key_down(&event, window, cx);
             started.elapsed().as_secs_f64() * 1000.0
         };
-        // From the board, where Enter used to open a draft nobody could see.
+        // On the board: a card in the focused column, three times over.
         self.app.overlay = None;
         self.app.editing = None;
         self.app.region = crate::state::Region::Tasks;
+        self.app.select_everything();
         self.app.run("goBoard", None);
+        let column = 1.min(self.app.board.columns.len().saturating_sub(1));
+        self.app.board.column = column;
+        self.app.selected_task = self
+            .app
+            .board
+            .cards
+            .get(column)
+            .and_then(|cards| cards.first())
+            .or_else(|| self.app.board.cards.iter().flatten().next())
+            .map(|card| card.id.clone());
         let open = press(self, "enter", window, cx);
-        let drawn = self.outline_display().len() > self.app.rows.len();
         said.push(format!(
-            "open from the board {open:.1} (draft drawn: {drawn})"
+            "open {open:.1} ({:?}, {:?})",
+            self.app.view_mode, self.app.editing
         ));
-        // The draft stays open below each new task for the next.
+        // The draft stays open below each new card for the next.
         for n in 0..3 {
-            self.field = TextField::new(&format!("smoke enter {n}"));
+            self.field = TextField::new(&format!("smoke card {n}"));
             let enter = press(self, "enter", window, cx);
-            let drawn = self.outline_display().len() > self.app.rows.len();
-            said.push(format!("enter {enter:.1} (draft drawn: {drawn})"));
+            let landed = self.app.selected_task.as_ref().and_then(|id| {
+                self.app
+                    .board
+                    .cards
+                    .iter()
+                    .position(|cards| cards.iter().any(|card| &card.id == id))
+            });
+            said.push(format!(
+                "enter {enter:.1} (card in column {landed:?} of wanted {column}, draft open: {})",
+                self.app.editing.is_some()
+            ));
         }
         let escape = press(self, "escape", window, cx);
+        // On the matrix: a card in the selected card's quadrant.
+        self.app.run("goMatrix", None);
+        if self.app.board.quadrants.iter().all(Vec::is_empty) {
+            self.app.selected_task = self.app.board.unplaced.first().map(|c| c.id.clone());
+            self.app.place_in_quadrant(1);
+        }
+        let quadrant = self
+            .app
+            .board
+            .quadrants
+            .iter()
+            .position(|cards| !cards.is_empty());
+        self.app.selected_task = quadrant
+            .and_then(|q| self.app.board.quadrants[q].first())
+            .map(|card| card.id.clone());
+        press(self, "enter", window, cx);
+        self.field = TextField::new("smoke matrix card");
+        let enter = press(self, "enter", window, cx);
+        let landed = self.app.selected_task.as_ref().and_then(|id| {
+            self.app
+                .board
+                .quadrants
+                .iter()
+                .position(|cards| cards.iter().any(|card| &card.id == id))
+        });
+        said.push(format!(
+            "matrix enter {enter:.1} (card in quadrant {landed:?} of wanted {quadrant:?})"
+        ));
+        press(self, "escape", window, cx);
         said.push(format!("escape {escape:.1}"));
         said
     }
@@ -768,6 +817,11 @@ impl Takt {
                     }
                     Some(Editing::NewTask { .. }) => {
                         if self.app.create_task(&text) {
+                            self.field = TextField::default();
+                        }
+                    }
+                    Some(Editing::NewCard { .. }) => {
+                        if self.app.create_card(&text) {
                             self.field = TextField::default();
                         }
                     }

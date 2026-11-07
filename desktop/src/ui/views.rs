@@ -1,5 +1,6 @@
 use super::board_links::{self, End};
 use super::*;
+use crate::state::board::CardPlace;
 use crate::state::columns::ColumnName;
 
 impl Takt {
@@ -246,7 +247,11 @@ impl Takt {
                                     .gap_1()
                                     .children(cards.iter().enumerate().map(|(ix, task)| {
                                         self.card(column_ix * 100_000 + ix, task, t, cx)
-                                    })),
+                                    }))
+                                    .children(
+                                        self.drafting(CardPlace::Column(column_ix))
+                                            .then(|| self.draft_card(t)),
+                                    ),
                             ),
                     )
                     .child(board_links::measure(
@@ -274,6 +279,25 @@ impl Takt {
                 },
             )
             .child(board_links::overlay(&self.board_links, focus, t.accent))
+            .into_any_element()
+    }
+
+    fn drafting(&self, place: CardPlace) -> bool {
+        matches!(&self.app.editing, Some(Editing::NewCard { place: p, .. }) if *p == place)
+    }
+
+    /// The new card being typed, at the foot of its column or quadrant.
+    fn draft_card(&self, t: Tokens) -> AnyElement {
+        div()
+            .px_2()
+            .py_1()
+            .rounded(px(4.))
+            .bg(t.background)
+            .border_1()
+            .border_color(t.accent)
+            .flex()
+            .items_center()
+            .child(self.field_inline(t, "New card"))
             .into_any_element()
     }
 
@@ -507,55 +531,60 @@ impl Takt {
 
     pub(super) fn matrix(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let hover = t.hover;
-        let quadrant = |q: usize, this: &Self, cx: &mut Context<Self>| {
-            let cards = this.app.board.quadrants.get(q).cloned().unwrap_or_default();
-            div()
-                .id(("quadrant", q))
-                .drag_over::<DraggedTask>(move |style, _, _, _| style.bg(hover))
-                .on_drop(cx.listener(move |this, drag: &DraggedTask, _, cx| {
-                    this.app.drop_task_into_quadrant(&drag.id, q);
-                    this.after_change(cx);
-                    cx.notify();
-                }))
-                .flex_1()
-                .min_w_0()
-                .flex()
-                .flex_col()
-                .rounded(px(6.))
-                .bg(t.surface)
-                .border_1()
-                .border_color(t.border_variant)
-                .child(
-                    div()
-                        .px_2()
-                        .py_1()
-                        .flex()
-                        .justify_between()
-                        .border_b_1()
-                        .border_color(t.border_variant)
-                        .child(div().text_color(t.muted).child(QUADRANT_TITLES[q]))
-                        .child(
-                            div()
-                                .text_size(px(11.))
-                                .text_color(t.placeholder)
-                                .child(format!("⌥{}  {}", q + 1, cards.len())),
-                        ),
-                )
-                .child(
-                    div()
-                        .id(("quadrant-cards", q))
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                        .p_1()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .children(cards.iter().enumerate().map(|(ix, task)| {
-                            this.card(1_000_000 + q * 100_000 + ix, task, t, cx)
-                        })),
-                )
-        };
+        let quadrant =
+            |q: usize, this: &Self, cx: &mut Context<Self>| {
+                let cards = this.app.board.quadrants.get(q).cloned().unwrap_or_default();
+                div()
+                    .id(("quadrant", q))
+                    .drag_over::<DraggedTask>(move |style, _, _, _| style.bg(hover))
+                    .on_drop(cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                        this.app.drop_task_into_quadrant(&drag.id, q);
+                        this.after_change(cx);
+                        cx.notify();
+                    }))
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .rounded(px(6.))
+                    .bg(t.surface)
+                    .border_1()
+                    .border_color(t.border_variant)
+                    .child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .flex()
+                            .justify_between()
+                            .border_b_1()
+                            .border_color(t.border_variant)
+                            .child(div().text_color(t.muted).child(QUADRANT_TITLES[q]))
+                            .child(
+                                div()
+                                    .text_size(px(11.))
+                                    .text_color(t.placeholder)
+                                    .child(format!("⌥{}  {}", q + 1, cards.len())),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .id(("quadrant-cards", q))
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_y_scroll()
+                            .p_1()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .children(cards.iter().enumerate().map(|(ix, task)| {
+                                this.card(1_000_000 + q * 100_000 + ix, task, t, cx)
+                            }))
+                            .children(
+                                this.drafting(CardPlace::Quadrant(Some(q)))
+                                    .then(|| this.draft_card(t)),
+                            ),
+                    )
+            };
         let unplaced = self.app.board.unplaced.clone();
         div()
             .flex_1()
@@ -613,6 +642,10 @@ impl Takt {
                                     .iter()
                                     .enumerate()
                                     .map(|(ix, task)| self.card(9_000_000 + ix, task, t, cx)),
+                            )
+                            .children(
+                                self.drafting(CardPlace::Quadrant(None))
+                                    .then(|| self.draft_card(t)),
                             ),
                     ),
             )

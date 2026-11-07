@@ -361,6 +361,98 @@ impl App {
     }
 }
 
+/// Where a new card is drafted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CardPlace {
+    Column(usize),
+    /// A matrix quadrant, or the unplaced cards.
+    Quadrant(Option<usize>),
+}
+
+impl App {
+    /// Enter on the board or the matrix: a draft card at the foot of the
+    /// focused column, or of the selected card's quadrant, in the selected
+    /// card's list (or the list on screen).
+    pub fn begin_new_card(&mut self) {
+        let selected = self.selected().cloned();
+        let Some(list_id) = selected
+            .as_ref()
+            .map(|task| task.list_id.clone())
+            .or_else(|| self.scope_list_id())
+        else {
+            self.message = Some("Select a card first, so the new one has a list.".into());
+            return;
+        };
+        let place = match self.view_mode {
+            ViewMode::Matrix => CardPlace::Quadrant(selected.as_ref().and_then(|task| {
+                self.board
+                    .quadrants
+                    .iter()
+                    .position(|cards| cards.iter().any(|card| card.id == task.id))
+            })),
+            _ => CardPlace::Column(self.board.column),
+        };
+        self.editing = Some(super::Editing::NewCard { list_id, place });
+    }
+
+    /// Adds the drafted card, files it where it was drafted and selects it,
+    /// leaving the draft open for the next. False when the text was kept
+    /// back, its problem in the status bar.
+    pub fn create_card(&mut self, title: &str) -> bool {
+        let Some(super::Editing::NewCard { list_id, place }) = self.editing.clone() else {
+            return true;
+        };
+        let title = title.trim();
+        if title.is_empty() {
+            self.editing = None;
+            return true;
+        }
+        let new = match self.new_task_from(title, &list_id) {
+            Ok(new) => takt_core::tasks::NewTask {
+                parent_task_id: None,
+                at_top: false,
+                adjacent_task_id: None,
+                ..new
+            },
+            Err(problem) => {
+                self.message = Some(problem);
+                return false;
+            }
+        };
+        let Some(id) = self.write(|store| store.core.create_task(new, now_ms())) else {
+            return false;
+        };
+        self.read_scope_into_rows();
+        self.selected_task = Some(id.clone());
+        match place {
+            CardPlace::Column(column) => {
+                let key = self.board.key.clone();
+                let zone = self.store.zone.clone();
+                if let Some(column_id) = self.board.columns.get(column).map(|c| c.id.clone()) {
+                    self.write(|store| {
+                        store.core.move_to_board_column(
+                            key,
+                            vec![id.clone()],
+                            column_id,
+                            now_ms(),
+                            zone,
+                        )
+                    });
+                    self.read_scope_into_rows();
+                }
+                self.board.column = column;
+            }
+            CardPlace::Quadrant(Some(quadrant)) => self.place_in_quadrant(quadrant),
+            CardPlace::Quadrant(None) => {}
+        }
+        self.layout_board();
+        self.selected_task = Some(id);
+        self.reload_today();
+        self.editing = Some(super::Editing::NewCard { list_id, place });
+        true
+    }
+}
+
 /// A row of a card's subtree.
 #[derive(Debug, Clone)]
 pub struct CardRow {

@@ -516,6 +516,10 @@ impl App {
             (NewPlacement::Child, Some(task)) => (Some(task.id.clone()), None),
             (_, None) => (entered, self.rows.last().map(|row| row.task.id.clone())),
         };
+        if matches!(self.view_mode, ViewMode::Board | ViewMode::Matrix) {
+            self.begin_new_card();
+            return;
+        }
         // Only the outline draws the draft row: from anywhere else the
         // typing would go into a field nobody can see.
         if self.view_mode != ViewMode::Outline {

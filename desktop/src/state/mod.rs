@@ -135,6 +135,12 @@ pub enum Editing {
         /// Inserted after this sibling; at the start when absent.
         after: Option<String>,
     },
+    /// A new card, drafted at the foot of a board column or a matrix
+    /// quadrant (`None`: the unplaced ones).
+    NewCard {
+        list_id: String,
+        place: board::CardPlace,
+    },
     /// Renaming a list or folder in the sidebar.
     SidebarName {
         row_id: String,
