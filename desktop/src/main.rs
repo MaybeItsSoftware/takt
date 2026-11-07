@@ -322,6 +322,60 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
         ));
         app.editing = None;
     }
+    // A subtask filed into the next column, selected, and the board left
+    // up: the shot then shows its link's line.
+    if std::env::var_os("TAKT_DESKTOP_SMOKE_LINK").is_some() {
+        app.overlay = None;
+        app.editing = None;
+        app.region = state::Region::Tasks;
+        app.select_everything();
+        app.run("goBoard", Some("2"));
+        let found = app
+            .board
+            .cards
+            .iter()
+            .enumerate()
+            .find_map(|(column, cards)| {
+                cards.iter().find_map(|card| {
+                    let (rows, _) = app.card_subtree(card);
+                    rows.iter()
+                        .find(|row| row.task.status == "open")
+                        .map(|row| (column, row.task.id.clone()))
+                })
+            });
+        if let Some((column, child)) = found {
+            app.selected_task = Some(child.clone());
+            app.board.column = column;
+            let by = if column + 1 < app.board.columns.len() {
+                1
+            } else {
+                -1
+            };
+            app.move_card_to_adjacent_column(by);
+            let elsewhere: usize = app
+                .board
+                .cards
+                .iter()
+                .flatten()
+                .map(|card| {
+                    app.card_subtree(card)
+                        .0
+                        .iter()
+                        .filter(|r| r.elsewhere.is_some())
+                        .count()
+                })
+                .sum();
+            let now_in = app
+                .board
+                .cards
+                .iter()
+                .position(|cards| cards.iter().any(|c| c.id == child));
+            report.push(format!(
+                "link: a subtask filed {by:+} column is a card in column {now_in:?}, {elsewhere} rows name another column"
+            ));
+            app.selected_task = Some(child);
+        }
+    }
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));
     }
@@ -340,6 +394,10 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                     cx.background_executor()
                         .timer(std::time::Duration::from_millis(1500))
                         .await;
+                    println!(
+                        "smoke: board link lines drawn {}",
+                        ui::board_links::painted()
+                    );
                     let _ = std::process::Command::new("/usr/sbin/screencapture")
                         .args(["-x", &path])
                         .status();

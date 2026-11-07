@@ -1,3 +1,4 @@
+use super::board_links::{self, End};
 use super::*;
 use crate::state::columns::ColumnName;
 
@@ -153,12 +154,22 @@ impl Takt {
             return self.empty(t, "No columns.");
         }
         let active = self.app.region == Region::Tasks;
+        self.board_links.borrow_mut().clear();
+        let focus: Vec<String> = [
+            self.app.selected_task.clone(),
+            self.hover_card.clone(),
+            self.hover_row.clone(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         div()
             .id("board")
+            .relative()
             .flex_1()
             .min_h_0()
             .flex()
-            .gap_2()
+            .gap(px(board_links::GUTTER))
             .p_2()
             .overflow_x_scroll()
             .children(board.columns.iter().enumerate().map(|(column_ix, column)| {
@@ -180,6 +191,7 @@ impl Takt {
                     .w(px(272.))
                     .flex_none()
                     .h_full()
+                    .relative()
                     .flex()
                     .flex_col()
                     .rounded(px(6.))
@@ -215,18 +227,31 @@ impl Takt {
                     )
                     .child(
                         div()
-                            .id(("cards", column_ix))
                             .flex_1()
                             .min_h_0()
-                            .overflow_y_scroll()
-                            .p_1()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .children(cards.iter().enumerate().map(|(ix, task)| {
-                                self.card(column_ix * 100_000 + ix, task, t, cx)
-                            })),
+                            .relative()
+                            .child(board_links::measure(
+                                &self.board_links,
+                                End::Band(column_ix),
+                            ))
+                            .child(
+                                div()
+                                    .id(("cards", column_ix))
+                                    .size_full()
+                                    .overflow_y_scroll()
+                                    .p_1()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .children(cards.iter().enumerate().map(|(ix, task)| {
+                                        self.card(column_ix * 100_000 + ix, task, t, cx)
+                                    })),
+                            ),
                     )
+                    .child(board_links::measure(
+                        &self.board_links,
+                        End::Column(column_ix),
+                    ))
             }))
             .when(
                 matches!(
@@ -247,6 +272,7 @@ impl Takt {
                     )
                 },
             )
+            .child(board_links::overlay(&self.board_links, focus, t.accent))
             .into_any_element()
     }
 
@@ -265,8 +291,24 @@ impl Takt {
             Scope::List { .. } => None,
             _ => self.app.list(&task.list_id).map(|list| list.name.clone()),
         };
+        // A board card's column, for its link ends; not the matrix's.
+        let column = (ix < 1_000_000).then_some(ix / 100_000);
         div()
             .id(("card", ix))
+            .on_hover({
+                let id = id.clone();
+                cx.listener(move |this, hovered: &bool, _, cx| {
+                    let was = this.hover_card.clone();
+                    if *hovered {
+                        this.hover_card = Some(id.clone());
+                    } else if this.hover_card.as_deref() == Some(id.as_str()) {
+                        this.hover_card = None;
+                    }
+                    if was != this.hover_card {
+                        cx.notify();
+                    }
+                })
+            })
             .px_2()
             .py_1()
             .rounded(px(4.))
@@ -307,9 +349,22 @@ impl Takt {
             }))
             .child(
                 div()
+                    .relative()
                     .flex()
                     .items_center()
                     .gap_2()
+                    .when_some(
+                        column.filter(|_| task.parent_task_id.is_some()),
+                        |d, column| {
+                            d.child(board_links::measure(
+                                &self.board_links,
+                                End::Target {
+                                    child: task.id.clone(),
+                                    column,
+                                },
+                            ))
+                        },
+                    )
                     .child(check(task, t))
                     .child(if editing {
                         self.field_inline(t, "Task").into_any_element()
@@ -340,13 +395,19 @@ impl Takt {
                         .child(hint),
                 )
             })
-            .child(self.card_subtasks(task, t, cx))
+            .child(self.card_subtasks(task, column, t, cx))
             .into_any_element()
     }
 
     /// The card's subtree as compact rows: `└` marks, flush with the card's
     /// edge; a subtask filed in another column muted and naming it.
-    fn card_subtasks(&self, card: &TaskRow, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+    fn card_subtasks(
+        &self,
+        card: &TaskRow,
+        column: Option<usize>,
+        t: Tokens,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let (rows, total) = self.app.card_subtree(card);
         if rows.is_empty() {
             return div().into_any_element();
@@ -360,8 +421,33 @@ impl Takt {
                 let id = row.task.id.clone();
                 let selected = self.app.selected_task.as_deref() == Some(id.as_str());
                 let open = row.task.status == "open";
+                let source = column
+                    .filter(|_| row.elsewhere.is_some())
+                    .map(|column| End::Source {
+                        child: id.clone(),
+                        column,
+                        card: card.id.clone(),
+                    });
                 div()
                     .id(gpui::SharedString::from(format!("card-row-{id}")))
+                    .relative()
+                    .when_some(source, |d, end| {
+                        d.child(board_links::measure(&self.board_links, end))
+                    })
+                    .on_hover({
+                        let id = id.clone();
+                        cx.listener(move |this, hovered: &bool, _, cx| {
+                            let was = this.hover_row.clone();
+                            if *hovered {
+                                this.hover_row = Some(id.clone());
+                            } else if this.hover_row.as_deref() == Some(id.as_str()) {
+                                this.hover_row = None;
+                            }
+                            if was != this.hover_row {
+                                cx.notify();
+                            }
+                        })
+                    })
                     .pl(px(4. + row.depth as f32 * 10.))
                     .h(px(20.))
                     .flex()

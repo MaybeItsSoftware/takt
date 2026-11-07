@@ -5,6 +5,7 @@
 //! keys and run by `App::handle_key`, so the keymap is the core's, not a
 //! second copy in GPUI's binding tables. Rendering reads only what is held.
 
+pub mod board_links;
 pub mod capture;
 mod chrome;
 mod dock;
@@ -56,6 +57,11 @@ pub struct Takt {
     capture: Option<gpui::WindowHandle<capture::QuickCapture>>,
     /// The status item and hotkeys are up (not in a smoke run).
     platform_live: bool,
+    /// Where the board's link ends were drawn, for the lines over them.
+    board_links: board_links::Shared,
+    /// The board card and the card's subtask row under the pointer.
+    hover_card: Option<String>,
+    hover_row: Option<String>,
 }
 
 /// Keeps the one `Takt` alive while no window shows it.
@@ -128,6 +134,9 @@ impl Takt {
             main: None,
             capture: None,
             platform_live: false,
+            board_links: Default::default(),
+            hover_card: None,
+            hover_row: None,
         };
         this.rank_today(cx);
         this.poll_external_writes(cx);

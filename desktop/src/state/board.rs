@@ -96,7 +96,8 @@ impl App {
             .collect();
         let layout = columns.layout;
         let drawn: Vec<BoardColumn> = columns.columns;
-        let cards = self.cards();
+        let mut cards = self.cards();
+        cards.extend(self.cross_column_cards(&cards, &overrides, &drawn));
         let mut by_column: Vec<Vec<TaskRow>> = vec![Vec::new(); drawn.len().max(1)];
         let mut quadrants: Vec<Vec<(i64, TaskRow)>> = vec![Vec::new(); 4];
         let mut unplaced = Vec::new();
@@ -142,6 +143,83 @@ impl App {
             column,
         };
         self.keep_board_selection();
+    }
+
+    /// The subtasks filed in another column than their parent card's,
+    /// which stand as cards of their own there (the core's
+    /// `board_cross_column`, as the Swift app and Android ask it). A
+    /// subtask nobody filed is in its parent's column, on its parent's card.
+    fn cross_column_cards(
+        &self,
+        cards: &[TaskRow],
+        overrides: &std::collections::HashMap<String, String>,
+        drawn: &[BoardColumn],
+    ) -> Vec<TaskRow> {
+        let mut children: std::collections::HashMap<&str, Vec<&TaskRow>> = Default::default();
+        for row in &self.all_rows {
+            if let Some(parent) = row.task.parent_task_id.as_deref() {
+                children.entry(parent).or_default().push(&row.task);
+            }
+        }
+        // The cards, then each card's tree beneath it, in drawing order.
+        let mut tree: Vec<&TaskRow> = cards.iter().collect();
+        let mut index: std::collections::HashMap<&str, usize> = tree
+            .iter()
+            .enumerate()
+            .map(|(ix, task)| (task.id.as_str(), ix))
+            .collect();
+        let mut parents: Vec<i32> = vec![-1; tree.len()];
+        for card in cards {
+            let mut stack: Vec<&TaskRow> = children
+                .get(card.id.as_str())
+                .map(|kids| kids.iter().rev().copied().collect())
+                .unwrap_or_default();
+            while let Some(task) = stack.pop() {
+                if index.contains_key(task.id.as_str()) {
+                    continue;
+                }
+                index.insert(task.id.as_str(), tree.len());
+                let parent = task
+                    .parent_task_id
+                    .as_deref()
+                    .and_then(|p| index.get(p))
+                    .map_or(-1, |ix| *ix as i32);
+                parents.push(parent);
+                tree.push(task);
+                if let Some(kids) = children.get(task.id.as_str()) {
+                    stack.extend(kids.iter().rev().copied());
+                }
+            }
+        }
+        let column_of = |task: &TaskRow| -> Option<String> {
+            overrides.get(&task.id).cloned().or_else(|| {
+                self.placements
+                    .get(&task.id)
+                    .and_then(|placement| placement.column.clone())
+            })
+        };
+        let code = |id: Option<String>| -> i32 {
+            id.and_then(|id| drawn.iter().position(|column| column.id == id))
+                .map_or(-1, |ix| ix as i32)
+        };
+        let filed: Vec<i32> = tree.iter().map(|task| code(column_of(task))).collect();
+        if filed[cards.len()..].iter().all(|code| *code < 0) {
+            return Vec::new();
+        }
+        let hide = self.prefs.hide_completed;
+        let eligible: Vec<bool> = tree
+            .iter()
+            .enumerate()
+            .map(|(ix, task)| {
+                ix >= cards.len()
+                    && task.item_kind.as_deref() != Some("list")
+                    && !(hide && task.status != "open" && !self.lingering.contains(&task.id))
+            })
+            .collect();
+        takt_core::board_rules::board_cross_column(parents, filed, eligible, 0)
+            .into_iter()
+            .map(|ix| tree[ix as usize].clone())
+            .collect()
     }
 
     /// The cards in reading order for the keys: the focused column's on the

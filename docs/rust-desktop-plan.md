@@ -79,8 +79,10 @@ keeps working throughout.
    cards moved by key or by drag, each card drawing its subtree with a
    subtask filed in another column named by that column, and "↳ parent" on
    a card whose parent is elsewhere), the matrix, Everything, folders,
-   filter lists, Today. The board's connecting *lines* are not drawn: each
-   end names the other in words instead.
+   filter lists, Today. A subtask filed in another column stands as a card
+   there (the core's `board_cross_column`), and while the selection or the
+   pointer is on either end, the accent line joins its row to its card
+   (`desktop/src/ui/board_links.rs`, routed as `BoardLinkRoute.swift` does).
 4. **The inspector — done.** Every field through `core::editor` drafts,
    conditions, dependencies, links, recurrence, commitments and habits as
    typed sheets.
