@@ -102,8 +102,8 @@ keeps working throughout.
    the icon and the `takt://` scheme; `scripts/build_desktop_dmg.sh` makes
    a Developer ID DMG, notarised and stapled. The first launch makes the
    workspace and carries forward the old `Priority` and `Bar Tasker`
-   folders. Left: `runtime_shaders` stays until the Metal toolchain is
-   installed (`xcodebuild -downloadComponent MetalToolchain`).
+   folders. The shaders are compiled at build time, which needs the Metal
+   toolchain (`xcodebuild -downloadComponent MetalToolchain`).
 8. **Cutover — done, 2026-11-07.** `install_local.sh` installs the Rust
    bundle as `/Applications/Takt.app` under the Swift bundle id
    (`uk.co.maybeitssoftware.takt`), so macOS treats it as the same app for
