@@ -11,6 +11,10 @@ set -euo pipefail
 # Development identity, or ad hoc when there is none; set
 # TAKT_SIGN_IDENTITY to choose. Like install_local.sh it supersedes the
 # installed copy outright and touches /Applications only after a good build.
+#
+# TAKT_BUNDLE_ONLY=1 stops once build/desktop/<name>.app is signed, for
+# scripts/build_desktop_dmg.sh; TAKT_SIGN_TIMESTAMP=1 asks Apple for a
+# secure timestamp, which notarisation needs.
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="Takt Desktop"
@@ -100,10 +104,17 @@ fi
 echo "==> Signing with ${IDENTITY}…"
 # Inside out: the helper before the bundle around it. No entitlements: like
 # the Swift app it isn't sandboxed, so there is nothing for one to grant.
-codesign --force --sign "$IDENTITY" --options runtime --timestamp=none \
+TIMESTAMP="--timestamp=none"
+[[ "${TAKT_SIGN_TIMESTAMP:-0}" == "1" ]] && TIMESTAMP="--timestamp"
+codesign --force --sign "$IDENTITY" --options runtime "$TIMESTAMP" \
   "$APP_PATH/Contents/Helpers/takt"
-codesign --force --sign "$IDENTITY" --options runtime --timestamp=none "$APP_PATH"
+codesign --force --sign "$IDENTITY" --options runtime "$TIMESTAMP" "$APP_PATH"
 codesign --verify --strict "$APP_PATH"
+
+if [[ "${TAKT_BUNDLE_ONLY:-0}" == "1" ]]; then
+  echo "Bundled: $APP_PATH"
+  exit 0
+fi
 
 echo "==> Quitting any running instance…"
 osascript -e "tell application \"$APP_NAME\" to quit" 2>/dev/null || true
