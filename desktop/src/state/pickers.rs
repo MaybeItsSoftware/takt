@@ -61,6 +61,8 @@ pub enum Picker {
     Appearance,
     /// The list quick capture lands in.
     CaptureList,
+    /// The Google calendar timed tasks are mirrored to.
+    GoogleCalendar,
 }
 
 impl Picker {
@@ -108,6 +110,7 @@ pub enum Choice {
     Theme(String),
     Appearance(String),
     CaptureList(Option<String>),
+    GoogleCalendar(Option<String>),
 }
 
 /// A row: title, detail, the key hint, and what picking it does.
@@ -195,6 +198,7 @@ impl App {
             Picker::Theme => "Choose a theme…",
             Picker::Appearance => "Light, dark, or the system's…",
             Picker::CaptureList => "Where quick capture lands…",
+            Picker::GoogleCalendar => "The two-way Google calendar…",
         }
     }
 
@@ -326,6 +330,17 @@ impl App {
                         )
                     })
                     .collect();
+                ranked(rows, query)
+            }
+            Picker::GoogleCalendar => {
+                let rows =
+                    std::iter::once(row("None", "", Choice::GoogleCalendar(None)))
+                        .chain(self.google_calendar_choices().into_iter().map(
+                            |(id, name, detail)| {
+                                row(name, &detail, Choice::GoogleCalendar(Some(id)))
+                            },
+                        ))
+                        .collect();
                 ranked(rows, query)
             }
             Picker::CaptureList => {
@@ -685,6 +700,9 @@ impl App {
             (Picker::Theme, Choice::Theme(id)) => {
                 self.prefs.theme = id;
                 self.prefs.save();
+            }
+            (Picker::GoogleCalendar, Choice::GoogleCalendar(id)) => {
+                self.choose_google_calendar(id);
             }
             (Picker::CaptureList, Choice::CaptureList(id)) => {
                 self.prefs.quick_capture_list = id;

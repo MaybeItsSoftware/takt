@@ -9,6 +9,7 @@
 #[macro_use]
 extern crate objc;
 
+mod google;
 mod keys;
 mod overlay;
 mod platform;

@@ -95,6 +95,30 @@ fn unescape(text: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// A form POST (`application/x-www-form-urlencoded`), as OAuth wants.
+pub fn form(url: &str, pairs: &[(&str, &str)], timeout: Duration) -> Result<Reply, String> {
+    let body = pairs
+        .iter()
+        .map(|(key, value)| format!("{}={}", escape(key), escape(value)))
+        .collect::<Vec<_>>()
+        .join("&");
+    let agent = ureq::AgentBuilder::new().timeout(timeout).build();
+    let answer = agent
+        .post(url)
+        .set("Content-Type", "application/x-www-form-urlencoded")
+        .send_string(&body);
+    let response = match answer {
+        Ok(response) => response,
+        Err(ureq::Error::Status(_, response)) => response,
+        Err(ureq::Error::Transport(error)) => {
+            return Err(format!("Couldn't reach the server: {error}"));
+        }
+    };
+    let status = response.status();
+    let body = response.into_string().unwrap_or_default();
+    Ok(Reply { status, body })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

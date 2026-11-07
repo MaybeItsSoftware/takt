@@ -144,6 +144,7 @@ impl Takt {
                     this.refresh_status();
                     this.app.sync.set_foreground(this.main.is_some());
                     this.app.sync.note_outbox();
+                    this.app.google_note_change();
                     this.app.tick_reminders();
                     if this.app.check_external_writes() {
                         this.app.reload_today();
@@ -263,6 +264,11 @@ impl Takt {
                     self.open_overlay_field();
                 }
                 "quit" => cx.quit(),
+                "pick-google-calendar" => {
+                    self.app
+                        .open_picker(crate::state::pickers::Picker::GoogleCalendar);
+                    self.open_overlay_field();
+                }
                 // A reminder clicked: the task, in the window.
                 open if open.starts_with("open:") => {
                     let id = &open["open:".len()..];

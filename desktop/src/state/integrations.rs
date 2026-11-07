@@ -114,12 +114,16 @@ impl App {
                 String::new(),
             )),
         }
+        rows.extend(self.google_rows());
         rows.extend(self.reminder_rows());
         rows
     }
 
     pub fn change_platform_setting(&mut self, id: &str) {
         self.message = None;
+        if self.change_google_setting(id) {
+            return;
+        }
         if self.change_reminder_setting(id) {
             if self.editing.is_none() {
                 self.open_overlay(super::Overlay::Settings);

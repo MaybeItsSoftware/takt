@@ -22,6 +22,7 @@ pub mod drag;
 pub mod focus;
 pub mod focus_prompt;
 pub mod forms;
+pub mod google;
 pub mod inspector;
 pub mod integrations;
 pub mod library;
@@ -205,6 +206,8 @@ pub struct App {
     pub agent: agent::Agent,
     /// Sync with the account's other devices.
     pub sync: crate::sync::Sync,
+    /// The Google Calendar and Tasks mirrors' worker.
+    pub google: google::Google,
     /// When reminders were last read.
     pub reminders_looked_ms: i64,
     /// Text the agent's message box opens with.
@@ -306,6 +309,7 @@ impl App {
             library: Default::default(),
             agent: Default::default(),
             sync,
+            google: Default::default(),
             reminders_looked_ms: 0,
             agent_draft: None,
             done_cursor: None,
@@ -359,6 +363,7 @@ impl App {
         app.reload_done();
         app.restore_scope();
         app.refresh_history();
+        app.start_google();
         Ok(app)
     }
 

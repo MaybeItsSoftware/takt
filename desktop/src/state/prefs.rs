@@ -53,6 +53,10 @@ pub struct Prefs {
     pub left_dock_tab: String,
     /// `claude` or `codex`.
     pub agent_client: String,
+    /// The person's own Google OAuth client ID; else the Swift app's.
+    pub google_client_id: Option<String>,
+    pub google_calendar: bool,
+    pub google_tasks: bool,
     /// Which reminders this Mac shows, and when (minutes after midnight).
     pub remind_due_time: bool,
     pub remind_due_today: bool,
@@ -99,6 +103,9 @@ impl Default for Prefs {
             hotkey_focus_panel: Some("cmd+ctrl+option+shift+f".into()),
             left_dock_tab: "lists".into(),
             agent_client: "claude".into(),
+            google_client_id: None,
+            google_calendar: false,
+            google_tasks: false,
             remind_due_time: true,
             remind_due_today: false,
             remind_due_today_minute: 9 * 60,

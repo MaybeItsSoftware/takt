@@ -25,6 +25,8 @@ pub enum Ask {
     CheckvistKey {
         email: String,
     },
+    /// The Google OAuth client the integrations sign in through.
+    GoogleClientId,
     /// The morning or evening reminder's time.
     ReminderTime {
         dailies: bool,
@@ -44,6 +46,7 @@ impl Ask {
             Ask::SyncServer => "Sync server",
             Ask::SyncDelete => "Delete the sync account",
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
+            Ask::GoogleClientId => "Google OAuth client ID",
             Ask::ReminderTime { dailies: false } => "Morning reminder at",
             Ask::ReminderTime { dailies: true } => "Evening reminder at",
         }
@@ -56,6 +59,7 @@ impl Ask {
             Ask::SyncServer => "https://… (empty for the hosted server)",
             Ask::SyncDelete => "delete",
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
+            Ask::GoogleClientId => "….apps.googleusercontent.com",
             Ask::ReminderTime { .. } => "09:00",
         }
     }
@@ -96,6 +100,7 @@ impl App {
                 self.sync.status().email.unwrap_or_default()
             }
             Ask::SyncServer => self.sync.status().server,
+            Ask::GoogleClientId => self.google_client_id(),
             Ask::ReminderTime { dailies } => super::reminders::clock(if *dailies {
                 self.prefs.remind_dailies_left_minute
             } else {
@@ -151,6 +156,10 @@ impl App {
             }
             Ask::CheckvistKey { email } => {
                 self.connect_checkvist(&email, text);
+                self.open_overlay(Overlay::Settings);
+            }
+            Ask::GoogleClientId => {
+                self.set_google_client_id(text);
                 self.open_overlay(Overlay::Settings);
             }
             Ask::ReminderTime { dailies } => {
