@@ -267,3 +267,39 @@ pub(super) fn reason_title(reason: &str) -> &'static str {
         _ => "",
     }
 }
+
+/// A task being dragged, and what is drawn under the pointer.
+#[derive(Clone)]
+pub(super) struct DraggedTask {
+    pub id: String,
+    pub title: String,
+    pub tokens: Tokens,
+}
+
+impl gpui::Render for DraggedTask {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let t = self.tokens;
+        div()
+            .px_2()
+            .py_1()
+            .max_w(px(320.))
+            .truncate()
+            .rounded(px(4.))
+            .bg(t.surface)
+            .border_1()
+            .border_color(t.accent)
+            .text_color(t.text)
+            .font_family(UI_FONT)
+            .text_size(px(13.))
+            .child(self.title.clone())
+    }
+}
+
+/// The drag a task row starts.
+pub(super) fn drag_task(task: &TaskRow, t: Tokens) -> DraggedTask {
+    DraggedTask {
+        id: task.id.clone(),
+        title: task.title.clone(),
+        tokens: t,
+    }
+}

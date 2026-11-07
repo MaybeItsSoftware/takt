@@ -18,6 +18,7 @@ pub mod conditions;
 pub mod context_menu;
 pub mod details;
 pub mod docks;
+pub mod drag;
 pub mod focus;
 pub mod focus_prompt;
 pub mod forms;

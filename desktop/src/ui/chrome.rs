@@ -348,6 +348,20 @@ impl Takt {
             })
             .when(current, |d| d.bg(t.selected))
             .when(!current, |d| d.hover(|d| d.bg(t.hover)))
+            .when_some(
+                match &target.kind {
+                    crate::state::sidebar::RowKind::List(list_id) => Some(list_id.clone()),
+                    _ => None,
+                },
+                |d, list_id| {
+                    d.drag_over::<DraggedTask>(move |style, _, _, _| style.bg(t.selected))
+                        .on_drop(cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                            this.app.drop_task_into_list(&drag.id, &list_id);
+                            this.after_change(cx);
+                            cx.notify();
+                        }))
+                },
+            )
             .on_mouse_down(gpui::MouseButton::Right, {
                 let row_id = target.id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {

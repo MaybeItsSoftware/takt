@@ -170,6 +170,26 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             "tick and untick {:.2} ms",
             started.elapsed().as_secs_f64() * 1000.0 / 2.0
         ));
+        // A drag: the selected row dropped before its previous sibling,
+        // then put back.
+        if let Some(task) = app.selected().cloned() {
+            let sibling = app
+                .rows
+                .iter()
+                .map(|row| &row.task)
+                .filter(|t| t.parent_task_id == task.parent_task_id && t.list_id == task.list_id)
+                .take_while(|t| t.id != task.id)
+                .last()
+                .map(|t| t.id.clone());
+            if let Some(sibling) = sibling {
+                app.drop_task_before(&task.id, &sibling);
+                let order: Vec<&str> = app.rows.iter().map(|r| r.task.id.as_str()).collect();
+                let moved = order.iter().position(|id| *id == task.id)
+                    < order.iter().position(|id| *id == sibling);
+                app.undo(false);
+                report.push(format!("drag before a sibling: moved {moved}"));
+            }
+        }
         let started = Instant::now();
         app.apply_typed("due tomorrow 4pm");
         app.apply_typed("tag smoke");

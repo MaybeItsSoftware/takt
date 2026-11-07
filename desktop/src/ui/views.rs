@@ -97,6 +97,19 @@ impl Takt {
             })
             .when(selected, |d| d.bg(t.selected))
             .when(!selected, |d| d.hover(|d| d.bg(t.hover)))
+            .on_drag(
+                drag_task_for(&id, &self.app, t),
+                |drag: &DraggedTask, _, _, cx| cx.new(|_| drag.clone()),
+            )
+            .drag_over::<DraggedTask>(move |style, _, _, _| style.border_color(t.accent))
+            .on_drop({
+                let id = id.clone();
+                cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                    this.app.drop_task_before(&drag.id, &id);
+                    this.after_change(cx);
+                    cx.notify();
+                })
+            })
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
@@ -158,6 +171,12 @@ impl Takt {
                 let ruled = column.rules.is_some();
                 div()
                     .id(("column", column_ix))
+                    .drag_over::<DraggedTask>(move |style, _, _, _| style.bg(t.hover))
+                    .on_drop(cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                        this.app.drop_task_into_column(&drag.id, column_ix);
+                        this.after_change(cx);
+                        cx.notify();
+                    }))
                     .w(px(272.))
                     .flex_none()
                     .h_full()
@@ -259,6 +278,19 @@ impl Takt {
                 t.border_variant
             })
             .when(selected, |d| d.bg(t.selected))
+            .on_drag(
+                drag_task_for(&id, &self.app, t),
+                |drag: &DraggedTask, _, _, cx| cx.new(|_| drag.clone()),
+            )
+            .drag_over::<DraggedTask>(move |style, _, _, _| style.border_color(t.accent))
+            .on_drop({
+                let id = id.clone();
+                cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                    this.app.drop_task_before(&drag.id, &id);
+                    this.after_change(cx);
+                    cx.notify();
+                })
+            })
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
@@ -302,10 +334,17 @@ impl Takt {
     }
 
     pub(super) fn matrix(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        let hover = t.hover;
         let quadrant = |q: usize, this: &Self, cx: &mut Context<Self>| {
             let cards = this.app.board.quadrants.get(q).cloned().unwrap_or_default();
             div()
                 .id(("quadrant", q))
+                .drag_over::<DraggedTask>(move |style, _, _, _| style.bg(hover))
+                .on_drop(cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                    this.app.drop_task_into_quadrant(&drag.id, q);
+                    this.after_change(cx);
+                    cx.notify();
+                }))
                 .flex_1()
                 .min_w_0()
                 .flex()
@@ -489,6 +528,19 @@ impl Takt {
             })
             .when(selected, |d| d.bg(t.selected))
             .when(!selected, |d| d.hover(|d| d.bg(t.hover)))
+            .on_drag(
+                drag_task_for(&id, &self.app, t),
+                |drag: &DraggedTask, _, _, cx| cx.new(|_| drag.clone()),
+            )
+            .drag_over::<DraggedTask>(move |style, _, _, _| style.border_color(t.accent))
+            .on_drop({
+                let id = id.clone();
+                cx.listener(move |this, drag: &DraggedTask, _, cx| {
+                    this.app.drop_task_before(&drag.id, &id);
+                    this.after_change(cx);
+                    cx.notify();
+                })
+            })
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
@@ -513,5 +565,17 @@ impl Takt {
                     .child(format!("{list} · {reason}")),
             )
             .into_any_element()
+    }
+}
+
+/// The drag for a row's task, by its id.
+fn drag_task_for(id: &str, app: &crate::state::App, t: Tokens) -> DraggedTask {
+    match app.task(id) {
+        Some(task) => drag_task(task, t),
+        None => DraggedTask {
+            id: id.into(),
+            title: String::new(),
+            tokens: t,
+        },
     }
 }
