@@ -67,6 +67,10 @@ pub struct Prefs {
     pub reminders_checked_ms: i64,
     /// The Swift app's settings and sign-in were carried over (`adopt.rs`).
     pub adopted_swift: bool,
+    /// Vault folders added by hand, beyond the ones Obsidian lists.
+    pub links_obsidian_vaults: Vec<String>,
+    /// The link picker searches Google Drive by name.
+    pub links_drive_search: bool,
 }
 
 impl Default for Prefs {
@@ -115,6 +119,8 @@ impl Default for Prefs {
             remind_dailies_left_minute: 20 * 60,
             reminders_checked_ms: 0,
             adopted_swift: false,
+            links_obsidian_vaults: Vec::new(),
+            links_drive_search: false,
         }
     }
 }

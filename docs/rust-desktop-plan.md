@@ -85,7 +85,8 @@ keeps working throughout.
    (`desktop/src/ui/board_links.rs`, routed as `BoardLinkRoute.swift` does).
 4. **The inspector — done.** Every field through `core::editor` drafts,
    conditions, dependencies, links, recurrence, commitments and habits as
-   typed sheets.
+   typed sheets. The link picker searches the Obsidian vaults and, when
+   switched on, Google Drive by name (`desktop/src/state/links.rs`).
 5. **Focus and the day — done.** Sessions, the "how did it go?" prompt,
    breaks, the queue, the floating focus panel, the timeline, the done
    rail, progress, habits and commitments, celebrations.

@@ -254,7 +254,13 @@ impl Takt {
                 if let Some(notice) = self.app.sync.take_notice() {
                     self.app.message = Some(notice);
                 }
-                if self.app.overlay == Some(Overlay::Settings) {
+                if matches!(
+                    self.app.overlay,
+                    Some(
+                        Overlay::Settings
+                            | Overlay::Picker(crate::state::pickers::Picker::Link { .. })
+                    )
+                ) {
                     self.overlay.refresh(&self.app);
                 }
             }

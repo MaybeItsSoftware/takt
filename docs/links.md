@@ -62,8 +62,13 @@ task's links.
 - **Opening**: `gx` / `Cmd+O` opens the first link, as before.
 - **Rows** that have links show a small link mark.
 
-The plugin is `Takt/Plugins/Native/Links/` (`NativeLinksPlugin`), with a
-settings page for the vaults and Drive search.
+The Rust app (`desktop/`, installed as `Takt.app`) does the same in
+`desktop/src/state/links.rs`: the picker searches the vaults' notes and
+folders as you type, and Drive by name when Settings → Links → "Search Google
+Drive in the link picker" is on. Its vault folders added by hand and the
+Drive switch are its own settings (`desktop.json`). The Swift app's version is
+`Takt/Plugins/Native/Links/` (`NativeLinksPlugin`), with a settings page for
+the vaults and Drive search.
 
 ### Obsidian vaults
 

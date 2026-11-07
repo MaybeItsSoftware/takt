@@ -90,6 +90,14 @@ pub enum Choice {
     NewBlocker(String),
     RemoveBlocker(String),
     AddLink(String),
+    /// A row that only says something, such as why Drive found nothing.
+    Nothing,
+    /// A vault note or folder, or a Drive file: linked with its name.
+    AddNamedLink {
+        url: String,
+        title: String,
+        mime_type: Option<String>,
+    },
     OpenLink(String),
     RemoveLink(String),
     Waiting(String),
@@ -186,7 +194,7 @@ impl App {
         match picker {
             Picker::MoveTask { .. } | Picker::MoveList { .. } => "Move to…",
             Picker::Blocker { .. } => "Wait on a task, or type a new one…",
-            Picker::Link { .. } => "Paste an address to link…",
+            Picker::Link { .. } => "Search Obsidian and Drive, or paste an address…",
             Picker::Waiting { .. } => "Who, when to follow up, every n days…",
             Picker::Icon { .. } => "An icon, or type an emoji…",
             Picker::Place => "Where are you?",
@@ -548,6 +556,25 @@ impl App {
                 Choice::AddLink(path),
             ));
         }
+        let (notes, drive, drive_error) = self.link_candidates(query);
+        let found = !notes.is_empty() || !drive.is_empty();
+        rows.extend(notes.into_iter().chain(drive).map(|c| {
+            row(
+                c.title.clone(),
+                c.subtitle.clone(),
+                Choice::AddNamedLink {
+                    url: c.url,
+                    title: c.title,
+                    mime_type: c.mime_type,
+                },
+            )
+        }));
+        if let Some(error) = drive_error {
+            rows.push(row("Google Drive", error, Choice::Nothing));
+        }
+        if found {
+            return rows;
+        }
         let links = self
             .store
             .core
@@ -814,6 +841,25 @@ impl App {
             (Picker::Link { task_id }, Choice::AddLink(url)) => {
                 if self
                     .write(|s| s.core.add_task_link(task_id.clone(), url, None, None, now))
+                    .is_some()
+                {
+                    self.patch_details(&task_id);
+                    self.message = Some("Linked.".into());
+                }
+            }
+            (
+                Picker::Link { task_id },
+                Choice::AddNamedLink {
+                    url,
+                    title,
+                    mime_type,
+                },
+            ) => {
+                if self
+                    .write(|s| {
+                        s.core
+                            .add_task_link(task_id.clone(), url, Some(title), mime_type, now)
+                    })
                     .is_some()
                 {
                     self.patch_details(&task_id);

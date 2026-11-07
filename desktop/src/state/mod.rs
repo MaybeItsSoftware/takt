@@ -27,6 +27,7 @@ pub mod google;
 pub mod inspector;
 pub mod integrations;
 pub mod library;
+pub mod links;
 pub mod mcp_clients;
 pub mod menubar;
 pub mod navigation;
@@ -212,6 +213,8 @@ pub struct App {
     pub quick_task: Option<String>,
     /// The Google Calendar and Tasks mirrors' worker.
     pub google: google::Google,
+    /// What the link picker searches (`links.rs`).
+    pub links: links::Links,
     /// When reminders were last read.
     pub reminders_looked_ms: i64,
     /// Text the agent's message box opens with.
@@ -316,6 +319,7 @@ impl App {
             quick_agent: Default::default(),
             quick_task: None,
             google: Default::default(),
+            links: Default::default(),
             reminders_looked_ms: 0,
             agent_draft: None,
             done_cursor: None,

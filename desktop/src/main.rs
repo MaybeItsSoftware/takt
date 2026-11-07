@@ -281,6 +281,20 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             "menus: task {task_items} items, sidebar {sidebar_items}"
         ));
     }
+    {
+        let started = Instant::now();
+        app.index_obsidian();
+        let indexed = started.elapsed().as_secs_f64() * 1000.0;
+        let started = Instant::now();
+        let (notes, _, _) = app.link_candidates("daily");
+        report.push(format!(
+            "link picker: {} vaults, {} entries in {indexed:.1} ms, \"daily\" {} rows in {:.2} ms",
+            app.links.vaults.len(),
+            app.links.entries.len(),
+            notes.len(),
+            started.elapsed().as_secs_f64() * 1000.0
+        ));
+    }
     report.push(format!(
         "{} themes, {} settings, {} diagnostics",
         app.library.themes.len(),

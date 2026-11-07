@@ -29,6 +29,8 @@ pub enum Ask {
     Agent,
     /// The Google OAuth client the integrations sign in through.
     GoogleClientId,
+    /// A folder to search as an Obsidian vault in the link picker.
+    ObsidianVault,
     /// The morning or evening reminder's time.
     ReminderTime {
         dailies: bool,
@@ -50,6 +52,7 @@ impl Ask {
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
             Ask::Agent => "Ask the agent",
             Ask::GoogleClientId => "Google OAuth client ID",
+            Ask::ObsidianVault => "Add an Obsidian vault",
             Ask::ReminderTime { dailies: false } => "Morning reminder at",
             Ask::ReminderTime { dailies: true } => "Evening reminder at",
         }
@@ -64,6 +67,7 @@ impl Ask {
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
             Ask::Agent => "Make it due Friday, split it up, explain it…",
             Ask::GoogleClientId => "….apps.googleusercontent.com",
+            Ask::ObsidianVault => "~/Documents/Notes",
             Ask::ReminderTime { .. } => "09:00",
         }
     }
@@ -176,6 +180,10 @@ impl App {
             }
             Ask::GoogleClientId => {
                 self.set_google_client_id(text);
+                self.open_overlay(Overlay::Settings);
+            }
+            Ask::ObsidianVault => {
+                self.add_obsidian_vault(text);
                 self.open_overlay(Overlay::Settings);
             }
             Ask::ReminderTime { dailies } => {

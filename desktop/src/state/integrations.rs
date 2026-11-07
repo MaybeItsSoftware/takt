@@ -115,13 +115,14 @@ impl App {
             )),
         }
         rows.extend(self.google_rows());
+        rows.extend(self.links_rows());
         rows.extend(self.reminder_rows());
         rows
     }
 
     pub fn change_platform_setting(&mut self, id: &str) {
         self.message = None;
-        if self.change_google_setting(id) {
+        if self.change_google_setting(id) || self.change_links_setting(id) {
             return;
         }
         if self.change_reminder_setting(id) {

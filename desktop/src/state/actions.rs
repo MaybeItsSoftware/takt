@@ -264,6 +264,7 @@ impl App {
 
     pub fn begin_add_link(&mut self) {
         if let Some(id) = self.selected_task.clone() {
+            self.index_obsidian();
             self.open_picker(Picker::Link { task_id: id });
         }
     }

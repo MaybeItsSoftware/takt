@@ -229,6 +229,9 @@ impl App {
                 let client = self.google_client_id();
                 let mut scopes: Vec<&str> = CALENDAR_SCOPES.to_vec();
                 scopes.extend(TASKS_SCOPES);
+                if self.prefs.links_drive_search {
+                    scopes.push(super::links::DRIVE_SCOPE);
+                }
                 self.message = Some("Finish connecting Google in the browser…".into());
                 std::thread::spawn(move || {
                     let said = match google::connect(&client, &scopes) {
