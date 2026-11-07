@@ -56,54 +56,60 @@ keeps working throughout.
    workspace (29 lists): a list switch 0.4 ms median, a tick 2.5–12 ms (all
    of it the core's `set_status` reaching the disk), first frame about 90 ms after launch.
    `TAKT_DESKTOP_SMOKE=1` checks this without anyone at the screen.
-1. **Shell — mostly done.** The sidebar from `core::sidebar` (Today,
-   Everything, the inbox, folders opening and closing, nested and pinned
-   lists, filter lists), its cursor, the mode strip, the right dock, the
-   status bar; where you were, the folds and the docks remembered in
+1. **Shell — done.** The sidebar from `core::sidebar` (Today,
+   Everything, the inbox, folders, nested and pinned lists, filter lists),
+   its cursor, the mode strip, the docks, the status bar; where you were,
+   the folds and the docks remembered in
    `Application Support/Takt/desktop.json` (the Swift app's preferences are
-   left alone). Every key goes through the catalogue (`desktop/src/keys.rs`
-   ports the Swift dispatch rules: which surfaces inherit which keys, the
-   two-key sequences with their 1.2 s hold, chords that reach out of a text
-   field). The command palette, the list navigator, search and the keyboard
-   reference are overlays ranked by `core::palette`. Left: the theme
-   switcher and the user keymap file.
-2. **Editing the outline — mostly done.** A one-line text field
-   (`desktop/src/text_field.rs`; no IME yet); new tasks below, above and as
-   children with Tab and ⇧Tab in the draft; rename (select-all, insert,
-   append); complete, invalidate, delete with Return to confirm; indent,
-   outdent, move up and down, to the next or previous list; due today,
-   tomorrow and cleared; the edit commands open the palette with `due `,
-   `start `, `repeat ` or `tag ` typed, and any palette command the core
-   parses (`priority 2`, `untag x`, `list groceries`) runs on the
-   selection; undo and redo through the core's journal; folding;
-   `f`/`F`/`;` find; other processes' writes picked up within a second by
-   `data_version`. A title or status change patches the rows held; a move
-   reads the one list again (about half a millisecond).
-3. **The other views — mostly done.** The board (columns from
-   `core::board_columns`, rule columns included, cards moved with ⌘←/⌘→),
-   the matrix (⌥1–⌥4 to place), Everything and folders, filter lists, and
-   Today (`core::next_up` ranked on a background thread). Left: dragging,
-   column editing, and the board's cross-column subtasks.
-4. **The inspector.** Read-only now: title, list, status, due, estimate,
-   priority, tags, recurrence and notes. Left: editing it through `core::editor` drafts, conditions, dependencies, links,
-   recurrence, reminders.
-5. **Focus and the day — started.** Done: starting a session on a task
-   (the core suggests the length; a task ruled out now asks for Return),
-   the clock in the status bar, finishing the block and stopping; the done
-   rail as a tab of the right dock. Left: the "how did it go?" prompt,
-   breaks, the queue, the focus panel, timeline, done
-   rail, dailies, day view, habits, celebrations.
-6. **The platform.** Menu bar status item and its menu, global hotkeys, the
-   quick-capture panel, notifications for reminders, keychain, sync
-   (`docs/sync.md`), Google sign-in and the calendar and tasks mirrors, the
-   Checkvist import, the agent pane, settings, and `--mcp-server`, which
-   `exec`s the bundled `takt` as now.
-7. **Packaging.** An `.app` bundle with `Contents/Helpers/takt`, signing and
-   notarisation as `docs/signing.md` describes, shaders precompiled (drop the
-   `runtime_shaders` feature), the legacy-name migration, the DMG.
-8. **Cutover.** `install_local.sh` installs the Rust app. The Swift app and
-   its package targets stay in the tree and keep building; `TaktWorkspace`
-   and the bindings are the iPhone's in any case.
+   left alone). Every key goes through the catalogue (`desktop/src/keys.rs`),
+   and `keymap.json` overrides it. The command palette, list navigator,
+   search, keyboard reference, pickers, settings and diagnostics are
+   overlays ranked by `core::palette`. Themes come from the core and the
+   themes folder. Right-click menus on tasks, sidebar rows and panes are
+   made of catalogue commands (`state/context_menu.rs`).
+2. **Editing the outline — done.** A text field with IME
+   (`desktop/src/text_field.rs`); the add row and quick capture read a typed
+   title's trailing words through `core::capture` (`45m #tag @fri !1`);
+   every edit command, undo and redo through the core's journal, folding,
+   find, and other processes' writes picked up within a second. Tasks drag
+   to reorder, into sidebar lists, board columns and matrix quadrants
+   (`state/drag.rs`).
+3. **The other views — done.** The board (rule columns, column editing,
+   cards moved by key or by drag, each card drawing its subtree with a
+   subtask filed in another column named by that column, and "↳ parent" on
+   a card whose parent is elsewhere), the matrix, Everything, folders,
+   filter lists, Today. The board's connecting *lines* are not drawn: each
+   end names the other in words instead.
+4. **The inspector — done.** Every field through `core::editor` drafts,
+   conditions, dependencies, links, recurrence, commitments and habits as
+   typed sheets.
+5. **Focus and the day — done.** Sessions, the "how did it go?" prompt,
+   breaks, the queue, the floating focus panel, the timeline, the done
+   rail, progress, habits and commitments, celebrations.
+6. **The platform — done.** The menu bar item and its menu, Carbon global
+   hotkeys (recorded in Settings), the quick-capture window, notifications
+   through `UNUserNotificationCenter` with reminders from `core::reminders`,
+   open at login (`SMAppService`), the keychain, sync with Supabase sign-in
+   (`desktop/src/sync/`), the Checkvist import, Google sign-in with the
+   Calendar two-way pass and the Tasks mirror (`desktop/src/google/`, the
+   Swift app's ledger file kept), the agent panel and quick ask (`aa`), the
+   MCP client installer, and `--mcp-server`, which `exec`s the bundled
+   `takt`. User plugins are not ported: the Swift app only installs their
+   manifests and stores their settings, and runs nothing.
+7. **Packaging — done but for shaders.** `scripts/install_desktop.sh`
+   builds `/Applications/Takt Desktop.app` with `Contents/Helpers/takt`,
+   the icon and the `takt://` scheme; `scripts/build_desktop_dmg.sh` makes
+   a Developer ID DMG, notarised and stapled. The first launch makes the
+   workspace and carries forward the old `Priority` and `Bar Tasker`
+   folders. Left: `runtime_shaders` stays until the Metal toolchain is
+   installed (`xcodebuild -downloadComponent MetalToolchain`).
+8. **Cutover — waiting on a decision.** `install_local.sh` still installs
+   the Swift app. Switching it means the Rust bundle installing as
+   `Takt.app` in its place; whether it also takes the Swift bundle id
+   (`uk.co.maybeitssoftware.takt`) decides whether macOS treats it as the
+   same app for notifications and the login item. The Swift app and its package
+   targets stay in the tree and keep building; `TaktWorkspace` and the
+   bindings are the iPhone's in any case.
 
 ## Risks
 
@@ -111,5 +117,9 @@ keeps working throughout.
   (`0.2.2`) and upgraded deliberately.
 - **Accessibility.** GPUI exposes far less to VoiceOver than AppKit does.
 - **No ready-made widgets.** Text input, menus, the status item and the
-  global hotkeys are built here, the latter two on `objc2`.
+  global hotkeys are built here, the latter two on `objc` and Carbon.
+- **Two apps, one database.** Until the cutover, both apps can run at once
+  against the same workspace. Writes are safe (the core serialises them and
+  each sees the other's through `data_version`), but signed in to sync in
+  both they would each push the one outbox; sign in in one of them.
 - **Disk.** GPUI's build output sits beside `core/target`'s 6 GB.

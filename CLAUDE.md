@@ -123,6 +123,10 @@ TAKT_DESKTOP_DB=<a copy of priority.sqlite> TAKT_DESKTOP_SMOKE=1 TAKT_DESKTOP_SM
   cargo run --release --manifest-path desktop/Cargo.toml   # draws a frame, prints timings, quits
 ```
 
+`scripts/install_desktop.sh` installs it as `/Applications/Takt Desktop.app`
+beside the Swift app (with the bundled `takt` helper), and
+`scripts/build_desktop_dmg.sh` makes a notarised DMG of it.
+
 Never drive it with simulated keystrokes (`osascript … keystroke`): they go to
 whatever is frontmost, which is usually the user's terminal.
 
