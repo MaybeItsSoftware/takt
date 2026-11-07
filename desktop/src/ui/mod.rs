@@ -1147,6 +1147,66 @@ enum Display {
     Draft(i64),
 }
 
+/// The window's panes, for a click to give one the keyboard.
+#[derive(Clone, Copy)]
+enum Pane {
+    Left,
+    Centre,
+    Right,
+    Bottom,
+}
+
+impl Takt {
+    /// `content` with a click anywhere on it giving it the keyboard; what
+    /// the click lands on still gets it too.
+    fn pane(
+        &self,
+        pane: Pane,
+        content: impl IntoElement,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        div()
+            .flex_none()
+            .flex()
+            // The bottom dock spans the window; the side docks keep their
+            // width and run its height.
+            .when(matches!(pane, Pane::Bottom), |d| d.w_full().flex_col())
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(move |this, _: &gpui::MouseDownEvent, _, cx| this.focus_pane(pane, cx)),
+            )
+            .child(content)
+    }
+
+    /// The region a pane is, given what it is showing.
+    fn focus_pane(&mut self, pane: Pane, cx: &mut Context<Self>) {
+        let p = &self.app.prefs;
+        let region = match pane {
+            Pane::Left if p.left_dock_tab == "agent" => Some(Region::Agent),
+            Pane::Left => Some(Region::Sidebar),
+            Pane::Centre => Some(Region::Tasks),
+            Pane::Right => crate::state::docks::tab_region(&p.right_dock_tab)
+                .filter(|r| *r != Region::Inspector || self.app.selected().is_some()),
+            Pane::Bottom => crate::state::docks::tab_region(&p.bottom_dock_tab),
+        };
+        let Some(region) = region else { return };
+        if region == self.app.region {
+            return;
+        }
+        if self.app.region == Region::Agent
+            && matches!(self.app.editing, Some(Editing::AgentMessage))
+        {
+            self.app.editing = None;
+        }
+        self.app.region = region;
+        if region == Region::Agent && self.app.editing.is_none() {
+            self.app.editing = Some(Editing::AgentMessage);
+            self.begin_editing();
+        }
+        cx.notify();
+    }
+}
+
 // MARK: Rendering
 
 impl Render for Takt {
@@ -1181,7 +1241,8 @@ impl Render for Takt {
                     .min_h_0()
                     .flex()
                     .when(self.app.prefs.sidebar_visible, |d| {
-                        d.child(self.left_dock(t, cx))
+                        let dock = self.left_dock(t, cx);
+                        d.child(self.pane(Pane::Left, dock, cx))
                     })
                     .child(
                         div()
@@ -1189,6 +1250,12 @@ impl Render for Takt {
                             .flex_1()
                             .min_w_0()
                             .flex()
+                            .on_mouse_down(
+                                gpui::MouseButton::Left,
+                                cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
+                                    this.focus_pane(Pane::Centre, cx);
+                                }),
+                            )
                             .on_mouse_down(
                                 gpui::MouseButton::Right,
                                 cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
@@ -1201,10 +1268,14 @@ impl Render for Takt {
                             )
                             .child(self.centre(t, cx)),
                     )
-                    .when_some(inspector, |d, stops| d.child(self.right_dock(t, stops, cx))),
+                    .when_some(inspector, |d, stops| {
+                        let dock = self.right_dock(t, stops, cx).into_any_element();
+                        d.child(self.pane(Pane::Right, dock, cx))
+                    }),
             )
             .when(self.app.prefs.bottom_dock_visible, |d| {
-                d.child(self.bottom_dock(t, cx))
+                let dock = self.bottom_dock(t, cx).into_any_element();
+                d.child(self.pane(Pane::Bottom, dock, cx))
             })
             .child(self.status_bar(t, cx))
             .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
