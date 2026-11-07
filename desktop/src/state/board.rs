@@ -282,3 +282,90 @@ impl App {
         self.layout_rows();
     }
 }
+
+/// A row of a card's subtree.
+#[derive(Debug, Clone)]
+pub struct CardRow {
+    pub task: TaskRow,
+    pub depth: usize,
+    /// The column it stands in as a card of its own, when that is another.
+    pub elsewhere: Option<String>,
+}
+
+/// How many subtask rows a card shows before "+N more".
+pub const CARD_SUBTASK_ROWS: usize = 6;
+
+impl App {
+    fn card_columns(&self) -> std::collections::HashMap<&str, usize> {
+        self.board
+            .cards
+            .iter()
+            .enumerate()
+            .flat_map(|(ix, cards)| cards.iter().map(move |t| (t.id.as_str(), ix)))
+            .collect()
+    }
+
+    /// A card's whole subtree, a compact row per task, and how many rows
+    /// there are in all. A subtask filed in another column keeps its row,
+    /// naming that column; its own subtasks are that card's to draw.
+    pub fn card_subtree(&self, card: &TaskRow) -> (Vec<CardRow>, usize) {
+        let columns = self.card_columns();
+        let own = columns.get(card.id.as_str()).copied();
+        let mut children: std::collections::HashMap<&str, Vec<&TaskRow>> = Default::default();
+        for row in &self.all_rows {
+            if let Some(parent) = row.task.parent_task_id.as_deref() {
+                children.entry(parent).or_default().push(&row.task);
+            }
+        }
+        let hide = self.prefs.hide_completed;
+        let mut out = Vec::new();
+        let mut stack: Vec<(&TaskRow, usize)> = children
+            .get(card.id.as_str())
+            .map(|kids| kids.iter().rev().map(|t| (*t, 0)).collect())
+            .unwrap_or_default();
+        while let Some((task, depth)) = stack.pop() {
+            if hide && task.status != "open" && !self.lingering.contains(&task.id) {
+                continue;
+            }
+            let elsewhere = columns
+                .get(task.id.as_str())
+                .filter(|ix| Some(**ix) != own)
+                .and_then(|ix| self.board.columns.get(*ix))
+                .map(|column| column.title.clone());
+            let filed_elsewhere = elsewhere.is_some();
+            out.push(CardRow {
+                task: task.clone(),
+                depth,
+                elsewhere,
+            });
+            if filed_elsewhere {
+                continue;
+            }
+            if let Some(kids) = children.get(task.id.as_str()) {
+                stack.extend(kids.iter().rev().map(|t| (*t, depth + 1)));
+            }
+        }
+        let total = out.len();
+        out.truncate(CARD_SUBTASK_ROWS);
+        (out, total)
+    }
+
+    /// Whose subtask a card is, when it is one: "↳ parent", with the
+    /// parent's column when the parent is a card in another.
+    pub fn card_parent_hint(&self, card: &TaskRow) -> Option<String> {
+        let parent_id = card.parent_task_id.as_deref()?;
+        let parent = self
+            .all_rows
+            .iter()
+            .map(|r| &r.task)
+            .find(|t| t.id == parent_id)?;
+        let columns = self.card_columns();
+        let column = columns
+            .get(parent_id)
+            .filter(|ix| columns.get(card.id.as_str()) != Some(*ix))
+            .and_then(|ix| self.board.columns.get(*ix))
+            .map(|c| format!(" ({})", c.title))
+            .unwrap_or_default();
+        Some(format!("↳ {}{column}", parent.title))
+    }
+}

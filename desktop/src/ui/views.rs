@@ -330,6 +330,90 @@ impl Takt {
                         .children(due_chip(task, t)),
                 )
             })
+            .when_some(self.app.card_parent_hint(task), |d, hint| {
+                d.child(
+                    div()
+                        .pl(px(20.))
+                        .text_size(px(11.))
+                        .text_color(t.placeholder)
+                        .truncate()
+                        .child(hint),
+                )
+            })
+            .child(self.card_subtasks(task, t, cx))
+            .into_any_element()
+    }
+
+    /// The card's subtree as compact rows: `└` marks, flush with the card's
+    /// edge; a subtask filed in another column muted and naming it.
+    fn card_subtasks(&self, card: &TaskRow, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        let (rows, total) = self.app.card_subtree(card);
+        if rows.is_empty() {
+            return div().into_any_element();
+        }
+        let more = total.saturating_sub(rows.len());
+        div()
+            .pt_1()
+            .flex()
+            .flex_col()
+            .children(rows.into_iter().map(|row| {
+                let id = row.task.id.clone();
+                let selected = self.app.selected_task.as_deref() == Some(id.as_str());
+                let open = row.task.status == "open";
+                div()
+                    .id(gpui::SharedString::from(format!("card-row-{id}")))
+                    .pl(px(4. + row.depth as f32 * 10.))
+                    .h(px(20.))
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .rounded(px(3.))
+                    .text_size(px(12.))
+                    .when(selected, |d| d.bg(t.selected))
+                    .hover(|d| d.bg(t.hover))
+                    .text_color(if row.elsewhere.is_some() || !open {
+                        t.placeholder
+                    } else {
+                        t.muted
+                    })
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.app.selected_task = Some(id.clone());
+                        this.app.region = Region::Tasks;
+                        cx.notify();
+                    }))
+                    .child(div().flex_none().text_color(t.placeholder).child("└"))
+                    .child(div().flex_none().child(match row.task.status.as_str() {
+                        "completed" => "●",
+                        "cancelled" => "✕",
+                        _ => "○",
+                    }))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .when(!open, |d| d.line_through())
+                            .child(row.task.title.clone()),
+                    )
+                    .when_some(row.elsewhere, |d, column| {
+                        d.child(
+                            div()
+                                .flex_none()
+                                .text_size(px(11.))
+                                .text_color(t.accent)
+                                .child(format!("→ {column}")),
+                        )
+                    })
+            }))
+            .when(more > 0, |d| {
+                d.child(
+                    div()
+                        .pl(px(4.))
+                        .text_size(px(11.))
+                        .text_color(t.placeholder)
+                        .child(format!("+{more} more")),
+                )
+            })
             .into_any_element()
     }
 

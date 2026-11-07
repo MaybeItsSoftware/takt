@@ -160,6 +160,19 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             started.elapsed().as_secs_f64() * 1000.0,
             app.visible_ids().len()
         ));
+        if mode == "board" {
+            let cards: Vec<_> = app.board.cards.iter().flatten().cloned().collect();
+            let (mut rows, mut elsewhere, mut hints) = (0, 0, 0);
+            for card in &cards {
+                let (subtree, _) = app.card_subtree(card);
+                rows += subtree.len();
+                elsewhere += subtree.iter().filter(|r| r.elsewhere.is_some()).count();
+                hints += usize::from(app.card_parent_hint(card).is_some());
+            }
+            report.push(format!(
+                "card subtasks {rows} rows, {elsewhere} in other columns, {hints} parent hints"
+            ));
+        }
     }
     app.run("goOutline", None);
     report.push(time("outline j", &vec!["j"; 30], app));
