@@ -293,6 +293,22 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             said.join(" | ")
         ));
     }
+    if std::env::var_os("TAKT_DESKTOP_SMOKE_QUICK_ASK").is_some() && app.selected().is_some() {
+        let started = Instant::now();
+        app.open_quick_ask();
+        app.send_quick_ask("What is this task's title? Answer with the title only.");
+        while app.quick_agent.working && started.elapsed().as_secs() < 120 {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            app.drain_agent();
+        }
+        report.push(format!(
+            "quick ask {:.1} s (panel untouched: {}): {}",
+            started.elapsed().as_secs_f64(),
+            app.agent.entries.is_empty(),
+            app.quick_ask_transcript().replace('\n', " | ")
+        ));
+        app.editing = None;
+    }
     if let Some(message) = &app.message {
         report.push(format!("message: {message}"));
     }

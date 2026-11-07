@@ -111,11 +111,11 @@ pub struct Agent {
     pub client: Option<Client>,
     child: Option<Child>,
     stdin: Option<ChildStdin>,
-    events: Option<Receiver<Event>>,
+    pub events: Option<Receiver<Event>>,
     /// Codex's thread, resumed by the next turn.
-    codex_thread: Option<String>,
+    pub codex_thread: Option<String>,
     /// Instructions were sent on this thread already.
-    sent_instructions: bool,
+    pub sent_instructions: bool,
 }
 
 impl Drop for Agent {
@@ -664,12 +664,94 @@ impl App {
                 })
                 .count()
         };
-        let before = had_writes(&self.agent);
-        let changed = self.agent.drain();
-        if had_writes(&self.agent) != before {
+        let before = had_writes(&self.agent) + had_writes(&self.quick_agent);
+        let mut changed = self.agent.drain();
+        if self.quick_agent.working || self.quick_agent.events.is_some() {
+            changed |= self.quick_agent.drain();
+            // A quick ask is one turn: its process ends with it.
+            if !self.quick_agent.working {
+                self.quick_agent.end();
+            }
+        }
+        if had_writes(&self.agent) + had_writes(&self.quick_agent) != before {
             self.check_external_writes();
         }
         changed
+    }
+
+    /// Whether either thread is still at work.
+    pub fn agents_working(&self) -> bool {
+        self.agent.working || self.quick_agent.working
+    }
+
+    /// `aa`: a one-line ask about the selected task, on a thread of its own
+    /// so it neither waits behind the panel's turn nor joins its memory.
+    /// While one is under way it reopens on that task.
+    pub fn open_quick_ask(&mut self) {
+        if !self.quick_agent.working {
+            let Some(task) = self.selected_task.clone() else {
+                return;
+            };
+            if self.quick_task.as_ref() != Some(&task) {
+                self.quick_agent.reset();
+            }
+            self.quick_task = Some(task);
+        }
+        self.ask(super::ask::Ask::Agent);
+    }
+
+    /// Sends `text` about the quick-ask task, in a fresh process.
+    pub fn send_quick_ask(&mut self, text: &str) {
+        let Some(task_id) = self.quick_task.clone() else {
+            return;
+        };
+        if text.trim().is_empty() || self.quick_agent.working {
+            return;
+        }
+        let title = self
+            .task(&task_id)
+            .map(|t| t.title.clone())
+            .unwrap_or_default();
+        self.selected_task = Some(task_id);
+        std::mem::swap(&mut self.agent, &mut self.quick_agent);
+        self.agent.end();
+        self.agent.entries.clear();
+        self.agent.codex_thread = None;
+        self.agent.sent_instructions = false;
+        self.send_to_agent(&format!("About the task \u{201c}{title}\u{201d}: {text}"));
+        std::mem::swap(&mut self.agent, &mut self.quick_agent);
+    }
+
+    /// The last quick ask, as the sheet shows it under the field.
+    pub fn quick_ask_transcript(&self) -> String {
+        let mut lines = Vec::new();
+        for entry in &self.quick_agent.entries {
+            match entry {
+                Entry::User(text) => lines.push(format!("› {text}")),
+                Entry::Assistant(text) => lines.push(text.clone()),
+                Entry::Tool {
+                    name,
+                    summary,
+                    failed,
+                    ..
+                } => lines.push(format!(
+                    "{} {name} {summary}",
+                    match failed {
+                        Some(true) => "✕",
+                        Some(false) => "✓",
+                        None => "…",
+                    }
+                )),
+                Entry::Notice { text, .. } => lines.push(text.clone()),
+            }
+        }
+        if self.quick_agent.working {
+            lines.push("Working…".into());
+        }
+        if lines.is_empty() {
+            return "Ask the agent to change or explain this task. It runs apart from the panel; ⌘Z undoes what it did.".into();
+        }
+        lines.join("\n")
     }
 
     pub fn toggle_agent_panel(&mut self) {
@@ -704,6 +786,8 @@ impl App {
     }
 
     /// `taskAskAgent`: the panel, with the task named in the draft.
+    /// The panel, with the selected task named in the draft.
+    #[allow(dead_code)]
     pub fn ask_agent_about_selected(&mut self) {
         let Some(task) = self.selected().cloned() else {
             return;

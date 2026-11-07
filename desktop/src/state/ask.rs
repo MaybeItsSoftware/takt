@@ -25,6 +25,8 @@ pub enum Ask {
     CheckvistKey {
         email: String,
     },
+    /// A line to the agent about the quick-ask task (`aa`).
+    Agent,
     /// The Google OAuth client the integrations sign in through.
     GoogleClientId,
     /// The morning or evening reminder's time.
@@ -46,6 +48,7 @@ impl Ask {
             Ask::SyncServer => "Sync server",
             Ask::SyncDelete => "Delete the sync account",
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
+            Ask::Agent => "Ask the agent",
             Ask::GoogleClientId => "Google OAuth client ID",
             Ask::ReminderTime { dailies: false } => "Morning reminder at",
             Ask::ReminderTime { dailies: true } => "Evening reminder at",
@@ -59,6 +62,7 @@ impl Ask {
             Ask::SyncServer => "https://… (empty for the hosted server)",
             Ask::SyncDelete => "delete",
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
+            Ask::Agent => "Make it due Friday, split it up, explain it…",
             Ask::GoogleClientId => "….apps.googleusercontent.com",
             Ask::ReminderTime { .. } => "09:00",
         }
@@ -91,6 +95,14 @@ impl App {
     pub fn ask(&mut self, ask: Ask) {
         self.overlay = None;
         self.editing = Some(Editing::Ask(ask));
+    }
+
+    /// What the sheet says under the field.
+    pub fn ask_hint(&self, ask: &Ask) -> String {
+        match ask {
+            Ask::Agent => self.quick_ask_transcript(),
+            other => other.hint(),
+        }
     }
 
     /// What the field starts with.
@@ -158,6 +170,10 @@ impl App {
                 self.connect_checkvist(&email, text);
                 self.open_overlay(Overlay::Settings);
             }
+            Ask::Agent => {
+                self.send_quick_ask(text);
+                self.ask(Ask::Agent);
+            }
             Ask::GoogleClientId => {
                 self.set_google_client_id(text);
                 self.open_overlay(Overlay::Settings);
@@ -171,6 +187,10 @@ impl App {
 
     /// Esc on the sheet: back to settings.
     pub fn leave_ask(&mut self) {
+        if matches!(self.editing, Some(Editing::Ask(Ask::Agent))) {
+            self.editing = None;
+            return;
+        }
         self.editing = None;
         self.open_overlay(Overlay::Settings);
     }

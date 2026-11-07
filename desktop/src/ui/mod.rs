@@ -423,7 +423,7 @@ impl Takt {
                         this.rank_today(cx);
                         cx.notify();
                     }
-                    this.app.agent.working
+                    this.app.agents_working()
                 });
                 if !matches!(working, Ok(true)) {
                     break;
@@ -740,6 +740,9 @@ impl Takt {
                         self.app.answer(ask, &text);
                         if self.app.overlay.is_some() {
                             self.open_overlay_field();
+                        }
+                        if self.app.agents_working() {
+                            self.poll_agent(cx);
                         }
                     }
                     Some(Editing::FocusNote) => {

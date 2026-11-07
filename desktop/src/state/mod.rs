@@ -206,6 +206,9 @@ pub struct App {
     pub agent: agent::Agent,
     /// Sync with the account's other devices.
     pub sync: crate::sync::Sync,
+    /// Quick ask's thread (`aa`), apart from the panel's, and its task.
+    pub quick_agent: agent::Agent,
+    pub quick_task: Option<String>,
     /// The Google Calendar and Tasks mirrors' worker.
     pub google: google::Google,
     /// When reminders were last read.
@@ -309,6 +312,8 @@ impl App {
             library: Default::default(),
             agent: Default::default(),
             sync,
+            quick_agent: Default::default(),
+            quick_task: None,
             google: Default::default(),
             reminders_looked_ms: 0,
             agent_draft: None,

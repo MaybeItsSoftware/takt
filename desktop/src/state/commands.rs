@@ -285,7 +285,7 @@ impl App {
             "windowToggleAgentPanel" => self.toggle_agent_panel(),
             "windowUseClaudeCode" => self.use_agent(super::agent::Client::ClaudeCode),
             "windowUseCodex" => self.use_agent(super::agent::Client::Codex),
-            "taskAskAgent" => self.ask_agent_about_selected(),
+            "taskAskAgent" => self.open_quick_ask(),
             "windowOpenKeymap" => self.open_keymap_file(),
             "windowReloadKeymap" => self.reload_keymap(),
             "windowOpenThemesFolder" => self.open_themes_folder(),

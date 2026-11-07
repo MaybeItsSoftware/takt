@@ -709,7 +709,7 @@ impl Takt {
         } else {
             self.field.clone()
         };
-        let hint = ask.hint();
+        let hint = self.app.ask_hint(&ask);
         div()
             .absolute()
             .top(px(TITLE_BAR_HEIGHT + 48.))
@@ -742,7 +742,22 @@ impl Takt {
                             .child(field_text(&shown, ask.placeholder(), t, self.input_hook())),
                     )
                     .when(!hint.is_empty(), |d| {
-                        d.child(div().text_size(px(12.)).text_color(t.muted).child(hint))
+                        d.child(
+                            div()
+                                .id("ask-hint")
+                                .max_h(px(320.))
+                                .overflow_y_scroll()
+                                .flex()
+                                .flex_col()
+                                .gap_1()
+                                .text_size(px(12.))
+                                .text_color(t.muted)
+                                .children(
+                                    hint.lines()
+                                        .map(|line| div().child(line.to_string()))
+                                        .collect::<Vec<_>>(),
+                                ),
+                        )
                     })
                     .when_some(self.app.message.clone(), |d, message| {
                         d.child(
