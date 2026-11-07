@@ -36,7 +36,7 @@ values = {
     "description.txt": ("\n\n".join(paragraphs), 4000),
     "keywords.txt": (field("Keywords"), 100),
     "privacy_url.txt": (privacy, 255),
-    "support_url.txt": ("https://github.com/MaybeItsSoftware/priority/issues", 255),
+    "support_url.txt": ("https://github.com/MaybeItsSoftware/takt/issues", 255),
 }
 for name, (text, limit) in values.items():
     assert 0 < len(text) <= limit, f"{name} is {len(text)} characters, over {limit}"

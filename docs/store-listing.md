@@ -4,7 +4,7 @@ What to paste into App Store Connect and the Play Console. Field limits are in
 brackets. Answers to the privacy forms follow from what the apps actually do;
 if sync or analytics change, change these.
 
-- **Privacy policy URL:** https://maybeitssoftware.github.io/priority/privacy/ — `site/privacy/`,
+- **Privacy policy URL:** https://maybeitssoftware.github.io/takt/privacy/ — `site/privacy/`,
   served by GitHub Pages (`.github/workflows/pages.yml`), so the listings do not
   depend on the sync server. `sync-server/static/privacy.html` is the same text
   with its contact line filled in at serve time; change both together.
@@ -59,7 +59,7 @@ EVERYWHERE
 
 OPEN SOURCE AND FREE
 • Open source under the GNU AGPL-3.0:
-  github.com/MaybeItsSoftware/priority
+  github.com/MaybeItsSoftware/takt
 • Sync between your devices is free, and you can self-host it for free
 
 No ads, no tracking, no analytics.
@@ -68,7 +68,7 @@ No ads, no tracking, no analytics.
 **Keywords** (App Store) [100]:
 `tasks,to-do,todo,planner,priority,focus,timer,pomodoro,lists,outline,kanban,habits,daily,gtd`
 
-**Support URL:** https://github.com/MaybeItsSoftware/priority/issues — the
+**Support URL:** https://github.com/MaybeItsSoftware/takt/issues — the
 privacy page sends people to "the support link" on the store page.
 
 **Uploading:** `scripts/upload_play_listing.sh` and

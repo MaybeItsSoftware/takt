@@ -5,21 +5,21 @@
 > source software. Plan the day, then do it — a ranked Today list, an outline,
 > a board, focus timers and dailies, all driven from the keyboard or a tap.
 
-- Source code: https://github.com/MaybeItsSoftware/priority (AGPL-3.0)
+- Source code: https://github.com/MaybeItsSoftware/takt (AGPL-3.0)
 - Price: free. No ads, no in-app purchases, no analytics or tracking SDKs.
 - Sync between devices: free (£0). Self-hosting the sync server is free too —
-  see https://github.com/MaybeItsSoftware/priority/blob/main/docs/self-hosting.md
+  see https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md
 - Works fully offline with no account; signing in is only for sync.
 - AI agents: the CLI `takt` includes an MCP server that exposes the whole
   workspace (tasks, lists, dailies, focus sessions) to an assistant —
-  https://github.com/MaybeItsSoftware/priority/blob/main/docs/mcp-server.md
-- Privacy policy: https://maybeitssoftware.github.io/priority/privacy/
+  https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md
+- Privacy policy: https://maybeitssoftware.github.io/takt/privacy/
 - Publisher: MaybeItsSoftware
 
 ## Docs
 
-- [README — features, keyboard flow, command palette](https://github.com/MaybeItsSoftware/priority#readme)
-- [Command line and terminal UI](https://github.com/MaybeItsSoftware/priority/blob/main/docs/cli.md)
-- [MCP server for AI assistants](https://github.com/MaybeItsSoftware/priority/blob/main/docs/mcp-server.md)
-- [Sync protocol](https://github.com/MaybeItsSoftware/priority/blob/main/docs/sync.md)
-- [Self-hosting sync](https://github.com/MaybeItsSoftware/priority/blob/main/docs/self-hosting.md)
+- [README — features, keyboard flow, command palette](https://github.com/MaybeItsSoftware/takt#readme)
+- [Command line and terminal UI](https://github.com/MaybeItsSoftware/takt/blob/main/docs/cli.md)
+- [MCP server for AI assistants](https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md)
+- [Sync protocol](https://github.com/MaybeItsSoftware/takt/blob/main/docs/sync.md)
+- [Self-hosting sync](https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md)
