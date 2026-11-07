@@ -6,6 +6,9 @@
 //! the first frame, prints what it saw and quits: a check that needs no one
 //! at the screen and never types into whatever is in front.
 
+#[macro_use]
+extern crate objc;
+
 mod keys;
 mod overlay;
 mod platform;
@@ -14,10 +17,7 @@ mod text_field;
 mod theme;
 mod ui;
 
-use gpui::{
-    App, AppContext, Application, Bounds, Focusable, TitlebarOptions, WindowBounds, WindowOptions,
-    point, px, size,
-};
+use gpui::{App, AppContext, Application};
 use std::borrow::Cow;
 use std::time::Instant;
 
@@ -46,37 +46,66 @@ fn main() {
         }
     };
     let smoke = std::env::var_os("TAKT_DESKTOP_SMOKE").is_some();
-    Application::new().run(move |cx: &mut App| {
+    let application = Application::new();
+    // The Dock icon clicked with no window: open one.
+    application.on_reopen(|cx| {
+        if let Some(takt) = cx.try_global::<ui::Shell>().map(|shell| shell.0.clone()) {
+            takt.update(cx, |this, cx| this.show_main_window(cx));
+        }
+    });
+    application.run(move |cx: &mut App| {
         load_fonts(cx);
-        let bounds = Bounds::centered(None, size(px(1200.), px(780.)), cx);
-        let window = cx
-            .open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: Some(TitlebarOptions {
-                        title: Some("Takt".into()),
-                        appears_transparent: true,
-                        traffic_light_position: Some(point(px(12.), px(11.))),
-                    }),
-                    ..Default::default()
-                },
-                |_, cx| cx.new(|cx| ui::Takt::new(app, cx)),
-            )
-            .expect("open the window");
+        let takt = cx.new(|cx| ui::Takt::new(app, cx));
+        cx.set_global(ui::Shell(takt.clone()));
+        let Some(window) = ui::open_main(&takt, cx) else {
+            eprintln!("takt-desktop: couldn't open the window");
+            cx.quit();
+            return;
+        };
+        cx.on_window_closed(ui::window_closed).detach();
         window
             .update(cx, |view, window, cx| {
-                window.focus(&view.focus_handle(cx));
-                cx.activate(true);
                 if smoke {
                     smoke_test(&mut view.app, window, launched);
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_PANEL").is_some() {
                         view.app.wants_panel = Some(true);
                         view.open_requested_windows(cx);
                     }
+                    if std::env::var_os("TAKT_DESKTOP_SMOKE_CAPTURE").is_some() {
+                        view.app.wants_capture = true;
+                        view.open_requested_windows(cx);
+                    }
+                    if std::env::var_os("TAKT_DESKTOP_SMOKE_PLATFORM").is_some() {
+                        view.start_platform(cx);
+                        smoke_platform(cx);
+                    }
+                } else {
+                    view.start_platform(cx);
                 }
             })
             .ok();
     });
+}
+
+/// `TAKT_DESKTOP_SMOKE_PLATFORM=1`: the status item, the hotkeys and the
+/// event queue, driven as AppKit would drive them (events queued, never a
+/// key sent), then a report and quit.
+fn smoke_platform(cx: &mut gpui::Context<ui::Takt>) {
+    use platform::Event;
+    platform::push(Event::QuickCapture);
+    platform::push(Event::FocusPanel);
+    platform::push(Event::Menu("focus-pause".into()));
+    cx.spawn(async move |this, cx| {
+        cx.background_executor()
+            .timer(std::time::Duration::from_millis(1200))
+            .await;
+        this.update(cx, |takt, cx| {
+            println!("platform: {}", takt.platform_report(cx));
+        })
+        .ok();
+        cx.update(|cx| cx.quit()).ok();
+    })
+    .detach();
 }
 
 /// Walks the sidebar, the outline, the board and the matrix the way the keys
@@ -242,6 +271,8 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 })
                 .detach();
             }
+            // The platform check quits once it has looked.
+            None if std::env::var_os("TAKT_DESKTOP_SMOKE_PLATFORM").is_some() => {}
             None => cx.quit(),
         }
     });

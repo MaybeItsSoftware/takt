@@ -5,6 +5,7 @@
 //! keys and run by `App::handle_key`, so the keymap is the core's, not a
 //! second copy in GPUI's binding tables. Rendering reads only what is held.
 
+pub mod capture;
 mod chrome;
 mod dock;
 pub mod panel;
@@ -49,6 +50,61 @@ pub struct Takt {
     last_key_ms: Option<f64>,
     /// The floating focus panel, while it is open.
     panel: Option<gpui::WindowHandle<panel::FocusPanel>>,
+    /// The main window, while it is open: closing it leaves the app in the
+    /// menu bar, and this entity lives on for the next one.
+    main: Option<gpui::WindowHandle<Takt>>,
+    capture: Option<gpui::WindowHandle<capture::QuickCapture>>,
+    /// The status item and hotkeys are up (not in a smoke run).
+    platform_live: bool,
+}
+
+/// Keeps the one `Takt` alive while no window shows it.
+pub struct Shell(pub gpui::Entity<Takt>);
+
+impl gpui::Global for Shell {}
+
+/// Opens the main window onto `takt`.
+pub fn open_main(takt: &gpui::Entity<Takt>, cx: &mut GpuiApp) -> Option<gpui::WindowHandle<Takt>> {
+    let bounds = Bounds::centered(None, gpui::size(px(1200.), px(780.)), cx);
+    let root = takt.clone();
+    let handle = cx
+        .open_window(
+            gpui::WindowOptions {
+                window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
+                titlebar: Some(gpui::TitlebarOptions {
+                    title: Some("Takt".into()),
+                    appears_transparent: true,
+                    traffic_light_position: Some(gpui::point(px(12.), px(11.))),
+                }),
+                ..Default::default()
+            },
+            move |_, _| root,
+        )
+        .ok()?;
+    let focus = takt.read(cx).focus.clone();
+    let _ = handle.update(cx, |_, window, _| window.focus(&focus));
+    takt.update(cx, |this, _| this.main = Some(handle));
+    crate::platform::set_regular(true);
+    cx.activate(true);
+    Some(handle)
+}
+
+/// After any window closes: with the main one gone the app keeps to the
+/// menu bar, out of the Dock.
+pub fn window_closed(cx: &mut GpuiApp) {
+    let Some(takt) = cx.try_global::<Shell>().map(|shell| shell.0.clone()) else {
+        return;
+    };
+    let main = takt.read(cx).main;
+    let open = main.is_some_and(|handle| {
+        cx.windows()
+            .iter()
+            .any(|w| w.window_id() == handle.window_id())
+    });
+    if !open {
+        takt.update(cx, |this, _| this.main = None);
+        crate::platform::set_regular(false);
+    }
 }
 
 impl Focusable for Takt {
@@ -69,6 +125,9 @@ impl Takt {
             main_scroll: UniformListScrollHandle::new(),
             last_key_ms: None,
             panel: None,
+            main: None,
+            capture: None,
+            platform_live: false,
         };
         this.rank_today(cx);
         this.poll_external_writes(cx);
@@ -82,6 +141,7 @@ impl Takt {
             loop {
                 cx.background_executor().timer(Duration::from_secs(1)).await;
                 let alive = this.update(cx, |this, cx| {
+                    this.refresh_status();
                     if this.app.check_external_writes() {
                         this.app.reload_today();
                         this.rank_today(cx);
@@ -108,9 +168,160 @@ impl Takt {
         .detach();
     }
 
+    /// The status item, the hotkeys, and the queue AppKit's callbacks
+    /// leave their events in.
+    pub fn start_platform(&mut self, cx: &mut Context<Self>) {
+        self.platform_live = true;
+        self.register_hotkeys();
+        self.refresh_status();
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(40))
+                    .await;
+                let events = crate::platform::drain();
+                if events.is_empty() {
+                    continue;
+                }
+                let alive = this.update(cx, |this, cx| {
+                    for event in events {
+                        this.platform_event(event, cx);
+                    }
+                    this.settle(cx);
+                });
+                if alive.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
+    fn register_hotkeys(&mut self) {
+        // Not while one is being recorded: the old one would take the key.
+        let wanted = if matches!(self.app.editing, Some(Editing::Hotkey(_))) {
+            Vec::new()
+        } else {
+            self.app.wanted_hotkeys()
+        };
+        let refused = crate::platform::hotkeys::register(&wanted);
+        self.app.hotkey_problems = refused;
+    }
+
+    fn refresh_status(&self) {
+        if self.platform_live {
+            crate::platform::status_item::update(self.app.status_snapshot());
+        }
+    }
+
+    /// After something outside the main window's keys changed the state:
+    /// the day reranked, windows asked for opened, the status item redrawn.
+    pub fn settle(&mut self, cx: &mut Context<Self>) {
+        self.rank_today(cx);
+        self.open_requested_windows(cx);
+        self.refresh_status();
+        cx.notify();
+    }
+
+    fn platform_event(&mut self, event: crate::platform::Event, cx: &mut Context<Self>) {
+        use crate::platform::Event;
+        match event {
+            Event::ShowWindow => self.show_main_window(cx),
+            Event::QuickCapture => self.app.wants_capture = true,
+            Event::FocusPanel => {
+                let open = self.panel_open(cx);
+                self.app.wants_panel = Some(!open);
+            }
+            Event::Menu(action) => match action.as_str() {
+                "show-window" => self.show_main_window(cx),
+                "quick-capture" => self.app.wants_capture = true,
+                "focus-panel" => self.app.wants_panel = Some(true),
+                "settings" => {
+                    self.show_main_window(cx);
+                    self.app.open_overlay(Overlay::Settings);
+                    self.open_overlay_field();
+                }
+                "quit" => cx.quit(),
+                other => {
+                    self.app.status_action(other);
+                }
+            },
+        }
+    }
+
+    /// What the platform smoke check prints.
+    pub fn platform_report(&self, cx: &mut Context<Self>) -> String {
+        let snapshot = self.app.status_snapshot();
+        let capture = self
+            .capture
+            .as_ref()
+            .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
+        format!(
+            "status \"{}\" ({} menu rows); hotkeys {:?}, refused {:?}; capture open {capture}; panel open {}; {}",
+            snapshot.title,
+            snapshot.menu.len(),
+            self.app
+                .wanted_hotkeys()
+                .into_iter()
+                .filter_map(|(_, s)| s)
+                .collect::<Vec<_>>(),
+            self.app.hotkey_problems,
+            self.panel_open(cx),
+            self.app.message.clone().unwrap_or_default(),
+        )
+    }
+
+    fn panel_open(&self, cx: &mut Context<Self>) -> bool {
+        self.panel
+            .as_ref()
+            .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok())
+    }
+
+    /// Brings the main window forward, opening a new one onto this same
+    /// state if it was closed.
+    pub fn show_main_window(&mut self, cx: &mut Context<Self>) {
+        if let Some(handle) = self.main
+            && handle
+                .update(cx, |_, window, _| window.activate_window())
+                .is_ok()
+        {
+            cx.activate(true);
+            return;
+        }
+        self.main = None;
+        // Once this update ends: the window's first draw reads this entity.
+        let takt = cx.entity();
+        cx.defer(move |cx| {
+            open_main(&takt, cx);
+        });
+    }
+
     /// What the state asked for that only the window can do: the focus
     /// panel opened or put away.
     pub fn open_requested_windows(&mut self, cx: &mut Context<Self>) {
+        if self.app.hotkeys_changed {
+            self.app.hotkeys_changed = false;
+            if self.platform_live {
+                self.register_hotkeys();
+            }
+        }
+        if std::mem::take(&mut self.app.wants_capture) {
+            let open = self
+                .capture
+                .as_ref()
+                .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
+            if open {
+                if let Some(handle) = self.capture.take() {
+                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                }
+            } else {
+                let takt = cx.entity();
+                cx.defer(move |cx| {
+                    let handle = capture::open(takt.clone(), cx);
+                    takt.update(cx, |this, _| this.capture = handle);
+                });
+            }
+        }
         if let Some(wanted) = self.app.wants_panel.take() {
             let open = self
                 .panel
@@ -215,6 +426,16 @@ impl Takt {
             window.remove_window();
             return;
         }
+        if matches!(self.app.editing, Some(Editing::Hotkey(_))) {
+            cx.stop_propagation();
+            let spelled = crate::platform::hotkeys::spell(&Press::from_keystroke(keystroke));
+            if self.app.record_hotkey_key(&spelled) && self.app.overlay.is_some() {
+                self.open_overlay_field();
+            }
+            self.open_requested_windows(cx);
+            cx.notify();
+            return;
+        }
         let editing_before = self.app.editing.clone();
         let handled = if self.app.overlay.is_some() {
             self.overlay_key(keystroke, cx)
@@ -232,6 +453,7 @@ impl Takt {
         }
         self.after_change(cx);
         self.open_requested_windows(cx);
+        self.refresh_status();
         self.last_key_ms = Some(started.elapsed().as_secs_f64() * 1000.0);
         cx.notify();
     }
@@ -271,7 +493,7 @@ impl Takt {
 
     /// What the field did with a key that was the clipboard's: true when it
     /// changed.
-    fn clipboard_key(field: &mut TextField, key: &FieldKey, cx: &mut Context<Self>) -> bool {
+    pub(super) fn clipboard_key(field: &mut TextField, key: &FieldKey, cx: &mut GpuiApp) -> bool {
         match key {
             FieldKey::Copy | FieldKey::Cut => {
                 let selected = field.selected_text().to_string();
@@ -417,8 +639,9 @@ impl Takt {
                         self.app.editing = None;
                     }
                     Some(Editing::NewTask { .. }) => {
-                        self.app.create_task(&text);
-                        self.field = TextField::default();
+                        if self.app.create_task(&text) {
+                            self.field = TextField::default();
+                        }
                     }
                     Some(Editing::InspectorField { stop, .. }) => {
                         self.app.editing = None;

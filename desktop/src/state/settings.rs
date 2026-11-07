@@ -3,8 +3,10 @@
 //! opens its picker, a text opens a field). `SettingsView.swift`'s panes,
 //! flattened into one ranked list, and `DiagnosticsView.swift`.
 
+use super::Editing;
 use super::pickers::Picker;
 use super::{App, Overlay};
+use crate::platform::hotkeys::{self, Hotkey};
 
 /// A row of the settings overlay.
 pub struct SettingRow {
@@ -12,6 +14,13 @@ pub struct SettingRow {
     pub group: &'static str,
     pub title: String,
     pub value: String,
+}
+
+fn shortcut(spelled: &Option<String>) -> String {
+    spelled
+        .as_deref()
+        .map(crate::platform::hotkeys::display)
+        .unwrap_or_else(|| "Off".into())
 }
 
 fn on(flag: bool) -> String {
@@ -111,6 +120,24 @@ impl App {
                 "Global hotkeys",
                 on(p.hotkeys_enabled),
             ),
+            row(
+                "hotkey-capture",
+                "Keyboard",
+                "Quick capture from any app",
+                shortcut(&p.hotkey_quick_capture),
+            ),
+            row(
+                "hotkey-panel",
+                "Keyboard",
+                "The focus panel from any app",
+                shortcut(&p.hotkey_focus_panel),
+            ),
+            row(
+                "hotkey-window",
+                "Keyboard",
+                "The main window from any app",
+                shortcut(&p.hotkey_show_window),
+            ),
             row("keymap-open", "Keyboard", "Open keymap.json", String::new()),
             row(
                 "keymap-reload",
@@ -157,17 +184,27 @@ impl App {
             "quick-capture-list" => return self.open_picker(Picker::CaptureList),
             "confirm-delete" => p.confirm_delete = !p.confirm_delete,
             "launch-at-login" => {
-                p.launch_at_login = !p.launch_at_login;
-                let enabled = p.launch_at_login;
-                p.save();
-                crate::platform::set_launch_at_login(enabled);
+                let enabled = !p.launch_at_login;
+                match crate::platform::set_launch_at_login(enabled) {
+                    Ok(()) => {
+                        self.prefs.launch_at_login = enabled;
+                        self.prefs.save();
+                    }
+                    Err(error) => self.message = Some(error),
+                }
                 return self.open_overlay(Overlay::Settings);
             }
             "focus-score" => p.scores_each_block = !p.scores_each_block,
             "focus-notify" => p.focus_notifications = !p.focus_notifications,
             "focus-sound" => p.focus_sound = !p.focus_sound,
             "focus-panel" => p.focus_panel = !p.focus_panel,
-            "hotkeys" => p.hotkeys_enabled = !p.hotkeys_enabled,
+            "hotkeys" => {
+                p.hotkeys_enabled = !p.hotkeys_enabled;
+                self.hotkeys_changed = true;
+            }
+            "hotkey-capture" => return self.record_hotkey(Hotkey::QuickCapture),
+            "hotkey-panel" => return self.record_hotkey(Hotkey::FocusPanel),
+            "hotkey-window" => return self.record_hotkey(Hotkey::ShowWindow),
             other => {
                 self.change_platform_setting(other);
                 return;
@@ -175,6 +212,68 @@ impl App {
         }
         self.prefs.save();
         self.open_overlay(Overlay::Settings);
+    }
+
+    /// Waits for the next key pressed to be the shortcut.
+    fn record_hotkey(&mut self, which: Hotkey) {
+        self.overlay = None;
+        self.editing = Some(Editing::Hotkey(which));
+        self.hotkeys_changed = true;
+        self.message =
+            Some("Press the new shortcut. Delete turns it off, Esc leaves it as it was.".into());
+    }
+
+    /// A key pressed while a shortcut is being recorded. `spelled` is the
+    /// raw press (`hotkeys::spell`); true once the recording is over.
+    pub fn record_hotkey_key(&mut self, spelled: &str) -> bool {
+        let Some(Editing::Hotkey(which)) = self.editing.clone() else {
+            return false;
+        };
+        let value = match spelled {
+            "escape" => {
+                self.editing = None;
+                self.hotkeys_changed = true;
+                self.message = None;
+                self.open_overlay(Overlay::Settings);
+                return true;
+            }
+            "delete" => None,
+            _ if hotkeys::parse(spelled).is_none() => {
+                // A modifier on its own is the start of a chord, not a miss.
+                if !["cmd", "ctrl", "option", "shift", "alt", "fn", "capslock"]
+                    .iter()
+                    .any(|m| spelled.ends_with(m))
+                {
+                    self.message =
+                        Some("A shortcut needs ⌘, ⌃ or ⌥ with a key. Try again, or Esc.".into());
+                }
+                return false;
+            }
+            _ => Some(spelled.to_string()),
+        };
+        let p = &mut self.prefs;
+        match which {
+            Hotkey::QuickCapture => p.hotkey_quick_capture = value,
+            Hotkey::FocusPanel => p.hotkey_focus_panel = value,
+            Hotkey::ShowWindow => p.hotkey_show_window = value,
+        }
+        p.save();
+        self.hotkeys_changed = true;
+        self.editing = None;
+        self.message = None;
+        self.open_overlay(Overlay::Settings);
+        true
+    }
+
+    /// The shortcuts to register: none while they are switched off.
+    pub fn wanted_hotkeys(&self) -> Vec<(Hotkey, Option<String>)> {
+        let p = &self.prefs;
+        let on = |s: &Option<String>| s.clone().filter(|_| p.hotkeys_enabled);
+        vec![
+            (Hotkey::ShowWindow, on(&p.hotkey_show_window)),
+            (Hotkey::QuickCapture, on(&p.hotkey_quick_capture)),
+            (Hotkey::FocusPanel, on(&p.hotkey_focus_panel)),
+        ]
     }
 
     /// The diagnostics page: what the app is reading and what went wrong.
@@ -204,6 +303,14 @@ impl App {
             ("Version".into(), env!("CARGO_PKG_VERSION").into()),
         ];
         rows.extend(self.platform_diagnostics());
+        for (hotkey, spelled) in self.wanted_hotkeys() {
+            if let Some(spelled) = spelled {
+                rows.push((format!("Hotkey: {hotkey:?}"), hotkeys::display(&spelled)));
+            }
+        }
+        for problem in &self.hotkey_problems {
+            rows.push(("Hotkey problem".into(), problem.clone()));
+        }
         for issue in &self.library.keymap_issues {
             rows.push(("Keymap problem".into(), issue.clone()));
         }

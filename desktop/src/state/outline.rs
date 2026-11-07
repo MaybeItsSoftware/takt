@@ -443,28 +443,32 @@ impl App {
 
     /// Adds a task from the draft row and selects it, leaving the draft open
     /// below it for the next.
-    pub fn create_task(&mut self, title: &str) {
+    /// False when the text was kept back, its problem in the status bar.
+    pub fn create_task(&mut self, title: &str) -> bool {
         let Some(Editing::NewTask {
             list_id,
             parent_id,
             after,
         }) = self.editing.clone()
         else {
-            return;
+            return true;
         };
         let title = title.trim();
         if title.is_empty() {
             self.editing = None;
-            return;
+            return true;
         }
-        let new = takt_core::tasks::NewTask {
-            list_id: list_id.clone(),
-            parent_task_id: parent_id.clone(),
-            title: title.into(),
-            kind: "task".into(),
-            at_top: after.is_none(),
-            adjacent_task_id: after.clone(),
-            ..Default::default()
+        let new = match self.new_task_from(title, &list_id) {
+            Ok(new) => takt_core::tasks::NewTask {
+                parent_task_id: parent_id.clone(),
+                at_top: after.is_none(),
+                adjacent_task_id: after.clone(),
+                ..new
+            },
+            Err(problem) => {
+                self.message = Some(problem);
+                return false;
+            }
         };
         let created = self.write(|store| store.core.create_task(new, now_ms()));
         if let Some(id) = created {
@@ -477,6 +481,7 @@ impl App {
                 after: Some(id),
             });
         }
+        true
     }
 
     /// Opens a draft row: `o` below the selection, `shift+o` above, `tab`

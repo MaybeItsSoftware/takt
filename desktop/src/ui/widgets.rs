@@ -2,16 +2,16 @@ use super::*;
 
 /// What a drawn field needs to take the input method's text: the window's
 /// view and its focus.
-pub(super) type InputHook = (gpui::WeakEntity<Takt>, gpui::FocusHandle);
+pub(super) type InputHook<V = Takt> = (gpui::WeakEntity<V>, gpui::FocusHandle);
 
 /// The field's text with its caret, selection and what is being composed,
 /// or the placeholder. With a hook, the field registers itself with the
 /// input method while it is drawn.
-pub(super) fn field_text(
+pub(super) fn field_text<V: EntityInputHandler>(
     field: &TextField,
     placeholder: &str,
     t: Tokens,
-    hook: Option<InputHook>,
+    hook: Option<InputHook<V>>,
 ) -> AnyElement {
     let caret = || div().w(px(1.5)).h(px(15.)).flex_none().bg(t.accent);
     let body = if field.text.is_empty() {

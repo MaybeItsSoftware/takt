@@ -4884,6 +4884,7 @@ dependencies = [
  "chrono",
  "gpui",
  "iana-time-zone",
+ "objc",
  "serde",
  "serde_json",
  "takt-core",

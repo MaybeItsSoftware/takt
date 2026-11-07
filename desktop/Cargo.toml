@@ -19,7 +19,14 @@ serde_json = "1"
 # Zed's UI framework. `runtime_shaders` compiles the Metal shaders when the
 # app starts rather than at build time, so a build needs no Metal toolchain;
 # a release build should drop it once the toolchain is installed.
+# AppKit and Carbon for what GPUI doesn't do: the status item, global
+# hotkeys, the activation policy, login items. The same `objc` GPUI uses.
+objc = "0.2"
 gpui = { version = "0.2.2", default-features = false, features = ["font-kit", "runtime_shaders"] }
 
 [profile.release]
 strip = true
+
+# `objc`'s macros test a `cargo-clippy` feature in the calling crate.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }

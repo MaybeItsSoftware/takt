@@ -9,6 +9,7 @@
 pub mod actions;
 pub mod agent;
 pub mod board;
+pub mod capture;
 pub mod columns;
 pub mod commands;
 pub mod conditions;
@@ -20,6 +21,7 @@ pub mod forms;
 pub mod inspector;
 pub mod integrations;
 pub mod library;
+pub mod menubar;
 pub mod navigation;
 pub mod outline;
 pub mod pickers;
@@ -148,6 +150,8 @@ pub enum Editing {
     AgentMessage,
     /// The note on the focus prompt.
     FocusNote,
+    /// A global shortcut, recorded from the next key pressed.
+    Hotkey(crate::platform::hotkeys::Hotkey),
     /// A field of the inspector, by its stop.
     InspectorField {
         task_id: String,
@@ -222,6 +226,12 @@ pub struct App {
     pub celebration: Option<(String, i64)>,
     /// The floating focus panel asked for (true) or away (false).
     pub wants_panel: Option<bool>,
+    /// The quick capture window, asked for.
+    pub wants_capture: bool,
+    /// The global shortcuts changed and want registering again.
+    pub hotkeys_changed: bool,
+    /// Shortcuts the system wouldn't register, for diagnostics.
+    pub hotkey_problems: Vec<String>,
     /// The done rail: what was finished in the last fortnight, newest first.
     pub done: Vec<TaskRow>,
     /// Text the palette opens with: an edit's word (`due `, `tag `).
@@ -298,6 +308,9 @@ impl App {
             focus_checkpointed_at: 0,
             celebration: None,
             wants_panel: None,
+            wants_capture: false,
+            hotkeys_changed: false,
+            hotkey_problems: Vec::new(),
             done: Vec::new(),
             palette_prefill: None,
             today: today::Today::default(),
