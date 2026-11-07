@@ -8,8 +8,10 @@
 
 pub mod actions;
 pub mod agent;
+pub mod ask;
 pub mod board;
 pub mod capture;
+pub mod checkvist;
 pub mod columns;
 pub mod commands;
 pub mod conditions;
@@ -152,6 +154,8 @@ pub enum Editing {
     FocusNote,
     /// A global shortcut, recorded from the next key pressed.
     Hotkey(crate::platform::hotkeys::Hotkey),
+    /// One answer typed into a sheet: an email, a password, a server.
+    Ask(ask::Ask),
     /// A field of the inspector, by its stop.
     InspectorField {
         task_id: String,
@@ -193,6 +197,8 @@ pub struct App {
     /// The themes and the keymap file, and what in them could not be read.
     pub library: library::Library,
     pub agent: agent::Agent,
+    /// Sync with the account's other devices.
+    pub sync: crate::sync::Sync,
     /// Text the agent's message box opens with.
     pub agent_draft: Option<String>,
     /// The done rail's cursor.
@@ -265,6 +271,7 @@ impl App {
         let store = Store::open()?;
         let prefs = Prefs::load();
         let seen_version = store.core.data_version().unwrap_or_default();
+        let sync = crate::sync::Sync::new(store.core.clone());
         let mut app = App {
             store,
             bindings: Bindings::shipped(),
@@ -289,6 +296,7 @@ impl App {
             conditions: Default::default(),
             library: Default::default(),
             agent: Default::default(),
+            sync,
             agent_draft: None,
             done_cursor: None,
             timeline: Default::default(),

@@ -142,6 +142,8 @@ impl Takt {
                 cx.background_executor().timer(Duration::from_secs(1)).await;
                 let alive = this.update(cx, |this, cx| {
                     this.refresh_status();
+                    this.app.sync.set_foreground(this.main.is_some());
+                    this.app.sync.note_outbox();
                     if this.app.check_external_writes() {
                         this.app.reload_today();
                         this.rank_today(cx);
@@ -231,6 +233,24 @@ impl Takt {
             Event::FocusPanel => {
                 let open = self.panel_open(cx);
                 self.app.wants_panel = Some(!open);
+            }
+            Event::Sync { workspace } => {
+                if workspace {
+                    self.app.reload_all();
+                    self.app.reload_today();
+                    self.rank_today(cx);
+                }
+                if let Some(notice) = self.app.sync.take_notice() {
+                    self.app.message = Some(notice);
+                }
+                if self.app.overlay == Some(Overlay::Settings) {
+                    self.overlay.refresh(&self.app);
+                }
+            }
+            Event::Url(url) => {
+                if url.starts_with(crate::sync::auth::CALLBACK) {
+                    self.app.sync.callback(&url);
+                }
             }
             Event::Menu(action) => match action.as_str() {
                 "show-window" => self.show_main_window(cx),
@@ -664,6 +684,12 @@ impl Takt {
                         self.app.editing = None;
                         self.app.commit_condition_name(id, &text);
                     }
+                    Some(Editing::Ask(ask)) => {
+                        self.app.answer(ask, &text);
+                        if self.app.overlay.is_some() {
+                            self.open_overlay_field();
+                        }
+                    }
                     Some(Editing::FocusNote) => {
                         self.app.editing = None;
                         if let Some(prompt) = self.app.focus_prompt.as_mut() {
@@ -685,7 +711,12 @@ impl Takt {
                 true
             }
             FieldKey::Cancel => {
-                self.app.editing = None;
+                if matches!(self.app.editing, Some(Editing::Ask(_))) {
+                    self.app.leave_ask();
+                    self.open_overlay_field();
+                } else {
+                    self.app.editing = None;
+                }
                 true
             }
             FieldKey::Tab { .. } | FieldKey::Up | FieldKey::Down
@@ -815,6 +846,7 @@ impl Takt {
                     .unwrap_or_default(),
             ),
             Some(Editing::CategoryName(Some(category))) => TextField::selecting_all(category),
+            Some(Editing::Ask(ask)) => TextField::selecting_all(&self.app.ask_prefill(ask)),
             Some(Editing::FocusNote) => TextField::new(
                 &self
                     .app
@@ -994,6 +1026,9 @@ impl Render for Takt {
             })
             .when(self.app.focus_prompt.is_some(), |d| {
                 d.child(self.focus_prompt_sheet(t))
+            })
+            .when(matches!(self.app.editing, Some(Editing::Ask(_))), |d| {
+                d.child(self.ask_sheet(t))
             })
             .when(self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))

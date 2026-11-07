@@ -22,6 +22,10 @@ pub enum Event {
     FocusPanel,
     /// A status item menu entry, by its action.
     Menu(String),
+    /// Sync's status moved; `workspace` when a pull changed the data.
+    Sync { workspace: bool },
+    /// A `takt://` URL opened: the sign-in coming back from the browser.
+    Url(String),
 }
 
 static QUEUE: Mutex<Vec<Event>> = Mutex::new(Vec::new());

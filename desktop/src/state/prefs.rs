@@ -53,6 +53,8 @@ pub struct Prefs {
     pub left_dock_tab: String,
     /// `claude` or `codex`.
     pub agent_client: String,
+    /// Where closed days are written as Obsidian notes; none, not written.
+    pub daily_notes_folder: Option<String>,
 }
 
 impl Default for Prefs {
@@ -91,6 +93,7 @@ impl Default for Prefs {
             hotkey_focus_panel: Some("cmd+ctrl+option+shift+f".into()),
             left_dock_tab: "lists".into(),
             agent_client: "claude".into(),
+            daily_notes_folder: None,
         }
     }
 }

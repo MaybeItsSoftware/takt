@@ -74,6 +74,19 @@ impl TextField {
         }
     }
 
+    /// The field as dots, for a password: the same caret and selection,
+    /// counted in characters.
+    pub fn masked(&self) -> TextField {
+        let dots = |end: usize| "•".len() * self.text[..end].chars().count();
+        TextField {
+            text: "•".repeat(self.text.chars().count()),
+            cursor: dots(self.cursor),
+            anchor: self.anchor.map(dots),
+            marked: self.marked.as_ref().map(|m| dots(m.start)..dots(m.end)),
+            multiline: false,
+        }
+    }
+
     /// The selected bytes, or the caret as an empty range.
     pub fn selection(&self) -> Range<usize> {
         match self.anchor {

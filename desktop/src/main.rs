@@ -13,6 +13,7 @@ mod keys;
 mod overlay;
 mod platform;
 mod state;
+mod sync;
 mod text_field;
 mod theme;
 mod ui;
@@ -57,6 +58,12 @@ fn main() {
     application.on_reopen(|cx| {
         if let Some(takt) = cx.try_global::<ui::Shell>().map(|shell| shell.0.clone()) {
             takt.update(cx, |this, cx| this.show_main_window(cx));
+        }
+    });
+    // Supabase sending the browser back after a sign-in.
+    application.on_open_urls(|urls| {
+        for url in urls {
+            platform::push(platform::Event::Url(url));
         }
     });
     application.run(move |cx: &mut App| {

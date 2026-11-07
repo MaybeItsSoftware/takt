@@ -74,6 +74,15 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.6</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$BUNDLE_ID.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array><string>takt</string></array>
+		</dict>
+	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>

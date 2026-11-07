@@ -671,6 +671,69 @@ impl Takt {
 }
 
 impl Takt {
+    /// A sheet asking for one thing: sync's email and password, a server,
+    /// Checkvist's key. A secret is drawn as dots.
+    pub(super) fn ask_sheet(&self, t: Tokens) -> impl IntoElement {
+        let Some(Editing::Ask(ask)) = self.app.editing.clone() else {
+            return div();
+        };
+        let shown = if ask.secret() {
+            self.field.masked()
+        } else {
+            self.field.clone()
+        };
+        let hint = ask.hint();
+        div()
+            .absolute()
+            .top(px(TITLE_BAR_HEIGHT + 48.))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .id("ask")
+                    .occlude()
+                    .w(px(440.))
+                    .p_4()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .rounded(px(8.))
+                    .bg(t.surface)
+                    .border_1()
+                    .border_color(t.border)
+                    .child(div().text_size(px(15.)).child(ask.title()))
+                    .child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(6.))
+                            .border_1()
+                            .border_color(t.accent)
+                            .bg(t.background)
+                            .child(field_text(&shown, ask.placeholder(), t, self.input_hook())),
+                    )
+                    .when(!hint.is_empty(), |d| {
+                        d.child(div().text_size(px(12.)).text_color(t.muted).child(hint))
+                    })
+                    .when_some(self.app.message.clone(), |d, message| {
+                        d.child(
+                            div()
+                                .text_size(px(12.))
+                                .text_color(t.warning)
+                                .child(message),
+                        )
+                    })
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(t.placeholder)
+                            .child("↩ continue · esc back to settings"),
+                    ),
+            )
+    }
+
     pub(super) fn focus_prompt_sheet(&self, t: Tokens) -> impl IntoElement {
         let Some(prompt) = self.app.focus_prompt.clone() else {
             return div();
