@@ -81,6 +81,11 @@ fn main() {
             .update(cx, |view, window, cx| {
                 if smoke {
                     smoke_test(&mut view.app, window, launched);
+                    if std::env::var_os("TAKT_DESKTOP_SMOKE_ENTER").is_some() {
+                        let keys = view.smoke_new_tasks(window, cx);
+                        println!("smoke enter: {}", keys.join(", "));
+                        smoke_frames(window);
+                    }
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_PANEL").is_some() {
                         view.app.wants_panel = Some(true);
                         view.open_requested_windows(cx);
@@ -99,6 +104,25 @@ fn main() {
             })
             .ok();
     });
+}
+
+/// The gaps between the next frames, for a freeze that only shows once
+/// the window draws.
+fn smoke_frames(window: &mut gpui::Window) {
+    fn next(window: &mut gpui::Window, last: Instant, gaps: Vec<f64>) {
+        window.on_next_frame(move |window, _| {
+            let mut gaps = gaps;
+            gaps.push(last.elapsed().as_secs_f64() * 1000.0);
+            if gaps.len() < 12 {
+                window.refresh();
+                next(window, Instant::now(), gaps);
+            } else {
+                let worst = gaps.iter().copied().fold(0., f64::max);
+                println!("smoke frames: worst {worst:.1} ms, all {gaps:.1?}");
+            }
+        });
+    }
+    next(window, Instant::now(), Vec::new());
 }
 
 /// `TAKT_DESKTOP_SMOKE_PLATFORM=1`: the status item, the hotkeys and the
@@ -178,11 +202,20 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
     report.push(time("outline j", &vec!["j"; 30], app));
     if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() && app.selected().is_some() {
         let started = Instant::now();
+        let ticked = app.selected().map(|t| t.id.clone()).unwrap_or_default();
         app.toggle_complete();
-        let celebrated = app
-            .selected()
-            .is_some_and(|t| app.celebrating(&t.id).is_some());
-        app.toggle_complete();
+        let celebrated = app.celebrating(&ticked).is_some();
+        let stays = app.visible_ids().contains(&ticked);
+        if let Some(since) = app.lingering_since.get_mut(&ticked) {
+            *since -= state::outline::LINGER_MS;
+        }
+        app.expire_lingering();
+        let leaves = !app.visible_ids().contains(&ticked);
+        report.push(format!(
+            "finished task stays at first: {stays}, gone after its seconds: {leaves}"
+        ));
+        app.set_status(&ticked, "open");
+        app.selected_task = Some(ticked);
         report.push(format!(
             "celebration {:?} played: {celebrated}",
             app.celebration_style()
@@ -342,6 +375,34 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             app.quick_ask_transcript().replace('\n', " | ")
         ));
         app.editing = None;
+    }
+    if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() {
+        app.overlay = None;
+        app.editing = None;
+        app.region = state::Region::Tasks;
+        app.run("goOutline", None);
+        let mut said = Vec::new();
+        for n in 0..3 {
+            let started = Instant::now();
+            app.run("taskNew", None);
+            let opened = started.elapsed().as_secs_f64() * 1000.0;
+            let started = Instant::now();
+            app.create_task(&format!("smoke new task {n}"));
+            let created = started.elapsed().as_secs_f64() * 1000.0;
+            let started = Instant::now();
+            let today = state::today::compute(
+                app.store.core.clone(),
+                app.store.workspace_id.clone(),
+                app.store.zone.clone(),
+            )
+            .is_ok();
+            said.push(format!(
+                "open {opened:.1} create {created:.1} today {:.1} ms ({today})",
+                started.elapsed().as_secs_f64() * 1000.0
+            ));
+        }
+        app.editing = None;
+        report.push(format!("new task: {}", said.join(", ")));
     }
     // A subtask filed into the next column, selected, and the board left
     // up: the shot then shows its link's line.

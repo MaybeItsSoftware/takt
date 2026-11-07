@@ -273,7 +273,7 @@ impl App {
             }
         }
         self.reload_focus();
-        self.lingering.insert(prompt.task_id.clone());
+        self.linger(&prompt.task_id);
         self.reload_rows();
         self.reload_today();
         self.reload_done();

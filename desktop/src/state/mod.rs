@@ -233,6 +233,9 @@ pub struct App {
     pub today_stale: bool,
     /// Ticked off this visit, kept on screen while finished tasks are hidden.
     pub lingering: HashSet<String>,
+    /// When each just-finished task began to linger: it leaves the list
+    /// `outline::LINGER_MS` later.
+    pub lingering_since: std::collections::HashMap<String, i64>,
     /// Each task's board column and matrix place, from the scope's board read.
     pub placements: std::collections::HashMap<String, outline::Placement>,
     /// A combined scope's cards (every open task) and those its board draws.
@@ -332,6 +335,7 @@ impl App {
             all_rows: Vec::new(),
             rows: Vec::new(),
             lingering: HashSet::new(),
+            lingering_since: Default::default(),
             placements: Default::default(),
             combined_cards: Vec::new(),
             board_card_ids: Vec::new(),
@@ -379,6 +383,7 @@ impl App {
         app.refresh_history();
         app.adopt_swift_app();
         app.adopt_swift_celebration();
+        app.adopt_finished_tasks_leave();
         app.start_google();
         Ok(app)
     }

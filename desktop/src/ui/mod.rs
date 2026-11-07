@@ -156,6 +156,9 @@ impl Takt {
                     this.app.sync.note_outbox();
                     this.app.google_note_change();
                     this.app.prune_celebrations();
+                    if !this.app.lingering_since.is_empty() {
+                        this.app.expire_lingering();
+                    }
                     this.app.tick_reminders();
                     if this.app.check_external_writes() {
                         this.app.reload_today();
@@ -545,6 +548,42 @@ impl Takt {
         self.refresh_status();
         self.last_key_ms = Some(started.elapsed().as_secs_f64() * 1000.0);
         cx.notify();
+    }
+
+    /// `TAKT_DESKTOP_SMOKE_ENTER`: Enter, a title and Enter, three times,
+    /// through the window's own key handler (in process; no key reaches the
+    /// system). Each step's time, in ms.
+    pub fn smoke_new_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<String> {
+        let mut said = Vec::new();
+        let press = |this: &mut Self, key: &str, window: &mut Window, cx: &mut Context<Self>| {
+            let event = KeyDownEvent {
+                keystroke: gpui::Keystroke::parse(key).expect("a key"),
+                is_held: false,
+            };
+            let started = Instant::now();
+            this.key_down(&event, window, cx);
+            started.elapsed().as_secs_f64() * 1000.0
+        };
+        // From the board, where Enter used to open a draft nobody could see.
+        self.app.overlay = None;
+        self.app.editing = None;
+        self.app.region = crate::state::Region::Tasks;
+        self.app.run("goBoard", None);
+        let open = press(self, "enter", window, cx);
+        let drawn = self.outline_display().len() > self.app.rows.len();
+        said.push(format!(
+            "open from the board {open:.1} (draft drawn: {drawn})"
+        ));
+        // The draft stays open below each new task for the next.
+        for n in 0..3 {
+            self.field = TextField::new(&format!("smoke enter {n}"));
+            let enter = press(self, "enter", window, cx);
+            let drawn = self.outline_display().len() > self.app.rows.len();
+            said.push(format!("enter {enter:.1} (draft drawn: {drawn})"));
+        }
+        let escape = press(self, "escape", window, cx);
+        said.push(format!("escape {escape:.1}"));
+        said
     }
 
     fn command_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {

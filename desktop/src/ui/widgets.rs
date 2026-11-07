@@ -106,7 +106,7 @@ pub(super) fn check(task: &TaskRow, t: Tokens) -> impl IntoElement {
         "completed" => ("●", t.success),
         "cancelled" => ("✕", t.placeholder),
         _ if task.item_kind.as_deref() == Some("list") => ("≡", t.muted),
-        _ => ("○", t.muted),
+        _ => ("", t.muted),
     };
     div()
         .w(px(12.))

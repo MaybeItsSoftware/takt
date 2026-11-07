@@ -172,7 +172,9 @@ impl App {
             }
         }
         self.reload_focus();
-        self.lingering.extend(session.active_task_id.clone());
+        if let Some(id) = session.active_task_id.clone() {
+            self.linger(&id);
+        }
         self.reload_rows();
         self.reload_today();
         if complete {

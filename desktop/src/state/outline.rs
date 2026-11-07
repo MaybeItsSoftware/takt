@@ -17,6 +17,10 @@ pub struct OutlineRow {
     pub has_children: bool,
 }
 
+/// How long a just-finished task stays in view while finished tasks are
+/// hidden.
+pub const LINGER_MS: i64 = 3000;
+
 impl App {
     /// The board read of the scope's lists: every task's column and matrix
     /// place, and for a combined scope its cards.
@@ -407,7 +411,7 @@ impl App {
             }
         }
         if status != "open" {
-            self.lingering.insert(id.to_string());
+            self.linger(id);
         }
         self.layout_rows();
         self.reload_today();
@@ -512,8 +516,10 @@ impl App {
             (NewPlacement::Child, Some(task)) => (Some(task.id.clone()), None),
             (_, None) => (entered, self.rows.last().map(|row| row.task.id.clone())),
         };
-        if self.view_mode == ViewMode::Today {
-            self.view_mode = ViewMode::Outline;
+        // Only the outline draws the draft row: from anywhere else the
+        // typing would go into a field nobody can see.
+        if self.view_mode != ViewMode::Outline {
+            self.select_view_mode(ViewMode::Outline);
         }
         self.editing = Some(Editing::NewTask {
             list_id,
@@ -642,7 +648,49 @@ impl App {
         counts
     }
 
+    /// A task just finished: kept in view for a few seconds while finished
+    /// tasks are hidden, then let go by `expire_lingering`.
+    pub fn linger(&mut self, id: &str) {
+        self.lingering.insert(id.to_string());
+        self.lingering_since.insert(id.to_string(), now_ms());
+    }
+
+    /// Called every second: finished tasks whose few seconds are up leave
+    /// the list.
+    pub fn expire_lingering(&mut self) {
+        let now = now_ms();
+        let due: Vec<String> = self
+            .lingering_since
+            .iter()
+            .filter(|(_, since)| now - **since >= LINGER_MS)
+            .map(|(id, _)| id.clone())
+            .collect();
+        if due.is_empty() {
+            return;
+        }
+        for id in &due {
+            self.lingering_since.remove(id);
+            self.lingering.remove(id);
+        }
+        if self.prefs.hide_completed {
+            self.layout_rows();
+        }
+    }
+
+    /// Once: finished tasks leave the list, whatever an earlier version
+    /// saved, as they always did in the Swift app.
+    pub fn adopt_finished_tasks_leave(&mut self) {
+        if self.prefs.finished_tasks_leave || std::env::var_os("TAKT_DESKTOP_PREFS").is_some() {
+            return;
+        }
+        self.prefs.finished_tasks_leave = true;
+        self.prefs.hide_completed = true;
+        self.prefs.save();
+        self.layout_rows();
+    }
+
     pub fn clear_lingering(&mut self) {
+        self.lingering_since.clear();
         self.lingering = HashSet::new();
     }
 }

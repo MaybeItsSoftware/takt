@@ -76,6 +76,9 @@ pub struct Prefs {
     pub celebration: Option<String>,
     /// A quiet system sound with it.
     pub celebration_sound: bool,
+    /// Finished tasks were switched to leaving the list after a few seconds,
+    /// as the Swift app always had them, once for every install.
+    pub finished_tasks_leave: bool,
 }
 
 impl Default for Prefs {
@@ -92,7 +95,7 @@ impl Default for Prefs {
             right_dock_tab: "inspector".into(),
             bottom_dock_visible: false,
             bottom_dock_tab: "done".into(),
-            hide_completed: false,
+            hide_completed: true,
             hide_later: false,
             icons: HashMap::new(),
             folder_destinations: HashMap::new(),
@@ -128,6 +131,7 @@ impl Default for Prefs {
             links_drive_search: false,
             celebration: None,
             celebration_sound: false,
+            finished_tasks_leave: false,
         }
     }
 }

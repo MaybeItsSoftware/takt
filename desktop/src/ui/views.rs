@@ -473,7 +473,7 @@ impl Takt {
                     .child(div().flex_none().child(match row.task.status.as_str() {
                         "completed" => "●",
                         "cancelled" => "✕",
-                        _ => "○",
+                        _ => "",
                     }))
                     .child(
                         div()
