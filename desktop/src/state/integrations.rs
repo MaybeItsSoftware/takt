@@ -144,6 +144,9 @@ impl App {
             "checkvist-connect" => self.ask(Ask::CheckvistEmail),
             "checkvist-import" => self.import_checkvist(),
             "checkvist-disconnect" => self.disconnect_checkvist(),
+            client if client.starts_with("mcp:") => {
+                self.install_mcp_client(&client["mcp:".len()..])
+            }
             _ => {}
         }
         if self.editing.is_none() {

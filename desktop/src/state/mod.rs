@@ -23,6 +23,7 @@ pub mod forms;
 pub mod inspector;
 pub mod integrations;
 pub mod library;
+pub mod mcp_clients;
 pub mod menubar;
 pub mod navigation;
 pub mod outline;

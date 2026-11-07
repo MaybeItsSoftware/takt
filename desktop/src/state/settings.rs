@@ -10,7 +10,7 @@ use crate::platform::hotkeys::{self, Hotkey};
 
 /// A row of the settings overlay.
 pub struct SettingRow {
-    pub id: &'static str,
+    pub id: String,
     pub group: &'static str,
     pub title: String,
     pub value: String,
@@ -30,8 +30,8 @@ fn on(flag: bool) -> String {
 impl App {
     pub fn settings_rows(&self) -> Vec<SettingRow> {
         let p = &self.prefs;
-        let row = |id, group, title: &str, value: String| SettingRow {
-            id,
+        let row = |id: &str, group, title: &str, value: String| SettingRow {
+            id: id.into(),
             group,
             title: title.into(),
             value,
@@ -161,11 +161,21 @@ impl App {
         self.platform_settings()
             .into_iter()
             .map(|(id, group, title, value)| SettingRow {
-                id,
+                id: id.into(),
                 group,
                 title: title.into(),
                 value,
             })
+            .chain(
+                self.mcp_client_rows()
+                    .into_iter()
+                    .map(|(id, title, value)| SettingRow {
+                        id,
+                        group: "MCP",
+                        title,
+                        value,
+                    }),
+            )
             .collect()
     }
 

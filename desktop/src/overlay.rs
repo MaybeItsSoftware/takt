@@ -23,7 +23,7 @@ pub enum Pick {
     },
     /// A picker's row.
     Choice(crate::state::pickers::Picker, crate::state::pickers::Choice),
-    Setting(&'static str),
+    Setting(String),
     Nothing,
 }
 
@@ -157,7 +157,7 @@ pub fn apply(app: &mut App, pick: Pick) {
                 app.open_overlay(Overlay::Settings);
             }
         }
-        Pick::Setting(id) => app.change_setting(id),
+        Pick::Setting(id) => app.change_setting(&id),
         Pick::Nothing => {}
     }
 }
@@ -390,7 +390,7 @@ fn settings(app: &App, query: &str) -> Vec<Item> {
             title: row.title.clone(),
             detail: row.group.into(),
             keys: row.value.clone(),
-            pick: Pick::Setting(row.id),
+            pick: Pick::Setting(row.id.clone()),
         })
         .collect()
 }
