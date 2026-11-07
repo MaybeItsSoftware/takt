@@ -348,6 +348,19 @@ impl Takt {
             })
             .when(current, |d| d.bg(t.selected))
             .when(!current, |d| d.hover(|d| d.bg(t.hover)))
+            .on_mouse_down(gpui::MouseButton::Right, {
+                let row_id = target.id.clone();
+                cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
+                    this.app.open_sidebar_menu(
+                        &row_id,
+                        f32::from(e.position.x),
+                        f32::from(e.position.y),
+                    );
+                    this.after_change(cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                })
+            })
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.app.apply_sidebar_cursor(&target);
                 this.app.region = Region::Sidebar;
@@ -835,5 +848,115 @@ impl Takt {
                             .child("←→ choose · ↩ takes it · esc keeps working"),
                     ),
             )
+    }
+}
+
+impl Takt {
+    /// The open right-click menu, kept inside the window, over a backdrop
+    /// that closes it when clicked.
+    pub(super) fn context_menu_view(
+        &self,
+        t: Tokens,
+        viewport: gpui::Size<Pixels>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let Some(menu) = self.app.context_menu.clone() else {
+            return div().into_any_element();
+        };
+        const WIDTH: f32 = 260.;
+        const ITEM: f32 = 24.;
+        let height: f32 = menu
+            .entries
+            .iter()
+            .map(|e| match e {
+                crate::state::context_menu::MenuEntry::Item(_) => ITEM,
+                crate::state::context_menu::MenuEntry::Divider => 9.,
+            })
+            .sum::<f32>()
+            + 10.;
+        let x = menu.x.min(f32::from(viewport.width) - WIDTH - 8.).max(4.);
+        let y = menu.y.min(f32::from(viewport.height) - height - 8.).max(4.);
+        let rows = menu
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(ix, entry)| match entry {
+                crate::state::context_menu::MenuEntry::Divider => div()
+                    .my(px(4.))
+                    .h(px(1.))
+                    .bg(t.border_variant)
+                    .into_any_element(),
+                crate::state::context_menu::MenuEntry::Item(item) => {
+                    let action = item.action.clone();
+                    let here = menu.index == Some(ix);
+                    div()
+                        .id(("menu-item", ix))
+                        .h(px(ITEM))
+                        .px_2()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .rounded(px(4.))
+                        .when(here, |d| d.bg(t.selected))
+                        .hover(|d| d.bg(t.hover))
+                        .text_color(if item.destructive { t.error } else { t.text })
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.app.pick_from_menu(&action);
+                            if this.app.overlay.is_some() {
+                                this.open_overlay_field();
+                            }
+                            this.begin_editing();
+                            this.after_change(cx);
+                            this.open_requested_windows(cx);
+                            cx.notify();
+                        }))
+                        .child(div().flex_1().truncate().child(item.title.clone()))
+                        .child(
+                            div()
+                                .font_family(MONO_FONT)
+                                .text_size(px(11.))
+                                .text_color(t.placeholder)
+                                .child(item.keys.clone()),
+                        )
+                        .into_any_element()
+                }
+            });
+        div()
+            .id("context-menu-backdrop")
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
+                    this.app.context_menu = None;
+                    cx.notify();
+                }),
+            )
+            .on_mouse_down(
+                gpui::MouseButton::Right,
+                cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
+                    this.app.context_menu = None;
+                    cx.notify();
+                }),
+            )
+            .child(
+                div()
+                    .id("context-menu")
+                    .occlude()
+                    .absolute()
+                    .left(px(x))
+                    .top(px(y))
+                    .w(px(WIDTH))
+                    .p_1()
+                    .rounded(px(6.))
+                    .bg(t.surface)
+                    .border_1()
+                    .border_color(t.border)
+                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .children(rows),
+            )
+            .into_any_element()
     }
 }

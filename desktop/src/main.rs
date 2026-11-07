@@ -234,6 +234,19 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             started.elapsed().as_secs_f64() * 1000.0
         ));
     }
+    if let Some(id) = app.selected_task.clone() {
+        app.open_task_menu(&id, 100., 100.);
+        let task_items = app.context_menu.as_ref().map_or(0, |m| m.items().count());
+        let first = app.sidebar_rows.get(2).map(|r| r.id.clone());
+        if let Some(row) = first {
+            app.open_sidebar_menu(&row, 10., 10.);
+        }
+        let sidebar_items = app.context_menu.as_ref().map_or(0, |m| m.items().count());
+        app.context_menu = None;
+        report.push(format!(
+            "menus: task {task_items} items, sidebar {sidebar_items}"
+        ));
+    }
     report.push(format!(
         "{} themes, {} settings, {} diagnostics",
         app.library.themes.len(),

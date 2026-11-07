@@ -97,6 +97,15 @@ impl Takt {
             })
             .when(selected, |d| d.bg(t.selected))
             .when(!selected, |d| d.hover(|d| d.bg(t.hover)))
+            .on_mouse_down(gpui::MouseButton::Right, {
+                let id = id.clone();
+                cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
+                    this.app
+                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    cx.stop_propagation();
+                    cx.notify();
+                })
+            })
             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                 this.app.selected_task = Some(id.clone());
                 this.app.region = Region::Tasks;
@@ -250,6 +259,15 @@ impl Takt {
                 t.border_variant
             })
             .when(selected, |d| d.bg(t.selected))
+            .on_mouse_down(gpui::MouseButton::Right, {
+                let id = id.clone();
+                cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
+                    this.app
+                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    cx.stop_propagation();
+                    cx.notify();
+                })
+            })
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.app.selected_task = Some(id.clone());
                 this.app.region = Region::Tasks;
@@ -471,6 +489,15 @@ impl Takt {
             })
             .when(selected, |d| d.bg(t.selected))
             .when(!selected, |d| d.hover(|d| d.bg(t.hover)))
+            .on_mouse_down(gpui::MouseButton::Right, {
+                let id = id.clone();
+                cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
+                    this.app
+                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    cx.stop_propagation();
+                    cx.notify();
+                })
+            })
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.app.selected_task = Some(id.clone());
                 this.app.region = Region::Tasks;

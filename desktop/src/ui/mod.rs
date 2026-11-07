@@ -279,6 +279,35 @@ impl Takt {
         }
     }
 
+    /// ↑↓ move through an open context menu, Return runs, Esc closes; any
+    /// other key closes it and goes on as usual (false).
+    fn context_menu_key(&mut self, keystroke: &gpui::Keystroke) -> bool {
+        let Some(menu) = self.app.context_menu.as_mut() else {
+            return false;
+        };
+        match keystroke.key.as_str() {
+            "down" => menu.step(1),
+            "up" => menu.step(-1),
+            "enter" => {
+                if let Some(action) = menu.picked().map(|item| item.action.clone()) {
+                    self.app.pick_from_menu(&action);
+                    if self.app.overlay.is_some() {
+                        self.open_overlay_field();
+                    }
+                    self.begin_editing();
+                } else {
+                    self.app.context_menu = None;
+                }
+            }
+            "escape" => self.app.context_menu = None,
+            _ => {
+                self.app.context_menu = None;
+                return false;
+            }
+        }
+        true
+    }
+
     /// What the platform smoke check prints.
     pub fn platform_report(&self, cx: &mut Context<Self>) -> String {
         let snapshot = self.app.status_snapshot();
@@ -462,6 +491,13 @@ impl Takt {
             if self.app.record_hotkey_key(&spelled) && self.app.overlay.is_some() {
                 self.open_overlay_field();
             }
+            self.open_requested_windows(cx);
+            cx.notify();
+            return;
+        }
+        if self.app.context_menu.is_some() && self.context_menu_key(keystroke) {
+            cx.stop_propagation();
+            self.after_change(cx);
             self.open_requested_windows(cx);
             cx.notify();
             return;
@@ -1024,7 +1060,24 @@ impl Render for Takt {
                     .when(self.app.prefs.sidebar_visible, |d| {
                         d.child(self.left_dock(t, cx))
                     })
-                    .child(self.centre(t, cx))
+                    .child(
+                        div()
+                            .id("centre")
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .on_mouse_down(
+                                gpui::MouseButton::Right,
+                                cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
+                                    this.app.open_pane_menu(
+                                        f32::from(e.position.x),
+                                        f32::from(e.position.y),
+                                    );
+                                    cx.notify();
+                                }),
+                            )
+                            .child(self.centre(t, cx)),
+                    )
                     .when_some(inspector, |d, stops| d.child(self.right_dock(t, stops, cx))),
             )
             .when(self.app.prefs.bottom_dock_visible, |d| {
@@ -1042,6 +1095,9 @@ impl Render for Takt {
             })
             .when(self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))
+            })
+            .when(self.app.context_menu.is_some(), |d| {
+                d.child(self.context_menu_view(t, window.viewport_size(), cx))
             })
     }
 }

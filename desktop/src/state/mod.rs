@@ -15,6 +15,7 @@ pub mod checkvist;
 pub mod columns;
 pub mod commands;
 pub mod conditions;
+pub mod context_menu;
 pub mod details;
 pub mod docks;
 pub mod focus;
@@ -179,6 +180,8 @@ pub struct App {
     pub filter_lists: Vec<FilterListRow>,
     pub task_counts: std::collections::HashMap<String, i64>,
     pub sidebar_rows: Vec<SidebarRow>,
+    /// A right-click menu, while one is open.
+    pub context_menu: Option<context_menu::ContextMenu>,
     pub sidebar_cursor: Option<String>,
 
     // Where you are.
@@ -287,6 +290,7 @@ impl App {
             filter_lists: Vec::new(),
             task_counts: Default::default(),
             sidebar_rows: Vec::new(),
+            context_menu: None,
             sidebar_cursor: None,
             scope: Scope::Everything,
             view_mode: ViewMode::Outline,
