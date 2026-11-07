@@ -373,6 +373,9 @@ impl App {
         if done.is_none() {
             return;
         }
+        if status == "completed" {
+            self.start_celebration(id);
+        }
         // A recurring task makes its next occurrence on completion, which is
         // a new row: then, and only then, the list is read again.
         let recurs = self

@@ -80,7 +80,8 @@ impl Takt {
             ""
         };
         let id = row.task.id.clone();
-        div()
+        let celebrating = self.app.celebrating(&row.task.id);
+        let element = div()
             .id(("outline-row", ix))
             .h(px(ROW_HEIGHT))
             .mx_1()
@@ -144,8 +145,8 @@ impl Takt {
                 title_greyed(&row.task, self.app.is_greyed(&row.task.id), t).into_any_element()
             })
             .children(detail_chips(&self.app, &row.task, t))
-            .children(task_chips(&row.task, counted, t))
-            .into_any_element()
+            .children(task_chips(&row.task, counted, t));
+        super::celebrate::celebrate(element, &row.task.id, celebrating, t)
     }
 
     pub(super) fn board(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
@@ -293,7 +294,8 @@ impl Takt {
         };
         // A board card's column, for its link ends; not the matrix's.
         let column = (ix < 1_000_000).then_some(ix / 100_000);
-        div()
+        let celebrating = self.app.celebrating(&task.id);
+        let element = div()
             .id(("card", ix))
             .on_hover({
                 let id = id.clone();
@@ -395,8 +397,8 @@ impl Takt {
                         .child(hint),
                 )
             })
-            .child(self.card_subtasks(task, column, t, cx))
-            .into_any_element()
+            .child(self.card_subtasks(task, column, t, cx));
+        super::celebrate::celebrate(element, &task.id, celebrating, t)
     }
 
     /// The card's subtree as compact rows: `└` marks, flush with the card's

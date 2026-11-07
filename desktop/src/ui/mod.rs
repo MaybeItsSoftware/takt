@@ -7,6 +7,7 @@
 
 pub mod board_links;
 pub mod capture;
+mod celebrate;
 mod chrome;
 mod dock;
 pub mod panel;
@@ -154,6 +155,7 @@ impl Takt {
                     this.app.sync.set_foreground(this.main.is_some());
                     this.app.sync.note_outbox();
                     this.app.google_note_change();
+                    this.app.prune_celebrations();
                     this.app.tick_reminders();
                     if this.app.check_external_writes() {
                         this.app.reload_today();

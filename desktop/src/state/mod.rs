@@ -12,6 +12,7 @@ pub mod agent;
 pub mod ask;
 pub mod board;
 pub mod capture;
+pub mod celebration;
 pub mod checkvist;
 pub mod columns;
 pub mod commands;
@@ -248,6 +249,8 @@ pub struct App {
     pub focus_checkpointed_at: i64,
     /// A task just finished, and when: drawn in the status bar a moment.
     pub celebration: Option<(String, i64)>,
+    /// The rows mid-celebration, by task id, and when each began.
+    pub celebrating: std::collections::HashMap<String, i64>,
     /// The floating focus panel asked for (true) or away (false).
     pub wants_panel: Option<bool>,
     /// The quick capture window, asked for.
@@ -339,6 +342,7 @@ impl App {
             focus_notified: None,
             focus_checkpointed_at: 0,
             celebration: None,
+            celebrating: Default::default(),
             wants_panel: None,
             wants_capture: false,
             hotkeys_changed: false,
@@ -374,6 +378,7 @@ impl App {
         app.restore_scope();
         app.refresh_history();
         app.adopt_swift_app();
+        app.adopt_swift_celebration();
         app.start_google();
         Ok(app)
     }

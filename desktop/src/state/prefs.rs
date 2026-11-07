@@ -71,6 +71,11 @@ pub struct Prefs {
     pub links_obsidian_vaults: Vec<String>,
     /// The link picker searches Google Drive by name.
     pub links_drive_search: bool,
+    /// The completion celebration (`celebration::Style`), once chosen or
+    /// carried over from the Swift app.
+    pub celebration: Option<String>,
+    /// A quiet system sound with it.
+    pub celebration_sound: bool,
 }
 
 impl Default for Prefs {
@@ -121,6 +126,8 @@ impl Default for Prefs {
             adopted_swift: false,
             links_obsidian_vaults: Vec::new(),
             links_drive_search: false,
+            celebration: None,
+            celebration_sound: false,
         }
     }
 }

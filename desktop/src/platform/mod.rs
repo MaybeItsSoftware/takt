@@ -111,6 +111,29 @@ pub fn set_launch_at_login(enabled: bool) -> Result<(), String> {
     }
 }
 
+/// Whether the person asked for less motion (Accessibility → Display).
+pub fn reduce_motion() -> bool {
+    unsafe {
+        let workspace: *mut objc::runtime::Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let reduce: bool = msg_send![workspace, accessibilityDisplayShouldReduceMotion];
+        reduce
+    }
+}
+
+/// Plays a system sound (`/System/Library/Sounds`) by name, quietly. A
+/// name that no longer resolves stays silent.
+pub fn play_sound(name: &str, volume: f32) {
+    unsafe {
+        let sound: *mut objc::runtime::Object =
+            msg_send![class!(NSSound), soundNamed: ns_string(name)];
+        if sound.is_null() {
+            return;
+        }
+        let _: () = msg_send![sound, setVolume: volume];
+        let _: bool = msg_send![sound, play];
+    }
+}
+
 /// The running bundle's identifier, when it is a bundle.
 pub fn bundle_id() -> Option<String> {
     unsafe {

@@ -407,6 +407,7 @@ impl App {
             .map(|t| t.title)
             .unwrap_or_default();
         self.celebration = Some((title, now_ms()));
+        self.start_celebration(task_id);
     }
 }
 

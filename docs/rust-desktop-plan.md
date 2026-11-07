@@ -87,6 +87,11 @@ keeps working throughout.
    conditions, dependencies, links, recurrence, commitments and habits as
    typed sheets. The link picker searches the Obsidian vaults and, when
    switched on, Google Drive by name (`desktop/src/state/links.rs`).
+   Finishing a task plays the chosen celebration on its row — Strike, Spark
+   or Fold, carried over from the Swift app, with its quiet system sound if
+   asked for (`state/celebration.rs`, `ui/celebrate.rs`). The milestone
+   flourishes across the panel are not drawn, and Fold folds a tint shut
+   over the row rather than closing the list over it.
 5. **Focus and the day — done.** Sessions, the "how did it go?" prompt,
    breaks, the queue, the floating focus panel, the timeline, the done
    rail, progress, habits and commitments, celebrations.

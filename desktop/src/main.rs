@@ -179,7 +179,14 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
     if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() && app.selected().is_some() {
         let started = Instant::now();
         app.toggle_complete();
+        let celebrated = app
+            .selected()
+            .is_some_and(|t| app.celebrating(&t.id).is_some());
         app.toggle_complete();
+        report.push(format!(
+            "celebration {:?} played: {celebrated}",
+            app.celebration_style()
+        ));
         report.push(format!(
             "tick and untick {:.2} ms",
             started.elapsed().as_secs_f64() * 1000.0 / 2.0
