@@ -1,8 +1,36 @@
 # Shared lists
 
-A plan, written 2026-11-08. Nothing here is built yet. When a step lands,
-[sync](sync.md) becomes the description of what is, and this file records
-how it got there.
+A plan, written 2026-11-08, and built the same day: steps 1 to 6 below.
+[sync](sync.md#shared-lists) is now the description of what is; this file
+records why, and where the build differs from the plan (next section).
+
+## What was built, and where it differs
+
+- **One cursor, one lock.** The plan gave a device one cursor per space.
+  Instead every push takes a single global advisory lock, so `seq` order is
+  commit order across all spaces and the integer `since` every client
+  already sends still covers them all. No client's pull loop changed. A join
+  renumbers the space's rows so they reach the new member past any cursor.
+  The cost is that pushes no longer run side by side across accounts. At
+  free-tier scale a push holds the lock for milliseconds; revisit it
+  (per-space cursors) if pushes ever queue.
+- **News on the account's own channel.** A push to a shared space nudges
+  `sync:<account id>` for each member, rather than a `space:<id>` channel.
+  The same number of messages, and no client's Realtime code changed.
+- **Companion rows, not new tables.** Instead of `task_personal` and
+  `list_placements`, a shared row's personal columns travel in the account's
+  own space as `<table>#personal` with the same id. No synced table changed
+  shape, so no client older than sharing breaks on a column it doesn't know.
+  `v37_shared_lists` adds only the device's own bookkeeping
+  (`sync_spaces`, `sync_row_spaces`, `sync_push_plan`).
+- **A removed member's changes are skipped, not refused.** A device just
+  taken out of a list can't know until its next pull; refusing its batch
+  would leave its outbox stuck for ever.
+- **Not built:** `createdBy` and `completedBy` ("completed by Sam"), and
+  assignment (step 7). Both need a synced column on `tasks`, so they wait
+  for a step of their own.
+- **Emails, not display names.** Members are shown by the email they sign in
+  with.
 
 Today Takt has one user per workspace. Every row the server holds is keyed
 by `(account_id, table_name, row_id)`, a device reads only its own account's

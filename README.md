@@ -26,7 +26,7 @@ It works offline, with no account. It works from the terminal. And it exposes th
 
 - [Install](#install) · [First run](#first-run)
 - [Keyboard flow](#keyboard-flow) · [Focus](#focus) · [Command palette](#command-palette)
-- [Views](#views) · [Waiting on](#waiting-on) · [Blocked by](#blocked-by) · [Quick ask](#quick-ask) · [The menu bar](#the-menu-bar) · [The window](#the-window) · [Themes](#themes) · [Diagnostics](#diagnostics)
+- [Views](#views) · [Waiting on](#waiting-on) · [Blocked by](#blocked-by) · [Shared lists](#shared-lists) · [Quick ask](#quick-ask) · [The menu bar](#the-menu-bar) · [The window](#the-window) · [Themes](#themes) · [Diagnostics](#diagnostics)
 - [Daily log](#daily-log) · [Obsidian daily notes](#obsidian-daily-notes) · [AFFiNE](#affine)
 - [Command line](#command-line) · [MCP server](#mcp-server) · [Plugins](#plugins)
 - [Build from source](#build-from-source) · [Where your data lives](#where-your-data-lives)
@@ -947,6 +947,18 @@ done, with the list when it is another — each with a button to stop waiting on
 it, and under **Blocks** the tasks waiting on this one. Adding and removing are
 each one undo step. A task cannot wait on itself, or on a task that already
 waits on it, however far round; the app says so rather than adding it.
+
+## Shared lists
+
+A list can be shared with other Takt accounts. Everyone in it sees its tasks and subtasks on every device they sync, and can add, edit, complete and delete them; edits merge the way edits between your own devices do. What stays each person's own: where the list sits in their sidebar, its tasks' board columns and matrix placement, their conditions for a task and its agent context. Nothing else in a workspace is ever shared.
+
+| Where | How |
+| --- | --- |
+| Mac | **Share the list** in the command palette (or the list's row in Settings → Shared lists) copies an invite link; each run makes a new one. **Join a shared list** takes a link or code, and is filled in from the clipboard. **Show who the list is shared with**, **Leave the shared list** and **Stop sharing the list** do what they say. A shared list has the two-people icon in the sidebar. |
+| iPhone, Android | Long-press the list → **Share…** for the people in it, an invite to send, and leaving or stopping sharing. **Join a shared list** is in the Lists toolbar. |
+| Terminal | `takt ws shared` lists the shared lists and who is in them; `takt ws tree` marks them. Sharing itself happens in the apps. |
+
+An invite works once, for seven days, and goes as a link (`…/join/<code>`, which opens Takt) or the code typed in. Only the list's owner invites. A member can leave, and can't delete the list; the owner stops sharing instead, which keeps the list for them and takes it off everyone else's devices. If the owner deletes their account, the longest-standing member becomes the owner. The Inbox can't be shared, and sync has to be on: shared lists travel through it. Every device in a shared list should be on a version from November 2026 or later — an older one shows the list but its edits stay on its own account. How it works is in [docs/shared-lists-plan.md](docs/shared-lists-plan.md).
 
 ## Repeating work
 

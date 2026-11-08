@@ -324,6 +324,13 @@ resets there and then. A client built before it ignores the rows and never
 resets; on it the context simply carries over, and a reset another device
 made reaches it as an ordinary context change.
 
+`v37_shared_lists` adds three tables of the device's own, none of them
+synced or journalled: `sync_spaces` (the shared lists this account is in, as
+the last pull listed them: space, list, role, members), `sync_row_spaces`
+(which shared space each row was last sent to or received from) and
+`sync_push_plan` (where a push in flight is sending its rows, recorded once
+the server has them). See [Shared lists](#shared-lists).
+
 The following are not synced: the undo journal (`undo_control`, `change_log`), the FTS index
 (rebuilt by its own triggers as synced rows land), `grdb_migrations`, and the
 sync tables themselves. Day-log files stay per device. Theme *files* do
@@ -570,6 +577,75 @@ When it runs: when the app comes to the foreground, 2 s after the last local wri
 when the Realtime channel says there is news (or, without it, in a long-poll
 loop while the app is in front), and in background refresh.
 
+## Shared lists
+
+A row belongs to a **space**: the account's own (the default, and every row
+before this), or a shared list's. Design and reasoning are in
+[shared-lists-plan.md](shared-lists-plan.md); this is the protocol.
+
+**What goes where.** A shared list's space holds the list's `task_lists` row,
+its `tasks`, their `task_metadata`, `task_dependencies` between two of its
+tasks, and its `agent_instructions` (`list:<id>`). Nothing else. Their
+*personal columns* — `task_lists`: `workspaceId`, `folderId`, `sortOrder`,
+`visibleRootTaskId`; `task_metadata`: `matrixUrgency`, `matrixImportance`,
+`matrixRank`, `kanbanColumn`, `focusRank`, `planningJSON`, `agentContext` —
+never go there. They go to the pusher's own space as a **companion row**,
+table `<table>#personal` with the same id, and a pull writes them over the
+local row. A client that predates sharing skips the table, as it skips any
+it doesn't know.
+
+**Push.** A change names its space, `"space": "<uuid>"`, or leaves it out for
+the account's own. The server writes a shared change only if the caller is a
+member, refuses one for a table a shared space doesn't hold or for another
+list's row (`400`), and **skips** (accepts without writing) one from a
+non-member or a member's delete of the list itself, so a device just removed
+doesn't retry its outbox for ever. Moving a task into a shared list sends it
+there whole and deletes the copy in the account's own space; moving it out
+deletes it from the shared space and sends it to the account's own whole. A
+row whose space changes without an edit of its own (a task's metadata, when
+the task moves; every row of a list just shared) is found by comparing where
+it belongs with `sync_row_spaces`.
+
+**One cursor.** Every push takes one global advisory lock rather than one per
+account, so `seq` order is commit order across every space and a device's
+single `since` covers its own space and every shared one. A join renumbers
+the space's rows (`seq = nextval`), so they reach the new member past any
+cursor, and every existing member re-applies them once, which is harmless.
+
+**Pull.** Every row of a shared space carries `"space"`. Each page also
+carries `"spaces"`: every shared list the account is in, with its list id,
+the caller's role and the members (`accountId`, `email`, `role`, `you`). A
+device brings `sync_spaces` to it on every pull: a new space whose list is
+already here (the owner's other devices) has its rows marked as sent; a
+space that has gone takes its rows from the device (a list you were in) or
+leaves them as a private list (one you owned). A shared row is written
+without its personal columns; a new shared list lands in the device's own
+workspace, at the root of its sidebar. A delete from a shared space is
+applied last, and only to a row that still belongs to that space, so a task
+moved out on another device survives its old space's tombstone. A row from
+the account's own space for a row that now lives in a shared list writes
+only its personal columns, unless it is a task whose list says it moved out.
+
+**News.** A push to a shared space nudges every member's own channel,
+`sync:<account id>`, so a device keeps the one channel it already joins.
+
+### Endpoints
+
+| Request | What |
+| --- | --- |
+| `POST /v1/spaces` `{ "listId", "name" }` | Shares a list of the caller's own (idempotent). Answers the space. |
+| `GET /v1/spaces` | `{ "spaces": [...] }`, as a pull lists them. |
+| `POST /v1/spaces/<id>/invites` | Owner only. `{ "code", "spaceId", "expiresAt" }`: 128 random bits as 26 Crockford base32 characters, single use, seven days, at most 20 open per list (`429`). |
+| `GET /v1/invites/<code>` | What the invite is for: `{ "spaceId", "name", "ownerEmail", "expiresAt", "joined" }`. `404` unknown, `410` used or expired. |
+| `POST /v1/invites/<code>/accept` | Joins, renumbers the space's rows and nudges its members. Answers the space. |
+| `DELETE /v1/spaces/<id>/members/<account>` | A member leaves (their own id), or the owner removes one. The owner can't leave (`403`). |
+| `DELETE /v1/spaces/<id>` | Owner only: stops sharing. The space's rows go from the server; the owner's device that asked sends the list back to its own space. |
+| `GET /join/<code>` | A page that opens `takt://join/<code>`, or shows the code to type. |
+
+Deleting an account hands each list it owns to its longest-standing member,
+or deletes the list's space when it has none, and leaves every list it was
+in.
+
 ## Server storage (Postgres)
 
 In the `sync` schema of the Supabase project's database, which the Data API
@@ -580,13 +656,26 @@ Supabase user's id.
 CREATE TABLE devices (id UUID PRIMARY KEY, account_id UUID NOT NULL, name TEXT,
   platform TEXT, created_at TIMESTAMPTZ, last_seen_at TIMESTAMPTZ);
 CREATE SEQUENCE row_seq;
-CREATE TABLE rows (account_id UUID NOT NULL, table_name TEXT, row_id TEXT,
+CREATE TABLE rows (space_id UUID NOT NULL, account_id UUID NOT NULL,
+  table_name TEXT, row_id TEXT,
   data JSONB NOT NULL DEFAULT '{}', col_hlc JSONB NOT NULL DEFAULT '{}',
   deleted BOOLEAN NOT NULL DEFAULT false, deleted_hlc TEXT, seq BIGINT NOT NULL,
-  last_device_id UUID, PRIMARY KEY (account_id, table_name, row_id));
-CREATE INDEX rows_account_seq ON rows(account_id, seq);
+  last_device_id UUID, PRIMARY KEY (space_id, table_name, row_id));
+CREATE INDEX rows_space_seq ON rows(space_id, seq);
+CREATE TABLE spaces (id UUID PRIMARY KEY, owner_account_id UUID NOT NULL,
+  list_id TEXT NOT NULL, name TEXT, created_at TIMESTAMPTZ,
+  UNIQUE (owner_account_id, list_id));
+CREATE TABLE space_members (space_id UUID REFERENCES spaces ON DELETE CASCADE,
+  account_id UUID, role TEXT, email TEXT, joined_at TIMESTAMPTZ,
+  PRIMARY KEY (space_id, account_id));
+CREATE TABLE space_invites (code TEXT PRIMARY KEY, space_id UUID REFERENCES
+  spaces ON DELETE CASCADE, created_by UUID, created_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ, used_by UUID, used_at TIMESTAMPTZ);
 ```
 
-`seq` is one sequence across all accounts, so an account's cursor has gaps;
-it only has to rise. Pushes are serialised per account by an advisory lock,
-which keeps each account's `seq` order its commit order.
+An account's own space has the account's id and no `spaces` row; on a
+personal row `account_id` is the owner, on a shared one the last writer.
+`seq` is one sequence across all spaces, so a cursor has gaps; it only has
+to rise. Every push takes one advisory lock, which keeps `seq` order commit
+order across spaces, so one cursor reads a device's own space and its shared
+ones (see [Shared lists](#shared-lists)).
