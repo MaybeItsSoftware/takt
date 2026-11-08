@@ -12,17 +12,30 @@ import UIKit
 /// never hands back a Google token that can reach the Calendar API; this
 /// asks Google for `calendar.events` and `calendar.readonly` and keeps the
 /// refresh token in the keychain, on this device only.
+///
+/// Drive linking signs in the same way with its own scope and keychain item
+/// (`GoogleCalendarAuth.drive`), so connecting one never changes the other.
 @MainActor
 final class GoogleCalendarAuth {
-  static let scopes = [
+  static let calendarScopes = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/calendar.readonly",
   ]
 
+  /// Only the Drive files picked in Google's Picker (docs/links.md).
+  static let driveScopes = ["https://www.googleapis.com/auth/drive.file"]
+
+  /// Drive linking's sign-in.
+  static func drive() -> GoogleCalendarAuth {
+    GoogleCalendarAuth(scopes: driveScopes, keychainService: "uk.co.maybeitssoftware.takt.google-drive")
+  }
+
+  let scopes: [String]
+  private let keychainService: String
+
   private static let authorizeURL = URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!
   private static let tokenURL = URL(string: "https://oauth2.googleapis.com/token")!
   private static let revokeURL = URL(string: "https://oauth2.googleapis.com/revoke")!
-  private static let keychainService = "uk.co.maybeitssoftware.takt.google-calendar"
   private static let keychainAccount = "oauth-token"
 
   private struct Token: Codable {
@@ -34,8 +47,13 @@ final class GoogleCalendarAuth {
   private var token: Token?
   private var refreshing: Task<Token, Error>?
 
-  init() {
-    token = Self.load()
+  init(
+    scopes: [String] = GoogleCalendarAuth.calendarScopes,
+    keychainService: String = "uk.co.maybeitssoftware.takt.google-calendar"
+  ) {
+    self.scopes = scopes
+    self.keychainService = keychainService
+    token = load()
   }
 
   /// The client id, when this build has one.
@@ -55,6 +73,34 @@ final class GoogleCalendarAuth {
   }
 
   func connect() async throws {
+    _ = try await authorize()
+  }
+
+  /// Google's Picker for mobile apps (docs/links.md): a `drive.file`
+  /// consent that shows the person their Drive to choose from
+  /// (`trigger_onepick`) and comes back with the ids picked, as well as the
+  /// token. Only for the Drive sign-in, since Google lets `drive.file` be
+  /// asked for only alone there.
+  func pickDriveFiles() async throws -> [String] {
+    let items = try await authorize(extra: [
+      .init(name: "trigger_onepick", value: "true"),
+      .init(name: "allow_multiple", value: "true"),
+      .init(name: "allow_folder_selection", value: "true"),
+    ])
+    return Self.pickedIDs(items)
+  }
+
+  /// The comma-separated `picked_file_ids` the Picker's redirect carries.
+  nonisolated static func pickedIDs(_ items: [URLQueryItem]) -> [String] {
+    (items.first { $0.name == "picked_file_ids" }?.value ?? "")
+      .split(separator: ",")
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+  }
+
+  /// The sign-in sheet's round trip with `extra` parameters, the code
+  /// exchanged and the token kept. Answers the redirect's parameters.
+  private func authorize(extra: [URLQueryItem] = []) async throws -> [URLQueryItem] {
     guard let clientID = Self.clientID else { throw GoogleCalendarAuthError.notConfigured }
     let scheme = Self.redirectScheme(for: clientID)
     let redirectURI = "\(scheme):/oauth2redirect"
@@ -66,13 +112,13 @@ final class GoogleCalendarAuth {
       .init(name: "client_id", value: clientID),
       .init(name: "redirect_uri", value: redirectURI),
       .init(name: "response_type", value: "code"),
-      .init(name: "scope", value: Self.scopes.joined(separator: " ")),
+      .init(name: "scope", value: scopes.joined(separator: " ")),
       .init(name: "code_challenge", value: challenge),
       .init(name: "code_challenge_method", value: "S256"),
       .init(name: "state", value: state),
       .init(name: "access_type", value: "offline"),
       .init(name: "prompt", value: "consent"),
-    ]
+    ] + extra
     let callback = try await GoogleWebSignIn.run(components.url!, callbackScheme: scheme)
     let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
     guard items.first(where: { $0.name == "state" })?.value == state else {
@@ -88,10 +134,11 @@ final class GoogleCalendarAuth {
       "code": code, "client_id": clientID, "redirect_uri": redirectURI,
       "grant_type": "authorization_code", "code_verifier": verifier,
     ])
-    guard let refresh = answer.refreshToken else {
+    guard let refresh = answer.refreshToken ?? token?.refreshToken else {
       throw GoogleCalendarAuthError.failed("Google sent no refresh token.")
     }
     store(Token(accessToken: answer.accessToken, refreshToken: refresh, expiresAt: answer.expiry))
+    return items
   }
 
   /// A token good for at least a minute, refreshed when it is not.
@@ -135,7 +182,7 @@ final class GoogleCalendarAuth {
   /// Google refused the token at use: the grant is gone.
   func forget() {
     token = nil
-    SecItemDelete(Self.query() as CFDictionary)
+    SecItemDelete(query() as CFDictionary)
   }
 
   // MARK: - Token endpoint
@@ -173,7 +220,7 @@ final class GoogleCalendarAuth {
 
   // MARK: - Keychain
 
-  private static func query() -> [String: Any] {
+  private func query() -> [String: Any] {
     [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: keychainService,
@@ -184,14 +231,14 @@ final class GoogleCalendarAuth {
   private func store(_ token: Token) {
     self.token = token
     guard let data = try? JSONEncoder().encode(token) else { return }
-    SecItemDelete(Self.query() as CFDictionary)
-    var item = Self.query()
+    SecItemDelete(query() as CFDictionary)
+    var item = query()
     item[kSecValueData as String] = data
     item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
     SecItemAdd(item as CFDictionary, nil)
   }
 
-  private static func load() -> Token? {
+  private func load() -> Token? {
     var item = query()
     item[kSecReturnData as String] = true
     item[kSecMatchLimit as String] = kSecMatchLimitOne

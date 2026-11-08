@@ -469,6 +469,10 @@ struct TaskInspector: View {
           .focused($focused, equals: .links)
           .controlFrame()
           .accessibilityIdentifier("inspector.links")
+        DriveLinkButton(
+          taskID: inspector.taskID,
+          beforeWriting: { _ = inspector.save(model) },
+          afterWriting: { inspector.refresh(model) })
         ForEach(links(values), id: \.url) { link in
           if let url = URL(string: link.url) {
             Link(destination: url) {
