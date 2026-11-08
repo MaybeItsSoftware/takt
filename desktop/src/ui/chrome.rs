@@ -57,6 +57,74 @@ impl Takt {
                             .child(mode.title())
                     })),
             )
+            .child(self.account_button(t, cx))
+    }
+
+    /// The account at the top right, as Zed shows yours: the picture the
+    /// sign-in gave, else an initial, else a figure; a click opens its menu.
+    fn account_button(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
+        const SIZE: f32 = 22.;
+        let signed_in = self.app.sync.signed_in();
+        let picture = signed_in
+            .then(|| self.app.sync.avatar_url())
+            .flatten()
+            .and_then(|url| crate::sync::avatar_file(&url));
+        let initial = signed_in
+            .then(|| self.app.sync.status().email)
+            .flatten()
+            .and_then(|email| email.chars().next())
+            .map(|c| c.to_uppercase().to_string());
+        let face: AnyElement = match (picture, initial) {
+            (Some(path), _) => gpui::img(path)
+                .size(px(SIZE))
+                .rounded_full()
+                .into_any_element(),
+            (None, Some(letter)) => div()
+                .size(px(SIZE))
+                .rounded_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(t.accent)
+                .text_color(t.background)
+                .text_size(px(11.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(letter)
+                .into_any_element(),
+            (None, None) => div()
+                .size(px(SIZE))
+                .rounded_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .border_1()
+                .border_color(t.border)
+                .text_color(t.muted)
+                .child(super::icons::icon("user", 13.))
+                .into_any_element(),
+        };
+        div()
+            .id("account")
+            .ml_2()
+            .p(px(2.))
+            .rounded_full()
+            .hover(|d| d.bg(t.hover))
+            .tooltip(super::widgets::tip(
+                if signed_in { "Account" } else { "Sign in" },
+                t,
+            ))
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
+                    cx.stop_propagation();
+                    this.app.open_account_menu(
+                        f32::from(e.position.x) - 200.,
+                        f32::from(e.position.y) + 14.,
+                    );
+                    cx.notify();
+                }),
+            )
+            .child(face)
     }
 
     pub(super) fn left_dock(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {

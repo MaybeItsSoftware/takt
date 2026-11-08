@@ -25,6 +25,10 @@ pub struct Session {
     pub expires_at: i64,
     pub user_id: String,
     pub email: Option<String>,
+    /// The picture the identity provider gave (Google's, GitHub's), for the
+    /// title bar. Older saved sessions lack it until their next refresh.
+    #[serde(default)]
+    pub avatar_url: Option<String>,
 }
 
 impl Session {
@@ -205,6 +209,11 @@ fn session(value: &Value) -> Result<Session, AuthError> {
             .get("email")
             .and_then(Value::as_str)
             .map(str::to_string),
+        avatar_url: ["avatar_url", "picture"]
+            .iter()
+            .find_map(|key| user.get("user_metadata")?.get(*key)?.as_str())
+            .filter(|url| url.starts_with("https://"))
+            .map(str::to_string),
     })
 }
 
@@ -248,6 +257,24 @@ mod tests {
         assert_eq!(session.email.as_deref(), Some("e@x"));
         assert!(session.fresh(39));
         assert!(!session.fresh(41));
+        assert_eq!(session.avatar_url, None);
+    }
+
+    #[test]
+    fn a_google_sign_in_brings_its_picture() {
+        let value = json!({
+            "access_token": "a", "refresh_token": "r", "expires_at": 100,
+            "user": { "id": "u", "user_metadata": { "picture": "https://lh3.example/p.png" } }
+        });
+        let session = session(&value).unwrap();
+        assert_eq!(
+            session.avatar_url.as_deref(),
+            Some("https://lh3.example/p.png")
+        );
+        // A session saved before the field existed still loads.
+        let saved =
+            r#"{"access_token":"a","refresh_token":"r","expires_at":1,"user_id":"u","email":null}"#;
+        assert!(serde_json::from_str::<Session>(saved).is_ok());
     }
 
     #[test]

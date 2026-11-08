@@ -212,6 +212,13 @@ impl Sync {
         lock(&self.inner.status).clone()
     }
 
+    /// The signed-in account's picture, when its provider gave one.
+    pub fn avatar_url(&self) -> Option<String> {
+        lock(&self.inner.session)
+            .as_ref()
+            .and_then(|s| s.avatar_url.clone())
+    }
+
     pub fn signed_in(&self) -> bool {
         lock(&self.inner.credentials).is_some()
     }
@@ -820,6 +827,54 @@ impl Inner {
         }
         Ok(reply.body)
     }
+}
+
+/// The account picture at `url`, from the cache once it has been fetched.
+/// The first ask starts the download and says None; the frames after it
+/// find the file.
+pub fn avatar_file(url: &str) -> Option<std::path::PathBuf> {
+    use std::hash::{Hash, Hasher};
+    static ASKED: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    url.hash(&mut hasher);
+    let dir = dirs_cache().join("avatars");
+    let path = dir.join(format!("{:016x}.img", hasher.finish()));
+    if path.exists() {
+        return Some(path);
+    }
+    if !lock(&ASKED)
+        .get_or_insert_with(Default::default)
+        .insert(url.to_string())
+    {
+        return None;
+    }
+    let url = url.to_string();
+    std::thread::spawn(move || {
+        let Ok(response) = ureq::get(&url).timeout(Duration::from_secs(20)).call() else {
+            return;
+        };
+        let mut bytes = Vec::new();
+        use std::io::Read;
+        if response
+            .into_reader()
+            .take(2 << 20)
+            .read_to_end(&mut bytes)
+            .is_ok()
+            && !bytes.is_empty()
+            && std::fs::create_dir_all(&dir).is_ok()
+        {
+            let partial = path.with_extension("part");
+            if std::fs::write(&partial, &bytes).is_ok() {
+                let _ = std::fs::rename(partial, path);
+            }
+        }
+    });
+    None
+}
+
+fn dirs_cache() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    std::path::PathBuf::from(home).join("Library/Caches/uk.co.maybeitssoftware.takt")
 }
 
 #[cfg(test)]

@@ -238,6 +238,44 @@ impl App {
         });
     }
 
+    /// The account button at the top right: who is signed in, and what
+    /// can be done about it.
+    pub fn open_account_menu(&mut self, x: f32, y: f32) {
+        let item = |title: &str, action: &str, keys: &str, destructive| {
+            MenuEntry::Item(MenuItem {
+                title: title.into(),
+                action: action.into(),
+                keys: keys.into(),
+                destructive,
+            })
+        };
+        let mut entries = Vec::new();
+        if self.sync.signed_in() {
+            let who = self
+                .sync
+                .status()
+                .email
+                .unwrap_or_else(|| "Signed in".into());
+            entries.push(item(&who, "account:settings", "", false));
+            entries.push(MenuEntry::Divider);
+            entries.push(item("Sync now", "account:sync-now", "", false));
+        } else {
+            entries.push(item("Sign in to sync…", "account:settings", "", false));
+            entries.push(MenuEntry::Divider);
+        }
+        entries.push(item("Settings…", "account:settings", "⌘,", false));
+        if self.sync.signed_in() {
+            entries.push(MenuEntry::Divider);
+            entries.push(item("Sign out", "account:sign-out", "", true));
+        }
+        self.context_menu = Some(ContextMenu {
+            x,
+            y,
+            entries,
+            index: None,
+        });
+    }
+
     fn task_links(&self, task_id: &str) -> Vec<String> {
         self.store
             .core
@@ -249,6 +287,18 @@ impl App {
     /// Runs what was picked and closes the menu.
     pub fn pick_from_menu(&mut self, action: &str) {
         self.context_menu = None;
+        match action {
+            "account:settings" => return self.open_overlay(super::Overlay::Settings),
+            "account:sync-now" => {
+                self.sync.sync_now();
+                return;
+            }
+            "account:sign-out" => {
+                self.sync.sign_out();
+                return;
+            }
+            _ => {}
+        }
         if let Some(ix) = action.strip_prefix("open-link:") {
             let links = self
                 .selected_task
