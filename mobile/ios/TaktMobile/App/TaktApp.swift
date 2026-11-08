@@ -151,6 +151,9 @@ enum DeepLink {
       model.navigation.quickAddListID = nil
       model.navigation.quickAddParentTaskID = nil
       model.navigation.isQuickAddPresented = true
+    case "join":
+      // An invite to a shared list, from the server's join page.
+      model.navigation.joinInvite = JoinInvite(text: url.absoluteString)
     case "today": model.navigation.go(to: .today, isPad: isPad)
     case "focus":
       model.navigation.go(to: .focus, isPad: isPad)

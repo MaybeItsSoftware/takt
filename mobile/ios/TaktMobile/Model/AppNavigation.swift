@@ -153,6 +153,10 @@ final class AppNavigation {
   var namePrompt: NamePrompt?
   var pendingDeletion: PendingDeletion?
   var listSettingsID: String?
+  /// The list whose sharing sheet is up (`SharedListSheet`).
+  var sharingListID: String?
+  /// The join sheet, with the invite it was opened with (a followed link).
+  var joinInvite: JoinInvite?
   /// A command for the outline on screen, from the toolbar or a hardware key.
   var outlineCommand: OutlineCommand?
   /// A reveal waiting for the outline of its scope. See `RevealRequest`.

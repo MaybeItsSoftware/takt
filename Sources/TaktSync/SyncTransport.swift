@@ -287,6 +287,18 @@ public struct HTTPSyncTransport: SyncTransport {
     _ = try await send(post("v1/account/delete", body: Self.emptyObject))
   }
 
+  /// Any other request to the server: the shared-list routes, whose paths
+  /// and bodies the core makes.
+  public func request(_ method: String, _ path: String, body: Data?) async throws -> Data {
+    var request = URLRequest(url: serverURL.appending(path: path))
+    request.httpMethod = method
+    if let body {
+      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+      request.httpBody = body
+    }
+    return try await send(request)
+  }
+
   private static let emptyObject = Data("{}".utf8)
 
   private func post(_ path: String, body: Data) -> URLRequest {

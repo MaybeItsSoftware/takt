@@ -52,7 +52,7 @@ public final class SyncSession {
 
   /// This device's id on the server, made once and kept.
   @ObservationIgnored public let deviceId: String
-  @ObservationIgnored private let store: WorkspaceStore
+  @ObservationIgnored let store: WorkspaceStore
   @ObservationIgnored private let credentialStore: any SyncCredentialStore
   @ObservationIgnored private var auth: any SyncAuthenticating
   /// Makes the Supabase client for a project, when `use(_:)` changes it.
@@ -389,7 +389,7 @@ public final class SyncSession {
 
   /// Runs an account call with this device's session, noticing a refusal.
   @discardableResult
-  private func signedInCall<T>(_ call: (HTTPSyncTransport) async throws -> T) async throws -> T {
+  func signedInCall<T>(_ call: (HTTPSyncTransport) async throws -> T) async throws -> T {
     guard let credentials else { throw SyncError.notPaired }
     do {
       return try await call(transport(for: credentials))

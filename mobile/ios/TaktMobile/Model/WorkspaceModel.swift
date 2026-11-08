@@ -14,6 +14,8 @@ struct WorkspaceStructure: Sendable, Equatable {
   /// The workspace's own filter lists, in sidebar order. Today and
   /// Everything are not among them: the app draws those itself.
   var filterLists: [WorkspaceFilterList] = []
+  /// The lists shared with other Takt accounts (`SharedListSheet`).
+  var sharedListIDs: Set<String> = []
 
   static let empty = WorkspaceStructure()
 
@@ -27,7 +29,8 @@ struct WorkspaceStructure: Sendable, Equatable {
       lists: active,
       archivedLists: all.filter(\.isArchived),
       sidebar: try store.sidebarIndex(lists: active),
-      filterLists: ((try? store.filterLists(in: workspaceId)) ?? []).filter { !$0.isBuiltin })
+      filterLists: ((try? store.filterLists(in: workspaceId)) ?? []).filter { !$0.isBuiltin },
+      sharedListIDs: Set(store.sharedLists().map(\.listId)))
   }
 
   var inbox: TaskList? { lists.first { $0.systemRole == .inbox } }

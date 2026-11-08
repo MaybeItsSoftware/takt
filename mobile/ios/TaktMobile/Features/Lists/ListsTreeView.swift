@@ -67,6 +67,9 @@ struct ListsTreeToolbar: ToolbarContent {
           Label("Restore the last archived list", systemImage: "tray.and.arrow.up")
         }
         .disabled(model.structure.archivedLists.isEmpty)
+        Button { model.navigation.joinInvite = JoinInvite(text: "") } label: {
+          Label("Join a shared list…", systemImage: "person.badge.plus")
+        }
         #if DEBUG
         Divider()
         Button { model.seedTasks() } label: { Label("Seed 5,000 tasks", systemImage: "hammer") }
@@ -219,7 +222,8 @@ struct ListsTreeRows: View {
   private func listRow(_ list: TaskList, depth: Int) -> some View {
     let nested = structure.sidebar.nestedLists.filter { $0.task.listId == list.id && !($0.task.isPromoted ?? false) }
     scopeRow(
-      .list(list.id), title: list.name, symbol: list.systemRole == .inbox ? "tray" : "list.bullet",
+      .list(list.id), title: list.name,
+      symbol: list.systemRole == .inbox ? "tray" : structure.sharedListIDs.contains(list.id) ? "person.2" : "list.bullet",
       count: structure.sidebar.taskCounts[list.id], tint: ListColor.color(hex: list.colorHex),
       completed: list.completedAt != nil
     )
@@ -302,10 +306,17 @@ struct ListsTreeRows: View {
         Label(list.completedAt == nil ? "Complete list" : "Reopen list", systemImage: "checkmark.square")
       }
       Button { model.setArchived(true, list: list.id) } label: { Label("Archive", systemImage: "archivebox") }
-      Button { model.convertListToTask(list.id) } label: { Label("Convert to task", systemImage: "checkmark.square") }
-      Button(role: .destructive) {
-        model.navigation.pendingDeletion = PendingDeletion(id: list.id, isFolder: false, name: list.name)
-      } label: { Label("Delete…", systemImage: "trash") }
+      Button { model.navigation.sharingListID = list.id } label: {
+        Label(structure.sharedListIDs.contains(list.id) ? "Sharing…" : "Share…", systemImage: "person.2")
+      }
+      if structure.sharedListIDs.contains(list.id) {
+        // A member leaves and an owner stops sharing first, from the sheet.
+      } else {
+        Button { model.convertListToTask(list.id) } label: { Label("Convert to task", systemImage: "checkmark.square") }
+        Button(role: .destructive) {
+          model.navigation.pendingDeletion = PendingDeletion(id: list.id, isFolder: false, name: list.name)
+        } label: { Label("Delete…", systemImage: "trash") }
+      }
     } else {
       Button { model.navigation.listSettingsID = list.id } label: { Label("List settings…", systemImage: "paintpalette") }
     }
@@ -508,10 +519,26 @@ struct ListsPresenters: ViewModifier {
       .sheet(item: settingsBinding) { item in
         ListSettingsSheet(listID: item.id).environment(model)
       }
+      .sheet(item: sharingBinding) { item in
+        SharedListSheet(listID: item.id).environment(model)
+      }
+      .sheet(item: joinBinding) { invite in
+        JoinListSheet(initialText: invite.text).environment(model)
+      }
   }
 
   private var deletionBinding: Binding<Bool> {
     Binding(get: { model.navigation.pendingDeletion != nil }, set: { if !$0 { model.navigation.pendingDeletion = nil } })
+  }
+
+  private var sharingBinding: Binding<IdentifiedString?> {
+    Binding(
+      get: { model.navigation.sharingListID.map(IdentifiedString.init) },
+      set: { model.navigation.sharingListID = $0?.id })
+  }
+
+  private var joinBinding: Binding<JoinInvite?> {
+    Binding(get: { model.navigation.joinInvite }, set: { model.navigation.joinInvite = $0 })
   }
 
   private var settingsBinding: Binding<IdentifiedString?> {
