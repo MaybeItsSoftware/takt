@@ -21,8 +21,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// The files picked in Google's Picker, and no others.
-pub const DRIVE_SCOPE: &str = google::DRIVE_FILE_SCOPE;
 /// The most entries one vault contributes.
 const ENTRY_LIMIT: usize = 20_000;
 /// The most vault rows the picker shows for one query.
@@ -207,22 +205,8 @@ fn drive_candidates(body: &str) -> Result<Vec<Candidate>, String> {
         .collect())
 }
 
-/// A token for Drive, signing in first (and shedding the old restricted
-/// scope) when the sign-in doesn't allow it yet.
-fn drive_token(client_id: &str, scopes: &[&str]) -> Result<String, String> {
-    match google::access_token(client_id, &[DRIVE_SCOPE], "Google Drive") {
-        Ok(token) => Ok(token),
-        Err(google::GoogleError::SignIn(_)) => {
-            google::connect(client_id, scopes)?;
-            google::access_token(client_id, &[DRIVE_SCOPE], "Google Drive").map_err(|e| e.message())
-        }
-        Err(error) => Err(error.message()),
-    }
-}
-
 fn search_drive(client_id: &str, text: &str) -> Result<Vec<Candidate>, String> {
-    let token =
-        google::access_token(client_id, &[DRIVE_SCOPE], "Google Drive").map_err(|e| e.message())?;
+    let token = google::drive_access_token(client_id).map_err(|e| e.message())?;
     let reply = google::send("GET", &drive_url(text), &token, None).map_err(|e| e.message())?;
     if !reply.ok() {
         return Err(google::failure("Google Drive", &reply).message());
@@ -246,33 +230,12 @@ impl App {
     }
 
     pub fn drive_search_ready(&self) -> bool {
-        self.prefs.links_drive_search
-            && self.plugin_on(super::plugins::Plugin::GoogleDrive)
-            && google::token()
-                .is_some_and(|token| token.scopes.split(' ').any(|s| s == DRIVE_SCOPE))
+        self.drive_linking_on() && google::drive_token().is_some()
     }
 
     /// Drive linking is switched on in Settings → Links.
     pub fn drive_linking_on(&self) -> bool {
         self.prefs.links_drive_search && self.plugin_on(super::plugins::Plugin::GoogleDrive)
-    }
-
-    /// The Picker's API key: Settings', else `TAKT_GOOGLE_API_KEY`; empty
-    /// when neither is set, and then Drive linking isn't set up.
-    pub fn google_api_key(&self) -> String {
-        self.prefs
-            .google_api_key
-            .clone()
-            .filter(|k| !k.trim().is_empty())
-            .or_else(|| std::env::var("TAKT_GOOGLE_API_KEY").ok())
-            .map(|k| k.trim().to_string())
-            .unwrap_or_default()
-    }
-
-    pub fn set_google_api_key(&mut self, text: &str) {
-        let text = text.trim();
-        self.prefs.google_api_key = (!text.is_empty()).then(|| text.to_string());
-        self.prefs.save();
     }
 
     /// Once, when the sign-in still holds the restricted Drive scope from
@@ -323,39 +286,29 @@ impl App {
         *lock(&self.links.known) = None;
     }
 
-    /// Opens Google's Picker in the browser for `task_id`, signing in first
-    /// when the sign-in doesn't allow Drive yet; the files come back through
-    /// `take_drive_picks`.
+    /// Opens Google's Picker in the browser for `task_id`: a consent for
+    /// `drive.file` that lists the person's Drive and grants the files
+    /// chosen. They come back through `take_drive_picks`.
     pub fn pick_drive(&mut self, task_id: &str) {
-        let key = self.google_api_key();
         let client = self.google_client_id();
-        if key.is_empty() {
-            self.message = Some(
-                "Drive linking isn't set up: add the Google Picker API key in Settings → Links."
-                    .into(),
-            );
-            return;
-        }
         if client.trim().is_empty() {
-            self.message = Some("Set the Google OAuth client ID in Settings first.".into());
-            return;
-        }
-        let Some(app_id) = google::drive::project_number(&client) else {
             self.message = Some(
-                "The Google client ID should start with the project's number (…-….apps.googleusercontent.com)."
+                "Drive linking isn't set up: set the Google OAuth client ID in Settings → Google."
                     .into(),
             );
             return;
-        };
+        }
         let picked = self.links.picked.clone();
         let task_id = task_id.to_string();
         self.message = Some("Choose the files in the browser…".into());
         std::thread::spawn(move || {
-            let mut scopes: Vec<&str> = google::CALENDAR_SCOPES.to_vec();
-            scopes.extend(google::TASKS_SCOPES);
-            scopes.push(DRIVE_SCOPE);
-            let result = drive_token(&client, &scopes)
-                .and_then(|token| google::drive::pick(&token, &key, &app_id));
+            let result = google::pick_drive_files(&client).and_then(|ids| {
+                if ids.is_empty() {
+                    return Ok(Vec::new());
+                }
+                let token = google::drive_access_token(&client).map_err(|e| e.message())?;
+                google::drive::describe(&token, &ids).map_err(|e| e.message())
+            });
             match result {
                 Ok(files) if files.is_empty() => {
                     crate::sync::announce("Nothing linked from Drive.", false)
@@ -475,21 +428,10 @@ impl App {
             "Off".to_string()
         } else if self.google_client_id().is_empty() {
             "On · set a Google client ID".to_string()
-        } else if self.google_api_key().is_empty() {
-            "On · not set up: add the Picker API key".to_string()
         } else if google::holds_legacy_drive() {
             "On · connect Google again to drop the old Drive access".to_string()
-        } else if self.drive_search_ready() || !google::connected() {
+        } else {
             "On".to_string()
-        } else {
-            "On · Google asks when you first pick".to_string()
-        };
-        let key = if self.prefs.google_api_key.is_some() {
-            "Set".to_string()
-        } else if !self.google_api_key().is_empty() {
-            "From TAKT_GOOGLE_API_KEY".to_string()
-        } else {
-            "Not set".to_string()
         };
         vec![
             (
@@ -510,7 +452,6 @@ impl App {
                 "Link Google Drive files you pick",
                 drive,
             ),
-            ("links-drive-key", "Links", "Google Picker API key", key),
         ]
     }
 
@@ -528,14 +469,10 @@ impl App {
             "links-drive" => {
                 self.prefs.links_drive_search = !self.prefs.links_drive_search;
                 self.prefs.save();
-                if self.prefs.links_drive_search && self.google_api_key().is_empty() {
+                if self.prefs.links_drive_search && self.google_client_id().is_empty() {
                     self.message =
-                        Some("Add the Google Picker API key to finish setting up Drive.".into());
+                        Some("Set the Google OAuth client ID to finish setting up Drive.".into());
                 }
-            }
-            "links-drive-key" => {
-                self.ask(super::ask::Ask::GooglePickerKey);
-                return true;
             }
             _ => return false,
         }

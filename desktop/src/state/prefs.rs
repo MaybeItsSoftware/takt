@@ -73,8 +73,6 @@ pub struct Prefs {
     /// finds the files picked before by name. The name is from when it
     /// searched all of Drive.
     pub links_drive_search: bool,
-    /// The Google Picker's API key (a browser key), else `TAKT_GOOGLE_API_KEY`.
-    pub google_api_key: Option<String>,
     /// The sign-in's restricted Drive scope was pointed out once.
     pub links_drive_legacy_told: bool,
     /// The completion celebration (`celebration::Style`), once chosen or
@@ -146,7 +144,6 @@ impl Default for Prefs {
             adopted_swift: false,
             links_obsidian_vaults: Vec::new(),
             links_drive_search: false,
-            google_api_key: None,
             links_drive_legacy_told: false,
             celebration: None,
             celebration_sound: false,

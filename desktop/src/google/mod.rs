@@ -77,8 +77,19 @@ fn now_s() -> i64 {
     chrono::Utc::now().timestamp()
 }
 
+/// The keychain items: the sign-in Calendar and Tasks share, and Drive
+/// linking's own. Drive's Picker hands out a token for `drive.file` alone,
+/// which Google won't mix with other scopes, so it is kept apart.
+const ACCOUNT: &str = "google";
+const DRIVE_ACCOUNT: &str = "google-drive";
+
 pub fn token() -> Option<Token> {
-    keychain::load("google")
+    keychain::load(ACCOUNT)
+}
+
+/// Drive linking's token, from the last time files were picked.
+pub fn drive_token() -> Option<Token> {
+    keychain::load(DRIVE_ACCOUNT)
 }
 
 pub fn connected() -> bool {
@@ -86,7 +97,8 @@ pub fn connected() -> bool {
 }
 
 pub fn disconnect() {
-    keychain::clear("google");
+    keychain::clear(ACCOUNT);
+    keychain::clear(DRIVE_ACCOUNT);
 }
 
 /// The sign-in still holds the restricted Drive scope from before the
@@ -116,19 +128,38 @@ pub fn access_token(
     scopes: &[&str],
     service: &str,
 ) -> Result<String, GoogleError> {
+    access_token_in(ACCOUNT, client_id, scopes, service)
+}
+
+/// Drive linking's token good for now, refreshed first when spent.
+pub fn drive_access_token(client_id: &str) -> Result<String, GoogleError> {
+    access_token_in(
+        DRIVE_ACCOUNT,
+        client_id,
+        &[DRIVE_FILE_SCOPE],
+        "Google Drive",
+    )
+}
+
+fn access_token_in(
+    account: &str,
+    client_id: &str,
+    scopes: &[&str],
+    service: &str,
+) -> Result<String, GoogleError> {
     if client_id.trim().is_empty() {
         return Err(GoogleError::SignIn(
             "Set the Google OAuth client ID in Settings first.".into(),
         ));
     }
     let _guard = REFRESHING.lock().unwrap_or_else(|p| p.into_inner());
-    let Some(token) = token() else {
+    let Some(token) = keychain::load::<Token>(account) else {
         return Err(GoogleError::SignIn(format!(
             "Connect {service} in Settings."
         )));
     };
     if token.client_id != client_id.trim() {
-        disconnect();
+        keychain::clear(account);
         return Err(GoogleError::SignIn(format!(
             "Connect {service} again: the client ID changed."
         )));
@@ -152,7 +183,7 @@ pub fn access_token(
     )
     .map_err(GoogleError::Other)?;
     if matches!(reply.status, 400 | 401 | 403) {
-        disconnect();
+        keychain::clear(account);
         return Err(GoogleError::SignIn(format!(
             "Google refused the sign-in. Connect {service} again."
         )));
@@ -178,7 +209,7 @@ pub fn access_token(
             .unwrap_or(token.scopes),
         client_id: token.client_id,
     };
-    let _ = keychain::save("google", &refreshed);
+    let _ = keychain::save(account, &refreshed);
     Ok(refreshed.access_token)
 }
 
@@ -190,14 +221,9 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
     if client_id.is_empty() {
         return Err("Set the Google OAuth client ID first.".into());
     }
-    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
-    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let redirect = format!("http://127.0.0.1:{port}{CALLBACK_PATH}");
-    let (verifier, challenge) = crate::sync::auth::pkce();
-    let state = uuid::Uuid::new_v4().simple().to_string();
     let mut wanted: BTreeSet<String> = scopes
         .iter()
-        .filter(|s| **s != LEGACY_DRIVE_SCOPE)
+        .filter(|s| **s != LEGACY_DRIVE_SCOPE && **s != DRIVE_FILE_SCOPE)
         .map(|s| s.to_string())
         .collect();
     // A grant with the restricted Drive scope can't be narrowed: Google
@@ -206,7 +232,8 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
     if let Some(old) = token().filter(|t| t.has(&[LEGACY_DRIVE_SCOPE])) {
         revoke(&old);
     }
-    if let Some(token) = token().filter(|t| t.client_id == client_id) {
+    let previous = token().filter(|t| t.client_id == client_id);
+    if let Some(token) = &previous {
         wanted.extend(
             token
                 .scopes
@@ -216,11 +243,75 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
         );
     }
     let scope = wanted.into_iter().collect::<Vec<_>>().join(" ");
+    let (mut token, _) = authorize(
+        client_id,
+        &scope,
+        "&include_granted_scopes=true",
+        "Signed in. You can close this tab and go back to Takt.",
+    )?;
+    if token.refresh_token.is_empty() {
+        token.refresh_token = previous
+            .map(|t| t.refresh_token)
+            .ok_or("Google gave no refresh token.")?;
+    }
+    keychain::save(ACCOUNT, &token)
+}
+
+/// Google's Picker for desktop apps: a consent for `drive.file` that shows
+/// the person their Drive to choose from (`trigger_onepick`), and comes
+/// back with the ids picked. Keeps the token for Drive linking, and
+/// answers the ids, none when nothing was picked. Blocks, so it runs on a
+/// thread.
+pub fn pick_drive_files(client_id: &str) -> Result<Vec<String>, String> {
+    let client_id = client_id.trim();
+    if client_id.is_empty() {
+        return Err("Set the Google OAuth client ID first.".into());
+    }
+    let (token, callback) = authorize(
+        client_id,
+        DRIVE_FILE_SCOPE,
+        "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true",
+        "Linked in Takt. You can close this tab.",
+    )?;
+    if !token.refresh_token.is_empty() || drive_token().is_none() {
+        keychain::save(DRIVE_ACCOUNT, &token)?;
+    }
+    Ok(picked_ids(&callback))
+}
+
+/// The comma-separated `picked_file_ids` the Picker's redirect carries.
+fn picked_ids(callback: &str) -> Vec<String> {
+    http::parameter(callback, "picked_file_ids")
+        .map(|ids| {
+            ids.split(',')
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The browser's round trip: Google's consent for `scope` with `extra`
+/// parameters, back to a listener on the loopback, and the code exchanged.
+/// Answers the token (its refresh token empty when Google sent none) and
+/// the address the browser came back to.
+fn authorize(
+    client_id: &str,
+    scope: &str,
+    extra: &str,
+    done: &str,
+) -> Result<(Token, String), String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    let redirect = format!("http://127.0.0.1:{port}{CALLBACK_PATH}");
+    let (verifier, challenge) = crate::sync::auth::pkce();
+    let state = uuid::Uuid::new_v4().simple().to_string();
     let url = format!(
-        "{AUTHORIZE}?client_id={}&redirect_uri={}&response_type=code&scope={}&code_challenge={challenge}&code_challenge_method=S256&state={state}&access_type=offline&prompt=consent&include_granted_scopes=true",
+        "{AUTHORIZE}?client_id={}&redirect_uri={}&response_type=code&scope={}&code_challenge={challenge}&code_challenge_method=S256&state={state}&access_type=offline&prompt=consent{extra}",
         http::escape(client_id),
         http::escape(&redirect),
-        http::escape(&scope),
+        http::escape(scope),
     );
     std::process::Command::new("/usr/bin/open")
         .arg(&url)
@@ -250,7 +341,9 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
             let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
             continue;
         }
-        let page = "<html><body style=\"font-family:-apple-system;padding:40px\">Signed in. You can close this tab and go back to Takt.</body></html>";
+        let page = format!(
+            "<html><body style=\"font-family:-apple-system;padding:40px\">{done}</body></html>"
+        );
         let _ = write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
@@ -285,19 +378,20 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
             .unwrap_or("it refused");
         return Err(format!("Google refused the sign-in: {said}."));
     }
-    let previous = token().filter(|t| t.client_id == client_id);
     let token = Token {
         access_token: value["access_token"].as_str().unwrap_or_default().into(),
         refresh_token: value["refresh_token"]
             .as_str()
-            .map(str::to_string)
-            .or(previous.map(|t| t.refresh_token))
-            .ok_or("Google gave no refresh token.")?,
+            .unwrap_or_default()
+            .to_string(),
         expires_at: now_s() + value["expires_in"].as_i64().unwrap_or(3600),
-        scopes: value["scope"].as_str().map(str::to_string).unwrap_or(scope),
+        scopes: value["scope"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| scope.to_string()),
         client_id: client_id.into(),
     };
-    keychain::save("google", &token)
+    Ok((token, full))
 }
 
 /// A Google API request with a bearer token: status and body.
@@ -347,5 +441,12 @@ mod tests {
         };
         assert!(token.has(&CALENDAR_SCOPES));
         assert!(!token.has(&TASKS_SCOPES));
+    }
+
+    #[test]
+    fn the_pickers_redirect_names_the_files() {
+        let back = "http://127.0.0.1/google-oauth-callback?code=c&state=s&picked_file_ids=1a%2C2b,3c&scope=x";
+        assert_eq!(picked_ids(back), vec!["1a", "2b", "3c"]);
+        assert!(picked_ids("http://127.0.0.1/google-oauth-callback?code=c").is_empty());
     }
 }

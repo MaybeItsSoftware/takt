@@ -229,11 +229,10 @@ impl App {
             "google-client" => self.ask(super::ask::Ask::GoogleClientId),
             "google-connect" => {
                 let client = self.google_client_id();
+                // Drive linking signs in on its own, in the Picker, since
+                // Google lets `drive.file` be asked for only alone there.
                 let mut scopes: Vec<&str> = CALENDAR_SCOPES.to_vec();
                 scopes.extend(TASKS_SCOPES);
-                if self.prefs.links_drive_search && self.plugin_on(Plugin::GoogleDrive) {
-                    scopes.push(super::links::DRIVE_SCOPE);
-                }
                 self.message = Some("Finish connecting Google in the browser…".into());
                 std::thread::spawn(move || {
                     let said = match google::connect(&client, &scopes) {

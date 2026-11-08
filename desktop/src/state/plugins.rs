@@ -70,7 +70,7 @@ impl Plugin {
                 "Timed tasks mirrored to a calendar, and its events brought back as tasks."
             }
             Plugin::GoogleTasks => "Each list mirrored as a Google Tasks list.",
-            Plugin::GoogleDrive => "Find Drive files by name when you link a task.",
+            Plugin::GoogleDrive => "Link Drive files you choose in Google's file picker.",
             Plugin::Checkvist => "Import your Checkvist lists into the workspace.",
             Plugin::Obsidian => "Notes and folders in your Obsidian vaults, offered as links.",
             Plugin::Mcp => "Add Takt's MCP server to the assistants on this Mac.",

@@ -29,8 +29,6 @@ pub enum Ask {
     Agent,
     /// The Google OAuth client the integrations sign in through.
     GoogleClientId,
-    /// The browser key Google's Drive Picker loads with.
-    GooglePickerKey,
     /// A folder to search as an Obsidian vault in the link picker.
     ObsidianVault,
     /// The morning or evening reminder's time.
@@ -56,7 +54,6 @@ impl Ask {
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
             Ask::Agent => "Ask the agent",
             Ask::GoogleClientId => "Google OAuth client ID",
-            Ask::GooglePickerKey => "Google Picker API key",
             Ask::ObsidianVault => "Add an Obsidian vault",
             Ask::ReminderTime { dailies: false } => "Morning reminder at",
             Ask::ReminderTime { dailies: true } => "Evening reminder at",
@@ -73,7 +70,6 @@ impl Ask {
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
             Ask::Agent => "Make it due Friday, split it up, explain it…",
             Ask::GoogleClientId => "….apps.googleusercontent.com",
-            Ask::GooglePickerKey => "AIza… (empty to use TAKT_GOOGLE_API_KEY)",
             Ask::ObsidianVault => "~/Documents/Notes",
             Ask::ReminderTime { .. } => "09:00",
             Ask::JoinList => "The invite link or code",
@@ -91,9 +87,6 @@ impl Ask {
                 "A self-hosted server must trust the same Supabase project.".into()
             }
             Ask::CheckvistKey { email } => format!("For {email}. Kept in the keychain."),
-            Ask::GooglePickerKey => {
-                "A browser key from the same Google Cloud project as the client ID, restricted to the Google Picker API.".into()
-            }
             Ask::JoinList => {
                 "Someone who shares a list with you sends an invite. Its tasks are everyone's to edit; where it sits in your sidebar and your board columns stay yours.".into()
             }
@@ -131,7 +124,6 @@ impl App {
             }
             Ask::SyncServer => self.sync.status().server,
             Ask::GoogleClientId => self.google_client_id(),
-            Ask::GooglePickerKey => self.prefs.google_api_key.clone().unwrap_or_default(),
             Ask::JoinList => clipboard_invite().unwrap_or_default(),
             Ask::ReminderTime { dailies } => super::reminders::clock(if *dailies {
                 self.prefs.remind_dailies_left_minute
@@ -196,10 +188,6 @@ impl App {
             }
             Ask::GoogleClientId => {
                 self.set_google_client_id(text);
-                self.open_overlay(Overlay::Settings);
-            }
-            Ask::GooglePickerKey => {
-                self.set_google_api_key(text);
                 self.open_overlay(Overlay::Settings);
             }
             Ask::ObsidianVault => {
