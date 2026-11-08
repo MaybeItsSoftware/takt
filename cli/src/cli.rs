@@ -318,6 +318,8 @@ pub enum WsCommand {
         #[arg(long)]
         archived: bool,
     },
+    /// The lists shared with other people, and who is in each.
+    Shared,
     /// One list's tasks as a tree.
     Tasks {
         list_id: String,
@@ -1055,6 +1057,7 @@ fn resolve_workspace(
             arguments.insert("include_archived".into(), json!(archived));
             "workspace_tree"
         }
+        WsCommand::Shared => "workspace_shared_lists",
         WsCommand::Tasks {
             list_id,
             parent,
@@ -1467,6 +1470,7 @@ pub fn render(tool: &str, outcome: &ToolOutcome, as_json: bool) {
         | "workspace_task_blocker_add"
         | "workspace_task_blocker_remove" => render_workspace_dependencies(payload),
         "workspace_conditions" => render_conditions(payload),
+        "workspace_shared_lists" => render_shared_lists(payload),
         "workspace_condition_provides_set" => {
             let names: Vec<String> = payload["provides"]
                 .as_array()
@@ -1941,6 +1945,11 @@ fn render_workspace_list(list: &Value, depth: usize) {
         (list["system_role"] == json!("inbox"), " (inbox)"),
         (list["is_archived"] == json!(true), " (archived)"),
         (!list["completed_at"].is_null(), " (completed)"),
+        (list["shared"]["role"] == json!("owner"), " (shared)"),
+        (
+            list["shared"]["role"] == json!("member"),
+            " (shared with you)",
+        ),
     ]
     .iter()
     .filter(|(on, _)| *on)
@@ -1953,6 +1962,43 @@ fn render_workspace_list(list: &Value, depth: usize) {
         list["open_task_count"],
         text_of(&list["id"])
     );
+}
+
+/// Each shared list, then who is in it.
+fn render_shared_lists(payload: &Value) {
+    let lists = payload["shared_lists"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    if lists.is_empty() {
+        return println!("  No shared lists. Share one from the app.");
+    }
+    for list in &lists {
+        let role = if list["role"] == json!("owner") {
+            "yours"
+        } else {
+            "shared with you"
+        };
+        println!(
+            "  {} ({role})  {}",
+            text_of(&list["name"]),
+            text_of(&list["list_id"])
+        );
+        for member in list["members"].as_array().into_iter().flatten() {
+            let who = member["email"].as_str().unwrap_or("someone");
+            let you = if member["you"] == json!(true) {
+                " (you)"
+            } else {
+                ""
+            };
+            let owner = if member["role"] == json!("owner") {
+                ", owner"
+            } else {
+                ""
+            };
+            println!("    {who}{you}{owner}");
+        }
+    }
 }
 
 fn render_workspace_tasks(payload: &Value) {

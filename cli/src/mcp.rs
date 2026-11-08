@@ -712,6 +712,11 @@ fn workspace_tool_definitions() -> Vec<Value> {
             },
         }),
         json!({
+            "name": "workspace_shared_lists",
+            "description": "The local lists shared with other Takt accounts: each list's id and name, your role (owner or member) and its members' emails. A shared list's tasks are everyone's to edit; its sidebar place, board columns, matrix placement, conditions and agent context stay each person's own. Sharing, inviting and leaving happen in the app, not here. workspace_tree marks the same lists with shared.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        }),
+        json!({
             "name": "workspace_tasks",
             "description": "One local list's tasks as a tree: ids, titles, notes, status, kind (task or nested list), kanban column and external links, with blocked: true on a task waiting on an open task (workspace_task_dependencies says which). Open tasks only unless include_closed.",
             "inputSchema": {

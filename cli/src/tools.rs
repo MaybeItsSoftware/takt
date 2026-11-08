@@ -371,6 +371,8 @@ impl Tools {
                 ))
             }
 
+            "workspace_shared_lists" => Ok(outcome("Shared lists", self.workspace.shared_lists()?)),
+
             "workspace_tasks" => {
                 let list_id = required_string(arguments, "list_id")?;
                 let parent = as_id(arguments.get("parent_task_id"));

@@ -451,6 +451,15 @@ impl Workspace {
                 Ok(list)
             },
         )?;
+        let shared = shared_lists(&connection)?;
+        let mut lists = lists;
+        for list in &mut lists {
+            let id = list["id"].as_str().unwrap_or_default().to_owned();
+            list["shared"] = shared
+                .iter()
+                .find(|shared| shared.list_id == id)
+                .map_or(Value::Null, shared_summary);
+        }
 
         // A nested list is a task with `itemKind = 'list'`, other than a
         // list's own visible root, which the sidebar shows as the list itself.
@@ -489,6 +498,23 @@ impl Workspace {
             "lists": lists,
             "nested_lists": nested,
         }))
+    }
+
+    /// The lists shared with this account or by it, with their members:
+    /// what the app last heard from the sync server. The CLI never talks to
+    /// the server itself, so it can't share, invite or leave; the apps do.
+    pub fn shared_lists(&self) -> Result<Value> {
+        let connection = self.open()?;
+        let lists: Vec<Value> = shared_lists(&connection)?
+            .iter()
+            .map(|shared| {
+                let mut summary = shared_summary(shared);
+                summary["list_id"] = json!(shared.list_id);
+                summary["name"] = json!(shared.name);
+                summary
+            })
+            .collect();
+        Ok(json!({ "shared_lists": lists }))
     }
 
     /// One list's tasks as a tree, children nested under their parents.
@@ -1587,4 +1613,32 @@ fn map_write_error(error: rusqlite::Error) -> ToolError {
         ));
     }
     ToolError::new(format!("Workspace write failed: {error}"))
+}
+
+/// The shared lists this database knows of; none in one from before v37.
+fn shared_lists(connection: &Connection) -> Result<Vec<takt_core::sync::spaces::SharedList>> {
+    let has_table: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_spaces')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| ToolError::new(error.to_string()))?;
+    if !has_table {
+        return Ok(Vec::new());
+    }
+    takt_core::sync::spaces::shared_lists(connection)
+        .map_err(|error| ToolError::new(error.to_string()))
+}
+
+/// A shared list's part of a list: your role in it and who else is in it.
+fn shared_summary(shared: &takt_core::sync::spaces::SharedList) -> Value {
+    json!({
+        "role": shared.role,
+        "members": shared.members.iter().map(|member| json!({
+            "email": member.email,
+            "role": member.role,
+            "you": member.you,
+        })).collect::<Vec<_>>(),
+    })
 }

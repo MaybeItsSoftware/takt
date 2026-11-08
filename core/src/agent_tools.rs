@@ -25,6 +25,7 @@ pub const READ_ONLY_TOOLS: &[&str] = &[
     "focus_status",
     "focus_history",
     "workspace_tree",
+    "workspace_shared_lists",
     "workspace_tasks",
     "workspace_task_dependencies",
     "workspace_filter_lists",
