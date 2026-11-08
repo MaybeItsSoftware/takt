@@ -331,6 +331,13 @@ the last pull listed them: space, list, role, members), `sync_row_spaces`
 `sync_push_plan` (where a push in flight is sending its rows, recorded once
 the server has them). See [Shared lists](#shared-lists).
 
+`v38_task_authorship` adds `tasks.createdBy`, `tasks.completedBy` and
+`task_metadata.assigneeAccountId`: account ids from a shared list's members,
+NULL for nobody and for every task in a list of your own. All three are
+shared columns, so they travel in the list's space. It reinstalls every
+journal and outbox trigger. A client older than v38 drops them on pull: it
+shows no authorship and offers a task assigned to someone else as anyone's.
+
 The following are not synced: the undo journal (`undo_control`, `change_log`), the FTS index
 (rebuilt by its own triggers as synced rows land), `grdb_migrations`, and the
 sync tables themselves. Day-log files stay per device. Theme *files* do

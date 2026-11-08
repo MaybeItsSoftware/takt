@@ -26,9 +26,13 @@ records why, and where the build differs from the plan (next section).
 - **A removed member's changes are skipped, not refused.** A device just
   taken out of a list can't know until its next pull; refusing its batch
   would leave its outbox stuck for ever.
-- **Not built:** `createdBy` and `completedBy` ("completed by Sam"), and
-  assignment (step 7). Both need a synced column on `tasks`, so they wait
-  for a step of their own.
+- **Who did what, and assignment** came a step later, as v38
+  (`v38_task_authorship`): `tasks.createdBy`, `tasks.completedBy` and
+  `task_metadata.assigneeAccountId`, all shared. The core stamps the first
+  two where it creates and closes tasks in a shared list, from the account
+  id the list's members name `you`; reopening clears `completedBy`. A task
+  assigned to someone else is left out of Today, next up and the focus
+  ladder (`core/src/assignment.rs`); unassigned, it is anyone's.
 - **Emails, not display names.** Members are shown by the email they sign in
   with.
 
