@@ -11,6 +11,9 @@ let pluginTargetExcludes = [
   "cli",
   // The Rust core; its Swift face is the TaktRustCore target.
   "core",
+  // The Rust desktop app: no Swift, and its build tree holds GPUI's shader
+  // sources, which would otherwise count as this target's resources.
+  "desktop",
   "README.md",
   "build",
   "corelogic-tests",
