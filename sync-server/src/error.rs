@@ -16,6 +16,17 @@ pub enum AppError {
     BadRequest(String),
     #[error("missing, expired or unknown access token")]
     Unauthorized,
+    /// Signed in, but not allowed: not a member of the shared list, or not
+    /// its owner.
+    #[error("{0}")]
+    Forbidden(String),
+    #[error("{0}")]
+    NotFound(String),
+    /// An invite that was good once: used or expired.
+    #[error("{0}")]
+    Gone(String),
+    #[error("{0}")]
+    TooMany(String),
     #[error("{0}")]
     Unavailable(String),
     #[error("internal error: {0}")]
@@ -31,6 +42,10 @@ impl IntoResponse for AppError {
         let status = match &self {
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
+            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
+            AppError::NotFound(_) => StatusCode::NOT_FOUND,
+            AppError::Gone(_) => StatusCode::GONE,
+            AppError::TooMany(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,

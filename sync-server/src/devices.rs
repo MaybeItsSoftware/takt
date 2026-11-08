@@ -137,8 +137,9 @@ pub async fn sign_out(
     Ok(Json(json!({ "ok": true })))
 }
 
-/// `POST /v1/account/delete`: deletes every row the account synced, its
-/// devices, and then the Supabase user, so the email is free and no token
+/// `POST /v1/account/delete`: deletes every row in the account's own space,
+/// its devices, and then the Supabase user, after handing each list it
+/// shares to the member longest in it, so the email is free and no token
 /// can be refreshed. Each device keeps its own local copy.
 pub async fn delete_account(
     State(state): State<AppState>,
@@ -150,7 +151,9 @@ pub async fn delete_account(
         ));
     };
     let mut tx = state.pool.begin().await?;
-    sqlx::query("DELETE FROM rows WHERE account_id = $1")
+    // Its shared lists pass to someone still in them, before its own rows go.
+    crate::spaces::leave_all(&mut tx, state.realtime, caller.account).await?;
+    sqlx::query("DELETE FROM rows WHERE space_id = $1")
         .bind(caller.account)
         .execute(&mut *tx)
         .await?;

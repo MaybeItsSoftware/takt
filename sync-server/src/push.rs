@@ -4,18 +4,17 @@ use crate::AppState;
 use crate::auth::{Caller, DEVICE_HEADER};
 use crate::error::{AppError, Result};
 use crate::merge::{self, Change, Op, Outcome, StoredRow};
-use crate::notify::CHANNEL;
-use crate::realtime;
+use crate::{realtime, spaces};
 use axum::extract::State;
 use axum::{Extension, Json};
 use serde_json::{Map, Value};
 use sqlx::types::Json as Jsonb;
 use sqlx::{Postgres, Transaction};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use takt_sync_rules::wire::{PushRequest, PushResponse, WireChange, WireOp};
 use uuid::Uuid;
 
-/// Serialises every push against every other.
+/// Serialises every push against every other, across every account.
 ///
 /// Row locks alone would keep two pushes from corrupting one row, but not the
 /// feed. Both would draw `seq`s from the one sequence and could commit out of
@@ -24,13 +23,20 @@ use uuid::Uuid;
 /// the first `nextval` until commit makes `seq` order commit order, which is
 /// the property the cursor depends on.
 ///
-/// The lock is per account, because a device only reads its own account's
-/// rows: an account's pushes are in commit order among themselves, which is
-/// all its readers can see, while different accounts push side by side. One
-/// person's handful of devices never pushes hard enough for the serialisation
-/// to cost anything.
-const PUSH_LOCK_SQL: &str =
-    "SELECT pg_advisory_xact_lock(hashtextextended('push:' || $1::text, 0))";
+/// It used to be per account, when a device read only its own account's
+/// rows. A device now reads its own space and every shared list it is in,
+/// with one cursor, so the order has to hold across all of them; and since
+/// lists link accounts to each other, only one lock for everything does
+/// that. A push is a few milliseconds of row writes, so at this server's
+/// size the serialisation costs nothing measurable.
+const PUSH_LOCK_SQL: &str = "SELECT pg_advisory_xact_lock(hashtextextended('push', 0))";
+
+/// Takes the push lock for the rest of `tx`. Anything that gives rows new
+/// `seq`s — a push, joining a list — holds it.
+pub async fn lock(tx: &mut Transaction<'_, Postgres>) -> Result<()> {
+    sqlx::query(PUSH_LOCK_SQL).execute(&mut **tx).await?;
+    Ok(())
+}
 
 /// Longest table name or row id accepted. Generous for uuids and SQLite table
 /// names; only there to stop a broken client storing megabyte keys.
@@ -38,8 +44,15 @@ const MAX_KEY_LEN: usize = 256;
 
 /// Checks a change before anything is written, so a batch is applied whole
 /// or refused whole: the client keeps its outbox and the bug shows.
-fn validate(change: WireChange) -> Result<Change> {
+fn validate(change: WireChange) -> Result<(Option<Uuid>, Change)> {
     let where_ = || format!("{} {}", change.table, change.id);
+    let space = match change.space.as_deref() {
+        None => None,
+        Some(text) => Some(
+            Uuid::parse_str(text)
+                .map_err(|_| AppError::BadRequest(format!("bad space {text:?} on {}", where_())))?,
+        ),
+    };
     if change.table.is_empty() || change.table.len() > MAX_KEY_LEN {
         return Err(AppError::BadRequest(format!(
             "bad table name {:?}",
@@ -76,12 +89,52 @@ fn validate(change: WireChange) -> Result<Change> {
             Op::Upsert(values)
         }
     };
-    Ok(Change {
-        table: change.table,
-        id: change.id,
-        op,
-        hlc: change.hlc,
-    })
+    Ok((
+        space,
+        Change {
+            table: change.table,
+            id: change.id,
+            op,
+            hlc: change.hlc,
+        },
+    ))
+}
+
+/// Whether the caller may write `change` into the shared space they named:
+/// they are in it, the row is one a shared list holds, and deleting the list
+/// itself is the owner's. A list's rows can't be smuggled into another
+/// list's space: the list row and its instructions must be that list's.
+fn check_shared(membership: Option<&spaces::Membership>, change: &Change) -> Result<()> {
+    let Some(membership) = membership else {
+        return Err(AppError::Forbidden(
+            "you aren't in that shared list any more".into(),
+        ));
+    };
+    if !spaces::SHARED_TABLES.contains(&change.table.as_str()) {
+        return Err(AppError::BadRequest(format!(
+            "{} rows aren't shared",
+            change.table
+        )));
+    }
+    match change.table.as_str() {
+        "task_lists" if change.id != membership.list_id => {
+            return Err(AppError::BadRequest(
+                "a shared list holds only its own list row".into(),
+            ));
+        }
+        "task_lists" if matches!(change.op, Op::Delete) && membership.role != "owner" => {
+            return Err(AppError::Forbidden(
+                "only the list's owner can delete it; leave it instead".into(),
+            ));
+        }
+        "agent_instructions" if change.id != format!("list:{}", membership.list_id) => {
+            return Err(AppError::BadRequest(
+                "a shared list holds only its own instructions".into(),
+            ));
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 pub async fn push(
@@ -101,50 +154,46 @@ pub async fn push(
         .collect::<Result<Vec<_>>>()?;
 
     let mut tx = state.pool.begin().await?;
-    sqlx::query(PUSH_LOCK_SQL)
-        .bind(account)
-        .execute(&mut *tx)
-        .await?;
+    lock(&mut tx).await?;
+    let memberships = spaces::memberships(&mut *tx, account).await?;
+    // Checked before anything is written, so a batch is applied whole or
+    // refused whole.
+    let changes = changes
+        .into_iter()
+        .map(|(space, change)| {
+            let space = match space {
+                Some(space) if space != account => {
+                    check_shared(memberships.get(&space), &change)?;
+                    space
+                }
+                _ => account,
+            };
+            Ok((space, change))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
-    let mut written = 0usize;
-    for change in &changes {
-        let stored = load(&mut tx, account, &change.table, &change.id).await?;
+    let mut written = BTreeSet::new();
+    for (space, change) in &changes {
+        let stored = load(&mut tx, *space, &change.table, &change.id).await?;
         if let Outcome::Changed(row) = merge::merge(stored.as_ref(), change, device) {
-            store(&mut tx, account, &change.table, &change.id, &row).await?;
-            written += 1;
+            store(&mut tx, *space, account, &change.table, &change.id, &row).await?;
+            written.insert(*space);
         }
     }
 
-    if written > 0 {
-        // Postgres holds a NOTIFY until the transaction commits, and drops it
-        // if it rolls back, so a long-poll is never woken for rows it cannot
-        // yet read.
-        sqlx::query("SELECT pg_notify($1, '')")
-            .bind(CHANNEL)
-            .execute(&mut *tx)
-            .await?;
-    }
+    let readable = spaces::readable(&mut *tx, account).await?;
     let cursor = sqlx::query_scalar::<_, i64>(
-        "SELECT COALESCE(MAX(seq), 0) FROM rows WHERE account_id = $1",
+        "SELECT COALESCE(MAX(seq), 0) FROM rows WHERE space_id = ANY($1)",
     )
-    .bind(account)
+    .bind(&readable)
     .fetch_one(&mut *tx)
     .await?;
-    if written > 0 && state.realtime {
-        // Rides the transaction, like the NOTIFY: Realtime reads it from the
-        // log once the push commits, and never if it rolls back.
-        // `realtime.send` catches its own errors, so a Realtime outage costs
-        // the nudge, not the push.
-        sqlx::query("SELECT realtime.send(jsonb_build_object('cursor', $1::bigint), $2, $3, true)")
-            .bind(cursor)
-            .bind(realtime::EVENT)
-            .bind(realtime::topic(account))
-            .execute(&mut *tx)
-            .await?;
-    }
+    let audience = spaces::audience(&mut tx, &written).await?;
+    realtime::nudge(&mut tx, state.realtime, &audience).await?;
     tx.commit().await?;
 
-    tracing::info!(%device, %account, received = changes.len(), written, cursor, "push");
+    let written = written.len();
+    tracing::info!(%device, %account, received = changes.len(), spaces = written, cursor, "push");
     Ok(Json(PushResponse {
         accepted: changes.len(),
         cursor,
@@ -161,15 +210,15 @@ type RowTuple = (
 
 async fn load(
     tx: &mut Transaction<'_, Postgres>,
-    account: Uuid,
+    space: Uuid,
     table: &str,
     id: &str,
 ) -> Result<Option<StoredRow>> {
     let row = sqlx::query_as::<_, RowTuple>(
         "SELECT data, col_hlc, deleted, deleted_hlc, last_device_id FROM rows \
-         WHERE account_id = $1 AND table_name = $2 AND row_id = $3 FOR UPDATE",
+         WHERE space_id = $1 AND table_name = $2 AND row_id = $3 FOR UPDATE",
     )
-    .bind(account)
+    .bind(space)
     .bind(table)
     .bind(id)
     .fetch_optional(&mut **tx)
@@ -187,20 +236,22 @@ async fn load(
 
 async fn store(
     tx: &mut Transaction<'_, Postgres>,
+    space: Uuid,
     account: Uuid,
     table: &str,
     id: &str,
     row: &StoredRow,
 ) -> Result<()> {
     sqlx::query(
-        "INSERT INTO rows (account_id, table_name, row_id, data, col_hlc, deleted, deleted_hlc, seq, last_device_id) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, nextval('row_seq'), $8) \
-         ON CONFLICT (account_id, table_name, row_id) DO UPDATE SET \
+        "INSERT INTO rows (space_id, account_id, table_name, row_id, data, col_hlc, deleted, deleted_hlc, seq, last_device_id) \
+         VALUES ($1, $9, $2, $3, $4, $5, $6, $7, nextval('row_seq'), $8) \
+         ON CONFLICT (space_id, table_name, row_id) DO UPDATE SET \
+           account_id = EXCLUDED.account_id, \
            data = EXCLUDED.data, col_hlc = EXCLUDED.col_hlc, deleted = EXCLUDED.deleted, \
            deleted_hlc = EXCLUDED.deleted_hlc, seq = EXCLUDED.seq, \
            last_device_id = EXCLUDED.last_device_id",
     )
-    .bind(account)
+    .bind(space)
     .bind(table)
     .bind(id)
     .bind(Jsonb(&row.data))
@@ -208,6 +259,7 @@ async fn store(
     .bind(row.deleted)
     .bind(&row.deleted_hlc)
     .bind(row.last_device_id)
+    .bind(account)
     .execute(&mut **tx)
     .await?;
     Ok(())

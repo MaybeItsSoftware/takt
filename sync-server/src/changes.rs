@@ -4,6 +4,7 @@ use crate::AppState;
 use crate::auth::Caller;
 use crate::error::Result;
 use crate::merge::row_hlc;
+use crate::spaces;
 use axum::extract::{Query, State};
 use axum::{Extension, Json};
 use serde::Deserialize;
@@ -57,6 +58,7 @@ pub async fn changes(
 
 type ScanTuple = (
     i64,
+    uuid::Uuid,
     String,
     String,
     Jsonb<Map<String, Value>>,
@@ -65,7 +67,9 @@ type ScanTuple = (
     Option<String>,
 );
 
-/// One page of the account's feed after `since`.
+/// One page of the account's feed after `since`: its own space's rows and
+/// those of every shared list it is in, each shared row tagged with its
+/// space, and the shared lists themselves.
 ///
 /// `seq` comes from one sequence shared by every account, so an account's
 /// rows have gaps between their numbers. That's fine: a cursor only has to
@@ -82,15 +86,23 @@ async fn scan(
     since: i64,
     limit: i64,
 ) -> Result<ChangesResponse> {
+    // In one snapshot, so the spaces sent are the ones the rows came from.
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .execute(&mut *tx)
+        .await?;
+    let readable = spaces::readable(&mut *tx, account).await?;
+    let spaces = spaces::wire_spaces(&mut *tx, account).await?;
     let mut scanned = sqlx::query_as::<_, ScanTuple>(
-        "SELECT seq, table_name, row_id, data, col_hlc, deleted, deleted_hlc \
-         FROM rows WHERE account_id = $1 AND seq > $2 ORDER BY seq LIMIT $3",
+        "SELECT seq, space_id, table_name, row_id, data, col_hlc, deleted, deleted_hlc \
+         FROM rows WHERE space_id = ANY($1) AND seq > $2 ORDER BY seq LIMIT $3",
     )
-    .bind(account)
+    .bind(&readable)
     .bind(since)
     .bind(limit + 1)
-    .fetch_all(&state.pool)
+    .fetch_all(&mut *tx)
     .await?;
+    tx.commit().await?;
 
     let has_more = scanned.len() as i64 > limit;
     scanned.truncate(limit as usize);
@@ -98,8 +110,9 @@ async fn scan(
     let rows = scanned
         .into_iter()
         .map(
-            |(_, table, id, data, col_hlc, deleted, deleted_hlc)| ChangedRow {
+            |(_, space, table, id, data, col_hlc, deleted, deleted_hlc)| ChangedRow {
                 hlc: row_hlc(&col_hlc.0, deleted_hlc.as_deref()),
+                space: (space != account).then(|| space.to_string()),
                 table,
                 id,
                 deleted,
@@ -111,5 +124,6 @@ async fn scan(
         rows,
         cursor,
         has_more,
+        spaces: Some(spaces),
     })
 }

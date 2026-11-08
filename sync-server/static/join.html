@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join a shared list — Takt</title>
+<style>
+  :root { color-scheme: light dark; --paper: #f7f7f8; --ink: #1f2026; --muted: #55565b; --border: #dddddf; }
+  @media (prefers-color-scheme: dark) { :root { --paper: #19191d; --ink: #ececf0; --muted: #b7b7bb; --border: #323236; } }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 -apple-system, system-ui, Roboto, sans-serif; }
+  main { max-width: 32rem; margin: 0 auto; padding: 3rem 1rem 4rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+  .muted { color: var(--muted); }
+  code { display: block; margin: 1rem 0; padding: .75rem 1rem; border: 1px solid var(--border); border-radius: 6px;
+         font: 600 1.05rem/1.4 ui-monospace, Menlo, monospace; letter-spacing: .08em; word-break: break-all; }
+  a.button { display: inline-block; padding: .6rem 1rem; border: 1px solid var(--border); border-radius: 6px; color: inherit; text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+<h1>You've been invited to a shared list</h1>
+<p>Open Takt on a device signed in to sync, and choose <strong>Join shared list</strong> from the command palette or from Settings → Sync. Then enter this code:</p>
+<code>INVITE_CODE</code>
+<p><a class="button" href="takt://join/INVITE_CODE">Open in Takt</a></p>
+<p class="muted">The code works once, for seven days. If it has expired, ask whoever shared the list for a new one.</p>
+</main>
+</body>
+</html>

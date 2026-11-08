@@ -700,3 +700,368 @@ async fn a_push_that_writes_broadcasts_on_the_accounts_channel(pool: PgPool) {
     let again = takt_sync_server::realtime::prepare(&pool).await;
     assert!(again);
 }
+
+// Shared lists (docs/shared-lists-plan.md).
+
+impl Server {
+    async fn send(&self, method: &str, uri: &str, token: &str, body: Option<Value>) -> Value {
+        let (status, body) = self.call(method, uri, Some(token), body).await;
+        assert_eq!(status, StatusCode::OK, "{method} {uri}: {body}");
+        body
+    }
+
+    /// Shares list `list` from `owner` and has `member` join it by invite.
+    async fn share_with(&self, owner: &str, member: &str, list: &str) -> String {
+        let space = self
+            .send(
+                "POST",
+                "/v1/spaces",
+                owner,
+                Some(json!({"listId": list, "name": "Groceries"})),
+            )
+            .await;
+        let space_id = space["id"].as_str().expect("id").to_owned();
+        let invite = self
+            .send(
+                "POST",
+                &format!("/v1/spaces/{space_id}/invites"),
+                owner,
+                None,
+            )
+            .await;
+        let code = invite["code"].as_str().expect("code");
+        let joined = self
+            .send("POST", &format!("/v1/invites/{code}/accept"), member, None)
+            .await;
+        assert_eq!(joined["id"], space_id.as_str());
+        assert_eq!(joined["role"], "member");
+        space_id
+    }
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn a_shared_list_reaches_its_members_and_nothing_else_does(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, owner) = server.sign_up("owner@example.com", "Mac").await;
+    let (_, member) = server.sign_up("member@example.com", "Phone").await;
+
+    // The owner's private task, and the list's rows, pushed before sharing.
+    let space = server.share_with(&owner, &member, "L1").await;
+    server
+        .push(
+            &owner,
+            json!([
+                {"table": "tasks", "id": "PRIVATE", "op": "upsert", "hlc": hlc(1000, "o"),
+                 "values": {"title": "mine alone"}},
+                {"table": "task_lists", "id": "L1", "op": "upsert", "hlc": hlc(1000, "o"),
+                 "values": {"name": "Groceries"}, "space": space},
+                {"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(1000, "o"),
+                 "values": {"title": "Milk", "listId": "L1"}, "space": space},
+            ]),
+        )
+        .await;
+
+    let page = server.changes(&member, "since=0").await;
+    assert_eq!(
+        ids(&page),
+        vec!["L1", "T1"],
+        "the private task stays private"
+    );
+    assert_eq!(page["rows"][1]["space"], space.as_str());
+    assert_eq!(page["spaces"][0]["listId"], "L1");
+    assert_eq!(page["spaces"][0]["role"], "member");
+    let members = page["spaces"][0]["members"].as_array().expect("members");
+    assert_eq!(members.len(), 2);
+    assert_eq!(members[0]["email"], "owner@example.com");
+    assert_eq!(members[0]["role"], "owner");
+    assert_eq!(members[1]["you"], true);
+
+    // The member's edit reaches the owner, tagged with the space.
+    let cursor = server.changes(&owner, "since=0").await["cursor"].clone();
+    server
+        .push(
+            &member,
+            json!([{"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(2000, "m"),
+                    "values": {"title": "Oat milk"}, "space": space}]),
+        )
+        .await;
+    let page = server.changes(&owner, &format!("since={cursor}")).await;
+    assert_eq!(ids(&page), vec!["T1"]);
+    assert_eq!(page["rows"][0]["values"]["title"], "Oat milk");
+    assert_eq!(page["rows"][0]["values"]["listId"], "L1");
+    assert_eq!(page["rows"][0]["space"], space.as_str());
+
+    // The owner's own rows carry no space.
+    let page = server.changes(&owner, "since=0").await;
+    let private = page["rows"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .find(|row| row["id"] == "PRIVATE")
+        .expect("private row");
+    assert!(private.get("space").is_none());
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn joining_late_still_pulls_what_was_there(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, owner) = server.sign_up("owner@example.com", "Mac").await;
+    let (_, member) = server.sign_up("member@example.com", "Phone").await;
+    let space = server
+        .send("POST", "/v1/spaces", &owner, Some(json!({"listId": "L1"})))
+        .await["id"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    server
+        .push(
+            &owner,
+            json!([{"table": "task_lists", "id": "L1", "op": "upsert", "hlc": hlc(1000, "o"),
+                    "values": {"name": "Groceries"}, "space": space}]),
+        )
+        .await;
+    // The member has synced their own rows well past the list's.
+    for n in 0..3 {
+        server
+            .push(
+                &member,
+                json!([{"table": "tasks", "id": format!("M{n}"), "op": "upsert",
+                        "hlc": hlc(1000 + n, "m"), "values": {"title": "theirs"}}]),
+            )
+            .await;
+    }
+    let cursor = server.changes(&member, "since=0").await["cursor"]
+        .as_i64()
+        .expect("cursor");
+
+    let invite = server
+        .send("POST", &format!("/v1/spaces/{space}/invites"), &owner, None)
+        .await;
+    let code = invite["code"].as_str().expect("code");
+    // Typed in lower case, with a dash: still the code.
+    let typed = format!("{}-{}", &code[..13].to_lowercase(), &code[13..]);
+    server
+        .send(
+            "POST",
+            &format!("/v1/invites/{typed}/accept"),
+            &member,
+            None,
+        )
+        .await;
+    let page = server.changes(&member, &format!("since={cursor}")).await;
+    assert_eq!(ids(&page), vec!["L1"], "the list comes after the cursor");
+
+    // The code is spent.
+    let (_, other) = server.sign_up("other@example.com", "Mac").await;
+    let (status, _) = server
+        .call(
+            "POST",
+            &format!("/v1/invites/{code}/accept"),
+            Some(&other),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::GONE);
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn what_a_shared_space_refuses(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, owner) = server.sign_up("owner@example.com", "Mac").await;
+    let (_, member) = server.sign_up("member@example.com", "Phone").await;
+    let (_, stranger) = server.sign_up("stranger@example.com", "Mac").await;
+    let space = server.share_with(&owner, &member, "L1").await;
+
+    let refused = |token: String, change: Value| {
+        let server = &server;
+        async move {
+            let (status, _) = server
+                .call(
+                    "POST",
+                    "/v1/push",
+                    Some(&token),
+                    Some(json!({"changes": [change]})),
+                )
+                .await;
+            status
+        }
+    };
+    let task = json!({"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(1, "x"),
+                      "values": {"title": "x"}, "space": space});
+    assert_eq!(
+        refused(stranger.clone(), task.clone()).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        refused(
+            member.clone(),
+            json!({"table": "dailies", "id": "D1", "op": "upsert", "hlc": hlc(1, "x"),
+                   "values": {}, "space": space})
+        )
+        .await,
+        StatusCode::BAD_REQUEST,
+        "habits stay personal"
+    );
+    assert_eq!(
+        refused(
+            member.clone(),
+            json!({"table": "task_lists", "id": "OTHER", "op": "upsert", "hlc": hlc(1, "x"),
+                   "values": {}, "space": space})
+        )
+        .await,
+        StatusCode::BAD_REQUEST,
+        "only the shared list's own row"
+    );
+    assert_eq!(
+        refused(
+            member.clone(),
+            json!({"table": "task_lists", "id": "L1", "op": "delete", "hlc": hlc(1, "x"),
+                   "space": space})
+        )
+        .await,
+        StatusCode::FORBIDDEN,
+        "a member leaves rather than deletes"
+    );
+    // Only the owner invites, and a member can't share the list as theirs.
+    let (status, _) = server
+        .call(
+            "POST",
+            &format!("/v1/spaces/{space}/invites"),
+            Some(&member),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = server
+        .call(
+            "POST",
+            "/v1/spaces",
+            Some(&member),
+            Some(json!({"listId": "L1"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(refused(owner.clone(), task).await, StatusCode::OK);
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn leaving_removal_and_stopping_sharing(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, owner) = server.sign_up("owner@example.com", "Mac").await;
+    let (_, member) = server.sign_up("member@example.com", "Phone").await;
+    let space = server.share_with(&owner, &member, "L1").await;
+    let spaces = |page: &Value| page["spaces"].as_array().expect("spaces").len();
+
+    // The owner can't leave their own list.
+    let owner_id = server.send("GET", "/v1/account", &owner, None).await["accountId"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    let (status, _) = server
+        .call(
+            "DELETE",
+            &format!("/v1/spaces/{space}/members/{owner_id}"),
+            Some(&member),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // A member leaves.
+    let member_id = server.send("GET", "/v1/account", &member, None).await["accountId"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    server
+        .send(
+            "DELETE",
+            &format!("/v1/spaces/{space}/members/{member_id}"),
+            &member,
+            None,
+        )
+        .await;
+    assert_eq!(spaces(&server.changes(&member, "since=0").await), 0);
+    let (status, _) = server
+        .call(
+            "POST",
+            "/v1/push",
+            Some(&member),
+            Some(
+                json!({"changes": [{"table": "tasks", "id": "T1", "op": "upsert",
+                "hlc": hlc(1, "m"), "values": {}, "space": space}]}),
+            ),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "a leaver can't write to it");
+
+    // Back in by a new invite, then the owner stops sharing.
+    let invite = server
+        .send("POST", &format!("/v1/spaces/{space}/invites"), &owner, None)
+        .await;
+    server
+        .send(
+            "POST",
+            &format!("/v1/invites/{}/accept", invite["code"].as_str().unwrap()),
+            &member,
+            None,
+        )
+        .await;
+    assert_eq!(spaces(&server.changes(&member, "since=0").await), 1);
+    server
+        .send("DELETE", &format!("/v1/spaces/{space}"), &owner, None)
+        .await;
+    assert_eq!(spaces(&server.changes(&member, "since=0").await), 0);
+    assert_eq!(spaces(&server.changes(&owner, "since=0").await), 0);
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn deleting_the_owner_hands_the_list_on(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, owner) = server.sign_up("owner@example.com", "Mac").await;
+    let (_, member) = server.sign_up("member@example.com", "Phone").await;
+    let space = server.share_with(&owner, &member, "L1").await;
+    server
+        .push(
+            &owner,
+            json!([{"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(1000, "o"),
+                    "values": {"title": "Milk"}, "space": space}]),
+        )
+        .await;
+    server
+        .send("POST", "/v1/account/delete", &owner, None)
+        .await;
+    let page = server.changes(&member, "since=0").await;
+    assert_eq!(
+        ids(&page),
+        vec!["T1"],
+        "the shared rows outlive their writer"
+    );
+    assert_eq!(page["spaces"][0]["role"], "owner");
+    assert_eq!(
+        page["spaces"][0]["members"]
+            .as_array()
+            .expect("members")
+            .len(),
+        1
+    );
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn a_join_link_opens_a_page(pool: PgPool) {
+    let server = server(pool).await;
+    let request = Request::builder()
+        .uri("/join/abc%3Cscript%3E123")
+        .body(Body::empty())
+        .expect("request");
+    let response = server.app.clone().oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let page = String::from_utf8_lossy(&bytes);
+    assert!(page.contains("ABCSCRIPT123"));
+    assert!(!page.contains("<script>"));
+}

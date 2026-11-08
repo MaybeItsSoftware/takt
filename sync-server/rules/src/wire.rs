@@ -27,6 +27,11 @@ pub struct WireChange {
     /// The columns of an upsert. Left out of a delete.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub values: Option<Map<String, Value>>,
+    /// The shared space the row belongs to (docs/shared-lists-plan.md), or
+    /// nothing for the account's own. A client that predates sharing never
+    /// sends it, and every row it pushes is its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +55,41 @@ pub struct ChangesResponse {
     pub rows: Vec<ChangedRow>,
     pub cursor: i64,
     pub has_more: bool,
+    /// Every shared space the account is in, as of this page. Absent from a
+    /// server that predates sharing, which a client reads as "no change"
+    /// rather than "none".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spaces: Option<Vec<WireSpace>>,
+}
+
+/// A shared list, as its members see it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WireSpace {
+    pub id: String,
+    /// The shared list's row id.
+    pub list_id: String,
+    /// The list's name when it was shared.
+    #[serde(default)]
+    pub name: String,
+    /// The caller's role: "owner" or "member".
+    pub role: String,
+    #[serde(default)]
+    pub members: Vec<WireMember>,
+}
+
+/// One of a shared list's members.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WireMember {
+    pub account_id: String,
+    #[serde(default)]
+    pub email: Option<String>,
+    /// "owner" or "member".
+    pub role: String,
+    /// The account asking.
+    #[serde(default)]
+    pub you: bool,
 }
 
 /// A row as the server holds it.
@@ -63,6 +103,9 @@ pub struct ChangedRow {
     /// The newest of the row's column stamps and its delete stamp.
     #[serde(default)]
     pub hlc: Option<String>,
+    /// The shared space the row is in, or nothing for the account's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space: Option<String>,
 }
 
 /// Every error the server sends: `{"error": "..."}`.
@@ -86,6 +129,7 @@ mod tests {
                     op: WireOp::Upsert,
                     hlc: "0000000000001-0000-d".into(),
                     values: Some(Map::from_iter([("title".into(), json!("Buy milk"))])),
+                    space: None,
                 },
                 WireChange {
                     table: "tasks".into(),
@@ -93,6 +137,7 @@ mod tests {
                     op: WireOp::Delete,
                     hlc: "0000000000002-0000-d".into(),
                     values: None,
+                    space: None,
                 },
             ],
         };

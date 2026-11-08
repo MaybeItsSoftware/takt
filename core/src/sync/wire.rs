@@ -160,6 +160,7 @@ pub fn prepare_push(
                         .map(|(name, value)| (name.clone(), json_value(value)))
                         .collect()
                 }),
+                space: None,
             }
         })
         .collect::<Vec<_>>();

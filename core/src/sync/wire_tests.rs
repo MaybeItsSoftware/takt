@@ -67,12 +67,14 @@ impl Server {
                 deleted: row.deleted,
                 values: row.data.clone(),
                 hlc: merge::row_hlc(&row.col_hlc, row.deleted_hlc.as_deref()),
+                space: None,
             })
             .collect();
         serde_json::to_string(&ChangesResponse {
             rows,
             cursor,
             has_more,
+            spaces: None,
         })
         .unwrap()
     }

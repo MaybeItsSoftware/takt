@@ -88,3 +88,41 @@ async fn has_policy(pool: &PgPool) -> Result<bool, sqlx::Error> {
     .fetch_one(pool)
     .await
 }
+
+/// Tells each of `accounts`' devices there is something to pull: a NOTIFY
+/// for the long-polls and, where Realtime is on, a broadcast on each
+/// account's channel. Both ride `tx`, so they go out only if it commits.
+pub async fn nudge(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    realtime: bool,
+    accounts: &std::collections::BTreeSet<uuid::Uuid>,
+) -> Result<(), sqlx::Error> {
+    if accounts.is_empty() {
+        return Ok(());
+    }
+    // Postgres holds a NOTIFY until the transaction commits, and drops it if
+    // it rolls back, so a long-poll is never woken for rows it cannot yet
+    // read.
+    sqlx::query("SELECT pg_notify($1, '')")
+        .bind(crate::notify::CHANNEL)
+        .execute(&mut **tx)
+        .await?;
+    if !realtime {
+        return Ok(());
+    }
+    let cursor: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(seq), 0) FROM rows")
+        .fetch_one(&mut **tx)
+        .await?;
+    for account in accounts {
+        // Realtime reads it from the log once the transaction commits, and
+        // never if it rolls back. `realtime.send` catches its own errors, so
+        // a Realtime outage costs the nudge, not the write.
+        sqlx::query("SELECT realtime.send(jsonb_build_object('cursor', $1::bigint), $2, $3, true)")
+            .bind(cursor)
+            .bind(EVENT)
+            .bind(topic(*account))
+            .execute(&mut **tx)
+            .await?;
+    }
+    Ok(())
+}

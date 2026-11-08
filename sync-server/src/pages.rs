@@ -1,4 +1,5 @@
-//! The public pages the app stores link to: the privacy policy.
+//! The public pages the app stores link to: the privacy policy, and where an
+//! invite to a shared list lands outside the app.
 //!
 //! Served here because the server is already the apps' one public address.
 //! The contact line takes `CONTACT_EMAIL` from the environment, so the
@@ -9,6 +10,24 @@ use axum::response::{Html, IntoResponse};
 use std::sync::OnceLock;
 
 const PRIVACY: &str = include_str!("../static/privacy.html");
+const JOIN: &str = include_str!("../static/join.html");
+
+/// `GET /join/<code>`: where an invite link lands when it is opened outside
+/// the app. It shows the code to type in and a `takt://join/<code>` link.
+/// Only the code's own alphabet is let through, so the path cannot put
+/// markup into the page.
+pub async fn join(axum::extract::Path(code): axum::extract::Path<String>) -> impl IntoResponse {
+    let code: String = code
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .take(64)
+        .collect::<String>()
+        .to_ascii_uppercase();
+    (
+        [(header::CACHE_CONTROL, "no-store")],
+        Html(JOIN.replace("INVITE_CODE", &code)),
+    )
+}
 
 /// `GET /privacy`.
 pub async fn privacy() -> impl IntoResponse {
@@ -53,5 +72,6 @@ mod tests {
         assert!(!contact_line(Some("<script>@x.com")).contains("<script>"));
         assert!(contact_line(None).contains("support link"));
         assert!(PRIVACY.contains("CONTACT_LINE"), "the page has the slot");
+        assert!(JOIN.contains("INVITE_CODE"), "the join page has its slot");
     }
 }

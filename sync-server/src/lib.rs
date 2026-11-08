@@ -5,8 +5,10 @@
 //! tasks, so a schema change on the clients needs no change here.
 //!
 //! Accounts are Supabase Auth users (`auth.rs`): the apps sign in with
-//! Supabase and send its access token, and every row and device belongs to
-//! the token's user. A device only ever sees its own account's rows.
+//! Supabase and send its access token, and every device belongs to the
+//! token's user. A row belongs to a space (`spaces.rs`): the account's own,
+//! or a shared list it is a member of. A device sees the rows of the spaces
+//! its account is in, and no others.
 
 pub mod auth;
 pub mod changes;
@@ -19,9 +21,10 @@ pub mod notify;
 pub mod pages;
 pub mod push;
 pub mod realtime;
+pub mod spaces;
 
 use axum::extract::{DefaultBodyLimit, State};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -63,6 +66,15 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/account", get(devices::account))
         .route("/v1/account/delete", post(devices::delete_account))
         .route("/v1/sign-out", post(devices::sign_out))
+        .route("/v1/spaces", get(spaces::list).post(spaces::share))
+        .route("/v1/spaces/{space}", delete(spaces::stop_sharing))
+        .route("/v1/spaces/{space}/invites", post(spaces::invite))
+        .route(
+            "/v1/spaces/{space}/members/{member}",
+            delete(spaces::remove_member),
+        )
+        .route("/v1/invites/{code}", get(spaces::preview))
+        .route("/v1/invites/{code}/accept", post(spaces::accept))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_user,
@@ -70,6 +82,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/privacy", get(pages::privacy))
+        .route("/join/{code}", get(pages::join))
         .merge(user_routes)
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
         .layer(CompressionLayer::new().gzip(true))
