@@ -150,9 +150,12 @@ rename, `h` / `l` / `-` collapse, expand and go up, `gg` / `Shift+G` the ends,
 opens the same panel's menu, each item with its sidebar key beside it.
 
 The **inspector** is modal, as vim is. With the keyboard in it, `j` / `k` (or
-`↓` / `↑`) move a row cursor down every row — the title, Start focus, the
-dates, Conditions, the estimate, the notes, Priority, Tags, List, Blocked by,
-Waiting on, Repeat and each commitment's Edit and Stop, Links, the actions —
+`↓` / `↑`) move a row cursor down every row, grouped by what you do with a task:
+the title; working on it (Start focus, which says how far it has got — time
+logged against the estimate and subtasks done — then the estimate, how it may
+be split once it has one, daily progress and the commitment); when (start,
+due, repeat); the notes; where it is filed (List, Priority, Tags); what it
+waits on (Conditions, Blocked by, Waiting on); Links; and the actions —
 and `gg` / `Shift+G` (or `Home` / `End`) go to the first and last. Landing on
 a text row only highlights it, so the notes no longer keep the keyboard.
 `Return`, `i` or `e` edits the row: it puts the caret in a field, presses a

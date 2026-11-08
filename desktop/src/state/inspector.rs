@@ -184,6 +184,7 @@ pub fn stops(
     task: &TaskRow,
     list_name: &str,
     focus_running: bool,
+    work: takt_core::task_work::TaskWorkFacts,
 ) -> Vec<Stop> {
     use StopKind::*;
     let planning = snapshot.planning.clone().unwrap_or_default();
@@ -192,16 +193,72 @@ pub fn stops(
         value: snapshot.title.clone(),
         ..Stop::new("title", "", Text { multiline: false })
     }];
+
+    // Progress: working on it, and how far it has got, before anything
+    // about when it is due. A task is worked on many times before it is
+    // finished, if it ever is.
     if !list {
+        let action = if focus_running {
+            "Add to the focus queue"
+        } else {
+            "Start focus"
+        };
         stops.push(Stop {
-            value: if focus_running {
-                "Add to the focus queue".into()
-            } else {
-                "Start focus".into()
+            value: match progress_summary(&work, snapshot.estimate_seconds) {
+                Some(progress) => format!("{action} \u{b7} {progress}"),
+                None => action.into(),
             },
             ..Stop::new("focus", "", Action)
         });
     }
+    let estimated = snapshot.estimate_seconds.is_some();
+    stops.push(
+        Stop::new("estimate", "Estimate", Text { multiline: false }).value(
+            snapshot
+                .estimate_seconds
+                .map(|s| format!("{} min", editor_minutes_text(s, true))),
+            "Add estimate",
+        ),
+    );
+    // How the estimate may be split only means something once there is one.
+    if estimated || planning.minimum_block_seconds.is_some() {
+        stops.push(
+            Stop::new("minimum-block", "Min. block", Text { multiline: false }).value(
+                planning
+                    .minimum_block_seconds
+                    .map(|s| format!("{} min", editor_minutes_text(s, true))),
+                "Add minimum",
+            ),
+        );
+    }
+    let single = planning.requires_single_sitting == Some(true);
+    if estimated || single {
+        stops.push(Stop {
+            value: if single {
+                "Must finish in one go".into()
+            } else {
+                "Can be split".into()
+            },
+            empty: !single,
+            ..Stop::new("single-sitting", "One sitting", Toggle)
+        });
+    }
+    if snapshot.daily_progress {
+        stops.push(Stop {
+            value: "Make daily progress".into(),
+            ..Stop::new("daily", "Daily", Toggle)
+        });
+    }
+    if !list {
+        stops.push(Stop {
+            value: "Commit periodically…".into(),
+            empty: true,
+            ..Stop::new("commit", "", Action)
+        });
+    }
+
+    // When: the dates and how it comes round. The calendar sets a due
+    // time or none, so the time needs no row of its own.
     stops.push(
         Stop::new("start", "Start", Text { multiline: false })
             .value(
@@ -216,61 +273,28 @@ pub fn stops(
         .due_at_ms
         .map(format_moment)
         .or_else(|| planning.due_date.as_deref().map(format_day_string));
-    let has_due = due.is_some();
     stops.push(
         Stop::new("due", "Due", Text { multiline: false })
             .value(due.map(|d| format!("Due {d}")), "Add due date"),
     );
-    if has_due {
-        stops.push(Stop {
-            value: if snapshot.due_at_ms.is_some() {
-                "At a set time".into()
-            } else {
-                "Any time that day".into()
-            },
-            empty: snapshot.due_at_ms.is_none(),
-            ..Stop::new("due.exact", "Time", Toggle)
-        });
-    }
-    stops.push(Stop::new("conditions", "Needs", Action).value(
-        planning.requirement_groups.as_ref().and_then(|groups| {
-            (!groups.is_empty()).then(|| format!("{} condition groups", groups.len()))
-        }),
-        "Add conditions",
-    ));
     stops.push(
-        Stop::new("estimate", "Estimate", Text { multiline: false })
-            .value(
-                snapshot
-                    .estimate_seconds
-                    .map(|s| format!("{} min", editor_minutes_text(s, true))),
-                "Add estimate",
-            )
-            .grouped(),
+        Stop::new("repeat", "Repeat", Text { multiline: false })
+            .value(snapshot.metadata.recurrence_rule.clone(), "Add repeat"),
     );
-    stops.push(
-        Stop::new("minimum-block", "Min. block", Text { multiline: false }).value(
-            planning
-                .minimum_block_seconds
-                .map(|s| format!("{} min", editor_minutes_text(s, true))),
-            "Add minimum",
-        ),
-    );
-    let single = planning.requires_single_sitting == Some(true);
-    stops.push(Stop {
-        value: if single {
-            "Must finish in one go".into()
-        } else {
-            "Can be split".into()
-        },
-        empty: !single,
-        ..Stop::new("single-sitting", "One sitting", Toggle)
-    });
+
+    // What it is about.
     stops.push(
         Stop::new("notes", "", Text { multiline: true })
             .value(Some(snapshot.notes.clone()), "Add notes")
             .grouped(),
     );
+
+    // Where it is filed and how it ranks.
+    stops.push(Stop {
+        value: list_name.into(),
+        group: true,
+        ..Stop::new("move", "List", Action)
+    });
     let priority = snapshot.metadata.priority.unwrap_or(0);
     stops.push(Stop {
         value: if priority == 0 {
@@ -279,39 +303,29 @@ pub fn stops(
             priority_name(priority).into()
         },
         empty: priority == 0,
-        group: true,
         ..Stop::new("priority", "Priority", Choice)
     });
     stops.push(
         Stop::new("tags", "Tags", Text { multiline: false })
             .value(Some(snapshot.metadata.tags.join(", ")), "Add tags"),
     );
-    stops.push(Stop {
-        value: list_name.into(),
-        ..Stop::new("move", "List", Action)
-    });
+
+    // What it waits on.
+    stops.push(
+        Stop::new("conditions", "Needs", Action)
+            .value(
+                planning.requirement_groups.as_ref().and_then(|groups| {
+                    (!groups.is_empty()).then(|| format!("{} condition groups", groups.len()))
+                }),
+                "Add conditions",
+            )
+            .grouped(),
+    );
     if !list {
         stops.push(Stop::new("blockers", "Blocked by", Action).value(None, "Add blocker"));
         stops.push(Stop::new("waiting", "Waiting on", Action).value(None, "Add waiting"));
     }
-    stops.push(
-        Stop::new("repeat", "Repeat", Text { multiline: false })
-            .value(snapshot.metadata.recurrence_rule.clone(), "Add repeat")
-            .grouped(),
-    );
-    if snapshot.daily_progress {
-        stops.push(Stop {
-            value: "Make daily progress".into(),
-            ..Stop::new("daily", "Daily", Toggle)
-        });
-    }
-    if !list {
-        stops.push(Stop {
-            value: "Commit periodically…".into(),
-            empty: true,
-            ..Stop::new("commit", "", Action)
-        });
-    }
+
     stops.push(
         Stop::new("links", "Links", Text { multiline: true })
             .value(
@@ -320,11 +334,20 @@ pub fn stops(
             )
             .grouped(),
     );
-    let mut actions = vec![Stop {
-        value: "Copy requirements to subtasks".into(),
-        group: true,
-        ..Stop::new("apply-planning", "", Action)
-    }];
+    let has_requirements = planning
+        .requirement_groups
+        .as_ref()
+        .is_some_and(|groups| !groups.is_empty())
+        || planning.minimum_block_seconds.is_some()
+        || single;
+    let mut actions = Vec::new();
+    // Only a task with subtasks has anyone to copy its requirements to.
+    if work.subtasks > 0 && has_requirements {
+        actions.push(Stop {
+            value: "Copy requirements to subtasks".into(),
+            ..Stop::new("apply-planning", "", Action)
+        });
+    }
     if list {
         actions.push(Stop {
             value: if task.is_promoted == Some(true) {
@@ -355,8 +378,43 @@ pub fn stops(
         },
         ..Stop::new("convert", "", Action)
     });
+    if let Some(first) = actions.first_mut() {
+        first.group = true;
+    }
     stops.extend(actions);
     stops
+}
+
+/// "1h 20m", "45m", "2h".
+fn span(seconds: i64) -> String {
+    let minutes = (seconds + 30) / 60;
+    match (minutes / 60, minutes % 60) {
+        (0, m) => format!("{m}m"),
+        (h, 0) => format!("{h}h"),
+        (h, m) => format!("{h}h {m}m"),
+    }
+}
+
+/// "1h 20m of 2h logged · 2 of 5 subtasks", or nothing when it has neither.
+fn progress_summary(
+    work: &takt_core::task_work::TaskWorkFacts,
+    estimate_seconds: Option<i64>,
+) -> Option<String> {
+    let mut parts = Vec::new();
+    if work.logged_seconds > 0 {
+        let logged = span(work.logged_seconds);
+        parts.push(match estimate_seconds.filter(|s| *s > 0) {
+            Some(estimate) => format!("{logged} of {} logged", span(estimate)),
+            None => format!("{logged} logged"),
+        });
+    }
+    if work.subtasks > 0 {
+        parts.push(format!(
+            "{} of {} subtasks",
+            work.subtasks_done, work.subtasks
+        ));
+    }
+    (!parts.is_empty()).then(|| parts.join(" \u{b7} "))
 }
 
 impl App {
@@ -393,7 +451,12 @@ impl App {
             .list(&task.list_id)
             .map(|list| list.name.clone())
             .unwrap_or_default();
-        let mut stops = stops(&snapshot, &task, &list, self.focus_session.is_some());
+        let work = self
+            .store
+            .core
+            .task_work_facts(task.id.clone())
+            .unwrap_or_default();
+        let mut stops = stops(&snapshot, &task, &list, self.focus_session.is_some(), work);
         // What the agent is told about the task, and about its list: each
         // its own field, apart from the notes, and none while AI is off.
         if !self.prefs.ai_off
@@ -1086,7 +1149,7 @@ mod tests {
 
     #[test]
     fn a_task_reads_title_first_and_its_empty_fields_as_adds() {
-        let stops = stops(&snapshot(), &task(None), "Inbox", false);
+        let stops = stops(&snapshot(), &task(None), "Inbox", false, Default::default());
         assert_eq!(stops[0].id, "title");
         let estimate = stops.iter().find(|s| s.id == "estimate").unwrap();
         assert_eq!(estimate.value, "30 min");
@@ -1098,9 +1161,56 @@ mod tests {
 
     #[test]
     fn a_list_offers_pinning_and_no_focus() {
-        let stops = stops(&snapshot(), &task(Some("list")), "Inbox", false);
+        let stops = stops(
+            &snapshot(),
+            &task(Some("list")),
+            "Inbox",
+            false,
+            Default::default(),
+        );
         assert!(stops.iter().any(|s| s.id == "pin"));
         assert!(!stops.iter().any(|s| s.id == "focus" || s.id == "blockers"));
+    }
+
+    #[test]
+    fn progress_comes_before_dates_and_says_how_far_it_has_got() {
+        use takt_core::task_work::TaskWorkFacts;
+        let work = TaskWorkFacts {
+            subtasks: 5,
+            subtasks_done: 2,
+            logged_seconds: 4800,
+            work_blocks: 3,
+        };
+        let stops = stops(&snapshot(), &task(None), "Inbox", false, work);
+        let order: Vec<&str> = stops.iter().map(|s| s.id).collect();
+        let at = |id: &str| order.iter().position(|s| *s == id).unwrap();
+        assert!(at("focus") < at("estimate") && at("estimate") < at("due"));
+        assert!(at("due") < at("repeat") && at("repeat") < at("notes"));
+        assert!(at("notes") < at("move") && at("move") < at("conditions"));
+        assert_eq!(
+            stops[at("focus")].value,
+            "Start focus \u{b7} 1h 20m of 30m logged \u{b7} 2 of 5 subtasks"
+        );
+        assert!(
+            !order.contains(&"apply-planning"),
+            "nothing to copy without requirements"
+        );
+    }
+
+    #[test]
+    fn splitting_rows_wait_for_an_estimate() {
+        let mut bare = snapshot();
+        bare.estimate_seconds = None;
+        let stops = stops(&bare, &task(None), "Inbox", false, Default::default());
+        assert!(
+            !stops
+                .iter()
+                .any(|s| s.id == "minimum-block" || s.id == "single-sitting")
+        );
+        assert_eq!(
+            stops.iter().find(|s| s.id == "focus").unwrap().value,
+            "Start focus"
+        );
     }
 
     #[test]
