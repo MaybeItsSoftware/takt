@@ -1,4 +1,5 @@
 import TaktCore
+import TaktRustCore
 import TaktWorkspace
 import SwiftUI
 
@@ -39,6 +40,7 @@ struct TaskInspector: View {
             notes(values)
             placement
             WaitingSection(task: task, column: inspector.kanbanColumn)
+            SharingSection(task: task)
             if !task.isList { BlockedBySection(task: task) }
             filing(values)
             actions(task)
@@ -654,5 +656,63 @@ private struct ProgressLine: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("inspector.progress")
+  }
+}
+
+/// In a shared list: who the task is assigned to, with a menu to change it,
+/// and who added and finished it. Nothing for a task in a list of your own.
+struct SharingSection: View {
+  @Environment(\.theme) private var theme
+  @Environment(WorkspaceModel.self) private var model
+  let task: WorkspaceTask
+  @State private var sharing: TaskSharing?
+
+  private struct ReloadKey: Hashable {
+    let taskID: String
+    let revision: Int
+  }
+
+  var body: some View {
+    Group {
+      if let sharing {
+        InspectorSection("Shared") {
+          Menu {
+            Button("Nobody: anyone in the list") { assign(nil) }
+            ForEach(sharing.members, id: \.accountId) { member in
+              Button(member.you ? "Me" : (member.email ?? "Someone")) { assign(member.accountId) }
+            }
+          } label: {
+            HStack {
+              Text("Assigned to").font(theme.type.body).foregroundStyle(theme.muted)
+              Spacer(minLength: theme.space.sm)
+              Text(sharing.assignee.map { $0.displayName.capitalizedFirst } ?? "Nobody")
+                .font(theme.type.body)
+                .foregroundStyle(theme.ink)
+                .lineLimit(1)
+            }
+            .frame(minHeight: theme.touchTarget)
+            .contentShape(Rectangle())
+          }
+          .accessibilityLabel("Assigned to \(sharing.assignee?.displayName ?? "nobody")")
+          if let line = authorship(sharing) {
+            Text(line).font(theme.type.footnote).foregroundStyle(theme.muted)
+          }
+        }
+      }
+    }
+    .task(id: ReloadKey(taskID: task.id, revision: model.revision)) {
+      sharing = model.store.taskSharing(task.id)
+    }
+  }
+
+  private func assign(_ accountId: String?) {
+    model.perform { store in try store.assignTask(task.id, to: accountId) }
+  }
+
+  private func authorship(_ sharing: TaskSharing) -> String? {
+    var parts: [String] = []
+    if let by = sharing.createdBy { parts.append("added by \(by.displayName)") }
+    if let by = sharing.completedBy { parts.append("completed by \(by.displayName)") }
+    return parts.isEmpty ? nil : parts.joined(separator: ", ").capitalizedFirst
   }
 }

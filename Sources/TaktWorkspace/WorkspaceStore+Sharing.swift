@@ -33,6 +33,25 @@ extension WorkspaceStore {
   public func forgetSharedSpace(spaceId: String, stoppedSharing: Bool) throws {
     try coreWrite { try core.forgetSharedSpace(spaceId: spaceId, stoppedSharing: stoppedSharing) }
   }
+
+  /// Who added, finished and holds a task in a shared list; nil for a task
+  /// in a list of your own.
+  public func taskSharing(_ taskId: String) -> TaskSharing? {
+    (try? Self.mappingCoreErrors { try core.taskSharing(taskId: taskId) }) ?? nil
+  }
+
+  /// Assigns a task in a shared list to a member, or to nobody, as one
+  /// undo step.
+  public func assignTask(_ taskId: String, to accountId: String?, now: Date = Date()) throws {
+    try coreWrite {
+      try core.assignTask(taskId: taskId, assigneeAccountId: accountId, nowMs: Int64(now.timeIntervalSince1970 * 1000))
+    }
+  }
+}
+
+extension SharedListMember {
+  /// "you", the member's email, or "someone".
+  public var displayName: String { sharedMemberName(member: self) }
 }
 
 extension SharedList {
