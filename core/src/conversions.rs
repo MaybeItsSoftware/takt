@@ -129,6 +129,7 @@ pub fn convert_list_to_task(
     if list.system_role.is_some() {
         return Err(CoreError::SystemListIsPermanent);
     }
+    crate::sync::spaces::refuse_if_shared(transaction, id)?;
     let inbox: String = transaction
         .query_row(
             "SELECT id FROM task_lists WHERE workspaceId = ?1 AND systemRole = 'inbox'",
@@ -155,6 +156,7 @@ pub fn nest_list(
     if list.system_role.is_some() {
         return Err(CoreError::SystemListIsPermanent);
     }
+    crate::sync::spaces::refuse_if_shared(transaction, id)?;
     if id == into_list_id || list.workspace_id != destination.workspace_id {
         return Err(CoreError::InvalidTaskMove);
     }

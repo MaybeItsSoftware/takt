@@ -1630,6 +1630,13 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func folders(workspaceId: String) throws  -> [FolderRow]
     
     /**
+     * After leaving a shared list, or being told it has gone: its rows go
+     * from this device. After stopping sharing one you own: it stays, as a
+     * private list, and the next push sends it back to your own space.
+     */
+    func forgetSharedSpace(spaceId: String, stoppedSharing: Bool) throws 
+    
+    /**
      * Whether a session waiting on a blocked queue can resume in `context`.
      */
     func hasResumableFocusQueueTask(context: FocusContext, nowMs: Int64, zone: String) throws  -> Bool
@@ -1863,6 +1870,14 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func reconcileWaitingFollowUps(nowMs: Int64) throws  -> Bool
     
     /**
+     * Keeps the space the server answered sharing a list or accepting an
+     * invite with (`POST /v1/spaces`, `POST /v1/invites/<code>/accept`).
+     * The next push sends a newly shared list's rows to it; the next pull
+     * brings a joined one's.
+     */
+    func recordSharedSpace(body: String) throws  -> SharedList
+    
+    /**
      * Advances the stored cursor and clock without applying rows.
      */
     func recordSyncProgress(cursor: Int64?, hlc: String?, nowMs: Int64) throws 
@@ -2054,6 +2069,22 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
      * to chase again (`None` for once), as one "Waiting On" step.
      */
     func setWaiting(taskId: String, waitingOn: String?, followUpAtMs: Int64?, followUpEveryDays: UInt32?, nowMs: Int64) throws 
+    
+    /**
+     * The name to share `list_id` under, or why it can't be shared: the
+     * Inbox, or a list someone else shared with you.
+     */
+    func shareableListName(listId: String) throws  -> String
+    
+    /**
+     * The shared list `list_id` is, or nothing when it isn't shared.
+     */
+    func sharedList(listId: String) throws  -> SharedList?
+    
+    /**
+     * Every shared list this device knows of, with its members.
+     */
+    func sharedLists() throws  -> [SharedList]
     
     /**
      * What the sidebar draws beneath the given lists, walked here so only
@@ -4050,6 +4081,21 @@ open func folders(workspaceId: String)throws  -> [FolderRow]  {
 }
     
     /**
+     * After leaving a shared list, or being told it has gone: its rows go
+     * from this device. After stopping sharing one you own: it stays, as a
+     * private list, and the next push sends it back to your own space.
+     */
+open func forgetSharedSpace(spaceId: String, stoppedSharing: Bool)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_forget_shared_space(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(spaceId),
+        FfiConverterBool.lower(stoppedSharing),uniffiCallStatus
+    )
+}
+}
+    
+    /**
      * Whether a session waiting on a blocked queue can resume in `context`.
      */
 open func hasResumableFocusQueueTask(context: FocusContext, nowMs: Int64, zone: String)throws  -> Bool  {
@@ -4683,6 +4729,22 @@ open func reconcileWaitingFollowUps(nowMs: Int64)throws  -> Bool  {
 }
     
     /**
+     * Keeps the space the server answered sharing a list or accepting an
+     * invite with (`POST /v1/spaces`, `POST /v1/invites/<code>/accept`).
+     * The next push sends a newly shared list's rows to it; the next pull
+     * brings a joined one's.
+     */
+open func recordSharedSpace(body: String)throws  -> SharedList  {
+    return try  FfiConverterTypeSharedList_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_record_shared_space(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(body),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Advances the stored cursor and clock without applying rows.
      */
 open func recordSyncProgress(cursor: Int64?, hlc: String?, nowMs: Int64)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
@@ -5219,6 +5281,45 @@ open func setWaiting(taskId: String, waitingOn: String?, followUpAtMs: Int64?, f
         FfiConverterInt64.lower(nowMs),uniffiCallStatus
     )
 }
+}
+    
+    /**
+     * The name to share `list_id` under, or why it can't be shared: the
+     * Inbox, or a list someone else shared with you.
+     */
+open func shareableListName(listId: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_shareable_list_name(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(listId),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The shared list `list_id` is, or nothing when it isn't shared.
+     */
+open func sharedList(listId: String)throws  -> SharedList?  {
+    return try  FfiConverterOptionTypeSharedList.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_shared_list(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(listId),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Every shared list this device knows of, with its members.
+     */
+open func sharedLists()throws  -> [SharedList]  {
+    return try  FfiConverterSequenceTypeSharedList.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_shared_lists(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
 }
     
     /**
@@ -18390,6 +18491,157 @@ public func FfiConverterTypeSessionRow_lower(_ value: SessionRow) -> RustBuffer 
 
 
 /**
+ * A shared list as the device knows it.
+ */
+public struct SharedList: Equatable, Hashable {
+    public var spaceId: String
+    public var listId: String
+    /**
+     * The list's name here, or the name it was shared under while its row
+     * hasn't arrived.
+     */
+    public var name: String
+    /**
+     * "owner" or "member": this account's part in it.
+     */
+    public var role: String
+    public var members: [SharedListMember]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(spaceId: String, listId: String, 
+        /**
+         * The list's name here, or the name it was shared under while its row
+         * hasn't arrived.
+         */name: String, 
+        /**
+         * "owner" or "member": this account's part in it.
+         */role: String, members: [SharedListMember]) {
+        self.spaceId = spaceId
+        self.listId = listId
+        self.name = name
+        self.role = role
+        self.members = members
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SharedList: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSharedList: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SharedList {
+        return
+            try SharedList(
+                spaceId: FfiConverterString.read(from: &buf), 
+                listId: FfiConverterString.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                role: FfiConverterString.read(from: &buf), 
+                members: FfiConverterSequenceTypeSharedListMember.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SharedList, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.spaceId, into: &buf)
+        FfiConverterString.write(value.listId, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.role, into: &buf)
+        FfiConverterSequenceTypeSharedListMember.write(value.members, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSharedList_lift(_ buf: RustBuffer) throws -> SharedList {
+    return try FfiConverterTypeSharedList.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSharedList_lower(_ value: SharedList) -> RustBuffer {
+    return FfiConverterTypeSharedList.lower(value)
+}
+
+
+public struct SharedListMember: Equatable, Hashable {
+    public var accountId: String
+    public var email: String?
+    public var role: String
+    /**
+     * This account.
+     */
+    public var you: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(accountId: String, email: String?, role: String, 
+        /**
+         * This account.
+         */you: Bool) {
+        self.accountId = accountId
+        self.email = email
+        self.role = role
+        self.you = you
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SharedListMember: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSharedListMember: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SharedListMember {
+        return
+            try SharedListMember(
+                accountId: FfiConverterString.read(from: &buf), 
+                email: FfiConverterOptionString.read(from: &buf), 
+                role: FfiConverterString.read(from: &buf), 
+                you: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SharedListMember, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.accountId, into: &buf)
+        FfiConverterOptionString.write(value.email, into: &buf)
+        FfiConverterString.write(value.role, into: &buf)
+        FfiConverterBool.write(value.you, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSharedListMember_lift(_ buf: RustBuffer) throws -> SharedListMember {
+    return try FfiConverterTypeSharedListMember.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSharedListMember_lower(_ value: SharedListMember) -> RustBuffer {
+    return FfiConverterTypeSharedListMember.lower(value)
+}
+
+
+/**
  * Where the section labels go when siblings are drawn in three sections:
  * open work, then blocked, then buried (`buried`).
  */
@@ -19334,6 +19586,142 @@ public func FfiConverterTypeSyncEndpointsResolution_lift(_ buf: RustBuffer) thro
 #endif
 public func FfiConverterTypeSyncEndpointsResolution_lower(_ value: SyncEndpointsResolution) -> RustBuffer {
     return FfiConverterTypeSyncEndpointsResolution.lower(value)
+}
+
+
+/**
+ * An invite the server made.
+ */
+public struct SyncInvite: Equatable, Hashable {
+    public var code: String
+    public var spaceId: String
+    public var expiresAt: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(code: String, spaceId: String, expiresAt: String) {
+        self.code = code
+        self.spaceId = spaceId
+        self.expiresAt = expiresAt
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SyncInvite: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSyncInvite: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SyncInvite {
+        return
+            try SyncInvite(
+                code: FfiConverterString.read(from: &buf), 
+                spaceId: FfiConverterString.read(from: &buf), 
+                expiresAt: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SyncInvite, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.code, into: &buf)
+        FfiConverterString.write(value.spaceId, into: &buf)
+        FfiConverterString.write(value.expiresAt, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncInvite_lift(_ buf: RustBuffer) throws -> SyncInvite {
+    return try FfiConverterTypeSyncInvite.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncInvite_lower(_ value: SyncInvite) -> RustBuffer {
+    return FfiConverterTypeSyncInvite.lower(value)
+}
+
+
+/**
+ * What an invite is for, before joining.
+ */
+public struct SyncInvitePreview: Equatable, Hashable {
+    public var spaceId: String
+    public var name: String
+    public var ownerEmail: String?
+    public var expiresAt: String
+    /**
+     * This account is in the list already.
+     */
+    public var joined: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(spaceId: String, name: String, ownerEmail: String?, expiresAt: String, 
+        /**
+         * This account is in the list already.
+         */joined: Bool) {
+        self.spaceId = spaceId
+        self.name = name
+        self.ownerEmail = ownerEmail
+        self.expiresAt = expiresAt
+        self.joined = joined
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SyncInvitePreview: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSyncInvitePreview: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SyncInvitePreview {
+        return
+            try SyncInvitePreview(
+                spaceId: FfiConverterString.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                ownerEmail: FfiConverterOptionString.read(from: &buf), 
+                expiresAt: FfiConverterString.read(from: &buf), 
+                joined: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SyncInvitePreview, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.spaceId, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterOptionString.write(value.ownerEmail, into: &buf)
+        FfiConverterString.write(value.expiresAt, into: &buf)
+        FfiConverterBool.write(value.joined, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncInvitePreview_lift(_ buf: RustBuffer) throws -> SyncInvitePreview {
+    return try FfiConverterTypeSyncInvitePreview.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncInvitePreview_lower(_ value: SyncInvitePreview) -> RustBuffer {
+    return FfiConverterTypeSyncInvitePreview.lower(value)
 }
 
 
@@ -26220,6 +26608,30 @@ fileprivate struct FfiConverterOptionTypeSessionRow: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeSharedList: FfiConverterRustBuffer {
+    typealias SwiftType = SharedList?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSharedList.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSharedList.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeStoredFocusContext: FfiConverterRustBuffer {
     typealias SwiftType = StoredFocusContext?
 
@@ -28721,6 +29133,56 @@ fileprivate struct FfiConverterSequenceTypeSearchHit: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSearchHit.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSharedList: FfiConverterRustBuffer {
+    typealias SwiftType = [SharedList]
+
+    public static func write(_ value: [SharedList], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSharedList.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SharedList] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SharedList]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSharedList.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSharedListMember: FfiConverterRustBuffer {
+    typealias SwiftType = [SharedListMember]
+
+    public static func write(_ value: [SharedListMember], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSharedListMember.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SharedListMember] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SharedListMember]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSharedListMember.read(from: &buf))
         }
         return seq
     }
@@ -31780,6 +32242,129 @@ public func syncResolveEndpoints(server: String, supabaseUrl: String, supabaseKe
     )
 })
 }
+public func syncAcceptInvitePath(code: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_accept_invite_path(
+        FfiConverterString.lower(code),uniffiCallStatus
+    )
+})
+}
+/**
+ * Reads `POST /v1/spaces/<id>/invites`'s answer.
+ */
+public func syncDecodeInvite(body: String)throws  -> SyncInvite  {
+    return try  FfiConverterTypeSyncInvite_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_decode_invite(
+        FfiConverterString.lower(body),uniffiCallStatus
+    )
+})
+}
+/**
+ * Reads `GET /v1/invites/<code>`'s answer.
+ */
+public func syncDecodeInvitePreview(body: String)throws  -> SyncInvitePreview  {
+    return try  FfiConverterTypeSyncInvitePreview_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_decode_invite_preview(
+        FfiConverterString.lower(body),uniffiCallStatus
+    )
+})
+}
+/**
+ * The invite code in what someone pasted or typed: a bare code, an
+ * `https://…/join/<code>` link or a `takt://join/<code>` one. Dashes and
+ * spaces are dropped, so a code read out in groups still works. Nothing
+ * when no code is there.
+ */
+public func syncInviteCode(text: String) -> String?  {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_invite_code(
+        FfiConverterString.lower(text),uniffiCallStatus
+    )
+})
+}
+/**
+ * A code in groups of four, for reading out or typing.
+ */
+public func syncInviteCodeGrouped(code: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_invite_code_grouped(
+        FfiConverterString.lower(code),uniffiCallStatus
+    )
+})
+}
+/**
+ * The link to send someone: the server's page for the code, which opens
+ * the app or shows the code to type in.
+ */
+public func syncInviteLink(serverUrl: String, code: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_invite_link(
+        FfiConverterString.lower(serverUrl),
+        FfiConverterString.lower(code),uniffiCallStatus
+    )
+})
+}
+public func syncInvitePath(code: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_invite_path(
+        FfiConverterString.lower(code),uniffiCallStatus
+    )
+})
+}
+/**
+ * `POST /v1/spaces`'s body, sharing `list_id` under `name`.
+ */
+public func syncShareListBody(listId: String, name: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_share_list_body(
+        FfiConverterString.lower(listId),
+        FfiConverterString.lower(name),uniffiCallStatus
+    )
+})
+}
+public func syncSpaceInvitesPath(spaceId: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_space_invites_path(
+        FfiConverterString.lower(spaceId),uniffiCallStatus
+    )
+})
+}
+public func syncSpaceMemberPath(spaceId: String, accountId: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_space_member_path(
+        FfiConverterString.lower(spaceId),
+        FfiConverterString.lower(accountId),uniffiCallStatus
+    )
+})
+}
+public func syncSpacePath(spaceId: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_space_path(
+        FfiConverterString.lower(spaceId),uniffiCallStatus
+    )
+})
+}
+/**
+ * The request paths, so every client names them the same way.
+ */
+public func syncSpacesPath() -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_spaces_path(uniffiCallStatus
+    )
+})
+}
 /**
  * How long to wait before the next long-poll after `failures` failed cycles
  * in a row: 2, 4, 8 … seconds, capped at five minutes, so an outage costs
@@ -32748,6 +33333,42 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_func_sync_resolve_endpoints() != 47020) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_func_sync_accept_invite_path() != 1505) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_decode_invite() != 24903) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_decode_invite_preview() != 20759) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_invite_code() != 31557) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_invite_code_grouped() != 46270) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_invite_link() != 28420) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_invite_path() != 42618) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_share_list_body() != 35228) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_space_invites_path() != 1730) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_space_member_path() != 2898) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_space_path() != 48274) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_spaces_path() != 7726) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_func_sync_backoff_seconds() != 25052) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33285,6 +33906,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_folders() != 64875) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_forget_shared_space() != 61341) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_has_resumable_focus_queue_task() != 48787) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33414,6 +34038,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_reconcile_waiting_follow_ups() != 63977) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_record_shared_space() != 65330) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_record_sync_progress() != 46438) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33520,6 +34147,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_waiting() != 62353) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_shareable_list_name() != 47590) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_shared_list() != 50237) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_shared_lists() != 8670) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_sidebar_index() != 50190) {

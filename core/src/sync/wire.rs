@@ -17,8 +17,12 @@ use takt_sync_rules::wire::{
     ChangedRow, ChangesResponse, ErrorBody, PushRequest, WireChange, WireOp,
 };
 
+use std::collections::{HashMap, HashSet};
+
+use super::spaces::{self, PERSONAL_SUFFIX};
 use super::{
-    IncomingRow, SyncValue, acknowledge, apply_remote_rows, pending_changes, record_progress,
+    IncomingRow, OutgoingChange, SyncValue, acknowledge, apply_rows, pending_changes,
+    record_progress,
 };
 use crate::CoreError;
 
@@ -65,6 +69,8 @@ pub struct SyncPull {
 struct Gathered {
     rows: Vec<ChangedRow>,
     cursor: Option<i64>,
+    /// The shared spaces the last page listed, when the server sends them.
+    spaces: Option<Vec<takt_sync_rules::wire::WireSpace>>,
 }
 
 #[uniffi::export]
@@ -83,6 +89,9 @@ impl SyncPull {
         let mut gathered = self.gathered();
         gathered.rows.extend(page.rows);
         gathered.cursor = Some(page.cursor);
+        if page.spaces.is_some() {
+            gathered.spaces = page.spaces;
+        }
         Ok(SyncPullPage {
             cursor: page.cursor,
             has_more: page.has_more,
@@ -130,23 +139,57 @@ pub fn prepare_push(
     let Some(mut clock) = stored_clock(connection)? else {
         return Err(not_paired());
     };
-    let mut pending = pending_changes(connection, limit)?;
-    let Some(through_seq) = pending.through_seq else {
-        return Ok(None);
-    };
-    if pending.changes.is_empty() {
+    let pending = pending_changes(connection, limit)?;
+    let sharing = spaces::active(connection)?;
+    let mut items = pending.changes;
+    if sharing {
+        // Rows whose space changed under them, which the outbox doesn't
+        // name: they go whole to where they now belong.
+        let named: HashSet<(String, String)> = items
+            .iter()
+            .map(|change| (change.table.clone(), change.row_id.clone()))
+            .collect();
+        let room = limit.saturating_sub(u32::try_from(items.len()).unwrap_or(u32::MAX));
+        for (table, id) in spaces::moved_rows(connection, room.max(1))? {
+            if named.contains(&(table.clone(), id.clone())) {
+                continue;
+            }
+            if let Some(values) = super::live_values(connection, &table, &id)? {
+                items.push(OutgoingChange {
+                    table,
+                    row_id: id,
+                    operation: "upsert".into(),
+                    values,
+                    changed_at_ms: wall_ms,
+                });
+            }
+        }
+    }
+    if items.is_empty() {
         return Ok(None);
     }
-    pending.changes.sort_by_key(|change| change.changed_at_ms);
-    let changes = pending
-        .changes
-        .into_iter()
-        .map(|change| {
-            clock = clock.tick(change.changed_at_ms.max(wall_ms));
-            let delete = change.operation == "delete";
-            WireChange {
-                table: change.table,
-                id: change.row_id,
+    let through_seq = pending.through_seq.unwrap_or(0);
+    items.sort_by_key(|change| change.changed_at_ms);
+    let mut changes = Vec::new();
+    let mut plan = Vec::new();
+    for item in items {
+        let at = item.changed_at_ms.max(wall_ms);
+        let routed = if sharing {
+            route(connection, &item, &mut plan)?
+        } else {
+            vec![(
+                None,
+                item.table.clone(),
+                item.operation.clone(),
+                item.values,
+            )]
+        };
+        for (space, table, operation, values) in routed {
+            clock = clock.tick(at);
+            let delete = operation == "delete";
+            changes.push(WireChange {
+                table,
+                id: item.row_id.clone(),
                 op: if delete {
                     WireOp::Delete
                 } else {
@@ -154,16 +197,21 @@ pub fn prepare_push(
                 },
                 hlc: clock.to_string(),
                 values: (!delete).then(|| {
-                    change
-                        .values
+                    values
                         .iter()
                         .map(|(name, value)| (name.clone(), json_value(value)))
                         .collect()
                 }),
-                space: None,
-            }
-        })
-        .collect::<Vec<_>>();
+                space,
+            });
+        }
+    }
+    if sharing {
+        spaces::plan(connection, &plan)?;
+    }
+    if changes.is_empty() {
+        return Ok(None);
+    }
     let count = u32::try_from(changes.len()).unwrap_or(u32::MAX);
     let body =
         serde_json::to_string(&PushRequest { changes }).map_err(|error| CoreError::File {
@@ -186,6 +234,7 @@ pub fn finish_push(
     now_ms: i64,
 ) -> Result<(), CoreError> {
     acknowledge(transaction, through_seq)?;
+    spaces::carry_out_plan(transaction)?;
     record_progress(transaction, None, Some(hlc), now_ms)
 }
 
@@ -210,12 +259,135 @@ pub fn apply_pull(
             clock = clock.receiving(&remote, wall_ms);
         }
     }
-    let rows: Vec<IncomingRow> = gathered.rows.into_iter().map(incoming).collect();
-    let changed = apply_remote_rows(transaction, &rows, cursor, Some(&clock.to_string()), now_ms)?;
+    let rows: Vec<(IncomingRow, Option<String>)> = gathered
+        .rows
+        .into_iter()
+        .map(|row| {
+            let space = row.space.clone();
+            (incoming(row), space)
+        })
+        .collect();
+    let borrowed: Vec<(&IncomingRow, Option<&str>)> = rows
+        .iter()
+        .map(|(row, space)| (row, space.as_deref()))
+        .collect();
+    let changed = apply_rows(
+        transaction,
+        &borrowed,
+        gathered.spaces.as_deref(),
+        cursor,
+        Some(&clock.to_string()),
+        now_ms,
+    )?;
     Ok(SyncPullOutcome {
         pulled: u32::try_from(rows.len()).unwrap_or(u32::MAX),
         changed,
     })
+}
+
+/// One outgoing row, as the changes to send for it: which space each goes
+/// to (nothing for the account's own), its table name, "upsert" or
+/// "delete", and its columns. Adds to `plan` where the row will live once
+/// the server has them. See `spaces.rs`.
+type Routed = (Option<String>, String, String, HashMap<String, SyncValue>);
+
+fn route(
+    connection: &Connection,
+    item: &OutgoingChange,
+    plan: &mut Vec<(String, String, Option<String>)>,
+) -> Result<Vec<Routed>, CoreError> {
+    let table = item.table.as_str();
+    if !spaces::SHARED_TABLES.contains(&table) {
+        return Ok(vec![(
+            None,
+            item.table.clone(),
+            item.operation.clone(),
+            item.values.clone(),
+        )]);
+    }
+    let known = spaces::known(connection)?;
+    // `''` marks a row already gone from its shared space.
+    let recorded = spaces::recorded_space(connection, table, &item.row_id)?;
+    let sent_to = recorded
+        .clone()
+        .filter(|space| !space.is_empty() && known.contains(space));
+    let key = super::key_of(table).unwrap_or("id");
+    let mut out: Vec<Routed> = Vec::new();
+    if item.operation == "delete" {
+        if let Some(space) = &sent_to {
+            out.push((
+                Some(space.clone()),
+                item.table.clone(),
+                "delete".into(),
+                HashMap::new(),
+            ));
+        }
+        out.push((None, item.table.clone(), "delete".into(), HashMap::new()));
+        if recorded.is_some()
+            && let Some(companion) = spaces::companion_table(table)
+        {
+            out.push((None, companion, "delete".into(), HashMap::new()));
+        }
+        if recorded.is_some() {
+            plan.push((item.table.clone(), item.row_id.clone(), None));
+        }
+        return Ok(out);
+    }
+    let current = spaces::current_space(connection, table, &item.row_id)?;
+    let was = recorded.filter(|space| !space.is_empty());
+    let moved = current != was;
+    let values = if moved {
+        super::live_values(connection, table, &item.row_id)?.unwrap_or_else(|| item.values.clone())
+    } else {
+        item.values.clone()
+    };
+    if moved && let Some(space) = &sent_to {
+        out.push((
+            Some(space.clone()),
+            item.table.clone(),
+            "delete".into(),
+            HashMap::new(),
+        ));
+    }
+    match &current {
+        None => out.push((None, item.table.clone(), "upsert".into(), values)),
+        Some(space) => {
+            let (personal, shared): (HashMap<_, _>, HashMap<_, _>) = values
+                .into_iter()
+                .partition(|(name, _)| spaces::is_personal_column(table, name));
+            let key_value = shared.get(key).cloned();
+            if moved || shared.keys().any(|name| name != key) {
+                out.push((
+                    Some(space.clone()),
+                    item.table.clone(),
+                    "upsert".into(),
+                    shared,
+                ));
+            }
+            if !personal.is_empty() {
+                let mut personal = personal;
+                if let Some(value) = key_value {
+                    personal.insert(key.to_string(), value);
+                }
+                out.push((
+                    None,
+                    format!("{}{PERSONAL_SUFFIX}", item.table),
+                    "upsert".into(),
+                    personal,
+                ));
+            }
+            // Moving in from your own space: the copy there goes, after the
+            // shared one is written, so it can't bring back an old version
+            // on a new device once the list's members have changed it.
+            if moved && was.is_none() {
+                out.push((None, item.table.clone(), "delete".into(), HashMap::new()));
+            }
+        }
+    }
+    if moved {
+        plan.push((item.table.clone(), item.row_id.clone(), current));
+    }
+    Ok(out)
 }
 
 fn not_paired() -> CoreError {

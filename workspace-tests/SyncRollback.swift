@@ -46,8 +46,8 @@ extension Database {
       try execute(sql: "ALTER TABLE task_conditions DROP COLUMN \(column)")
     }
     // `v21_task_dependencies` and `v23_filter_lists` come later still: their
-    // tables go, triggers and all.
-    for table in ["calendar_event_links", "calendar_sync_tokens", "focus_contexts", "agent_instructions", "filter_lists", "task_dependencies", "sync_outbox", "sync_state", "sync_control", "themes", "preferences"] {
+    // tables go, triggers and all, as do `v37_shared_lists`'s.
+    for table in ["sync_push_plan", "sync_row_spaces", "sync_spaces", "calendar_event_links", "calendar_sync_tokens", "focus_contexts", "agent_instructions", "filter_lists", "task_dependencies", "sync_outbox", "sync_state", "sync_control", "themes", "preferences"] {
       try execute(sql: "DROP TABLE IF EXISTS \(table)")
     }
     try execute(
@@ -57,6 +57,6 @@ extension Database {
         + "'v26_commitment_missed_stack', 'v27_condition_order_and_context', 'v28_synced_focus_context', "
         + "'v29_daily_contribution_skips', 'v30_google_calendar', 'v31_link_details', 'v32_follow_up_repeat', "
         + "'v33_recurrence_series', 'v34_condition_provides', 'v35_series_title', "
-        + "'v36_task_agent_context')")
+        + "'v36_task_agent_context', 'v37_shared_lists')")
   }
 }

@@ -1460,6 +1460,51 @@ impl CoreWorkspace {
         self.unjournalled(|tx| sync::apply_remote_rows(tx, &rows, cursor, hlc.as_deref(), now_ms))
     }
 
+    /// Every shared list this device knows of, with its members.
+    pub fn shared_lists(&self) -> Result<Vec<sync::spaces::SharedList>, CoreError> {
+        sync::spaces::shared_lists(&self.lock())
+    }
+
+    /// The shared list `list_id` is, or nothing when it isn't shared.
+    pub fn shared_list(
+        &self,
+        list_id: String,
+    ) -> Result<Option<sync::spaces::SharedList>, CoreError> {
+        sync::spaces::shared_list(&self.lock(), &list_id)
+    }
+
+    /// The name to share `list_id` under, or why it can't be shared: the
+    /// Inbox, or a list someone else shared with you.
+    pub fn shareable_list_name(&self, list_id: String) -> Result<String, CoreError> {
+        sync::spaces::shareable_name(&self.lock(), &list_id)
+    }
+
+    /// Keeps the space the server answered sharing a list or accepting an
+    /// invite with (`POST /v1/spaces`, `POST /v1/invites/<code>/accept`).
+    /// The next push sends a newly shared list's rows to it; the next pull
+    /// brings a joined one's.
+    pub fn record_shared_space(&self, body: String) -> Result<sync::spaces::SharedList, CoreError> {
+        let space = sync::spaces::decode_space(&body)?;
+        let list_id = space.list_id.clone();
+        self.unjournalled(|tx| sync::spaces::record_space(tx, &space))?;
+        sync::spaces::shared_list(&self.lock(), &list_id)?.ok_or_else(|| CoreError::MissingList {
+            id: list_id.clone(),
+        })
+    }
+
+    /// After leaving a shared list, or being told it has gone: its rows go
+    /// from this device. After stopping sharing one you own: it stays, as a
+    /// private list, and the next push sends it back to your own space.
+    pub fn forget_shared_space(
+        &self,
+        space_id: String,
+        stopped_sharing: bool,
+    ) -> Result<(), CoreError> {
+        self.unjournalled(|tx| {
+            sync::spaces::forget(tx, &space_id, !stopped_sharing, stopped_sharing)
+        })
+    }
+
     /// The outbox's next batch as a `POST /v1/push` body, stamped from the
     /// stored clock; nothing when the outbox is empty.
     pub fn prepare_sync_push(

@@ -614,6 +614,7 @@ pub fn delete_list(transaction: &Transaction, id: &str) -> Result<DeletedList, C
     if system_role.is_some() {
         return Err(CoreError::SystemListIsPermanent);
     }
+    crate::sync::spaces::refuse_if_shared(transaction, id)?;
     let tasks_deleted: u32 = transaction.query_row(
         "SELECT COUNT(*) FROM tasks WHERE listId = ?1",
         [id],

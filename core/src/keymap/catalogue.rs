@@ -435,6 +435,15 @@ fn lists() -> Vec<Spec> {
         c("listDelete", "Delete the list or folder", "Lists", &["cmd+shift+delete"])
             .also(Sidebar, &["delete", "cmd+delete", "shift+d"])
             .note("Asks first. ⌫ and ⇧D on the sidebar row, as in Zed's project panel"),
+        c("listShare", "Share the list", "Lists", &[])
+            .note("Copies an invite link for another Takt account; each run makes a new one"),
+        c("listJoin", "Join a shared list", "Lists", &[])
+            .note("Asks for an invite link or code"),
+        c("listMembers", "Show who the list is shared with", "Lists", &[]),
+        c("listLeave", "Leave the shared list", "Lists", &[])
+            .note("Asks first. The list goes from your devices; the others keep it"),
+        c("listStopSharing", "Stop sharing the list", "Lists", &[])
+            .note("Asks first. Owner only: the list stays yours and leaves everyone else's"),
         c("folderNew", "Create a folder", "Lists", &["cmd+option+n"])
             .also(Sidebar, &["d"])
             .note("d in the sidebar, as in Zed's vim project panel"),

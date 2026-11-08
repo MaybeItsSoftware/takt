@@ -358,31 +358,98 @@ pub fn apply_remote_rows(
     hlc: Option<&str>,
     now_ms: i64,
 ) -> Result<bool, CoreError> {
+    let rows: Vec<(&IncomingRow, Option<&str>)> = rows.iter().map(|row| (row, None)).collect();
+    apply_rows(transaction, &rows, None, cursor, hlc, now_ms)
+}
+
+/// [`apply_remote_rows`] for rows that each name the space they came from
+/// (nothing for the account's own), with the shared spaces the server
+/// listed beside them when it did. See `spaces.rs` for what a space changes.
+pub(crate) fn apply_rows(
+    transaction: &Transaction,
+    rows: &[(&IncomingRow, Option<&str>)],
+    shared: Option<&[takt_sync_rules::wire::WireSpace]>,
+    cursor: i64,
+    hlc: Option<&str>,
+    now_ms: i64,
+) -> Result<bool, CoreError> {
     transaction.execute_batch("PRAGMA defer_foreign_keys = ON")?;
-    set_applying(transaction, true)?;
     let mut changed = false;
+    if let Some(shared) = shared {
+        changed |= spaces::store_spaces(transaction, shared)?;
+    }
+    let sharing = spaces::active(transaction)?;
+    set_applying(transaction, true)?;
+    // Applied after everything else: see `spaces.rs`, "Tombstones".
+    let mut shared_tombstones: Vec<(&IncomingRow, &str)> = Vec::new();
+    // Personal columns for a row that hasn't arrived yet.
+    let mut companions: Vec<(&IncomingRow, &'static str)> = Vec::new();
     let applied = (|| -> Result<(), CoreError> {
-        for row in rows {
+        for (row, space) in rows {
+            if let Some(base) = spaces::companion_base(&row.table) {
+                let Some(base) = SYNCED_TABLES
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .find(|name| *name == base)
+                else {
+                    continue;
+                };
+                if !row.deleted && !waiting(transaction, base, &row.id)? {
+                    match apply_companion(transaction, row, base)? {
+                        Some(applied) => changed |= applied,
+                        None => companions.push((row, base)),
+                    }
+                }
+                continue;
+            }
             let Some(key_column) = sync_key(&row.table) else {
                 continue;
             };
-            let waiting: bool = transaction.query_row(
-                "SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE tableName = ?1 AND rowId = ?2)",
-                params![row.table, row.id],
-                |r| r.get(0),
-            )?;
-            if waiting {
+            if waiting(transaction, &row.table, &row.id)? {
                 continue;
             }
-            if row.deleted {
-                transaction.execute(
-                    &format!("DELETE FROM {} WHERE \"{key_column}\" = ?1", row.table),
-                    [&row.id],
-                )?;
-            } else {
-                upsert_remote(transaction, row, key_column)?;
+            match space {
+                Some(space) if row.deleted => shared_tombstones.push((row, space)),
+                Some(space) => {
+                    upsert_shared(transaction, row, key_column, now_ms)?;
+                    changed |= transaction.changes() > 0;
+                    spaces::record(transaction, &row.table, &row.id, Some(space))?;
+                }
+                // A copy in the account's own space of a row that now lives
+                // in a shared list: left over from before it was shared, or a
+                // tidy-up after a member's delete. The shared space speaks for
+                // it; only the row's personal columns, and a move out of the
+                // list, come from here.
+                None if sharing
+                    && exists(transaction, &row.table, key_column, &row.id)?
+                    && spaces::current_space(transaction, &row.table, &row.id)?
+                        .is_some_and(|here| !moves_out(transaction, row, &here)) =>
+                {
+                    if !row.deleted {
+                        changed |= apply_personal_part(transaction, row, key_column)?;
+                    }
+                }
+                None if row.deleted => {
+                    transaction.execute(
+                        &format!("DELETE FROM {} WHERE \"{key_column}\" = ?1", row.table),
+                        [&row.id],
+                    )?;
+                    changed |= transaction.changes() > 0;
+                    if sharing {
+                        spaces::record(transaction, &row.table, &row.id, None)?;
+                    }
+                }
+                None => {
+                    upsert_remote(transaction, row, key_column)?;
+                    changed |= transaction.changes() > 0;
+                }
             }
-            changed |= transaction.changes() > 0;
+        }
+        for (row, base) in companions.drain(..) {
+            changed |= apply_companion(transaction, row, base)?.unwrap_or(false);
+        }
+        for (row, space) in shared_tombstones.drain(..) {
+            changed |= apply_shared_tombstone(transaction, row, space)?;
         }
         Ok(())
     })();
@@ -395,6 +462,262 @@ pub fn apply_remote_rows(
         params![cursor, hlc, stored(now_ms)],
     )?;
     Ok(changed)
+}
+
+/// Whether a local edit of the row still waits to be pushed.
+fn waiting(transaction: &Transaction, table: &str, id: &str) -> Result<bool, CoreError> {
+    Ok(transaction.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE tableName = ?1 AND rowId = ?2)",
+        params![table, id],
+        |r| r.get(0),
+    )?)
+}
+
+/// A row from a shared list's space: everything but the personal columns,
+/// which are each member's own. A list arriving for the first time goes at
+/// the end of the sidebar's top level, in this device's workspace.
+fn upsert_shared(
+    transaction: &Transaction,
+    row: &IncomingRow,
+    key_column: &str,
+    now_ms: i64,
+) -> Result<(), CoreError> {
+    let mut shared = row.clone();
+    shared
+        .values
+        .retain(|name, _| !spaces::is_personal_column(&row.table, name));
+    if row.table == "task_lists" {
+        let exists: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM task_lists WHERE id = ?1)",
+            [&row.id],
+            |r| r.get(0),
+        )?;
+        if !exists {
+            let workspace = home_workspace(transaction)?;
+            let order: i64 = transaction.query_row(
+                "SELECT COALESCE(MAX(sortOrder) + 1, 0) FROM task_lists
+                 WHERE workspaceId IS ?1 AND folderId IS NULL",
+                [&workspace],
+                |r| r.get(0),
+            )?;
+            if let Some(workspace) = workspace {
+                shared
+                    .values
+                    .insert("workspaceId".into(), SyncValue::Text { value: workspace });
+            }
+            shared
+                .values
+                .insert("sortOrder".into(), SyncValue::Integer { value: order });
+            shared
+                .values
+                .entry("createdAt".into())
+                .or_insert_with(|| SyncValue::Text {
+                    value: stored(now_ms),
+                });
+            shared
+                .values
+                .entry("updatedAt".into())
+                .or_insert_with(|| SyncValue::Text {
+                    value: stored(now_ms),
+                });
+        }
+    }
+    upsert_remote(transaction, &shared, key_column)
+}
+
+/// The workspace a shared list lands in: the canonical one, or the oldest.
+fn home_workspace(transaction: &Transaction) -> Result<Option<String>, CoreError> {
+    let canonical: Option<String> = transaction
+        .query_row(
+            "SELECT canonicalWorkspaceId FROM sync_state WHERE id = 0
+               AND canonicalWorkspaceId IN (SELECT id FROM workspaces)",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten();
+    match canonical {
+        Some(id) => Ok(Some(id)),
+        None => Ok(transaction
+            .query_row(
+                "SELECT id FROM workspaces ORDER BY createdAt LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?),
+    }
+}
+
+/// A shared row's personal columns, from the account's own space. Nothing
+/// (`None`) while the row itself hasn't arrived.
+fn apply_companion(
+    transaction: &Transaction,
+    row: &IncomingRow,
+    base: &str,
+) -> Result<Option<bool>, CoreError> {
+    let Some(key_column) = sync_key(base) else {
+        return Ok(Some(false));
+    };
+    let exists: bool = transaction.query_row(
+        &format!("SELECT EXISTS(SELECT 1 FROM {base} WHERE \"{key_column}\" = ?1)"),
+        [&row.id],
+        |r| r.get(0),
+    )?;
+    if !exists {
+        return Ok(None);
+    }
+    let mut personal = row.clone();
+    personal.table = base.to_string();
+    personal
+        .values
+        .retain(|name, _| spaces::is_personal_column(base, name));
+    upsert_remote(transaction, &personal, key_column)?;
+    Ok(Some(transaction.changes() > 0))
+}
+
+/// A delete from a shared list's space, for a row that still belongs there.
+/// It is passed on to the account's own space as well, with recording on,
+/// so a copy of the row left there from before it was shared goes too.
+fn apply_shared_tombstone(
+    transaction: &Transaction,
+    row: &IncomingRow,
+    space: &str,
+) -> Result<bool, CoreError> {
+    let Some(key_column) = sync_key(&row.table) else {
+        return Ok(false);
+    };
+    let exists: bool = transaction.query_row(
+        &format!(
+            "SELECT EXISTS(SELECT 1 FROM {} WHERE \"{key_column}\" = ?1)",
+            row.table
+        ),
+        [&row.id],
+        |r| r.get(0),
+    )?;
+    if !exists {
+        spaces::record(transaction, &row.table, &row.id, None)?;
+        return Ok(false);
+    }
+    if spaces::current_space(transaction, &row.table, &row.id)?.as_deref() != Some(space) {
+        // It has moved on since; its new home's row is what counts. The old
+        // space no longer holds it, so moving it back in sends it whole.
+        if spaces::recorded_space(transaction, &row.table, &row.id)?.as_deref() == Some(space) {
+            spaces::record(transaction, &row.table, &row.id, None)?;
+        }
+        return Ok(false);
+    }
+    transaction.execute(
+        &format!("DELETE FROM {} WHERE \"{key_column}\" = ?1", row.table),
+        [&row.id],
+    )?;
+    let recording: bool =
+        transaction.query_row("SELECT recording FROM sync_control WHERE id = 0", [], |r| {
+            r.get(0)
+        })?;
+    if recording {
+        // Gone from the shared space already: the push only tidies the
+        // account's own copy (`''` says so).
+        spaces::record(transaction, &row.table, &row.id, Some(""))?;
+        transaction.execute(
+            "INSERT INTO sync_outbox (tableName, rowId, operation, changedJSON, changedAtMs)
+             VALUES (?1, ?2, 'delete', NULL, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER))",
+            params![row.table, row.id],
+        )?;
+    } else {
+        spaces::record(transaction, &row.table, &row.id, None)?;
+    }
+    Ok(true)
+}
+
+fn exists(
+    transaction: &Transaction,
+    table: &str,
+    key_column: &str,
+    id: &str,
+) -> Result<bool, CoreError> {
+    Ok(transaction.query_row(
+        &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE \"{key_column}\" = ?1)"),
+        [id],
+        |r| r.get(0),
+    )?)
+}
+
+/// Whether an own-space copy of a task in shared list `space` moves it out:
+/// its list is one that isn't that space's.
+fn moves_out(transaction: &Transaction, row: &IncomingRow, space: &str) -> bool {
+    // A tombstone still carries the row's last values, which say nothing of
+    // where it lives now.
+    if row.deleted {
+        return false;
+    }
+    match spaces::incoming_list_id(&row.table, &row.values) {
+        Some(list) => {
+            spaces::space_of_list(transaction, list)
+                .ok()
+                .flatten()
+                .as_deref()
+                != Some(space)
+        }
+        None => false,
+    }
+}
+
+/// Writes only a row's personal columns over the live row.
+fn apply_personal_part(
+    transaction: &Transaction,
+    row: &IncomingRow,
+    key_column: &str,
+) -> Result<bool, CoreError> {
+    let values: HashMap<String, SyncValue> = row
+        .values
+        .iter()
+        .filter(|(name, _)| spaces::is_personal_column(&row.table, name))
+        .map(|(name, value)| (name.clone(), value.clone()))
+        .collect();
+    if values.is_empty() {
+        return Ok(false);
+    }
+    let part = IncomingRow {
+        table: row.table.clone(),
+        id: row.id.clone(),
+        deleted: false,
+        values,
+        hlc: row.hlc.clone(),
+    };
+    upsert_remote(transaction, &part, key_column)?;
+    Ok(transaction.changes() > 0)
+}
+
+/// Every column of the live row, or nothing when it is gone.
+pub(crate) fn live_values(
+    connection: &Connection,
+    table: &str,
+    id: &str,
+) -> Result<Option<HashMap<String, SyncValue>>, CoreError> {
+    let Some(key_column) = sync_key(table) else {
+        return Ok(None);
+    };
+    let mut statement = connection.prepare(&format!(
+        "SELECT * FROM {table} WHERE \"{key_column}\" = ?1"
+    ))?;
+    let names: Vec<String> = statement
+        .column_names()
+        .iter()
+        .map(|n| n.to_string())
+        .collect();
+    Ok(statement
+        .query_row([id], |row| {
+            let mut values = HashMap::new();
+            for (index, name) in names.iter().enumerate() {
+                values.insert(name.clone(), SyncValue::from_ref(row.get_ref(index)?));
+            }
+            Ok(values)
+        })
+        .optional()?)
+}
+
+pub(crate) fn key_of(table: &str) -> Option<&'static str> {
+    sync_key(table)
 }
 
 fn set_applying(transaction: &Transaction, on: bool) -> Result<(), CoreError> {
@@ -782,6 +1105,9 @@ fn base64(bytes: &[u8]) -> String {
 }
 
 pub mod endpoints;
+pub mod spaces;
+#[cfg(test)]
+mod spaces_tests;
 #[cfg(test)]
 mod tests;
 pub mod wire;

@@ -1009,6 +1009,30 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_func_sync_resolve_endpoints(
     ): Int
+    external fun uniffi_takt_core_checksum_func_sync_accept_invite_path(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_decode_invite(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_decode_invite_preview(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_invite_code(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_invite_code_grouped(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_invite_link(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_invite_path(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_share_list_body(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_space_invites_path(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_space_member_path(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_space_path(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_sync_spaces_path(
+    ): Int
     external fun uniffi_takt_core_checksum_func_sync_backoff_seconds(
     ): Int
     external fun uniffi_takt_core_checksum_func_sync_body_is_json_object(
@@ -1367,6 +1391,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_folders(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_forget_shared_space(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_has_resumable_focus_queue_task(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_history_target(
@@ -1453,6 +1479,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_reconcile_waiting_follow_ups(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_record_shared_space(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_record_sync_progress(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_recover_interrupted_focus(
@@ -1524,6 +1552,12 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_task_requirements(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_waiting(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_shareable_list_name(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_shared_list(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_shared_lists(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_sidebar_index(
     ): Int
@@ -1897,6 +1931,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_folders(`ptr`: Long,`workspaceId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_forget_shared_space(`ptr`: Long,`spaceId`: RustBuffer.ByValue,`stoppedSharing`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_has_resumable_focus_queue_task(`ptr`: Long,`context`: RustBuffer.ByValue,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_history_target(`ptr`: Long,`forUndo`: Byte,uniffi_out_err: UniffiRustCallStatus, 
@@ -1983,6 +2019,8 @@ internal object UniffiLib {
     ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_reconcile_waiting_follow_ups(`ptr`: Long,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
+    external fun uniffi_takt_core_fn_method_coreworkspace_record_shared_space(`ptr`: Long,`body`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_record_sync_progress(`ptr`: Long,`cursor`: RustBuffer.ByValue,`hlc`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_recover_interrupted_focus(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -2055,6 +2093,12 @@ internal object UniffiLib {
     ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_set_waiting(`ptr`: Long,`taskId`: RustBuffer.ByValue,`waitingOn`: RustBuffer.ByValue,`followUpAtMs`: RustBuffer.ByValue,`followUpEveryDays`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_takt_core_fn_method_coreworkspace_shareable_list_name(`ptr`: Long,`listId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_shared_list(`ptr`: Long,`listId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_shared_lists(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_sidebar_index(`ptr`: Long,`listIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_sidebar_index_with_open_counts(`ptr`: Long,`listIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -2440,6 +2484,30 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_func_sync_normalised_url(`typed`: RustBuffer.ByValue,`droppingSuffixes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_sync_resolve_endpoints(`server`: RustBuffer.ByValue,`supabaseUrl`: RustBuffer.ByValue,`supabaseKey`: RustBuffer.ByValue,`hosted`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_accept_invite_path(`code`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_decode_invite(`body`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_decode_invite_preview(`body`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_invite_code(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_invite_code_grouped(`code`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_invite_link(`serverUrl`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_invite_path(`code`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_share_list_body(`listId`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_space_invites_path(`spaceId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_space_member_path(`spaceId`: RustBuffer.ByValue,`accountId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_space_path(`spaceId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_spaces_path(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_sync_backoff_seconds(`failures`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
@@ -3143,6 +3211,42 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_func_sync_resolve_endpoints() and 0xFFFF) != 47020) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_func_sync_accept_invite_path() and 0xFFFF) != 1505) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_decode_invite() and 0xFFFF) != 24903) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_decode_invite_preview() and 0xFFFF) != 20759) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_invite_code() and 0xFFFF) != 31557) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_invite_code_grouped() and 0xFFFF) != 46270) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_invite_link() and 0xFFFF) != 28420) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_invite_path() and 0xFFFF) != 42618) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_share_list_body() and 0xFFFF) != 35228) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_space_invites_path() and 0xFFFF) != 1730) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_space_member_path() and 0xFFFF) != 2898) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_space_path() and 0xFFFF) != 48274) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_spaces_path() and 0xFFFF) != 7726) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_func_sync_backoff_seconds() and 0xFFFF) != 25052) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -3680,6 +3784,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_folders() and 0xFFFF) != 64875) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_forget_shared_space() and 0xFFFF) != 61341) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_has_resumable_focus_queue_task() and 0xFFFF) != 48787) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -3809,6 +3916,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_reconcile_waiting_follow_ups() and 0xFFFF) != 63977) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_record_shared_space() and 0xFFFF) != 65330) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_record_sync_progress() and 0xFFFF) != 46438) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -3915,6 +4025,15 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_waiting() and 0xFFFF) != 62353) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_shareable_list_name() and 0xFFFF) != 47590) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_shared_list() and 0xFFFF) != 50237) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_shared_lists() and 0xFFFF) != 8670) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_sidebar_index() and 0xFFFF) != 50190) {
@@ -5670,6 +5789,13 @@ public interface CoreWorkspaceInterface {
     fun `folders`(`workspaceId`: kotlin.String): List<FolderRow>
     
     /**
+     * After leaving a shared list, or being told it has gone: its rows go
+     * from this device. After stopping sharing one you own: it stays, as a
+     * private list, and the next push sends it back to your own space.
+     */
+    fun `forgetSharedSpace`(`spaceId`: kotlin.String, `stoppedSharing`: kotlin.Boolean)
+    
+    /**
      * Whether a session waiting on a blocked queue can resume in `context`.
      */
     fun `hasResumableFocusQueueTask`(`context`: FocusContext, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.Boolean
@@ -5903,6 +6029,14 @@ public interface CoreWorkspaceInterface {
     fun `reconcileWaitingFollowUps`(`nowMs`: kotlin.Long): kotlin.Boolean
     
     /**
+     * Keeps the space the server answered sharing a list or accepting an
+     * invite with (`POST /v1/spaces`, `POST /v1/invites/<code>/accept`).
+     * The next push sends a newly shared list's rows to it; the next pull
+     * brings a joined one's.
+     */
+    fun `recordSharedSpace`(`body`: kotlin.String): SharedList
+    
+    /**
      * Advances the stored cursor and clock without applying rows.
      */
     fun `recordSyncProgress`(`cursor`: kotlin.Long?, `hlc`: kotlin.String?, `nowMs`: kotlin.Long)
@@ -6094,6 +6228,22 @@ public interface CoreWorkspaceInterface {
      * to chase again (`None` for once), as one "Waiting On" step.
      */
     fun `setWaiting`(`taskId`: kotlin.String, `waitingOn`: kotlin.String?, `followUpAtMs`: kotlin.Long?, `followUpEveryDays`: kotlin.UInt?, `nowMs`: kotlin.Long)
+    
+    /**
+     * The name to share `list_id` under, or why it can't be shared: the
+     * Inbox, or a list someone else shared with you.
+     */
+    fun `shareableListName`(`listId`: kotlin.String): kotlin.String
+    
+    /**
+     * The shared list `list_id` is, or nothing when it isn't shared.
+     */
+    fun `sharedList`(`listId`: kotlin.String): SharedList?
+    
+    /**
+     * Every shared list this device knows of, with its members.
+     */
+    fun `sharedLists`(): List<SharedList>
     
     /**
      * What the sidebar draws beneath the given lists, walked here so only
@@ -8753,6 +8903,26 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 
     
     /**
+     * After leaving a shared list, or being told it has gone: its rows go
+     * from this device. After stopping sharing one you own: it stays, as a
+     * private list, and the next push sends it back to your own space.
+     */
+    @Throws(CoreException::class)override fun `forgetSharedSpace`(`spaceId`: kotlin.String, `stoppedSharing`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_forget_shared_space(
+        it,
+        
+        FfiConverterString.lower(`spaceId`),
+        FfiConverterBoolean.lower(`stoppedSharing`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * Whether a session waiting on a blocked queue can resume in `context`.
      */
     @Throws(CoreException::class)override fun `hasResumableFocusQueueTask`(`context`: FocusContext, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.Boolean {
@@ -9601,6 +9771,27 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 
     
     /**
+     * Keeps the space the server answered sharing a list or accepting an
+     * invite with (`POST /v1/spaces`, `POST /v1/invites/<code>/accept`).
+     * The next push sends a newly shared list's rows to it; the next pull
+     * brings a joined one's.
+     */
+    @Throws(CoreException::class)override fun `recordSharedSpace`(`body`: kotlin.String): SharedList {
+            return FfiConverterTypeSharedList.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_record_shared_space(
+        it,
+        
+        FfiConverterString.lower(`body`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Advances the stored cursor and clock without applying rows.
      */
     @Throws(CoreException::class)override fun `recordSyncProgress`(`cursor`: kotlin.Long?, `hlc`: kotlin.String?, `nowMs`: kotlin.Long)
@@ -10316,6 +10507,60 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 }
     }
     
+    
+
+    
+    /**
+     * The name to share `list_id` under, or why it can't be shared: the
+     * Inbox, or a list someone else shared with you.
+     */
+    @Throws(CoreException::class)override fun `shareableListName`(`listId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_shareable_list_name(
+        it,
+        
+        FfiConverterString.lower(`listId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The shared list `list_id` is, or nothing when it isn't shared.
+     */
+    @Throws(CoreException::class)override fun `sharedList`(`listId`: kotlin.String): SharedList? {
+            return FfiConverterOptionalTypeSharedList.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_shared_list(
+        it,
+        
+        FfiConverterString.lower(`listId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Every shared list this device knows of, with its members.
+     */
+    @Throws(CoreException::class)override fun `sharedLists`(): List<SharedList> {
+            return FfiConverterSequenceTypeSharedList.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_shared_lists(
+        it,
+        _status)
+}
+    }
+    )
+    }
     
 
     
@@ -20891,6 +21136,120 @@ public object FfiConverterTypeSessionRow: FfiConverterRustBuffer<SessionRow> {
 
 
 /**
+ * A shared list as the device knows it.
+ */
+data class SharedList (
+    var `spaceId`: kotlin.String
+    , 
+    var `listId`: kotlin.String
+    , 
+    /**
+     * The list's name here, or the name it was shared under while its row
+     * hasn't arrived.
+     */
+    var `name`: kotlin.String
+    , 
+    /**
+     * "owner" or "member": this account's part in it.
+     */
+    var `role`: kotlin.String
+    , 
+    var `members`: List<SharedListMember>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSharedList: FfiConverterRustBuffer<SharedList> {
+    override fun read(buf: ByteBuffer): SharedList {
+        return SharedList(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeSharedListMember.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SharedList) = (
+            FfiConverterString.allocationSize(value.`spaceId`) +
+            FfiConverterString.allocationSize(value.`listId`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`role`) +
+            FfiConverterSequenceTypeSharedListMember.allocationSize(value.`members`)
+    )
+
+    override fun write(value: SharedList, buf: ByteBuffer) {
+            FfiConverterString.write(value.`spaceId`, buf)
+            FfiConverterString.write(value.`listId`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`role`, buf)
+            FfiConverterSequenceTypeSharedListMember.write(value.`members`, buf)
+    }
+}
+
+
+
+data class SharedListMember (
+    var `accountId`: kotlin.String
+    , 
+    var `email`: kotlin.String?
+    , 
+    var `role`: kotlin.String
+    , 
+    /**
+     * This account.
+     */
+    var `you`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSharedListMember: FfiConverterRustBuffer<SharedListMember> {
+    override fun read(buf: ByteBuffer): SharedListMember {
+        return SharedListMember(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SharedListMember) = (
+            FfiConverterString.allocationSize(value.`accountId`) +
+            FfiConverterOptionalString.allocationSize(value.`email`) +
+            FfiConverterString.allocationSize(value.`role`) +
+            FfiConverterBoolean.allocationSize(value.`you`)
+    )
+
+    override fun write(value: SharedListMember, buf: ByteBuffer) {
+            FfiConverterString.write(value.`accountId`, buf)
+            FfiConverterOptionalString.write(value.`email`, buf)
+            FfiConverterString.write(value.`role`, buf)
+            FfiConverterBoolean.write(value.`you`, buf)
+    }
+}
+
+
+
+/**
  * Where the section labels go when siblings are drawn in three sections:
  * open work, then blocked, then buried (`buried`).
  */
@@ -21577,6 +21936,111 @@ public object FfiConverterTypeSyncEndpointsResolution: FfiConverterRustBuffer<Sy
     override fun write(value: SyncEndpointsResolution, buf: ByteBuffer) {
             FfiConverterOptionalTypeSyncEndpointsRecord.write(value.`endpoints`, buf)
             FfiConverterOptionalString.write(value.`problem`, buf)
+    }
+}
+
+
+
+/**
+ * An invite the server made.
+ */
+data class SyncInvite (
+    var `code`: kotlin.String
+    , 
+    var `spaceId`: kotlin.String
+    , 
+    var `expiresAt`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSyncInvite: FfiConverterRustBuffer<SyncInvite> {
+    override fun read(buf: ByteBuffer): SyncInvite {
+        return SyncInvite(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SyncInvite) = (
+            FfiConverterString.allocationSize(value.`code`) +
+            FfiConverterString.allocationSize(value.`spaceId`) +
+            FfiConverterString.allocationSize(value.`expiresAt`)
+    )
+
+    override fun write(value: SyncInvite, buf: ByteBuffer) {
+            FfiConverterString.write(value.`code`, buf)
+            FfiConverterString.write(value.`spaceId`, buf)
+            FfiConverterString.write(value.`expiresAt`, buf)
+    }
+}
+
+
+
+/**
+ * What an invite is for, before joining.
+ */
+data class SyncInvitePreview (
+    var `spaceId`: kotlin.String
+    , 
+    var `name`: kotlin.String
+    , 
+    var `ownerEmail`: kotlin.String?
+    , 
+    var `expiresAt`: kotlin.String
+    , 
+    /**
+     * This account is in the list already.
+     */
+    var `joined`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSyncInvitePreview: FfiConverterRustBuffer<SyncInvitePreview> {
+    override fun read(buf: ByteBuffer): SyncInvitePreview {
+        return SyncInvitePreview(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SyncInvitePreview) = (
+            FfiConverterString.allocationSize(value.`spaceId`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterOptionalString.allocationSize(value.`ownerEmail`) +
+            FfiConverterString.allocationSize(value.`expiresAt`) +
+            FfiConverterBoolean.allocationSize(value.`joined`)
+    )
+
+    override fun write(value: SyncInvitePreview, buf: ByteBuffer) {
+            FfiConverterString.write(value.`spaceId`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterOptionalString.write(value.`ownerEmail`, buf)
+            FfiConverterString.write(value.`expiresAt`, buf)
+            FfiConverterBoolean.write(value.`joined`, buf)
     }
 }
 
@@ -29018,6 +29482,38 @@ public object FfiConverterOptionalTypeSessionRow: FfiConverterRustBuffer<Session
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeSharedList: FfiConverterRustBuffer<SharedList?> {
+    override fun read(buf: ByteBuffer): SharedList? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeSharedList.read(buf)
+    }
+
+    override fun allocationSize(value: SharedList?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeSharedList.allocationSize(value)
+        }
+    }
+
+    override fun write(value: SharedList?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeSharedList.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeStoredFocusContext: FfiConverterRustBuffer<StoredFocusContext?> {
     override fun read(buf: ByteBuffer): StoredFocusContext? {
         if (buf.get().toInt() == 0) {
@@ -31900,6 +32396,62 @@ public object FfiConverterSequenceTypeSearchHit: FfiConverterRustBuffer<List<Sea
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeSearchHit.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSharedList: FfiConverterRustBuffer<List<SharedList>> {
+    override fun read(buf: ByteBuffer): List<SharedList> {
+        val len = buf.getInt()
+        return List<SharedList>(len) {
+            FfiConverterTypeSharedList.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SharedList>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSharedList.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SharedList>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSharedList.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSharedListMember: FfiConverterRustBuffer<List<SharedListMember>> {
+    override fun read(buf: ByteBuffer): List<SharedListMember> {
+        val len = buf.getInt()
+        return List<SharedListMember>(len) {
+            FfiConverterTypeSharedListMember.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SharedListMember>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSharedListMember.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SharedListMember>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSharedListMember.write(it, buf)
         }
     }
 }
@@ -35601,6 +36153,167 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
         FfiConverterString.lower(`supabaseUrl`),
         FfiConverterString.lower(`supabaseKey`),
         FfiConverterTypeSyncEndpointsRecord.lower(`hosted`),_status)
+}
+    )
+    }
+    
+ fun `syncAcceptInvitePath`(`code`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_accept_invite_path(
+    
+        
+        FfiConverterString.lower(`code`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Reads `POST /v1/spaces/<id>/invites`'s answer.
+         */
+    @Throws(CoreException::class) fun `syncDecodeInvite`(`body`: kotlin.String): SyncInvite {
+            return FfiConverterTypeSyncInvite.lift(
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_decode_invite(
+    
+        
+        FfiConverterString.lower(`body`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Reads `GET /v1/invites/<code>`'s answer.
+         */
+    @Throws(CoreException::class) fun `syncDecodeInvitePreview`(`body`: kotlin.String): SyncInvitePreview {
+            return FfiConverterTypeSyncInvitePreview.lift(
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_decode_invite_preview(
+    
+        
+        FfiConverterString.lower(`body`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The invite code in what someone pasted or typed: a bare code, an
+         * `https://…/join/<code>` link or a `takt://join/<code>` one. Dashes and
+         * spaces are dropped, so a code read out in groups still works. Nothing
+         * when no code is there.
+         */ fun `syncInviteCode`(`text`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_invite_code(
+    
+        
+        FfiConverterString.lower(`text`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * A code in groups of four, for reading out or typing.
+         */ fun `syncInviteCodeGrouped`(`code`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_invite_code_grouped(
+    
+        
+        FfiConverterString.lower(`code`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The link to send someone: the server's page for the code, which opens
+         * the app or shows the code to type in.
+         */ fun `syncInviteLink`(`serverUrl`: kotlin.String, `code`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_invite_link(
+    
+        
+        FfiConverterString.lower(`serverUrl`),
+        FfiConverterString.lower(`code`),_status)
+}
+    )
+    }
+    
+ fun `syncInvitePath`(`code`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_invite_path(
+    
+        
+        FfiConverterString.lower(`code`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * `POST /v1/spaces`'s body, sharing `list_id` under `name`.
+         */ fun `syncShareListBody`(`listId`: kotlin.String, `name`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_share_list_body(
+    
+        
+        FfiConverterString.lower(`listId`),
+        FfiConverterString.lower(`name`),_status)
+}
+    )
+    }
+    
+ fun `syncSpaceInvitesPath`(`spaceId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_space_invites_path(
+    
+        
+        FfiConverterString.lower(`spaceId`),_status)
+}
+    )
+    }
+    
+ fun `syncSpaceMemberPath`(`spaceId`: kotlin.String, `accountId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_space_member_path(
+    
+        
+        FfiConverterString.lower(`spaceId`),
+        FfiConverterString.lower(`accountId`),_status)
+}
+    )
+    }
+    
+ fun `syncSpacePath`(`spaceId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_space_path(
+    
+        
+        FfiConverterString.lower(`spaceId`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The request paths, so every client names them the same way.
+         */ fun `syncSpacesPath`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_spaces_path(
+    
+        _status)
 }
     )
     }
