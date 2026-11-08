@@ -267,15 +267,18 @@ pub fn pick_drive_files(client_id: &str) -> Result<Vec<String>, String> {
     if client_id.is_empty() {
         return Err("Set the Google OAuth client ID first.".into());
     }
-    let (token, callback) = authorize(
+    let (mut token, callback) = authorize(
         client_id,
         DRIVE_FILE_SCOPE,
         "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true",
         "Linked in Takt. You can close this tab.",
     )?;
-    if !token.refresh_token.is_empty() || drive_token().is_none() {
-        keychain::save(DRIVE_ACCOUNT, &token)?;
+    if token.refresh_token.is_empty()
+        && let Some(previous) = drive_token().filter(|t| t.client_id == client_id)
+    {
+        token.refresh_token = previous.refresh_token;
     }
+    keychain::save(DRIVE_ACCOUNT, &token)?;
     Ok(picked_ids(&callback))
 }
 
