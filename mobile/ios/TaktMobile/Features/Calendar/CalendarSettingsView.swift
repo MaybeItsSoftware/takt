@@ -21,7 +21,9 @@ struct CalendarSettingsRow: View {
         }
         .accessibilityIdentifier("settings.calendar")
       } header: {
-        Text("Calendar").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+        // The integrations under one heading, as the Mac's Settings →
+        // Plugins; Google Calendar is the one this phone has.
+        Text("Plugins").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
       }
       .listRowBackground(theme.raised)
     }
