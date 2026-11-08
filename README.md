@@ -2,7 +2,7 @@
 
 # Takt
 
-**Plan the day, then do it.** Takt is the gold standard of easy-to-use open source software: a free task manager for Mac, iPhone, iPad, Android, Wear OS and the terminal.
+**Plan the day, then do it.** Takt is the gold standard of easy-to-use open source software: a task manager for Mac, iPhone, iPad, Android, Wear OS and the terminal.
 A ranked Today list, an outline, a board, focus timers, dailies, and a command line that reaches the same data.
 
 <br clear="left" />
@@ -12,8 +12,8 @@ A ranked Today list, an outline, a board, focus timers, dailies, and a command l
 | | |
 | --- | --- |
 | **Source** | [github.com/MaybeItsSoftware/takt](https://github.com/MaybeItsSoftware/takt) — open source under the [GNU AGPL-3.0](LICENSE) |
-| **Price** | Free on every platform — no ads, no in-app purchases, no tracking |
-| **Sync** | Free (£0) between your devices; [self-hosting it](docs/self-hosting.md) is free too |
+| **Open source** | Every app, the CLI and the sync server, under the [GNU AGPL-3.0](LICENSE) — no ads, no tracking. The apps are free and work offline with no account |
+| **Sync** | [Host it yourself](docs/self-hosting.md) with the server in this repo, with every feature, or use Takt's hosted server |
 | **Platforms** | macOS 15.6+, iPhone and iPad, Android and Wear OS, and a terminal CLI |
 | **For AI agents** | [`llms.txt`](site/llms.txt) and an [MCP server](docs/mcp-server.md) over the whole workspace |
 | **Website** | [maybeitssoftware.github.io/takt](https://maybeitssoftware.github.io/takt/) |
