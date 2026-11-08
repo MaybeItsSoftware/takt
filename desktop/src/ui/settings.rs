@@ -394,11 +394,28 @@ impl Takt {
         } else {
             self.app.settings_category().into()
         };
-        let body: Vec<AnyElement> = rows
-            .iter()
-            .enumerate()
-            .map(|(ix, row)| self.setting_row(ix, ix == cursor, row, searching, t, cx))
-            .collect();
+        // A section's heading above its first row: a small group shown
+        // under a bigger category (Shared lists under Sync).
+        let category = self.app.settings_category();
+        let mut body: Vec<AnyElement> = Vec::new();
+        let mut section: Option<&'static str> = None;
+        for (ix, row) in rows.iter().enumerate() {
+            if !searching && row.group != category && section != Some(row.group) {
+                body.push(
+                    div()
+                        .px_2()
+                        .pt_6()
+                        .pb_1()
+                        .text_size(px(10.))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(t.placeholder)
+                        .child(row.group.to_uppercase())
+                        .into_any_element(),
+                );
+            }
+            section = Some(row.group);
+            body.push(self.setting_row(ix, ix == cursor, row, searching, t, cx));
+        }
         div()
             .flex_1()
             .min_w_0()

@@ -29,22 +29,46 @@ pub struct SettingsPage {
 
 /// The categories, in the order the page lists them; a group no entry here
 /// names goes at the end.
-pub const CATEGORIES: [(&str, &str); 14] = [
+pub const CATEGORIES: [(&str, &str); 8] = [
     ("General", "settings"),
     ("Appearance", "palette"),
     ("Keyboard", "keyboard"),
     ("Focus", "timer"),
-    ("Reminders", "bell"),
-    ("Completion", "party"),
     ("Sync", "refresh"),
-    ("Shared lists", "users"),
-    ("Google", "calendar"),
-    ("Checkvist", "square-check"),
-    ("Links", "link"),
+    ("Integrations", "plug"),
     ("AI", "sparkles"),
-    ("MCP", "plug"),
     ("Advanced", "wrench"),
 ];
+
+/// The groups too small for a category of their own: each is a headed
+/// section of the category it sits under, in this order after the
+/// category's own settings.
+const SECTIONS: [(&str, &str); 7] = [
+    ("Completion", "General"),
+    ("Reminders", "General"),
+    ("Shared lists", "Sync"),
+    ("Google", "Integrations"),
+    ("Checkvist", "Integrations"),
+    ("Links", "Integrations"),
+    ("MCP", "AI"),
+];
+
+/// The category a row's group is shown under.
+pub fn category_of(group: &'static str) -> &'static str {
+    SECTIONS
+        .iter()
+        .find(|(section, _)| *section == group)
+        .map_or(group, |(_, category)| category)
+}
+
+/// Where a group sorts within its category: the category's own settings
+/// first, then its sections in [`SECTIONS`] order.
+fn section_rank(group: &str) -> usize {
+    SECTIONS
+        .iter()
+        .position(|(section, _)| *section == group)
+        .map_or(0, |at| at + 1)
+}
 
 /// How a setting is changed on the page.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -360,11 +384,12 @@ impl App {
         let rows = self.settings_rows();
         let mut shown: Vec<(&'static str, &'static str)> = CATEGORIES
             .into_iter()
-            .filter(|(name, _)| rows.iter().any(|row| row.group == *name))
+            .filter(|(name, _)| rows.iter().any(|row| category_of(row.group) == *name))
             .collect();
         for row in &rows {
-            if !shown.iter().any(|(name, _)| *name == row.group) {
-                shown.push((row.group, "settings"));
+            let category = category_of(row.group);
+            if !shown.iter().any(|(name, _)| *name == category) {
+                shown.push((category, "settings"));
             }
         }
         shown
@@ -387,7 +412,13 @@ impl App {
         let rows = self.settings_rows();
         if query.trim().is_empty() {
             let category = self.settings_category();
-            return rows.into_iter().filter(|r| r.group == category).collect();
+            let mut shown: Vec<SettingRow> = rows
+                .into_iter()
+                .filter(|r| category_of(r.group) == category)
+                .collect();
+            // Stable, so each section keeps its own order.
+            shown.sort_by_key(|r| section_rank(r.group));
+            return shown;
         }
         // Every word somewhere in the setting; those whose title has them
         // all come first. Fuzzy matching across the descriptions finds
