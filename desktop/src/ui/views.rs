@@ -165,6 +165,12 @@ impl Takt {
         .into_iter()
         .flatten()
         .collect();
+        {
+            let mut scrolls = self.card_scrolls.borrow_mut();
+            if scrolls.len() < board.columns.len() {
+                scrolls.resize_with(board.columns.len(), gpui::ScrollHandle::new);
+            }
+        }
         div()
             .id("board")
             .relative()
@@ -174,6 +180,7 @@ impl Takt {
             .gap(px(board_links::GUTTER))
             .p_2()
             .overflow_x_scroll()
+            .track_scroll(&self.board_scroll)
             .children(board.columns.iter().enumerate().map(|(column_ix, column)| {
                 let cards = board.cards.get(column_ix).cloned().unwrap_or_default();
                 let focused = column_ix == board.column && active;
@@ -241,6 +248,7 @@ impl Takt {
                                     .id(("cards", column_ix))
                                     .size_full()
                                     .overflow_y_scroll()
+                                    .track_scroll(&self.card_scrolls.borrow()[column_ix])
                                     .p_1()
                                     .flex()
                                     .flex_col()

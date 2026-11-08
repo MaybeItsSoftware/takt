@@ -56,6 +56,9 @@ pub struct Takt {
     /// The settings page's search, and where its list is scrolled.
     settings_field: TextField,
     settings_scroll: gpui::ScrollHandle,
+    /// The board's columns side to side, and each column's cards.
+    board_scroll: gpui::ScrollHandle,
+    card_scrolls: std::cell::RefCell<Vec<gpui::ScrollHandle>>,
     sidebar_scroll: UniformListScrollHandle,
     main_scroll: UniformListScrollHandle,
     last_key_ms: Option<f64>,
@@ -160,6 +163,8 @@ impl Takt {
             overlay: OverlayState::default(),
             settings_field: TextField::default(),
             settings_scroll: gpui::ScrollHandle::new(),
+            board_scroll: gpui::ScrollHandle::new(),
+            card_scrolls: Default::default(),
             sidebar_scroll: UniformListScrollHandle::new(),
             main_scroll: UniformListScrollHandle::new(),
             last_key_ms: None,
@@ -1087,6 +1092,23 @@ impl Takt {
         if let Some(index) = self.main_row_index() {
             self.main_scroll
                 .scroll_to_item(index, ScrollStrategy::Center);
+        }
+        // The board: the focused column into view side to side, and the
+        // selected card within it.
+        if self.app.view_mode == crate::state::ViewMode::Board {
+            let column = self.app.board.column;
+            self.board_scroll.scroll_to_item(column);
+            let card = self.app.selected_task.as_ref().and_then(|id| {
+                self.app
+                    .board
+                    .cards
+                    .get(column)?
+                    .iter()
+                    .position(|task| &task.id == id)
+            });
+            if let (Some(card), Some(handle)) = (card, self.card_scrolls.borrow().get(column)) {
+                handle.scroll_to_item(card);
+            }
         }
         if let Some(index) = self
             .app
