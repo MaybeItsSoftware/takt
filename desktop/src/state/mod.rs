@@ -395,6 +395,7 @@ impl App {
         app.refresh_history();
         app.adopt_swift_app();
         app.adopt_swift_celebration();
+        app.adopt_shared_theme();
         app.adopt_finished_tasks_leave();
         app.start_google();
         Ok(app)

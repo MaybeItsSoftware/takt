@@ -737,6 +737,7 @@ impl App {
             (Picker::Theme, Choice::Theme(id)) => {
                 self.prefs.theme = id;
                 self.prefs.save();
+                self.share_theme_choice();
             }
             (Picker::Repeat { task_id, .. }, Choice::Repeat(rule)) => {
                 if self.selected_task.as_deref() == Some(task_id.as_str()) {

@@ -28,6 +28,10 @@ const KEYMAP_TEMPLATE: &str = r#"// Your own keys, laid over Takt's. The keyboar
 []
 "#;
 
+/// Zed One's identifier, the core's built-in of the same pair: what this
+/// app's own Zed theme is stored and synced as.
+pub const ONE: &str = "native.theme.one";
+
 /// A theme the picker offers: Zed's own pair, or a specification the core
 /// resolved from a built-in or a file.
 #[derive(Debug, Clone)]
@@ -39,14 +43,14 @@ pub enum Theme {
 impl Theme {
     pub fn id(&self) -> String {
         match self {
-            Theme::Zed => "zed".into(),
+            Theme::Zed => ONE.into(),
             Theme::Spec(spec) => spec.identifier.clone(),
         }
     }
 
     pub fn name(&self) -> String {
         match self {
-            Theme::Zed => "Zed (One Dark, One Light)".into(),
+            Theme::Zed => "Zed One (One Dark, One Light)".into(),
             Theme::Spec(spec) => spec.name.clone(),
         }
     }
@@ -102,8 +106,15 @@ impl App {
             Some(built_ins.clone()),
             built_ins.first().cloned(),
         );
+        // Zed One is the core's too, for the phones; here it is drawn from
+        // Zed's own tokens, so the core's copy is not listed twice.
         let mut themes = vec![Theme::Zed];
-        themes.extend(built_ins.into_iter().map(|s| Theme::Spec(Box::new(s))));
+        themes.extend(
+            built_ins
+                .into_iter()
+                .filter(|s| s.identifier != ONE)
+                .map(|s| Theme::Spec(Box::new(s))),
+        );
         let mut issues = Vec::new();
         for outcome in outcomes {
             for issue in &outcome.issues {
@@ -123,6 +134,31 @@ impl App {
         }
         self.library.themes = themes;
         self.library.theme_issues = issues;
+    }
+
+    /// Writes the theme in force to the synced `theme.selected`, so the
+    /// phones and any other Mac follow it (`docs/themes.md`).
+    pub fn share_theme_choice(&mut self) {
+        let id = self.theme().id();
+        let now = super::store::now_ms();
+        if let Err(error) = self
+            .store
+            .core
+            .set_preference("theme.selected".into(), Some(id), now)
+        {
+            self.message = Some(format!("The theme choice didn't sync: {error}"));
+        }
+    }
+
+    /// Once: this Mac's theme becomes the shared choice, so the phones take
+    /// the look this app has.
+    pub fn adopt_shared_theme(&mut self) {
+        if self.prefs.theme_shared || std::env::var_os("TAKT_DESKTOP_PREFS").is_some() {
+            return;
+        }
+        self.share_theme_choice();
+        self.prefs.theme_shared = true;
+        self.prefs.save();
     }
 
     pub fn theme(&self) -> Theme {
@@ -185,6 +221,7 @@ impl App {
                 {
                     self.prefs.theme = theme.id();
                     self.prefs.save();
+                    self.share_theme_choice();
                 }
                 self.message = Some(format!("Exported to {}.", path.display()));
             }

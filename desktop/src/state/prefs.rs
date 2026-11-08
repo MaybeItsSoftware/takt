@@ -79,6 +79,9 @@ pub struct Prefs {
     /// Finished tasks were switched to leaving the list after a few seconds,
     /// as the Swift app always had them, once for every install.
     pub finished_tasks_leave: bool,
+    /// This Mac's theme has been written to the synced choice once.
+    #[serde(default)]
+    pub theme_shared: bool,
     /// Every AI feature off: the agent panel, quick ask, the MCP setup and
     /// the agent's context on tasks are hidden.
     pub ai_off: bool,
@@ -107,7 +110,7 @@ impl Default for Prefs {
             folded_conditions: HashSet::new(),
             recent_lists: Vec::new(),
             recent_commands: Vec::new(),
-            theme: "zed".into(),
+            theme: super::library::ONE.into(),
             appearance: "system".into(),
             confirm_delete: true,
             quick_capture_list: None,
@@ -137,6 +140,7 @@ impl Default for Prefs {
             celebration: None,
             celebration_sound: false,
             finished_tasks_leave: false,
+            theme_shared: false,
             ai_off: false,
             hide_key_hints: false,
         }
