@@ -161,6 +161,23 @@ class OkHttpSyncTransportTest {
     }
 
     @Test
+    fun a402IsTaktSyncAndTheAccountSaysWhetherItIsPaid(): Unit = runBlocking {
+        server.answer(402, """{"error":"Hosted sync needs Takt Sync (£1 a year).","subscription":"required"}""")
+        expect<SyncException.SubscriptionRequired> { device().push(EMPTY_PUSH) }
+        assertEquals("a 402 is not refreshed", 0, tokens.refreshes)
+
+        server.answer(
+            200,
+            """{"accountId":"a","email":null,"devices":[],"subscription":{"required":true,"active":false,"expiresAt":null,"comp":false}}""",
+        )
+        val unpaid = device().account().subscription
+        assertEquals(true, unpaid?.required)
+        assertEquals(false, unpaid?.active)
+        server.answer(200, """{"accountId":"a","email":null,"devices":[]}""")
+        assertNull("a server from before Takt Sync says nothing", device().account().subscription)
+    }
+
+    @Test
     fun aRefusedTokenIsRefreshedOnceAndTheRequestRetried(): Unit = runBlocking {
         server.answer(401, unauthorized).answer(200, """{"accepted":2,"cursor":9}""")
         device().push(EMPTY_PUSH)

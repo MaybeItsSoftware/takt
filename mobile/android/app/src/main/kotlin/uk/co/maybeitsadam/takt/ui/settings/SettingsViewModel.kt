@@ -35,6 +35,7 @@ object SyncStatusText {
         SyncUiState.SessionExpired -> "Signed out — sign in again"
         SyncUiState.Syncing -> "Syncing…"
         is SyncUiState.Failed -> "Couldn't sync: ${state.message}"
+        SyncUiState.NeedsSubscription -> "Paused — needs Takt Sync"
         is SyncUiState.Idle -> {
             val last = state.lastSyncedAt
             when {

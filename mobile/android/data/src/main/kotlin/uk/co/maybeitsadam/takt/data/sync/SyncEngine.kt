@@ -33,6 +33,9 @@ class SyncEngine(
 
         /** The server no longer knows this device's token. Retrying cannot help; the user has to sign in again. */
         data object SignedOut : Status
+
+        /** The hosted server wants Takt Sync. Not an error: sync waits. */
+        data object NeedsSubscription : Status
     }
 
     private val cycle = Mutex()
@@ -62,6 +65,9 @@ class SyncEngine(
             outcome
         } catch (error: SyncException.Unauthorized) {
             _status.value = Status.SignedOut
+            throw error
+        } catch (error: SyncException.SubscriptionRequired) {
+            _status.value = Status.NeedsSubscription
             throw error
         } catch (error: Throwable) {
             _status.value = Status.Failed(error.message ?: error.toString())

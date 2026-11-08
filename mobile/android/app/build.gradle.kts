@@ -47,6 +47,15 @@ val priorityGoogleWebClientId = stringProperty("priorityGoogleWebClientId")
     ?: localProperties.getProperty("priorityGoogleWebClientId")?.trim()?.takeIf { it.isNotEmpty() }
     ?: ""
 
+// RevenueCat's public Google Play SDK key (`goog_…`), for Takt Sync's £1-a-year
+// purchase. Empty: the purchase says it isn't available in this build. The
+// Gradle property `taktRevenueCatKey`, then TAKT_REVENUECAT_ANDROID_KEY, then
+// `taktRevenueCatKey=…` in local.properties.
+val taktRevenueCatKey = stringProperty("taktRevenueCatKey")
+    ?: System.getenv("TAKT_REVENUECAT_ANDROID_KEY")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: localProperties.getProperty("taktRevenueCatKey")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: ""
+
 android {
     namespace = "uk.co.maybeitsadam.takt"
     compileSdk = 36
@@ -63,6 +72,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"$prioritySupabaseUrl\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$prioritySupabaseKey\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$priorityGoogleWebClientId\"")
+        buildConfigField("String", "REVENUECAT_KEY", "\"$taktRevenueCatKey\"")
     }
     signingConfigs {
         if (keystoreProperties.isNotEmpty()) {
@@ -119,6 +129,7 @@ composeCompiler {
 dependencies {
     implementation(project(":data"))
     implementation(project(":wearcontract"))
+    implementation(libs.revenuecat.purchases)
     baselineProfile(project(":baselineprofile"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

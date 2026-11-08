@@ -311,6 +311,10 @@ private fun SignedInSync(sync: SyncController, status: SyncUiState, credentials:
         }
     }
 
+    if (account?.subscription?.required == true || status == SyncUiState.NeedsSubscription) {
+        TaktSyncSection(sync, account?.subscription, credentials)
+    }
+
     val devices = account?.devices.orEmpty()
     CollapsibleSection(
         "Devices",
@@ -640,3 +644,72 @@ private fun Field(
 }
 
 // endregion
+
+/**
+ * Takt Sync on Takt's hosted server: whether this account has it, and the
+ * £1-a-year purchase. A self-hosted server never asks, and never shows it.
+ */
+@Composable
+private fun TaktSyncSection(sync: SyncController, subscription: uk.co.maybeitsadam.takt.core.SyncSubscription?, credentials: SyncCredentials) {
+    val container = uk.co.maybeitsadam.takt.ui.navigation.LocalShell.current.container
+    val purchase = container.syncPurchase
+    val state by purchase.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(credentials.accountId) { purchase.prepare(credentials.accountId) }
+    val active = subscription?.active == true || state.active
+    // After a purchase the server hears from RevenueCat within seconds: ask it again, then sync.
+    val refreshed: suspend () -> Unit = {
+        delay(2_000)
+        sync.refreshAccount()
+        sync.syncNow()
+    }
+    Section(
+        "Takt Sync",
+        footer = "Syncing through Takt's server costs £1 a year, and one purchase covers every device on this account. " +
+            "The server is open source: host it yourself and sync is free, with every feature.",
+    ) {
+        InfoRow("Takt Sync") {
+            val until = subscription?.expiresAt?.let(SyncController::parseExpiry)
+            Text(
+                when {
+                    subscription?.comp == true -> "Included"
+                    !active -> "Not subscribed"
+                    until != null -> "Until ${Format.day(until)}"
+                    else -> "Active"
+                },
+                style = TaktTheme.type.small, color = TaktTheme.colors.mutedText,
+                modifier = Modifier.testTag("sync_subscription"),
+            )
+        }
+        Hairline(color = TaktTheme.colors.borderMuted)
+        if (!purchase.isAvailable) {
+            Text(
+                "Purchases aren't available in this build.", style = TaktTheme.type.small, color = TaktTheme.colors.mutedText,
+                modifier = Modifier.padding(Metrics.md),
+            )
+        } else {
+            Row(Modifier.padding(Metrics.md), horizontalArrangement = Arrangement.spacedBy(Metrics.sm)) {
+                if (!active) {
+                    PButton(
+                        "Subscribe — ${state.price ?: "£1"} a year", primary = true, enabled = !state.working && state.price != null,
+                        modifier = Modifier.testTag("sync_subscribe"),
+                    ) {
+                        val activity = context.findActivity() ?: return@PButton
+                        scope.launch { purchase.subscribe(activity, refreshed) }
+                    }
+                }
+                PButton("Restore purchases", enabled = !state.working) { scope.launch { purchase.restore(refreshed) } }
+            }
+        }
+        state.problem?.let {
+            Text(it, style = TaktTheme.type.small, color = TaktTheme.colors.danger, modifier = Modifier.padding(horizontal = Metrics.md).padding(bottom = Metrics.md))
+        }
+    }
+}
+
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}

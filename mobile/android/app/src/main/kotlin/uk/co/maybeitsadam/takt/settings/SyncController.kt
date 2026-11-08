@@ -65,6 +65,9 @@ sealed interface SyncUiState {
     data class Idle(val lastSyncedAt: Instant?) : SyncUiState
     data object Syncing : SyncUiState
     data class Failed(val message: String) : SyncUiState
+
+    /** The hosted server wants Takt Sync (£1 a year), and this account hasn't it. Sync waits. */
+    data object NeedsSubscription : SyncUiState
 }
 
 /** What the signed-out form prefills, and whether the device was signed out for the user rather than by them. */
@@ -652,6 +655,7 @@ class SyncController(private val container: AppContainer) {
         fun describe(credentials: SyncCredentials?, engine: SyncEngine.Status?, stored: SyncLocalState?, expired: Boolean = false): SyncUiState = when {
             credentials == null -> if (expired) SyncUiState.SessionExpired else SyncUiState.Unpaired
             engine is SyncEngine.Status.SignedOut -> SyncUiState.SessionExpired
+            engine is SyncEngine.Status.NeedsSubscription -> SyncUiState.NeedsSubscription
             engine is SyncEngine.Status.Syncing -> SyncUiState.Syncing
             engine is SyncEngine.Status.Failed -> SyncUiState.Failed(engine.message)
             engine is SyncEngine.Status.Synced -> SyncUiState.Idle(engine.at)

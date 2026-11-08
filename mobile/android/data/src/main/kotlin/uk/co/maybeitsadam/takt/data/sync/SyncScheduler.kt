@@ -176,6 +176,10 @@ class SyncScheduler(
         null
     } catch (cancelled: CancellationException) {
         throw cancelled
+    } catch (unpaid: SyncException.SubscriptionRequired) {
+        // Calm and slow: nothing changes until a purchase, which syncs at once.
+        failures = 0
+        SUBSCRIPTION_PAUSE
     } catch (error: Exception) {
         failures += 1
         if (error is SyncException.Unauthorized) {
@@ -191,6 +195,9 @@ class SyncScheduler(
 
     private companion object {
         val SIGNED_OUT_PAUSE = 300.seconds
+
+        /** Between asks while the server wants Takt Sync. */
+        val SUBSCRIPTION_PAUSE = 3600.seconds
 
         /** Between cycles while the channel is up and says nothing. */
         val REALTIME_SAFETY_INTERVAL = 300.seconds

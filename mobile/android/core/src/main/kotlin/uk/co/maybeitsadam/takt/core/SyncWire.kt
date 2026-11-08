@@ -35,8 +35,34 @@ data class SyncDeviceInfo(
     val current: Boolean = false,
 )
 
-/** `GET /v1/account`, read by the core (`sync_decode_account`). */
-data class SyncAccountInfo(val accountId: String, val email: String? = null, val devices: List<SyncDeviceInfo> = emptyList())
+/** `GET /v1/account`, read by the core (`sync_decode_account`); [subscription] is null from a server that predates Takt Sync. */
+data class SyncAccountInfo(
+    val accountId: String,
+    val email: String? = null,
+    val devices: List<SyncDeviceInfo> = emptyList(),
+    val subscription: SyncSubscription? = null,
+)
+
+/**
+ * Takt Sync, the hosted server's £1-a-year subscription, as `GET /v1/account`
+ * reports it (docs/sync.md, "Subscription"). A self-hosted server reports
+ * [required] false.
+ */
+@Serializable
+data class SyncSubscription(
+    /** Whether this server charges at all. */
+    val required: Boolean = false,
+    /** Whether this account may sync here now. */
+    val active: Boolean = true,
+    val expiresAt: String? = null,
+    /** Granted rather than bought. */
+    val comp: Boolean = false,
+) {
+    companion object {
+        /** What a lapsed account is told, wherever sync stops for it. */
+        const val NEEDED = "Hosted sync needs Takt Sync (£1 a year). Subscribe here, or self-host the server."
+    }
+}
 
 /**
  * Which server this device syncs with, as which device, and for whom. The

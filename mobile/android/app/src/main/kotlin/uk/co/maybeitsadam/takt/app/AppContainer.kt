@@ -104,6 +104,9 @@ class AppContainer(
     val clashes = RecurrenceClashes(this)
     val sync = SyncController(this)
 
+    /** Takt Sync, the hosted server's £1-a-year subscription, bought through Google Play. */
+    val syncPurchase by lazy { uk.co.maybeitsadam.takt.settings.TaktSyncPurchase(context) }
+
     /** Sharing lists with other accounts, through [sync]. */
     val sharedLists = uk.co.maybeitsadam.takt.settings.SharedLists(this)
     val calendar = GoogleCalendarController(this)

@@ -51,6 +51,9 @@ sealed class SyncException(message: String) : Exception(message) {
 
     class NotPaired : SyncException("This device is not signed in to a sync server.")
 
+    /** `402`: the hosted server wants Takt Sync, and this account hasn't it. Not an error to retry hot. */
+    class SubscriptionRequired : SyncException(uk.co.maybeitsadam.takt.core.SyncSubscription.NEEDED)
+
     companion object {
         /** The `error` field of a server error body, or null when there isn't one. The Rust core's. */
         fun serverMessage(body: String): String? = syncServerMessage(body).trim().takeIf { it.isNotEmpty() }
@@ -98,8 +101,13 @@ class OkHttpSyncTransport(
 
     /** Who this device is signed in as, and every device on the account (`GET /v1/account`). */
     suspend fun account(): SyncAccountInfo {
-        val account = syncDecodeAccount(send(endpoint("v1/account")) { get() })
+        val body = send(endpoint("v1/account")) { get() }
+        val account = syncDecodeAccount(body)
+        val subscription = runCatching {
+            subscriptionJson.decodeFromString<AccountSubscription>(body).subscription
+        }.getOrNull()
         return SyncAccountInfo(
+            subscription = subscription,
             accountId = account.accountId,
             email = account.email,
             devices = account.devices.map {
@@ -141,6 +149,7 @@ class OkHttpSyncTransport(
         val answer = if (first.status == 401) execute(request(tokens.refresh(rejected = token))) else first
         return when {
             answer.status == 401 -> throw SyncException.Unauthorized()
+            answer.status == 402 -> throw SyncException.SubscriptionRequired()
             answer.status !in 200..299 -> throw SyncException.Server(answer.status, answer.body)
             else -> answer.body
         }
@@ -178,3 +187,9 @@ class OkHttpSyncTransport(
         }
     }
 }
+
+/** Just the subscription out of `GET /v1/account`, which the core's account record predates. */
+@kotlinx.serialization.Serializable
+private class AccountSubscription(val subscription: uk.co.maybeitsadam.takt.core.SyncSubscription? = null)
+
+private val subscriptionJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
