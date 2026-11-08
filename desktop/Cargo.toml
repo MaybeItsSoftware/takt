@@ -25,6 +25,9 @@ objc = "0.2"
 # instead, for a machine without it.
 gpui = { version = "0.2.2", default-features = false, features = ["font-kit"] }
 ureq = { version = "2", features = ["json"] }
+# The Supabase Realtime channel sync waits on (src/sync/realtime.rs): a
+# blocking client, like ureq, for the sync threads.
+tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 security-framework = "2"
 sha2 = "0.10"
 base64 = "0.22"

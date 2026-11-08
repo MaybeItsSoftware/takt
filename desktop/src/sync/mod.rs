@@ -5,23 +5,27 @@
 //!
 //! Two threads while signed in. One runs cycles, one at a time: at once,
 //! two seconds after a local write goes quiet, when the other says the
-//! server has news, and every five minutes regardless. The other holds a
-//! long-poll open while a window is up (`/v1/changes?wait=25&limit=1`),
-//! which only *notices* changes: it never applies them, so it never races
-//! a cycle, and nothing has to be cancelled to push a local edit.
+//! server has news, and every five minutes regardless. The other only
+//! *notices* changes: it never applies them, so it never races a cycle, and
+//! nothing has to be cancelled to push a local edit. It listens on the
+//! account's Supabase Realtime channel (`realtime.rs`) where the server
+//! broadcasts there, which costs the server nothing while idle; otherwise,
+//! and while the channel is down, it holds a long-poll open while a window
+//! is up (`/v1/changes?wait=25&limit=1`).
 //!
 //! The window learns of a sync through [`crate::platform::Event::Sync`].
 
 pub mod auth;
 pub mod http;
 pub mod keychain;
+pub mod realtime;
 
 use auth::{AuthError, Session, Supabase};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use takt_core::sync::wire::{self, SyncAccountBody, SyncPull};
 use takt_core::workspace::CoreWorkspace;
 
@@ -40,6 +44,9 @@ const PUSH_BATCH: u32 = 100;
 const PULL_PAGE: u32 = 1000;
 const QUIET: Duration = Duration::from_secs(2);
 const EVERY: Duration = Duration::from_secs(300);
+/// How long to go on long-polling before asking again whether a server
+/// without Realtime has gained it.
+const REALTIME_RECHECK: Duration = Duration::from_secs(600);
 
 /// Who this device is signed in as, and where. Kept in the keychain.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -652,40 +659,107 @@ impl Inner {
         }
     }
 
-    /// Notices news on the server while a window is up.
+    /// Notices news on the server: on the Realtime channel when the server
+    /// broadcasts there, otherwise by long-polling while a window is up.
     fn watch(&self, sender: Sender<Wake>, generation: u64) {
+        let mut failures = 0u32;
+        let mut retry = Instant::now();
         while self.live(generation) {
-            if !self.foreground.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_secs(1));
+            if Instant::now() < retry {
+                if !self.long_poll(&sender, generation) {
+                    return;
+                }
                 continue;
             }
-            let cursor = self.cursor();
-            let path = format!("v1/changes?since={cursor}&limit=1&wait=25");
-            match self.call("GET", &path, None, Duration::from_secs(60)) {
-                Ok(body) => {
-                    let news = serde_json::from_str::<serde_json::Value>(&body)
-                        .ok()
-                        .and_then(|v| {
-                            v.get("rows")
-                                .and_then(|r| r.as_array())
-                                .map(|r| !r.is_empty())
-                        })
-                        .unwrap_or(false);
-                    if news && self.live(generation) {
-                        let _ = sender.send(Wake::Remote);
-                        // Give the cycle a moment to move the cursor on.
-                        for _ in 0..20 {
-                            std::thread::sleep(Duration::from_millis(500));
-                            if self.cursor() != cursor || !self.live(generation) {
-                                break;
-                            }
+            let Some(channel) = self.realtime_channel() else {
+                retry = Instant::now() + REALTIME_RECHECK;
+                continue;
+            };
+            let stop = realtime::listen(
+                &realtime::socket_url(SUPABASE_URL, SUPABASE_KEY),
+                &channel,
+                || {
+                    self.token().map_err(|fail| match fail {
+                        Fail::Unauthorized => realtime::Stop::Unauthorized,
+                        Fail::Other(why) => realtime::Stop::Failed { joined: false, why },
+                    })
+                },
+                || {
+                    let _ = sender.send(Wake::Remote);
+                },
+                || self.live(generation),
+            );
+            match stop {
+                realtime::Stop::Asked | realtime::Stop::Unauthorized => return,
+                realtime::Stop::Failed { joined, why } => {
+                    // A channel that was up and dropped starts the count
+                    // again; one that never joins backs off to five minutes.
+                    failures = if joined { 1 } else { failures + 1 };
+                    let wait = wire::sync_backoff_seconds(failures).max(2);
+                    eprintln!("takt sync: realtime channel down ({why}); retrying in {wait}s");
+                    retry = Instant::now() + Duration::from_secs(wait.into());
+                }
+            }
+        }
+    }
+
+    /// The account's Realtime channel, when the server says it broadcasts.
+    fn realtime_channel(&self) -> Option<String> {
+        let (server, account) = {
+            let credentials = lock(&self.credentials);
+            let credentials = credentials.as_ref()?;
+            (
+                current_server(&credentials.server_url),
+                credentials.account_id.clone()?,
+            )
+        };
+        let reply = http::request(
+            "GET",
+            &format!("{server}/health"),
+            &[],
+            None,
+            Duration::from_secs(20),
+        )
+        .ok()?;
+        let health: serde_json::Value = serde_json::from_str(&reply.body).ok()?;
+        (reply.ok() && health["realtime"].as_bool() == Some(true))
+            .then(|| realtime::channel(&account))
+    }
+
+    /// One long-poll round while a window is up; a second's nap otherwise.
+    /// False once the session is refused.
+    fn long_poll(&self, sender: &Sender<Wake>, generation: u64) -> bool {
+        if !self.foreground.load(Ordering::Relaxed) {
+            std::thread::sleep(Duration::from_secs(1));
+            return true;
+        }
+        let cursor = self.cursor();
+        let path = format!("v1/changes?since={cursor}&limit=1&wait=25");
+        match self.call("GET", &path, None, Duration::from_secs(60)) {
+            Ok(body) => {
+                let news = serde_json::from_str::<serde_json::Value>(&body)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("rows")
+                            .and_then(|r| r.as_array())
+                            .map(|r| !r.is_empty())
+                    })
+                    .unwrap_or(false);
+                if news && self.live(generation) {
+                    let _ = sender.send(Wake::Remote);
+                    // Give the cycle a moment to move the cursor on.
+                    for _ in 0..20 {
+                        std::thread::sleep(Duration::from_millis(500));
+                        if self.cursor() != cursor || !self.live(generation) {
+                            break;
                         }
                     }
                 }
-                Err(Fail::Unauthorized) => return,
-                Err(Fail::Other(_)) => std::thread::sleep(Duration::from_secs(15)),
             }
+            Err(Fail::Unauthorized) => return false,
+            Err(Fail::Other(_)) => std::thread::sleep(Duration::from_secs(15)),
         }
+        true
     }
 
     fn cursor(&self) -> i64 {
