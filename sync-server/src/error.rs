@@ -27,6 +27,10 @@ pub enum AppError {
     Gone(String),
     #[error("{0}")]
     TooMany(String),
+    /// Hosted sync without a subscription (`billing.rs`). The body also
+    /// carries `"subscription": "required"`, which the apps look for.
+    #[error("{0}")]
+    PaymentRequired(String),
     #[error("{0}")]
     Unavailable(String),
     #[error("internal error: {0}")]
@@ -46,6 +50,7 @@ impl IntoResponse for AppError {
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Gone(_) => StatusCode::GONE,
             AppError::TooMany(_) => StatusCode::TOO_MANY_REQUESTS,
+            AppError::PaymentRequired(_) => StatusCode::PAYMENT_REQUIRED,
             AppError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -61,6 +66,13 @@ impl IntoResponse for AppError {
             }
             other => other.to_string(),
         };
+        if matches!(self, AppError::PaymentRequired(_)) {
+            return (
+                status,
+                Json(json!({ "error": message, "subscription": "required" })),
+            )
+                .into_response();
+        }
         (status, Json(json!({ "error": message }))).into_response()
     }
 }

@@ -646,6 +646,44 @@ Deleting an account hands each list it owns to its longest-standing member,
 or deletes the list's space when it has none, and leaves every list it was
 in.
 
+## Subscription
+
+Takt's hosted server charges £1 a year for sync, as Takt Sync: an
+auto-renewing yearly subscription (`takt_sync_yearly`) sold only in the
+iPhone and Android apps, through the App Store and Google Play. RevenueCat
+merges the two stores into one entitlement, `sync`. The apps log in to
+RevenueCat with the Supabase account id, so a purchase made on one phone
+covers every device on the account, the Mac included. A server someone
+hosts themselves charges nothing.
+
+- **Off by default.** Nothing is checked unless the server runs with
+  `REQUIRE_SUBSCRIPTION=true`. `COMP_ACCOUNTS` lists accounts that sync free;
+  an `entitlements` row with `source = 'comp'` does the same and no webhook
+  overwrites it.
+- **What is charged.** `/v1/push`, `/v1/changes` and every shared-list call
+  answer `402 {"error": "…", "subscription": "required"}` to an account
+  without an active, unexpired entitlement. `/health`, `/v1/devices`,
+  `/v1/account`, `/v1/sign-out` and `/v1/account/delete` never do, so a
+  lapsed device can say why, and its owner can leave or delete the account.
+  Each member of a shared list needs their own subscription to sync it; the
+  others' devices are unaffected by one member lapsing.
+- **`GET /v1/account`** adds `"subscription": {"required", "active",
+  "expiresAt", "comp"}`.
+- **`POST /v1/webhooks/revenuecat`**, authorised by the header RevenueCat is
+  configured to send (`REVENUECAT_WEBHOOK_SECRET`, bare or as a Bearer
+  token; 404 without it). Each event is applied once, by its id
+  (`entitlement_events`). A purchase, renewal, product change,
+  uncancellation, non-renewing purchase, cancellation or billing issue marks
+  the account active until the latest expiry it has heard of: a cancellation
+  stops the renewal, not the year paid for, and a billing issue's grace is
+  the expiry RevenueCat reports. An expiry ends it, unless a later renewal
+  has already moved the expiry past it. A transfer (a restore signed in as
+  another account) moves the entitlement. An event for another entitlement,
+  or with no account id among its ids, is acknowledged and ignored.
+- **The apps on a 402** stop syncing and say so — "Hosted sync needs Takt
+  Sync (£1 a year). Subscribe in the iPhone or Android app, or self-host" —
+  and try again only after the backoff, or at once after a purchase.
+
 ## Server storage (Postgres)
 
 In the `sync` schema of the Supabase project's database, which the Data API
@@ -668,6 +706,9 @@ CREATE TABLE spaces (id UUID PRIMARY KEY, owner_account_id UUID NOT NULL,
 CREATE TABLE space_members (space_id UUID REFERENCES spaces ON DELETE CASCADE,
   account_id UUID, role TEXT, email TEXT, joined_at TIMESTAMPTZ,
   PRIMARY KEY (space_id, account_id));
+CREATE TABLE entitlements (account_id UUID PRIMARY KEY, active BOOLEAN,
+  expires_at TIMESTAMPTZ, source TEXT, product TEXT, updated_at TIMESTAMPTZ);
+CREATE TABLE entitlement_events (id TEXT PRIMARY KEY, received_at TIMESTAMPTZ);
 CREATE TABLE space_invites (code TEXT PRIMARY KEY, space_id UUID REFERENCES
   spaces ON DELETE CASCADE, created_by UUID, created_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, used_by UUID, used_at TIMESTAMPTZ);

@@ -20,6 +20,8 @@ see [`docs/self-hosting.md`](../docs/self-hosting.md).
 | `src/realtime.rs` | The Supabase Realtime broadcast a push sends, and the access policy that lets an account's devices hear it |
 | `src/auth.rs` | Checking the Supabase access token each request carries |
 | `src/devices.rs` | Registering a device, the account's devices, signing out, deleting an account |
+| `src/spaces.rs` | Shared lists: spaces, members, invites |
+| `src/billing.rs` | Takt Sync: the RevenueCat webhook, and the `402` for an unsubscribed account when `REQUIRE_SUBSCRIPTION` is on |
 | `migrations/` | The Postgres schema, applied at boot |
 
 ## Configuration
@@ -32,6 +34,9 @@ see [`docs/self-hosting.md`](../docs/self-hosting.md).
 | `SUPABASE_JWT_SECRET` | Only for a project still signing with the legacy shared secret (HS256). |
 | `SUPABASE_SECRET_KEY` | The project's secret API key, used only to delete the Supabase user when an account is deleted. Without it deleting answers 503. |
 | `RUST_LOG` | Log filter, default `info`. Logs are JSON lines. |
+| `REQUIRE_SUBSCRIPTION` | Off unless set to `true`. Leave it off when you host your own: every feature is free. Takt's hosted server turns it on, and then pushing, pulling and the shared-list calls answer `402` to an account without Takt Sync. |
+| `COMP_ACCOUNTS` | Optional, with `REQUIRE_SUBSCRIPTION`. Comma-separated account ids that sync free. |
+| `REVENUECAT_WEBHOOK_SECRET` | Optional. The Authorization header RevenueCat sends to `POST /v1/webhooks/revenuecat`. Without it that route answers 404. |
 
 ## Running locally
 

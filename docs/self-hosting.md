@@ -79,6 +79,14 @@ not been tested.
 | `SUPABASE_JWT_SECRET` | Optional. Only for a project on the legacy HS256 secret. |
 | `PORT` | Default 8080. |
 | `RUST_LOG` | Default `info`. Logs are JSON lines. |
+| `REQUIRE_SUBSCRIPTION` | Off unless set to `true`. Leave it off when you host your own: every feature is free. Takt's hosted server turns it on, and then pushing, pulling and the shared-list calls answer `402` to an account without Takt Sync. |
+| `COMP_ACCOUNTS` | Optional, with `REQUIRE_SUBSCRIPTION`. Comma-separated account ids that sync free. |
+| `REVENUECAT_WEBHOOK_SECRET` | Optional. The Authorization header RevenueCat sends to `POST /v1/webhooks/revenuecat`. Without it that route answers 404. |
+
+A server you host yourself never charges: `REQUIRE_SUBSCRIPTION` is off
+unless you set it, and the apps sync with it with every feature, shared
+lists included. The £1-a-year Takt Sync subscription is only for Takt's own
+hosted server.
 
 ### Migrations
 

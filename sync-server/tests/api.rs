@@ -46,6 +46,10 @@ struct Server {
 }
 
 async fn server(pool: PgPool) -> Server {
+    server_with(pool, takt_sync_server::billing::Billing::default()).await
+}
+
+async fn server_with(pool: PgPool, billing: takt_sync_server::billing::Billing) -> Server {
     let realtime = takt_sync_server::realtime::prepare(&pool).await;
     let changes = notify::spawn_listener(&pool).await.expect("listen");
     let (stop, shutdown) = watch::channel(false);
@@ -57,6 +61,7 @@ async fn server(pool: PgPool) -> Server {
         changes,
         shutdown,
         realtime,
+        billing: Arc::new(billing),
     };
     Server {
         app: router(state),
@@ -1071,4 +1076,196 @@ async fn a_join_link_opens_a_page(pool: PgPool) {
     let page = String::from_utf8_lossy(&bytes);
     assert!(page.contains("ABCSCRIPT123"));
     assert!(!page.contains("<script>"));
+}
+
+// Takt Sync, the hosted subscription (billing.rs).
+
+const WEBHOOK_SECRET: &str = "rc-test-secret";
+
+fn charging() -> takt_sync_server::billing::Billing {
+    takt_sync_server::billing::Billing {
+        required: true,
+        comp: Default::default(),
+        webhook_secret: Some(WEBHOOK_SECRET.into()),
+    }
+}
+
+impl Server {
+    async fn account_id(&self, token: &str) -> String {
+        let (_, body) = self.call("GET", "/v1/account", Some(token), None).await;
+        body["accountId"].as_str().expect("account id").to_owned()
+    }
+
+    async fn webhook(&self, secret: &str, event: Value) -> StatusCode {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/webhooks/revenuecat")
+            .header("authorization", secret)
+            .header("content-type", "application/json")
+            .body(Body::from(
+                json!({ "api_version": "1.0", "event": event }).to_string(),
+            ))
+            .expect("request");
+        self.app
+            .clone()
+            .oneshot(request)
+            .await
+            .expect("response")
+            .status()
+    }
+}
+
+fn event(id: &str, kind: &str, account: &str, expires_in_days: i64) -> Value {
+    let expires = chrono::Utc::now().timestamp_millis() + expires_in_days * 86_400_000;
+    json!({ "id": id, "type": kind, "app_user_id": account, "product_id": "takt_sync_yearly",
+            "entitlement_ids": ["sync"], "store": "APP_STORE", "expiration_at_ms": expires })
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn a_free_server_never_asks(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, token) = server.sign_up("me@example.com", "Mac").await;
+    server.changes(&token, "since=0").await;
+    let (_, account) = server.call("GET", "/v1/account", Some(&token), None).await;
+    assert_eq!(account["subscription"]["required"], json!(false));
+    assert_eq!(account["subscription"]["active"], json!(true));
+    // And the webhook isn't there without a secret.
+    assert_eq!(
+        server
+            .webhook("anything", event("e", "RENEWAL", "x", 1))
+            .await,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn a_charging_server_lets_in_only_the_subscribed(pool: PgPool) {
+    let server = server_with(pool, charging()).await;
+    let (_, token) = server.sign_up("me@example.com", "Phone").await;
+    let me = server.account_id(&token).await;
+
+    // Signed in, but not paid: data is refused with a 402 the apps can read,
+    // the account page still answers.
+    let (status, body) = server
+        .call("GET", "/v1/changes?since=0", Some(&token), None)
+        .await;
+    assert_eq!(status, StatusCode::PAYMENT_REQUIRED);
+    assert_eq!(body["subscription"], json!("required"));
+    let (status, _) = server
+        .call(
+            "POST",
+            "/v1/spaces",
+            Some(&token),
+            Some(json!({"listId": "L"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::PAYMENT_REQUIRED);
+    let (status, account) = server.call("GET", "/v1/account", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(account["subscription"]["required"], json!(true));
+    assert_eq!(account["subscription"]["active"], json!(false));
+
+    // The webhook wants its secret.
+    assert_eq!(
+        server
+            .webhook("wrong", event("e1", "INITIAL_PURCHASE", &me, 365))
+            .await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        server
+            .webhook(WEBHOOK_SECRET, event("e1", "INITIAL_PURCHASE", &me, 365))
+            .await,
+        StatusCode::OK
+    );
+    server.changes(&token, "since=0").await;
+
+    // Cancelling keeps the paid year; a late, older expiry changes nothing;
+    // the real expiry ends it; the same event twice is applied once.
+    assert_eq!(
+        server
+            .webhook(WEBHOOK_SECRET, event("e2", "CANCELLATION", &me, 365))
+            .await,
+        StatusCode::OK
+    );
+    server.changes(&token, "since=0").await;
+    assert_eq!(
+        server
+            .webhook(WEBHOOK_SECRET, event("e3", "EXPIRATION", &me, -30))
+            .await,
+        StatusCode::OK
+    );
+    server.changes(&token, "since=0").await;
+    assert_eq!(
+        server
+            .webhook(WEBHOOK_SECRET, event("e4", "EXPIRATION", &me, 365))
+            .await,
+        StatusCode::OK
+    );
+    let (status, _) = server
+        .call("GET", "/v1/changes?since=0", Some(&token), None)
+        .await;
+    assert_eq!(status, StatusCode::PAYMENT_REQUIRED);
+    assert_eq!(
+        server
+            .webhook(WEBHOOK_SECRET, event("e1", "INITIAL_PURCHASE", &me, 365))
+            .await,
+        StatusCode::OK
+    );
+    let (status, _) = server
+        .call("GET", "/v1/changes?since=0", Some(&token), None)
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::PAYMENT_REQUIRED,
+        "a replayed event is ignored"
+    );
+
+    // Renewed: back in.
+    assert_eq!(
+        server
+            .webhook(WEBHOOK_SECRET, event("e5", "RENEWAL", &me, 365))
+            .await,
+        StatusCode::OK
+    );
+    server.changes(&token, "since=0").await;
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn a_restore_moves_the_purchase_and_comps_are_left_alone(pool: PgPool) {
+    let mut billing = charging();
+    let server = server_with(pool.clone(), charging()).await;
+    let (_, old) = server.sign_up("old@example.com", "Phone").await;
+    let (_, new) = server.sign_up("new@example.com", "Phone").await;
+    let (old_id, new_id) = (server.account_id(&old).await, server.account_id(&new).await);
+    server
+        .webhook(WEBHOOK_SECRET, event("p", "INITIAL_PURCHASE", &old_id, 365))
+        .await;
+    server.changes(&old, "since=0").await;
+    let transfer = json!({ "id": "t", "type": "TRANSFER",
+        "transferred_from": [old_id], "transferred_to": [new_id] });
+    assert_eq!(
+        server.webhook(WEBHOOK_SECRET, transfer).await,
+        StatusCode::OK
+    );
+    server.changes(&new, "since=0").await;
+    let (status, _) = server
+        .call("GET", "/v1/changes?since=0", Some(&old), None)
+        .await;
+    assert_eq!(status, StatusCode::PAYMENT_REQUIRED);
+
+    // COMP_ACCOUNTS lets an account in with nothing in the table, and a comp
+    // row outlives an expiry event.
+    billing.comp.insert(Uuid::parse_str(&old_id).unwrap());
+    let comped_server = server_with(pool.clone(), billing).await;
+    comped_server.changes(&old, "since=0").await;
+    takt_sync_server::billing::grant_comp(&pool, Uuid::parse_str(&new_id).unwrap())
+        .await
+        .expect("comp");
+    server
+        .webhook(WEBHOOK_SECRET, event("x", "EXPIRATION", &new_id, 400))
+        .await;
+    server.changes(&new, "since=0").await;
+    let (_, account) = server.call("GET", "/v1/account", Some(&new), None).await;
+    assert_eq!(account["subscription"]["comp"], json!(true));
 }

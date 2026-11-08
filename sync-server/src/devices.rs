@@ -69,6 +69,8 @@ pub struct AccountInfo {
     pub account_id: Uuid,
     pub email: Option<String>,
     pub devices: Vec<DeviceInfo>,
+    /// Whether this server charges, and whether this account has paid.
+    pub subscription: crate::billing::Subscription,
 }
 
 #[derive(Debug, Serialize)]
@@ -114,10 +116,12 @@ pub async fn account(
         },
     )
     .collect();
+    let subscription = crate::billing::subscription(&state, caller.account).await?;
     Ok(Json(AccountInfo {
         account_id: caller.account,
         email: caller.email,
         devices,
+        subscription,
     }))
 }
 
@@ -154,6 +158,10 @@ pub async fn delete_account(
     // Its shared lists pass to someone still in them, before its own rows go.
     crate::spaces::leave_all(&mut tx, state.realtime, caller.account).await?;
     sqlx::query("DELETE FROM rows WHERE space_id = $1")
+        .bind(caller.account)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM entitlements WHERE account_id = $1")
         .bind(caller.account)
         .execute(&mut *tx)
         .await?;

@@ -67,6 +67,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let realtime = realtime::prepare(&pool).await;
     tracing::info!(realtime, "realtime nudges");
     let (stop, shutdown) = watch::channel(false);
+    let billing = takt_sync_server::billing::Billing::from_env();
+    tracing::info!(
+        required = billing.required,
+        comp = billing.comp.len(),
+        webhook = billing.webhook_secret.is_some(),
+        "subscription"
+    );
     let state = AppState {
         pool,
         verifier,
@@ -74,6 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         changes,
         shutdown,
         realtime,
+        billing: Arc::new(billing),
     };
 
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", config.port)).await?;

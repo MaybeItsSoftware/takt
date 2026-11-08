@@ -11,6 +11,7 @@
 //! its account is in, and no others.
 
 pub mod auth;
+pub mod billing;
 pub mod changes;
 pub mod config;
 pub mod devices;
@@ -56,16 +57,17 @@ pub struct AppState {
     /// Pushes broadcast on the account's Supabase Realtime channel, and
     /// `/health` tells the apps to listen there. See `realtime.rs`.
     pub realtime: bool,
+    /// Whether hosted sync is charged for, and who is let through free.
+    /// Off by default: a self-hosted server is free. See `billing.rs`.
+    pub billing: Arc<billing::Billing>,
 }
 
 pub fn router(state: AppState) -> Router {
-    let user_routes = Router::new()
+    // The routes that move data: a subscription when the server charges.
+    // Layers run outermost-last, so the sign-in check runs first.
+    let data_routes = Router::new()
         .route("/v1/push", post(push::push))
         .route("/v1/changes", get(changes::changes))
-        .route("/v1/devices", post(devices::register))
-        .route("/v1/account", get(devices::account))
-        .route("/v1/account/delete", post(devices::delete_account))
-        .route("/v1/sign-out", post(devices::sign_out))
         .route("/v1/spaces", get(spaces::list).post(spaces::share))
         .route("/v1/spaces/{space}", delete(spaces::stop_sharing))
         .route("/v1/spaces/{space}/invites", post(spaces::invite))
@@ -77,13 +79,30 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/invites/{code}/accept", post(spaces::accept))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
+            billing::require_subscription,
+        ))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_user,
+        ));
+    // Signing in, the account and leaving: never charged, so a lapsed
+    // device can say why and its owner can go.
+    let account_routes = Router::new()
+        .route("/v1/devices", post(devices::register))
+        .route("/v1/account", get(devices::account))
+        .route("/v1/account/delete", post(devices::delete_account))
+        .route("/v1/sign-out", post(devices::sign_out))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
             auth::require_user,
         ));
     Router::new()
         .route("/health", get(health))
         .route("/privacy", get(pages::privacy))
         .route("/join/{code}", get(pages::join))
-        .merge(user_routes)
+        .route("/v1/webhooks/revenuecat", post(billing::revenuecat))
+        .merge(data_routes)
+        .merge(account_routes)
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
         .layer(CompressionLayer::new().gzip(true))
         .layer(TraceLayer::new_for_http())
