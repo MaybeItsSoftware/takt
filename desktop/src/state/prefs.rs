@@ -79,6 +79,11 @@ pub struct Prefs {
     /// Finished tasks were switched to leaving the list after a few seconds,
     /// as the Swift app always had them, once for every install.
     pub finished_tasks_leave: bool,
+    /// Every AI feature off: the agent panel, quick ask, the MCP setup and
+    /// the agent's context on tasks are hidden.
+    pub ai_off: bool,
+    /// Key hints drawn beside the controls that have a key.
+    pub hide_key_hints: bool,
 }
 
 impl Default for Prefs {
@@ -132,6 +137,8 @@ impl Default for Prefs {
             celebration: None,
             celebration_sound: false,
             finished_tasks_leave: false,
+            ai_off: false,
+            hide_key_hints: false,
         }
     }
 }

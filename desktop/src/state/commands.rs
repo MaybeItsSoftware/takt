@@ -103,6 +103,10 @@ impl App {
     /// Runs a command by catalogue id; `key` is the press that asked, which
     /// motions read (`j` or `k`, which digit).
     pub fn run(&mut self, id: &str, key: Option<&str>) {
+        if self.prefs.ai_off && AI_COMMANDS.contains(&id) {
+            self.message = Some("AI is switched off in Settings.".into());
+            return;
+        }
         let key = key.unwrap_or("");
         let tasks = self.region != Region::Sidebar;
         match id {
@@ -756,9 +760,38 @@ impl App {
     /// Whether a command can run from the palette now (motions cannot: they
     /// move from where the cursor is).
     pub fn palette_can_run(&self, id: &str) -> bool {
+        if self.prefs.ai_off && AI_COMMANDS.contains(&id) {
+            return false;
+        }
         self.bindings
             .entry(id)
             .is_some_and(|entry| !entry.motion && entry.surface != CommandSurface::Timeline)
+    }
+}
+
+/// The commands that reach an AI, which "AI off" takes away.
+pub const AI_COMMANDS: [&str; 2] = ["taskAskAgent", "windowToggleAgentPanel"];
+
+impl App {
+    /// The settings switch: everything AI off, or back on. Off closes the
+    /// agent panel if it is showing.
+    pub fn set_ai_off(&mut self, off: bool) {
+        self.prefs.ai_off = off;
+        if off {
+            if self.prefs.left_dock_tab == "agent" {
+                self.prefs.left_dock_tab = "lists".into();
+            }
+            if self.region == Region::Agent {
+                self.region = Region::Tasks;
+            }
+            if matches!(
+                self.editing,
+                Some(super::Editing::AgentMessage | super::Editing::Ask(super::ask::Ask::Agent))
+            ) {
+                self.editing = None;
+            }
+        }
+        self.prefs.save();
     }
 }
 

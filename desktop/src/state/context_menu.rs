@@ -144,7 +144,9 @@ impl App {
                 destructive: false,
             }));
         }
-        entries.push(self.item("taskAskAgent", "Ask the agent about it"));
+        if !self.prefs.ai_off {
+            entries.push(self.item("taskAskAgent", "Ask the agent about it"));
+        }
         entries.push(MenuEntry::Divider);
         entries.push(self.item("taskDelete", "Delete"));
         self.context_menu = Some(ContextMenu {

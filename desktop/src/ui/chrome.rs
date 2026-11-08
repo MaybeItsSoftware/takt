@@ -128,7 +128,7 @@ impl Takt {
     }
 
     pub(super) fn left_dock(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
-        let agent = self.app.prefs.left_dock_tab == "agent";
+        let agent = self.app.prefs.left_dock_tab == "agent" && !self.app.prefs.ai_off;
         div()
             .w(px(
                 self.app.prefs.sidebar_width.clamp(180., 420.) * if agent { 1.5 } else { 1. }
@@ -475,7 +475,7 @@ impl Takt {
     }
 
     fn status_divider(t: Tokens) -> impl IntoElement {
-        div().w(px(1.)).h(px(14.)).mx_1().bg(t.border_variant)
+        div().w(px(1.)).h(px(16.)).mx_2().bg(t.border)
     }
 
     /// The status bar's icons: what each dock can show, Zed's way.
@@ -484,7 +484,8 @@ impl Takt {
         if left {
             let lists = p.sidebar_visible && p.left_dock_tab != "agent";
             let agent = p.sidebar_visible && p.left_dock_tab == "agent";
-            return vec![
+            let ai = !p.ai_off;
+            let mut icons = vec![
                 self.status_icon("status-lists", "panel-left", lists, t, cx, |this, _| {
                     let p = &mut this.app.prefs;
                     if p.sidebar_visible && p.left_dock_tab != "agent" {
@@ -512,6 +513,11 @@ impl Takt {
                     this.open_overlay_field();
                 }),
             ];
+            if !ai {
+                // The agent's icon and the divider after it.
+                icons.drain(2..4);
+            }
+            return icons;
         }
         let bottom = |tab: &str| p.bottom_dock_visible && p.bottom_dock_tab == tab;
         let right = |tab: &str| p.right_dock_visible && p.right_dock_tab == tab;

@@ -29,7 +29,7 @@ pub struct SettingsPage {
 
 /// The categories, in the order the page lists them; a group no entry here
 /// names goes at the end.
-pub const CATEGORIES: [(&str, &str); 12] = [
+pub const CATEGORIES: [(&str, &str); 13] = [
     ("General", "settings"),
     ("Appearance", "palette"),
     ("Keyboard", "keyboard"),
@@ -40,6 +40,7 @@ pub const CATEGORIES: [(&str, &str); 12] = [
     ("Google", "calendar"),
     ("Checkvist", "square-check"),
     ("Links", "link"),
+    ("AI", "sparkles"),
     ("MCP", "plug"),
     ("Advanced", "wrench"),
 ];
@@ -55,7 +56,9 @@ pub enum Control {
     Choice(String),
 }
 
-const SWITCHES: [&str; 15] = [
+const SWITCHES: [&str; 17] = [
+    "ai-off",
+    "key-hints",
     "confirm-delete",
     "launch-at-login",
     "focus-score",
@@ -146,6 +149,10 @@ impl SettingRow {
             "keymap-open" => "Your own bindings, laid over the built-in ones.",
             "keymap-reload" => "Read keymap.json again without relaunching.",
             "diagnostics" => "What the app is reading, and anything that went wrong.",
+            "ai-off" => {
+                "Hide the agent panel, quick ask, the agent's context on tasks and the MCP setup. Nothing is sent to an AI while it is on."
+            }
+            "key-hints" => "A small marking with the key beside buttons and rows that have one.",
             "remind-due-time" => "A notification when a task's due time comes.",
             "remind-due-today" => "Each morning, a notification listing what is due that day.",
             "remind-due-today-at" => "When the morning reminder comes.",
@@ -318,6 +325,13 @@ impl App {
                 },
             ),
             row("diagnostics", "Advanced", "Diagnostics", String::new()),
+            row("ai-off", "AI", "Switch off all AI", on(p.ai_off)),
+            row(
+                "key-hints",
+                "Keyboard",
+                "Show key hints",
+                on(!p.hide_key_hints),
+            ),
         ];
         rows.extend(self.integration_settings());
         rows
@@ -434,6 +448,7 @@ impl App {
             .chain(
                 self.mcp_client_rows()
                     .into_iter()
+                    .filter(|_| !self.prefs.ai_off)
                     .map(|(id, title, value)| SettingRow {
                         id,
                         group: "MCP",
@@ -458,6 +473,11 @@ impl App {
             "diagnostics" => return self.open_overlay(Overlay::Diagnostics),
             "quick-capture-list" => return self.open_picker(Picker::CaptureList),
             "confirm-delete" => p.confirm_delete = !p.confirm_delete,
+            "key-hints" => p.hide_key_hints = !p.hide_key_hints,
+            "ai-off" => {
+                let off = !p.ai_off;
+                self.set_ai_off(off);
+            }
             "launch-at-login" => {
                 let enabled = !p.launch_at_login;
                 match crate::platform::set_launch_at_login(enabled) {
