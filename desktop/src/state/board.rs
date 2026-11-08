@@ -224,15 +224,23 @@ impl App {
     }
 
     /// The cards in reading order for the keys: the focused column's on the
-    /// board; on the matrix, quadrant by quadrant then the unplaced.
+    /// board, or the subtask rows of the card the selection is inside; on
+    /// the matrix, quadrant by quadrant then the unplaced.
     pub fn board_ids(&self) -> Vec<String> {
         match self.view_mode {
-            ViewMode::Board => self
-                .board
-                .cards
-                .get(self.board.column)
-                .map(|cards| cards.iter().map(|task| task.id.clone()).collect())
-                .unwrap_or_default(),
+            ViewMode::Board => {
+                if let Some(id) = self.selected_task.as_deref()
+                    && let Some((column, card)) = self.card_holding(id)
+                    && column == self.board.column
+                {
+                    return self.card_row_ids(&card);
+                }
+                self.board
+                    .cards
+                    .get(self.board.column)
+                    .map(|cards| cards.iter().map(|task| task.id.clone()).collect())
+                    .unwrap_or_default()
+            }
             ViewMode::Matrix => self
                 .board
                 .quadrants
@@ -246,15 +254,18 @@ impl App {
     }
 
     fn keep_board_selection(&mut self) {
-        if self.view_mode == ViewMode::Board {
-            // The selection's own column takes the keyboard.
-            if let Some(id) = &self.selected_task
-                && let Some(column) = self
-                    .board
-                    .cards
-                    .iter()
-                    .position(|cards| cards.iter().any(|task| &task.id == id))
-            {
+        if self.view_mode == ViewMode::Board
+            && let Some(id) = self.selected_task.clone()
+        {
+            // The selection's own column takes the keyboard: the card's, or
+            // the column of the card a selected subtask row is drawn on.
+            let column = self
+                .board
+                .cards
+                .iter()
+                .position(|cards| cards.iter().any(|task| task.id == id))
+                .or_else(|| self.card_holding(&id).map(|(column, _)| column));
+            if let Some(column) = column {
                 self.board.column = column;
                 return;
             }
@@ -461,6 +472,8 @@ pub struct CardRow {
     pub depth: usize,
     /// The column it stands in as a card of its own, when that is another.
     pub elsewhere: Option<String>,
+    /// Its own subtasks are folded away (`,`), so none are drawn under it.
+    pub folded: bool,
 }
 
 /// How many subtask rows a card shows before "+N more".
@@ -489,7 +502,11 @@ impl App {
             }
         }
         let hide = self.prefs.hide_completed;
+        let folded = &self.prefs.folded_tasks;
         let mut out = Vec::new();
+        if folded.contains(&card.id) {
+            return (out, 0);
+        }
         let mut stack: Vec<(&TaskRow, usize)> = children
             .get(card.id.as_str())
             .map(|kids| kids.iter().rev().map(|t| (*t, 0)).collect())
@@ -504,12 +521,17 @@ impl App {
                 .and_then(|ix| self.board.columns.get(*ix))
                 .map(|column| column.title.clone());
             let filed_elsewhere = elsewhere.is_some();
+            let kids = children
+                .get(task.id.as_str())
+                .filter(|kids| !kids.is_empty());
+            let folded_away = kids.is_some() && folded.contains(&task.id);
             out.push(CardRow {
                 task: task.clone(),
                 depth,
                 elsewhere,
+                folded: folded_away && !filed_elsewhere,
             });
-            if filed_elsewhere {
+            if filed_elsewhere || folded_away {
                 continue;
             }
             if let Some(kids) = children.get(task.id.as_str()) {
@@ -519,6 +541,117 @@ impl App {
         let total = out.len();
         out.truncate(CARD_SUBTASK_ROWS);
         (out, total)
+    }
+
+    /// How many subtasks a folded card keeps out of sight; none when the
+    /// card is not folded or has none.
+    pub fn card_folded_count(&self, card: &TaskRow) -> usize {
+        if !self.prefs.folded_tasks.contains(&card.id) {
+            return 0;
+        }
+        let hide = self.prefs.hide_completed;
+        self.all_rows
+            .iter()
+            .filter(|row| row.task.parent_task_id.as_deref() == Some(card.id.as_str()))
+            .filter(|row| {
+                !(hide && row.task.status != "open" && !self.lingering.contains(&row.task.id))
+            })
+            .count()
+    }
+
+    /// The card in the board's columns whose drawn subtask rows hold `id`,
+    /// and that card's column; none when `id` is a card itself, or is not
+    /// drawn on one (folded away, past "+N more", or a card elsewhere).
+    pub fn card_holding(&self, id: &str) -> Option<(usize, TaskRow)> {
+        let columns = self.card_columns();
+        if columns.contains_key(id) {
+            return None;
+        }
+        let parent_of = |id: &str| -> Option<&str> {
+            self.all_rows
+                .iter()
+                .find(|row| row.task.id == id)
+                .and_then(|row| row.task.parent_task_id.as_deref())
+        };
+        // The nearest ancestor that is a card is the one drawing it: a
+        // subtask that is a card elsewhere draws its own subtree.
+        let mut parent = parent_of(id);
+        let (column, card_id) = loop {
+            let here = parent?;
+            if let Some(column) = columns.get(here) {
+                break (*column, here);
+            }
+            parent = parent_of(here);
+        };
+        let card = self
+            .board
+            .cards
+            .get(column)?
+            .iter()
+            .find(|c| c.id == card_id)?;
+        let drawn = self
+            .card_subtree(card)
+            .0
+            .iter()
+            .any(|row| row.task.id == id && row.elsewhere.is_none());
+        drawn.then(|| (column, card.clone()))
+    }
+
+    /// The subtask rows the keys stand on inside a card: every one drawn,
+    /// but those that are cards in another column, which are reached there.
+    pub fn card_row_ids(&self, card: &TaskRow) -> Vec<String> {
+        self.card_subtree(card)
+            .0
+            .into_iter()
+            .filter(|row| row.elsewhere.is_none())
+            .map(|row| row.task.id)
+            .collect()
+    }
+
+    /// `l` on a board card: the cursor onto its first subtask row, unfolding
+    /// the card first when it is folded.
+    pub fn enter_card_rows(&mut self) {
+        if self.view_mode != ViewMode::Board {
+            return;
+        }
+        let Some(id) = self.selected_task.clone() else {
+            return;
+        };
+        let Some(card) = self
+            .board
+            .cards
+            .get(self.board.column)
+            .and_then(|cards| cards.iter().find(|card| card.id == id))
+            .cloned()
+        else {
+            return;
+        };
+        if self.prefs.folded_tasks.remove(&card.id) {
+            self.prefs.save();
+            self.layout_rows();
+        }
+        match self.card_row_ids(&card).into_iter().next() {
+            Some(first) => self.selected_task = Some(first),
+            None => self.message = Some("This card has no subtasks to step into.".into()),
+        }
+    }
+
+    /// `h` (or `Esc`) on a subtask row: the cursor back onto its card. False
+    /// when the selection is not inside a card.
+    pub fn leave_card_rows(&mut self) -> bool {
+        if self.view_mode != ViewMode::Board {
+            return false;
+        }
+        let Some((column, card)) = self
+            .selected_task
+            .as_deref()
+            .and_then(|id| self.card_holding(id))
+        else {
+            return false;
+        };
+        self.board.column = column;
+        self.selected_task = Some(card.id);
+        true
     }
 
     /// Whose subtask a card is, when it is one: "↳ parent", with the

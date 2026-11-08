@@ -86,13 +86,15 @@ impl App {
         let Some(id) = self.selected_task.clone() else {
             return;
         };
-        let row = self.rows.iter().find(|row| row.task.id == id).cloned();
+        // The scope's rows, not the outline's: on the board a subtask row
+        // drawn on a card is not one of the outline's.
+        let row = self.all_rows.iter().find(|row| row.task.id == id).cloned();
         let target = match row {
             Some(row) if row.has_children && !self.prefs.folded_tasks.contains(&id) => Some(id),
             Some(row) => row
                 .task
                 .parent_task_id
-                .filter(|parent| self.rows.iter().any(|r| r.task.id == *parent)),
+                .filter(|parent| self.all_rows.iter().any(|r| r.task.id == *parent)),
             None => None,
         };
         if let Some(target) = target {

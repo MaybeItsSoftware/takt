@@ -121,7 +121,8 @@ So none of it is reachable only by something you already have to know.
 | `]` / `[` | Open the task's subtasks / leave them |
 | `→` / `←` | In the outline, show a task's subtasks and step into them / hide them and step out — without opening the task. Elsewhere, open and leave it. At the top level of a list, `←` goes back to the list in the sidebar |
 | `za` / `Cmd+←` / `Cmd+→` | Fold or unfold the task you are on (outline or board) / fold / unfold the whole outline |
-| `.` / `,` | Grow the task you are on to show its subtasks / shrink it (on a task with none, folds the one it sits under) |
+| `.` / `,` | Grow the task you are on to show its subtasks / shrink it (on a task with none, folds the one it sits under) — in the outline and on a board card or subtask row |
+| `l` / `h` | On the board, step into the card's subtask rows / back out onto the card (`Esc` too). Inside, `↑`/`↓` walk the rows and Space, `ee`, the inspector and folding act on the row you are on |
 | `Cmd+Shift+C` / `Cmd+Ctrl+C` | On the board, add a column / delete the one you are in (it asks where its tasks go) |
 | `Alt+Up` / `Alt+Down` | Move the task up or down past its neighbour: on the board, the card above or below in its column, or the row above or below on its card |
 | `Cmd+N` / `Cmd+Shift+N` / `Cmd+Alt+N` | New task / list / folder |
@@ -274,10 +275,10 @@ so nothing is a surprise after Return.
 
 The desktop workspace supports Checkvist-style two-letter commands, including
 `uu`, `ee`, `dd`, `nn`, `tt`, `mm` and `ww`, plus native undo/redo in the
-Edit menu. Board arrows navigate every column, including empty ones, and
-`Up`/`Down` step through the subtask rows drawn on each card as well as the
-cards (folded cards are skipped over); `Space` completes the row you are on and
-`Return` adds a task, as Checkvist's do. The sidebar outlines the list you are navigating.
+Edit menu. Board arrows navigate every column, including empty ones,
+`Up`/`Down` step through the cards, and `l` steps into the card you are on so
+they walk its subtask rows instead (`h` or `Esc` steps back out); `Space`
+completes the row you are on and `Return` adds a task, as Checkvist's do. The sidebar outlines the list you are navigating.
 
 A task you tick off stays where it was for three seconds — long enough to see
 it go and to take it back — and then leaves the list; the Done rail keeps it.

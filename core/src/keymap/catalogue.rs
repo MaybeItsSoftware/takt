@@ -841,6 +841,17 @@ fn motions() -> Vec<Spec> {
         c("motionBoardColumn", "Focus the next or previous column", "Moving around", &["left", "right"])
             .on(Board)
             .motion(),
+        // A card's subtask rows are a column of their own: `l` steps the
+        // cursor in, ↑/↓ walk them, and `h` (or Esc) steps back onto the card.
+        // ←/→ stay the columns', so the pair is vim's other one.
+        c("motionBoardIntoCard", "Step into the card's subtasks", "Moving around", &["l"])
+            .on(Board)
+            .motion()
+            .note("↑ and ↓ then walk the subtask rows the card shows, and what acts on a task acts on the row you are on; a folded card unfolds first"),
+        c("motionBoardOutOfCard", "Step out of the subtasks, back onto the card", "Moving around", &["h"])
+            .on(Board)
+            .motion()
+            .note("Esc does the same"),
         c("motionOutlineUnfold", "Show the subtasks, step into them, or go to the inspector", "Moving around", &["right"])
             .on(Outline)
             .motion()

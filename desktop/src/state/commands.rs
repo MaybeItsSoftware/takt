@@ -251,6 +251,10 @@ impl App {
                     self.move_board_column(if back { -1 } else { 1 });
                 }
             }
+            "motionBoardIntoCard" => self.enter_card_rows(),
+            "motionBoardOutOfCard" => {
+                self.leave_card_rows();
+            }
             "motionSidebarSelect" => self.move_sidebar_cursor(key),
             "motionSidebarExpand" => self.activate_sidebar_cursor(key != "enter", key == "enter"),
             "motionSidebarCollapse" => self.collapse_sidebar_cursor(),
@@ -437,6 +441,8 @@ impl App {
             self.editing = None;
         } else if self.region == Region::Inspector {
             self.region = Region::Tasks;
+        } else if self.region == Region::Tasks && self.leave_card_rows() {
+            // Out of a card's subtask rows, onto the card.
         } else if matches!(
             self.scope,
             Scope::List {

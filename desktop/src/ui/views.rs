@@ -1,6 +1,6 @@
 use super::board_links::{self, End};
 use super::*;
-use crate::state::board::CardPlace;
+use crate::state::board::{CardPlace, CardRow};
 use crate::state::columns::ColumnName;
 
 impl Takt {
@@ -327,6 +327,18 @@ impl Takt {
         // A board card's column, for its link ends; not the matrix's.
         let column = (ix < 1_000_000).then_some(ix / 100_000);
         let celebrating = self.app.celebrating(&task.id);
+        // The status mark takes a slot only when it draws something: an open
+        // task's is empty, and reserving it left a gap before every title.
+        let marked = task.status != "open" || task.item_kind.as_deref() == Some("list");
+        let inset = if marked { px(20.) } else { px(0.) };
+        let (rows, total) = self.app.card_subtree(task);
+        // The cursor on one of its subtask rows: the card is still the one
+        // the keyboard is in.
+        let holds_cursor = self
+            .app
+            .selected_task
+            .as_deref()
+            .is_some_and(|id| rows.iter().any(|row| row.task.id == id));
         let element = div()
             .id(("card", ix))
             .on_hover({
@@ -348,7 +360,7 @@ impl Takt {
             .rounded(px(4.))
             .bg(t.background)
             .border_1()
-            .border_color(if selected && active {
+            .border_color(if (selected || holds_cursor) && active {
                 t.accent
             } else {
                 t.border_variant
@@ -379,6 +391,9 @@ impl Takt {
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.app.selected_task = Some(id.clone());
                 this.app.region = Region::Tasks;
+                if let Some(column) = column {
+                    this.app.board.column = column;
+                }
                 cx.notify();
             }))
             .child(
@@ -399,7 +414,7 @@ impl Takt {
                             ))
                         },
                     )
-                    .child(check(task, t))
+                    .when(marked, |d| d.child(check(task, t)))
                     .child(if editing {
                         self.field_inline(t, "Task").into_any_element()
                     } else {
@@ -410,7 +425,7 @@ impl Takt {
             .when(list.is_some() || task.due_at_ms.is_some(), |d| {
                 d.child(
                     div()
-                        .pl(px(20.))
+                        .pl(inset)
                         .flex()
                         .gap_2()
                         .text_size(px(11.))
@@ -422,29 +437,43 @@ impl Takt {
             .when_some(self.app.card_parent_hint(task), |d, hint| {
                 d.child(
                     div()
-                        .pl(px(20.))
+                        .pl(inset)
                         .text_size(px(11.))
                         .text_color(t.placeholder)
                         .truncate()
                         .child(hint),
                 )
             })
-            .child(self.card_subtasks(task, column, t, cx));
+            .child(self.card_subtasks(task, rows, total, column, t, cx));
         super::celebrate::celebrate(element, &task.id, celebrating, t)
     }
 
     /// The card's subtree as compact rows: `└` marks, flush with the card's
-    /// edge; a subtask filed in another column muted and naming it.
+    /// title; a subtask filed in another column muted and naming it; a
+    /// folded card or row says what it keeps out of sight.
     fn card_subtasks(
         &self,
         card: &TaskRow,
+        rows: Vec<CardRow>,
+        total: usize,
         column: Option<usize>,
         t: Tokens,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let (rows, total) = self.app.card_subtree(card);
+        let hidden = self.app.card_folded_count(card);
         if rows.is_empty() {
-            return div().into_any_element();
+            if hidden == 0 {
+                return div().into_any_element();
+            }
+            return div()
+                .pt_1()
+                .text_size(px(11.))
+                .text_color(t.placeholder)
+                .child(format!(
+                    "▸ {hidden} subtask{}",
+                    if hidden == 1 { "" } else { "s" }
+                ))
+                .into_any_element();
         }
         let more = total.saturating_sub(rows.len());
         div()
@@ -454,7 +483,13 @@ impl Takt {
             .children(rows.into_iter().map(|row| {
                 let id = row.task.id.clone();
                 let selected = self.app.selected_task.as_deref() == Some(id.as_str());
+                let editing = matches!(&self.app.editing, Some(Editing::TaskTitle { task_id }) if *task_id == id);
                 let open = row.task.status == "open";
+                let status = match row.task.status.as_str() {
+                    "completed" => "●",
+                    "cancelled" => "✕",
+                    _ => "",
+                };
                 let source = column
                     .filter(|_| row.elsewhere.is_some())
                     .map(|column| End::Source {
@@ -482,7 +517,7 @@ impl Takt {
                             }
                         })
                     })
-                    .pl(px(4. + row.depth as f32 * 10.))
+                    .pl(px(row.depth as f32 * 10.))
                     .h(px(20.))
                     .flex()
                     .items_center()
@@ -499,22 +534,29 @@ impl Takt {
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.app.selected_task = Some(id.clone());
                         this.app.region = Region::Tasks;
+                        if let Some(column) = column {
+                            this.app.board.column = column;
+                        }
                         cx.notify();
                     }))
                     .child(div().flex_none().text_color(t.placeholder).child("└"))
-                    .child(div().flex_none().child(match row.task.status.as_str() {
-                        "completed" => "●",
-                        "cancelled" => "✕",
-                        _ => "",
-                    }))
-                    .child(
+                    .when(!status.is_empty(), |d| {
+                        d.child(div().flex_none().child(status))
+                    })
+                    .child(if editing {
+                        self.field_inline(t, "Task").into_any_element()
+                    } else {
                         div()
                             .flex_1()
                             .min_w_0()
                             .truncate()
                             .when(!open, |d| d.line_through())
-                            .child(row.task.title.clone()),
-                    )
+                            .child(row.task.title.clone())
+                            .into_any_element()
+                    })
+                    .when(row.folded, |d| {
+                        d.child(div().flex_none().text_color(t.placeholder).child("▸"))
+                    })
                     .when_some(row.elsewhere, |d, column| {
                         d.child(
                             div()
@@ -528,7 +570,6 @@ impl Takt {
             .when(more > 0, |d| {
                 d.child(
                     div()
-                        .pl(px(4.))
                         .text_size(px(11.))
                         .text_color(t.placeholder)
                         .child(format!("+{more} more")),

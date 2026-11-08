@@ -256,10 +256,13 @@ exactly what a keyboard-first app cannot afford, and Today's meaning is the one
 a Blitzit-style day is built on.
 
 The board keeps Left/Right for column navigation, including empty columns.
-Up/Down walk a column row by row, and a card's subtask rows are rows: the
-keys step onto each subtask the card is showing before the next card, and
-over a folded card's tree without stopping. Left/Right from a subtask leave
-from the column its card is in. On an entered card's board the columns left
+Up/Down walk a column card by card. `l` steps into the card you are on: the
+cursor goes onto its first subtask row (a folded card unfolds first), Up/Down
+then walk the rows the card shows, and everything that acts on a task —
+Space, `ee`, the inspector, `za`, `,`/`.` — acts on the row you are on. `h`
+or Esc steps back out onto the card. A subtask filed in another column is
+skipped inside the card; it is reached as a card in its own column.
+Left/Right from a subtask leave from the column its card is in. On an entered card's board the columns left
 of the card's own are hidden, and neither the arrows nor `Cmd+←`/`Cmd+→`
 reach them.
 
@@ -296,6 +299,10 @@ subtasks fold and unfold where they stand:
 - **`za` (vim's fold toggle) folds the task you are on** in the outline, the
   board card, or the subtask row on a card — where `←`/`→` belong to the
   columns. Every row with subtasks carries a chevron that does the same.
+- **`,` folds and `.` unfolds**, on the board as in the outline: `,` on a
+  card hides its subtask rows, leaving "▸ N subtasks" on the card, and on a
+  subtask row with none of its own folds the task it sits under, the cursor
+  going with it; `.` shows them again.
 
 There is one set of folds, shared by the outline and the board, and it
 survives a relaunch. Going to a task from search or the done rail unfolds the

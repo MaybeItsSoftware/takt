@@ -266,7 +266,13 @@ impl App {
     // MARK: Folding
 
     pub fn toggle_fold(&mut self) {
-        let Some(row) = self.selected_index().and_then(|ix| self.rows.get(ix)) else {
+        // By id, as the board's cards and subtask rows are not the outline's
+        // rows and their index there means nothing.
+        let Some(row) = self
+            .selected_task
+            .as_deref()
+            .and_then(|id| self.all_rows.iter().find(|row| row.task.id == id))
+        else {
             return;
         };
         if !row.has_children {

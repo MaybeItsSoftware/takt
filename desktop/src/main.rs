@@ -220,6 +220,31 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             report.push(format!(
                 "card subtasks {rows} rows, {elsewhere} in other columns, {hints} parent hints"
             ));
+            // `l` into a card's subtask rows, `j` along them, `h` back out.
+            let held = app
+                .board
+                .cards
+                .iter()
+                .enumerate()
+                .find_map(|(column, cards)| {
+                    cards
+                        .iter()
+                        .find(|card| app.card_row_ids(card).len() > 1)
+                        .map(|card| (column, card.clone()))
+                });
+            if let Some((column, card)) = held {
+                let ids = app.card_row_ids(&card);
+                app.board.column = column;
+                app.selected_task = Some(card.id.clone());
+                app.run("motionBoardIntoCard", Some("l"));
+                let into = app.selected_task.as_deref() == ids.first().map(String::as_str)
+                    && app.visible_ids() == ids;
+                app.run("motionSelectNext", Some("j"));
+                let along = app.selected_task.as_deref() == ids.get(1).map(String::as_str);
+                app.run("motionBoardOutOfCard", Some("h"));
+                let out = app.selected_task.as_deref() == Some(card.id.as_str());
+                report.push(format!("card rows: into {into}, along {along}, out {out}"));
+            }
         }
     }
     app.run("goOutline", None);
