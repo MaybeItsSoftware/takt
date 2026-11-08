@@ -303,3 +303,41 @@ pub(super) fn drag_task(task: &TaskRow, t: Tokens) -> DraggedTask {
         tokens: t,
     }
 }
+
+/// A tooltip: a word or two in a bordered box, as Zed draws them.
+pub(super) struct Tip {
+    text: SharedString,
+    t: Tokens,
+}
+
+impl gpui::Render for Tip {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        let t = self.t;
+        div()
+            .font_family(UI_FONT)
+            .text_size(px(12.))
+            .px_2()
+            .py_1()
+            .rounded(px(6.))
+            .bg(t.surface)
+            .border_1()
+            .border_color(t.border)
+            .text_color(t.text)
+            .child(self.text.clone())
+    }
+}
+
+/// What `.tooltip(…)` takes, saying `text`.
+pub(super) fn tip(
+    text: impl Into<SharedString>,
+    t: Tokens,
+) -> impl Fn(&mut Window, &mut GpuiApp) -> gpui::AnyView + 'static {
+    let text = text.into();
+    move |_, cx| {
+        cx.new(|_| Tip {
+            text: text.clone(),
+            t,
+        })
+        .into()
+    }
+}

@@ -237,6 +237,10 @@ impl Takt {
                                 .when_some(stop.icon(), |d, glyph| {
                                     d.child(
                                         div()
+                                            .id(("inspector-icon", ix))
+                                            .when_some(stop.tip(), |d, text| {
+                                                d.tooltip(super::widgets::tip(text, t))
+                                            })
                                             .w(px(16.))
                                             .h(px(18.))
                                             .flex_none()

@@ -38,6 +38,25 @@ pub struct Stop {
 }
 
 impl Stop {
+    /// What its icon says on hover: its label, or what the row is when it
+    /// has none.
+    pub fn tip(&self) -> Option<&'static str> {
+        if !self.label.is_empty() {
+            return Some(self.label);
+        }
+        Some(match self.id {
+            "notes" => "Notes",
+            "focus" => "Focus",
+            "commit" => "Commitment",
+            "apply-planning" => "Requirements",
+            "pin" => "Sidebar",
+            "complete" => "Complete",
+            "archive" => "Archive",
+            "convert" => "Convert",
+            _ => return None,
+        })
+    }
+
     fn new(id: &'static str, label: &'static str, kind: StopKind) -> Self {
         Stop {
             id,
