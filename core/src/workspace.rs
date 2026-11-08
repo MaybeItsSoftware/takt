@@ -1460,6 +1460,28 @@ impl CoreWorkspace {
         self.unjournalled(|tx| sync::apply_remote_rows(tx, &rows, cursor, hlc.as_deref(), now_ms))
     }
 
+    /// Who added, finished and holds a task in a shared list; nothing for a
+    /// task in a list of your own.
+    pub fn task_sharing(
+        &self,
+        task_id: String,
+    ) -> Result<Option<crate::assignment::TaskSharing>, CoreError> {
+        crate::assignment::task_sharing(&self.lock(), &task_id)
+    }
+
+    /// Assigns a task in a shared list to a member, or to nobody, as one
+    /// "Assign Task" step.
+    pub fn assign_task(
+        &self,
+        task_id: String,
+        assignee_account_id: Option<String>,
+        now_ms: i64,
+    ) -> Result<(), CoreError> {
+        journal::journalled(&mut self.lock(), "Assign Task", |tx| {
+            crate::assignment::assign_task(tx, &task_id, assignee_account_id.as_deref(), now_ms)
+        })
+    }
+
     /// Every shared list this device knows of, with its members.
     pub fn shared_lists(&self) -> Result<Vec<sync::spaces::SharedList>, CoreError> {
         sync::spaces::shared_lists(&self.lock())

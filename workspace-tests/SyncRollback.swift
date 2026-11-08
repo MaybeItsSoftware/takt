@@ -32,8 +32,16 @@ extension Database {
     for column in [
       "waitingOn", "waitingFollowUpAt", "waitingFollowUpTaskId", "followUpOfTaskId", "matrixRank", "linkDetailsJSON",
       "waitingFollowUpEveryDays", "waitingFollowUpCount", "seriesTaskId", "seriesTitle", "agentContext",
+      "assigneeAccountId",
     ] {
       try execute(sql: "ALTER TABLE task_metadata DROP COLUMN \(column)")
+    }
+    // `v38_task_authorship`: the journal's `tasks` triggers name its columns.
+    for operation in ["insert", "update", "delete"] {
+      try execute(sql: "DROP TRIGGER IF EXISTS change_log_tasks_\(operation)")
+    }
+    for column in ["createdBy", "completedBy"] {
+      try execute(sql: "ALTER TABLE tasks DROP COLUMN \(column)")
     }
     // `v24_condition_categories`: the journal's `task_conditions` triggers
     // name its new column.
@@ -57,6 +65,6 @@ extension Database {
         + "'v26_commitment_missed_stack', 'v27_condition_order_and_context', 'v28_synced_focus_context', "
         + "'v29_daily_contribution_skips', 'v30_google_calendar', 'v31_link_details', 'v32_follow_up_repeat', "
         + "'v33_recurrence_series', 'v34_condition_provides', 'v35_series_title', "
-        + "'v36_task_agent_context', 'v37_shared_lists')")
+        + "'v36_task_agent_context', 'v37_shared_lists', 'v38_task_authorship')")
   }
 }

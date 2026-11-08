@@ -202,6 +202,9 @@ pub fn candidates(
     let blocked: HashSet<String> = crate::dependencies::blocked_task_ids(connection)?
         .into_iter()
         .collect();
+    // A shared task someone else has taken on is theirs to do
+    // (`assignment`).
+    let elsewhere = crate::assignment::assigned_elsewhere(connection)?;
     let mut work: HashMap<String, i64> = HashMap::new();
     {
         let mut statement = connection.prepare(
@@ -294,6 +297,7 @@ pub fn candidates(
             || closed_lists.contains(&row.list_id)
             || parents.contains(&row.id)
             || blocked.contains(&row.id)
+            || elsewhere.contains(&row.id)
         {
             continue;
         }

@@ -48,6 +48,7 @@ public enum WorkspaceCommandID: String, CaseIterable, Sendable {
   // Lists and folders
   case listNew, listRename, listSettings, listArchive, listRestore, listComplete
   case listDelete, folderNew, folderMoveUp, folderMoveDown, folderSelectPrevious
+  case listShare, listJoin, listMembers, listLeave, listStopSharing, taskAssign
   case folderSelectNext, listMoveUp, listMoveDown, listNewTaskDestination
   case folderCollapseAll, folderExpandAll
   case filterListNew, filterListEdit, listIcon
@@ -79,6 +80,7 @@ public enum WorkspaceCommandID: String, CaseIterable, Sendable {
   case motionSidebarSelect, motionSidebarExpand, motionSidebarCollapse
   case motionInspectorNext, motionInspectorPrevious, motionInspectorEnds, motionInspectorEdit
   case motionInspectorClear, motionInspectorLeave
+  case motionBoardIntoCard, motionBoardOutOfCard
   case motionBoardColumn, motionOutlineUnfold, motionOutlineFold, motionDismiss, motionSetPriority
   case todayStart, motionTodayUnfold, motionTodayLeave
 }

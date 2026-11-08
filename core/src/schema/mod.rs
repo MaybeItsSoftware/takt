@@ -170,6 +170,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "v37_shared_lists",
         include_str!("migrations/v37_shared_lists.sql"),
     ),
+    (
+        "v38_task_authorship",
+        include_str!("migrations/v38_task_authorship.sql"),
+    ),
 ];
 
 /// Brings the database at `path` up to date, creating it if it does not

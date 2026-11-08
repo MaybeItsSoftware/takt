@@ -194,6 +194,7 @@ pub fn create_task_in(
         Some(_) => move_task_to_end(transaction, &id, now_ms)?,
         None => {}
     }
+    crate::assignment::stamp_created(transaction, &id)?;
     Ok(id)
 }
 
@@ -904,6 +905,7 @@ pub fn set_status(
     if status != "open" {
         close_open_descendants(transaction, task_id, status, &now, now_ms)?;
     }
+    crate::assignment::stamp_status(transaction, task_id, status, &now)?;
     Ok(())
 }
 

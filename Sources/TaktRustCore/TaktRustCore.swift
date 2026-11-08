@@ -1449,6 +1449,12 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func arrangeDay(orderedTaskIds: [String], nowMs: Int64) throws 
     
     /**
+     * Assigns a task in a shared list to a member, or to nobody, as one
+     * "Assign Task" step.
+     */
+    func assignTask(taskId: String, assigneeAccountId: String?, nowMs: Int64) throws 
+    
+    /**
      * Pairs the store with a sync server.
      */
     func beginSync(deviceId: String, serverUrl: String) throws 
@@ -2133,6 +2139,12 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
      * The task's links, described for drawing (`links::task_links`).
      */
     func taskLinks(taskId: String) throws  -> [TaskLink]
+    
+    /**
+     * Who added, finished and holds a task in a shared list; nothing for a
+     * task in a list of your own.
+     */
+    func taskSharing(taskId: String) throws  -> TaskSharing?
     
     /**
      * The tasks waiting on `task_id`, open ones first.
@@ -3594,6 +3606,21 @@ open func arrangeDay(orderedTaskIds: [String], nowMs: Int64)throws   {try rustCa
     uniffi_takt_core_fn_method_coreworkspace_arrange_day(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(orderedTaskIds),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Assigns a task in a shared list to a member, or to nobody, as one
+     * "Assign Task" step.
+     */
+open func assignTask(taskId: String, assigneeAccountId: String?, nowMs: Int64)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_assign_task(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),
+        FfiConverterOptionString.lower(assigneeAccountId),
         FfiConverterInt64.lower(nowMs),uniffiCallStatus
     )
 }
@@ -5448,6 +5475,20 @@ open func taskLinks(taskId: String)throws  -> [TaskLink]  {
     return try  FfiConverterSequenceTypeTaskLink.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
         uniffiCallStatus in
     uniffi_takt_core_fn_method_coreworkspace_task_links(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Who added, finished and holds a task in a shared list; nothing for a
+     * task in a list of your own.
+     */
+open func taskSharing(taskId: String)throws  -> TaskSharing?  {
+    return try  FfiConverterOptionTypeTaskSharing.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_task_sharing(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(taskId),uniffiCallStatus
     )
@@ -20382,6 +20423,75 @@ public func FfiConverterTypeTaskRow_lower(_ value: TaskRow) -> RustBuffer {
 
 
 /**
+ * A task's part in a shared list, for a client's task detail.
+ */
+public struct TaskSharing: Equatable, Hashable {
+    public var listId: String
+    public var members: [SharedListMember]
+    public var createdBy: SharedListMember?
+    public var completedBy: SharedListMember?
+    public var assignee: SharedListMember?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(listId: String, members: [SharedListMember], createdBy: SharedListMember?, completedBy: SharedListMember?, assignee: SharedListMember?) {
+        self.listId = listId
+        self.members = members
+        self.createdBy = createdBy
+        self.completedBy = completedBy
+        self.assignee = assignee
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TaskSharing: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTaskSharing: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TaskSharing {
+        return
+            try TaskSharing(
+                listId: FfiConverterString.read(from: &buf), 
+                members: FfiConverterSequenceTypeSharedListMember.read(from: &buf), 
+                createdBy: FfiConverterOptionTypeSharedListMember.read(from: &buf), 
+                completedBy: FfiConverterOptionTypeSharedListMember.read(from: &buf), 
+                assignee: FfiConverterOptionTypeSharedListMember.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TaskSharing, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.listId, into: &buf)
+        FfiConverterSequenceTypeSharedListMember.write(value.members, into: &buf)
+        FfiConverterOptionTypeSharedListMember.write(value.createdBy, into: &buf)
+        FfiConverterOptionTypeSharedListMember.write(value.completedBy, into: &buf)
+        FfiConverterOptionTypeSharedListMember.write(value.assignee, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTaskSharing_lift(_ buf: RustBuffer) throws -> TaskSharing {
+    return try FfiConverterTypeTaskSharing.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTaskSharing_lower(_ value: TaskSharing) -> RustBuffer {
+    return FfiConverterTypeTaskSharing.lower(value)
+}
+
+
+/**
  * A task's subtasks and logged work.
  */
 public struct TaskWorkFacts: Equatable, Hashable {
@@ -26632,6 +26742,30 @@ fileprivate struct FfiConverterOptionTypeSharedList: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeSharedListMember: FfiConverterRustBuffer {
+    typealias SwiftType = SharedListMember?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSharedListMember.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSharedListMember.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeStoredFocusContext: FfiConverterRustBuffer {
     typealias SwiftType = StoredFocusContext?
 
@@ -26720,6 +26854,30 @@ fileprivate struct FfiConverterOptionTypeTaskRow: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeTaskRow.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeTaskSharing: FfiConverterRustBuffer {
+    typealias SwiftType = TaskSharing?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeTaskSharing.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeTaskSharing.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -29991,6 +30149,18 @@ public func agentWriteTools() -> [String]  {
 })
 }
 /**
+ * "you", or the member's email, or "someone": how a member is named in a
+ * sentence.
+ */
+public func sharedMemberName(member: SharedListMember) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_shared_member_name(
+        FfiConverterTypeSharedListMember_lower(member),uniffiCallStatus
+    )
+})
+}
+/**
  * The stock columns, which a workspace with no default of its own uses.
  */
 public func boardStockColumns() -> [BoardColumn]  {
@@ -32844,6 +33014,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_func_agent_write_tools() != 8928) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_func_shared_member_name() != 9929) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_func_board_stock_columns() != 23218) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33804,6 +33977,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_arrange_day() != 44382) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_assign_task() != 7755) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_begin_sync() != 42313) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -34183,6 +34359,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_task_links() != 32690) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_task_sharing() != 26707) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_tasks_blocked_by() != 18723) {

@@ -12,6 +12,7 @@ uniffi::setup_scaffolding!();
 pub mod agent_hints;
 pub mod agent_instructions;
 pub mod agent_tools;
+pub mod assignment;
 pub mod board;
 pub mod board_columns;
 pub mod board_rules;

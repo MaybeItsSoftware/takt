@@ -70,6 +70,9 @@ final class WorkspaceCommandCatalogTests: XCTestCase {
         .planBoardRenameColumn,
         .planBoardAddColumnLeft, .planBoardAddColumnRight, .planBoardEditColumnRules,
         .planBoardMakeDefaultColumns, .planBoardResetColumns,
+        // Sharing a list, and handing a task in one to someone: rare, and
+        // done from the palette, the list's menu or the inspector.
+        .listShare, .listJoin, .listMembers, .listLeave, .listStopSharing, .taskAssign,
         .windowUseClaudeCode, .windowUseCodex,
         .windowOpenKeymap, .windowReloadKeymap, .windowShowDiagnostics,
         .windowOpenThemesFolder, .windowReloadThemes, .windowExportTheme,

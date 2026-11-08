@@ -444,6 +444,8 @@ fn lists() -> Vec<Spec> {
             .note("Asks first. The list goes from your devices; the others keep it"),
         c("listStopSharing", "Stop sharing the list", "Lists", &[])
             .note("Asks first. Owner only: the list stays yours and leaves everyone else's"),
+        c("taskAssign", "Assign the task to someone in the list", "Lists", &[])
+            .note("A task in a shared list. One assigned to someone else leaves your Today and focus"),
         c("folderNew", "Create a folder", "Lists", &["cmd+option+n"])
             .also(Sidebar, &["d"])
             .note("d in the sidebar, as in Zed's vim project panel"),

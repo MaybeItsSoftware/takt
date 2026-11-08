@@ -683,6 +683,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_func_agent_write_tools(
     ): Int
+    external fun uniffi_takt_core_checksum_func_shared_member_name(
+    ): Int
     external fun uniffi_takt_core_checksum_func_board_stock_columns(
     ): Int
     external fun uniffi_takt_core_checksum_func_parse_board_columns(
@@ -1323,6 +1325,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_arrange_day(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_assign_task(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_begin_sync(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_blocked_task_ids(
@@ -1576,6 +1580,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_method_coreworkspace_task_blockers(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_task_links(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_task_sharing(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_tasks_blocked_by(
     ): Int
@@ -1863,6 +1869,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_arrange_day(`ptr`: Long,`orderedTaskIds`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_takt_core_fn_method_coreworkspace_assign_task(`ptr`: Long,`taskId`: RustBuffer.ByValue,`assigneeAccountId`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_begin_sync(`ptr`: Long,`deviceId`: RustBuffer.ByValue,`serverUrl`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_blocked_task_ids(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -2117,6 +2125,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_task_links(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_task_sharing(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_tasks_blocked_by(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_tasks_by_id(`ptr`: Long,`ids`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -2158,6 +2168,8 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_func_agent_read_only_tools(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_agent_write_tools(uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_shared_member_name(`member`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_board_stock_columns(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2720,6 +2732,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_agent_write_tools() and 0xFFFF) != 8928) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_shared_member_name() and 0xFFFF) != 9929) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_board_stock_columns() and 0xFFFF) != 23218) {
@@ -3682,6 +3697,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_arrange_day() and 0xFFFF) != 44382) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_assign_task() and 0xFFFF) != 7755) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_begin_sync() and 0xFFFF) != 42313) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -4061,6 +4079,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_task_links() and 0xFFFF) != 32690) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_task_sharing() and 0xFFFF) != 26707) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_tasks_blocked_by() and 0xFFFF) != 18723) {
@@ -5608,6 +5629,12 @@ public interface CoreWorkspaceInterface {
     fun `arrangeDay`(`orderedTaskIds`: List<kotlin.String>, `nowMs`: kotlin.Long)
     
     /**
+     * Assigns a task in a shared list to a member, or to nobody, as one
+     * "Assign Task" step.
+     */
+    fun `assignTask`(`taskId`: kotlin.String, `assigneeAccountId`: kotlin.String?, `nowMs`: kotlin.Long)
+    
+    /**
      * Pairs the store with a sync server.
      */
     fun `beginSync`(`deviceId`: kotlin.String, `serverUrl`: kotlin.String)
@@ -6292,6 +6319,12 @@ public interface CoreWorkspaceInterface {
      * The task's links, described for drawing (`links::task_links`).
      */
     fun `taskLinks`(`taskId`: kotlin.String): List<TaskLink>
+    
+    /**
+     * Who added, finished and holds a task in a shared list; nothing for a
+     * task in a list of your own.
+     */
+    fun `taskSharing`(`taskId`: kotlin.String): TaskSharing?
     
     /**
      * The tasks waiting on `task_id`, open ones first.
@@ -8244,6 +8277,26 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         it,
         
         FfiConverterSequenceString.lower(`orderedTaskIds`),
+        FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Assigns a task in a shared list to a member, or to nobody, as one
+     * "Assign Task" step.
+     */
+    @Throws(CoreException::class)override fun `assignTask`(`taskId`: kotlin.String, `assigneeAccountId`: kotlin.String?, `nowMs`: kotlin.Long)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_assign_task(
+        it,
+        
+        FfiConverterString.lower(`taskId`),
+        FfiConverterOptionalString.lower(`assigneeAccountId`),
         FfiConverterLong.lower(`nowMs`),_status)
 }
     }
@@ -10731,6 +10784,25 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
     callWithHandle {
     uniffiRustCallWithError(CoreException) { _status ->
     UniffiLib.uniffi_takt_core_fn_method_coreworkspace_task_links(
+        it,
+        
+        FfiConverterString.lower(`taskId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Who added, finished and holds a task in a shared list; nothing for a
+     * task in a list of your own.
+     */
+    @Throws(CoreException::class)override fun `taskSharing`(`taskId`: kotlin.String): TaskSharing? {
+            return FfiConverterOptionalTypeTaskSharing.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_task_sharing(
         it,
         
         FfiConverterString.lower(`taskId`),_status)
@@ -22550,6 +22622,62 @@ public object FfiConverterTypeTaskRow: FfiConverterRustBuffer<TaskRow> {
 
 
 /**
+ * A task's part in a shared list, for a client's task detail.
+ */
+data class TaskSharing (
+    var `listId`: kotlin.String
+    , 
+    var `members`: List<SharedListMember>
+    , 
+    var `createdBy`: SharedListMember?
+    , 
+    var `completedBy`: SharedListMember?
+    , 
+    var `assignee`: SharedListMember?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTaskSharing: FfiConverterRustBuffer<TaskSharing> {
+    override fun read(buf: ByteBuffer): TaskSharing {
+        return TaskSharing(
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeSharedListMember.read(buf),
+            FfiConverterOptionalTypeSharedListMember.read(buf),
+            FfiConverterOptionalTypeSharedListMember.read(buf),
+            FfiConverterOptionalTypeSharedListMember.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: TaskSharing) = (
+            FfiConverterString.allocationSize(value.`listId`) +
+            FfiConverterSequenceTypeSharedListMember.allocationSize(value.`members`) +
+            FfiConverterOptionalTypeSharedListMember.allocationSize(value.`createdBy`) +
+            FfiConverterOptionalTypeSharedListMember.allocationSize(value.`completedBy`) +
+            FfiConverterOptionalTypeSharedListMember.allocationSize(value.`assignee`)
+    )
+
+    override fun write(value: TaskSharing, buf: ByteBuffer) {
+            FfiConverterString.write(value.`listId`, buf)
+            FfiConverterSequenceTypeSharedListMember.write(value.`members`, buf)
+            FfiConverterOptionalTypeSharedListMember.write(value.`createdBy`, buf)
+            FfiConverterOptionalTypeSharedListMember.write(value.`completedBy`, buf)
+            FfiConverterOptionalTypeSharedListMember.write(value.`assignee`, buf)
+    }
+}
+
+
+
+/**
  * A task's subtasks and logged work.
  */
 data class TaskWorkFacts (
@@ -29514,6 +29642,38 @@ public object FfiConverterOptionalTypeSharedList: FfiConverterRustBuffer<SharedL
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeSharedListMember: FfiConverterRustBuffer<SharedListMember?> {
+    override fun read(buf: ByteBuffer): SharedListMember? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeSharedListMember.read(buf)
+    }
+
+    override fun allocationSize(value: SharedListMember?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeSharedListMember.allocationSize(value)
+        }
+    }
+
+    override fun write(value: SharedListMember?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeSharedListMember.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeStoredFocusContext: FfiConverterRustBuffer<StoredFocusContext?> {
     override fun read(buf: ByteBuffer): StoredFocusContext? {
         if (buf.get().toInt() == 0) {
@@ -29632,6 +29792,38 @@ public object FfiConverterOptionalTypeTaskRow: FfiConverterRustBuffer<TaskRow?> 
         } else {
             buf.put(1)
             FfiConverterTypeTaskRow.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeTaskSharing: FfiConverterRustBuffer<TaskSharing?> {
+    override fun read(buf: ByteBuffer): TaskSharing? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeTaskSharing.read(buf)
+    }
+
+    override fun allocationSize(value: TaskSharing?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeTaskSharing.allocationSize(value)
+        }
+    }
+
+    override fun write(value: TaskSharing?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeTaskSharing.write(value, buf)
         }
     }
 }
@@ -33395,6 +33587,21 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
     UniffiLib.uniffi_takt_core_fn_func_agent_write_tools(
     
         _status)
+}
+    )
+    }
+    
+
+        /**
+         * "you", or the member's email, or "someone": how a member is named in a
+         * sentence.
+         */ fun `sharedMemberName`(`member`: SharedListMember): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_shared_member_name(
+    
+        
+        FfiConverterTypeSharedListMember.lower(`member`),_status)
 }
     )
     }
