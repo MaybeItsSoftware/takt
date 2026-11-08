@@ -39,6 +39,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.graphics.Color
+import uk.co.maybeitsadam.takt.ui.components.Hairline
+import uk.co.maybeitsadam.takt.ui.navigation.Tab
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -211,7 +215,7 @@ private fun ListsTree(
                     true
                 },
         ) {
-            TaktTopBar("Lists") {
+            TaktTopBar("Lists", sidebar = true) {
                 IconAction(PIcons.Folder, "New folder", onClick = { dialog = ListsDialog.NewFolder(null) })
                 IconAction(Icons.Filled.Add, "New list", onClick = { dialog = ListsDialog.NewList(null) })
             }
@@ -224,6 +228,69 @@ private fun ListsTree(
         if (trailingRule) VerticalHairline()
     }
 
+    ListsDialogHost(dialog, vm, state.folders) { dialog = null }
+}
+
+/** What the sidebar highlights: a list's id, "" for Everything, a filter list's key, or one of these. */
+object SidebarKeys {
+    const val TODAY = "place:today"
+    fun tab(tab: Tab): String = "place:${tab.name}"
+}
+
+/**
+ * The Mac's left dock: Today, Everything, the folders and lists, then the
+ * places beside them. A phone shows it as a drawer; a wide window keeps it
+ * open. [onDone] runs after a row is chosen, so a drawer can close.
+ */
+@Composable
+fun Sidebar(selectedKey: String?, onDone: () -> Unit, modifier: Modifier = Modifier) {
+    val shell = LocalShell.current
+    val navigator = shell.navigator
+    val vm: ListsViewModel = viewModel { ListsViewModel(shell.container) }
+    val state by vm.tree.collectAsStateWithLifecycle()
+    var dialog by remember { mutableStateOf<ListsDialog?>(null) }
+    val colors = TaktTheme.colors
+    val go: (() -> Unit) -> Unit = { block ->
+        block()
+        onDone()
+    }
+    Column(modifier.fillMaxSize().background(colors.altRow)) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = Metrics.headerHeight).padding(start = Metrics.lg, end = Metrics.xxs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Takt", style = TaktTheme.type.bodyStrong, color = colors.ink, modifier = Modifier.weight(1f))
+            IconAction(PIcons.Folder, "New folder", onClick = { dialog = ListsDialog.NewFolder(null) })
+            IconAction(Icons.Filled.Add, "New list", onClick = { dialog = ListsDialog.NewList(null) })
+        }
+        Hairline()
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("sidebar")) {
+            item(key = SidebarKeys.TODAY, contentType = "place") {
+                TreeLine(
+                    title = "Today", icon = PIcons.Today, depth = 0, count = null,
+                    selected = selectedKey == SidebarKeys.TODAY, onClick = { go { navigator.openTab(Tab.TODAY) } },
+                )
+            }
+            items(state.rows, key = { it.key }, contentType = { it::class.simpleName }) { row ->
+                TreeRowView(
+                    row, selectedKey, vm,
+                    onOpen = { listId, reveal -> go { navigator.openList(listId, reveal, root = true) } },
+                    onOpenFilterList = { id -> go { navigator.openFilterList(id, root = true) } },
+                ) { dialog = it }
+            }
+        }
+        Hairline()
+        Column(Modifier.padding(vertical = Metrics.xs)) {
+            for (tab in listOf(Tab.FOCUS, Tab.REVIEW, Tab.SEARCH)) {
+                TreeLine(
+                    title = tab.title, icon = tab.icon, depth = 0, count = null,
+                    selected = selectedKey == SidebarKeys.tab(tab), onClick = { go { navigator.openTab(tab) } },
+                )
+            }
+            TreeLine(title = "History", icon = PIcons.History, depth = 0, count = null, selected = false, onClick = { go { shell.showHistory() } })
+            TreeLine(title = "Settings", icon = Icons.Filled.Settings, depth = 0, count = null, selected = false, onClick = { go { navigator.openSettings() } })
+        }
+    }
     ListsDialogHost(dialog, vm, state.folders) { dialog = null }
 }
 
@@ -334,7 +401,7 @@ private fun TreeLine(
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (selected) colors.primary.copy(alpha = 0.10f) else colors.paper)
+            .background(if (selected) colors.primary.copy(alpha = 0.10f) else Color.Transparent)
             .heightIn(min = Metrics.touchTarget)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = onLongClick?.let { "$title actions" })
             .padding(start = Metrics.md + Metrics.indent * depth, end = Metrics.lg)

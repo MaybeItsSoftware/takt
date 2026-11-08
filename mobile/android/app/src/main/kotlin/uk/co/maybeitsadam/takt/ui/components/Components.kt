@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.focus.focusProperties
@@ -113,27 +114,42 @@ fun TaktTopBar(
     navigation: (@Composable () -> Unit)? = null,
     showHistory: Boolean = true,
     insetStatusBar: Boolean = true,
+    /** A top-level place: on a phone, a button opens the sidebar where the back arrow would be. */
+    sidebar: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    val shell = LocalShell.current
+    val openSidebar = shell.openSidebar.takeIf { sidebar && navigation == null }
     Column(
         modifier
             .fillMaxWidth()
             .background(TaktTheme.colors.paper)
             .then(if (insetStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top)) else Modifier),
     ) {
+        // One line, as the Mac's title bar: the place, a muted note beside it, then its tools.
         Row(
-            Modifier.fillMaxWidth().heightIn(min = Metrics.headerHeight).padding(start = if (navigation == null) Metrics.lg else Metrics.xs, end = Metrics.xs),
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Metrics.headerHeight)
+                .padding(start = if (navigation == null && openSidebar == null) Metrics.lg else Metrics.xxs, end = Metrics.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            navigation?.invoke()
-            Column(Modifier.weight(1f).padding(vertical = Metrics.xs)) {
-                Text(title, style = TaktTheme.type.title, color = TaktTheme.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            when {
+                navigation != null -> navigation()
+                openSidebar != null -> IconAction(PIcons.Sidebar, "Lists", tint = TaktTheme.colors.ink, onClick = openSidebar, modifier = Modifier.testTag("open_sidebar"))
+            }
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title, style = TaktTheme.type.bodyStrong, color = TaktTheme.colors.ink,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                )
                 if (subtitle != null) {
+                    Spacer(Modifier.width(Metrics.sm))
                     Text(subtitle, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             actions()
-            if (showHistory) HistoryActions()
+            if (showHistory) HistoryActions(compact = !shell.layout.isWide)
         }
         Hairline()
     }
@@ -141,7 +157,7 @@ fun TaktTopBar(
 
 /** Toolbar undo, redo and the history sheet, labelled with what each would do. */
 @Composable
-fun HistoryActions() {
+fun HistoryActions(compact: Boolean = false) {
     val shell = LocalShell.current
     val labels by shell.container.undo.labels.collectAsStateWithLifecycle()
     IconAction(
@@ -150,6 +166,8 @@ fun HistoryActions() {
         enabled = labels.undo != null,
         onClick = { shell.container.undo.undo() },
     )
+    // A phone keeps only undo in its bar; redo and the history are in the sidebar.
+    if (compact) return
     IconAction(
         PIcons.Redo,
         labels.redo?.let { "Redo $it" } ?: "Nothing to redo",

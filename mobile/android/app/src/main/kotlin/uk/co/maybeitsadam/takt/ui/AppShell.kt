@@ -1,5 +1,18 @@
 package uk.co.maybeitsadam.takt.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.statusBars
+import kotlinx.coroutines.launch
+import uk.co.maybeitsadam.takt.ui.lists.Sidebar
+import uk.co.maybeitsadam.takt.ui.lists.SidebarKeys
+import uk.co.maybeitsadam.takt.ui.lists.DetailKey
 import android.content.Intent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
@@ -35,12 +48,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItemColors
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
-import androidx.compose.material3.NavigationRailItemDefaults
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -134,12 +141,18 @@ private class NavControllerNavigator(private val nav: NavHostController) : AppNa
         }
     }
 
-    override fun openList(listId: String?, revealTaskId: String?) {
-        nav.navigate(ListRoute(listId, revealTaskId)) { launchSingleTop = true }
+    override fun openList(listId: String?, revealTaskId: String?, root: Boolean) {
+        nav.navigate(ListRoute(listId, revealTaskId, root)) {
+            if (root) popUpTo(nav.graph.findStartDestination().id)
+            launchSingleTop = true
+        }
     }
 
-    override fun openFilterList(id: String) {
-        nav.navigate(FilterListRoute(id)) { launchSingleTop = true }
+    override fun openFilterList(id: String, root: Boolean) {
+        nav.navigate(FilterListRoute(id, root)) {
+            if (root) popUpTo(nav.graph.findStartDestination().id)
+            launchSingleTop = true
+        }
     }
 
     override fun openSettings() {
@@ -152,7 +165,7 @@ private class NavControllerNavigator(private val nav: NavHostController) : AppNa
 }
 
 /**
- * The window: navigation (a bottom bar on phones, a rail on wide screens),
+ * The window: the sidebar (a drawer on phones, always open on wide screens),
  * the screens, and the shared surfaces over them — the inspector, quick add,
  * the history sheet, the command palette and the undo snackbar.
  */
@@ -253,22 +266,36 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
             },
     ) {
         val layout = WindowLayout(maxWidth.value.toInt())
-        val shell = remember(container, navigator, layout) {
-            Shell(container, navigator, layout, showHistory = { historyOpen = true }, showPalette = { paletteOpen = true })
+        val drawer = rememberDrawerState(DrawerValue.Closed)
+        val drawerScope = rememberCoroutineScope()
+        val shell = remember(container, navigator, layout, drawer) {
+            Shell(
+                container, navigator, layout,
+                showHistory = { historyOpen = true },
+                showPalette = { paletteOpen = true },
+                openSidebar = if (layout.isWide) null else ({ drawerScope.launch { drawer.open() } }),
+            )
         }
         CompositionLocalProvider(LocalShell provides shell, LocalCommandRegistry provides registry) {
             val backStack by nav.currentBackStackEntryAsState()
             val destination = backStack?.destination
             val currentTab = Tab.entries.firstOrNull { tab -> destination?.hasRoute(tab.route::class) == true }
                 ?: if (destination?.hasRoute(ListRoute::class) == true || destination?.hasRoute(FilterListRoute::class) == true) Tab.LISTS else null
-            val showFab = currentTab == Tab.TODAY || currentTab == Tab.LISTS
-            // A tab's own screen, not a list opened from Lists or Settings:
-            // only there does a sideways swipe mean the tab beside it.
-            val swipeTab = Tab.entries.firstOrNull { tab -> destination?.hasRoute(tab.route::class) == true }
+            // A list has its own add field; Today has only this.
+            val showFab = currentTab == Tab.TODAY
+            val sidebarKey = backStack?.let { entry ->
+                when {
+                    destination?.hasRoute(ListRoute::class) == true -> entry.toRoute<ListRoute>().listId ?: ""
+                    destination?.hasRoute(FilterListRoute::class) == true -> DetailKey.filterKey(entry.toRoute<FilterListRoute>().id)
+                    currentTab == Tab.TODAY -> SidebarKeys.TODAY
+                    currentTab != null && currentTab != Tab.LISTS -> SidebarKeys.tab(currentTab)
+                    else -> null
+                }
+            }
 
             val content: @Composable (Modifier) -> Unit = { modifier ->
                 Row(modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f).fillMaxHeight().tabSwipe(swipeTab, navigator::openTab)) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
                         AppNavHost(nav)
                         if (showFab && !layout.isWide) {
                             QuickAddFab(
@@ -293,37 +320,35 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
             }
 
             if (layout.isWide) {
-                val itemColors = navItemColors()
-                NavigationSuiteScaffold(
-                    layoutType = NavigationSuiteType.NavigationRail,
-                    containerColor = TaktTheme.colors.paper,
-                    contentColor = TaktTheme.colors.ink,
-                    navigationSuiteColors = NavigationSuiteDefaults.colors(
-                        navigationRailContainerColor = TaktTheme.colors.paper,
-                        navigationRailContentColor = TaktTheme.colors.mutedText,
-                    ),
-                    navigationSuiteItems = {
-                        Tab.entries.forEach { tab ->
-                            item(
-                                selected = tab == currentTab,
-                                onClick = { navigator.openTab(tab) },
-                                icon = { Icon(tab.icon, null) },
-                                label = { Text(tab.title, style = TaktTheme.type.small) },
-                                colors = itemColors,
-                                modifier = Modifier.testTag("tab_${tab.name}"),
-                            )
+                Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
+                    Sidebar(
+                        sidebarKey, onDone = {},
+                        modifier = Modifier.width(Metrics.sidebarWidth).windowInsetsPadding(WindowInsets.statusBars),
+                    )
+                    VerticalHairline()
+                    content(Modifier.weight(1f))
+                }
+            } else {
+                BackHandler(enabled = drawer.isOpen) { drawerScope.launch { drawer.close() } }
+                ModalNavigationDrawer(
+                    drawerState = drawer,
+                    // Opened by the title bar's button; a swipe only closes it, so rows keep their own swipes.
+                    gesturesEnabled = drawer.isOpen,
+                    scrimColor = TaktTheme.colors.ink.copy(alpha = 0.32f),
+                    drawerContent = {
+                        ModalDrawerSheet(
+                            drawerState = drawer,
+                            modifier = Modifier.width(Metrics.sidebarWidth),
+                            drawerShape = RectangleShape,
+                            drawerContainerColor = TaktTheme.colors.altRow,
+                            drawerTonalElevation = 0.dp,
+                            windowInsets = WindowInsets.systemBars,
+                        ) {
+                            Sidebar(sidebarKey, onDone = { drawerScope.launch { drawer.close() } })
                         }
                     },
                 ) {
-                    Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
-                        VerticalHairline()
-                        content(Modifier.weight(1f))
-                    }
-                }
-            } else {
-                Column(Modifier.fillMaxSize()) {
-                    content(Modifier.weight(1f))
-                    PhoneNavBar(currentTab, onSelect = navigator::openTab)
+                    content(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars))
                 }
             }
 
@@ -332,7 +357,7 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = if (layout.isWide) Metrics.lg else 64.dp, start = Metrics.md, end = Metrics.md),
+                    .padding(bottom = Metrics.lg, start = Metrics.md, end = Metrics.md),
             ) { data ->
                 Snackbar(
                     snackbarData = data,
@@ -383,57 +408,13 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
     }
 }
 
-/**
- * A sideways swipe across a tab's screen opens the tab beside it, in the
- * bar's order. Rows that swipe themselves (complete, put off) consume the
- * drag before it gets here, so a swipe that starts on one stays the row's.
- */
-private fun Modifier.tabSwipe(current: Tab?, onSelect: (Tab) -> Unit): Modifier =
-    if (current == null) {
-        this
-    } else {
-        pointerInput(current) {
-            val threshold = 72.dp.toPx()
-            var travelled = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { travelled = 0f },
-                onDragEnd = {
-                    val step = when {
-                        travelled <= -threshold -> 1
-                        travelled >= threshold -> -1
-                        else -> 0
-                    }
-                    if (step != 0) Tab.entries.getOrNull(current.ordinal + step)?.let(onSelect)
-                },
-                onHorizontalDrag = { change, amount ->
-                    change.consume()
-                    travelled += amount
-                },
-            )
-        }
-    }
-
-private fun NavBackStackEntry.tabIndex(): Int? =
-    Tab.entries.indexOfFirst { destination.hasRoute(it.route::class) }.takeIf { it >= 0 }
-
-/** Between two tabs, the way the bar runs, so a swipe and a tap on the bar both slide; anything else fades. */
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabDirection(): AnimatedContentTransitionScope.SlideDirection? {
-    val from = initialState.tabIndex() ?: return null
-    val to = targetState.tabIndex() ?: return null
-    return when {
-        to > from -> AnimatedContentTransitionScope.SlideDirection.Left
-        to < from -> AnimatedContentTransitionScope.SlideDirection.Right
-        else -> null
-    }
-}
-
 @Composable
 private fun AppNavHost(nav: NavHostController) {
     NavHost(
         navController = nav,
         startDestination = TodayRoute,
-        enterTransition = { tabDirection()?.let { slideIntoContainer(it) } ?: fadeIn() },
-        exitTransition = { tabDirection()?.let { slideOutOfContainer(it) } ?: fadeOut() },
+        enterTransition = { fadeIn() },
+        exitTransition = { fadeOut() },
         popEnterTransition = { EnterTransition.None },
         popExitTransition = { ExitTransition.None },
     ) {
@@ -445,58 +426,6 @@ private fun AppNavHost(nav: NavHostController) {
         composable<ReviewRoute> { ReviewScreen() }
         composable<SearchRoute> { SearchScreen() }
         composable<SettingsRoute> { SettingsScreen() }
-    }
-}
-
-@Composable
-private fun navItemColors(): NavigationSuiteItemColors = NavigationSuiteDefaults.itemColors(
-    navigationBarItemColors = NavigationBarItemDefaults.colors(
-        selectedIconColor = TaktTheme.colors.primary, selectedTextColor = TaktTheme.colors.ink,
-        indicatorColor = TaktTheme.colors.well, unselectedIconColor = TaktTheme.colors.mutedText,
-        unselectedTextColor = TaktTheme.colors.mutedText,
-    ),
-    navigationRailItemColors = NavigationRailItemDefaults.colors(
-        selectedIconColor = TaktTheme.colors.primary, selectedTextColor = TaktTheme.colors.ink,
-        indicatorColor = TaktTheme.colors.well, unselectedIconColor = TaktTheme.colors.mutedText,
-        unselectedTextColor = TaktTheme.colors.mutedText,
-    ),
-    navigationDrawerItemColors = NavigationDrawerItemDefaults.colors(),
-)
-
-/** The phone's bottom bar: five flat items over a hairline, padded above the gesture bar. */
-@Composable
-private fun PhoneNavBar(current: Tab?, onSelect: (Tab) -> Unit) {
-    Column(Modifier.fillMaxWidth().background(TaktTheme.colors.paper)) {
-        Hairline()
-        Row(
-            Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).height(56.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            Tab.entries.forEach { tab ->
-                val selected = tab == current
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(role = Role.Tab) { onSelect(tab) }
-                        .semantics { contentDescription = tab.title }
-                        .testTag("tab_${tab.name}"),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        tab.icon, null,
-                        tint = if (selected) TaktTheme.colors.primary else TaktTheme.colors.mutedText,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Text(
-                        tab.title,
-                        style = TaktTheme.type.small.copy(fontSize = TaktTheme.type.monoSmall.fontSize),
-                        color = if (selected) TaktTheme.colors.ink else TaktTheme.colors.mutedText,
-                    )
-                }
-            }
-        }
     }
 }
 

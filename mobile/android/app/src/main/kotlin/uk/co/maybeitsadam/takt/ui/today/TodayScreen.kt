@@ -64,7 +64,6 @@ import uk.co.maybeitsadam.takt.ui.components.MonoText
 import uk.co.maybeitsadam.takt.ui.components.PButton
 import uk.co.maybeitsadam.takt.ui.components.TaktTopBar
 import uk.co.maybeitsadam.takt.ui.components.SectionHeader
-import uk.co.maybeitsadam.takt.ui.components.SettingsAction
 import uk.co.maybeitsadam.takt.ui.components.SwipeAction
 import uk.co.maybeitsadam.takt.ui.components.SwipeRow
 import uk.co.maybeitsadam.takt.ui.focus.BlockIconButton
@@ -133,7 +132,7 @@ fun TodayScreen() {
     )
 
     Column(Modifier.fillMaxSize().background(TaktTheme.colors.paper)) {
-        TaktTopBar("Today", subtitle = longDay(LocalDate.now()), actions = { SettingsAction() })
+        TaktTopBar("Today", subtitle = longDay(LocalDate.now()), sidebar = true)
         // A leaving card the day now shows in another section stays there:
         // put back in its old one too, it would be the same key twice.
         val onTheDay = day.cards.mapTo(HashSet()) { it.id }

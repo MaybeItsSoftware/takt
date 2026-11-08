@@ -75,7 +75,6 @@ import uk.co.maybeitsadam.takt.ui.components.Hairline
 import uk.co.maybeitsadam.takt.ui.components.IconAction
 import uk.co.maybeitsadam.takt.ui.components.TaktTopBar
 import uk.co.maybeitsadam.takt.ui.components.SectionHeader
-import uk.co.maybeitsadam.takt.ui.components.SettingsAction
 import uk.co.maybeitsadam.takt.ui.components.Tag
 import uk.co.maybeitsadam.takt.ui.components.TaskCheck
 import uk.co.maybeitsadam.takt.ui.lists.OutlineShaping
@@ -146,7 +145,7 @@ fun SearchScreen() {
     LaunchedEffect(Unit) { focus.requestFocus() }
 
     Column(Modifier.fillMaxSize().background(TaktTheme.colors.paper).imePadding()) {
-        TaktTopBar("Find", actions = { SettingsAction() })
+        TaktTopBar("Find", sidebar = true)
         Column(Modifier.padding(horizontal = Metrics.lg, vertical = Metrics.sm)) {
             SearchField(
                 value = query,

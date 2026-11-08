@@ -69,7 +69,6 @@ import uk.co.maybeitsadam.takt.ui.components.MonoText
 import uk.co.maybeitsadam.takt.ui.components.PButton
 import uk.co.maybeitsadam.takt.ui.components.TaktTopBar
 import uk.co.maybeitsadam.takt.ui.components.SectionHeader
-import uk.co.maybeitsadam.takt.ui.components.SettingsAction
 import uk.co.maybeitsadam.takt.ui.components.TaskCheck
 import uk.co.maybeitsadam.takt.ui.navigation.LocalShell
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
@@ -91,7 +90,7 @@ fun ReviewScreen() {
     )
 
     Column(Modifier.fillMaxSize().background(TaktTheme.colors.paper)) {
-        TaktTopBar("Review", actions = { SettingsAction() })
+        TaktTopBar("Review", sidebar = true)
         Segmented(
             options = ReviewSection.entries,
             selected = section,

@@ -1,5 +1,15 @@
 package uk.co.maybeitsadam.takt.ui.lists
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,11 +55,14 @@ import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 import uk.co.maybeitsadam.takt.ui.theme.Metrics
 import uk.co.maybeitsadam.takt.ui.theme.PIcons
 
-/** One list, or Everything when the route's list is null, pushed on the back stack. */
+/**
+ * One list, or Everything when the route's list is null: a place of its own
+ * when the sidebar opened it, otherwise pushed with a way back.
+ */
 @Composable
 fun ListScreen(route: ListRoute) {
     val navigator = LocalShell.current.navigator
-    ListContent(route, showBack = true, onClose = { navigator.back() })
+    ListContent(route, showBack = !route.root, onClose = { if (route.root) navigator.openList(null, root = true) else navigator.back() })
 }
 
 /**
@@ -127,21 +140,18 @@ internal fun ListContent(route: ListRoute, showBack: Boolean, onClose: () -> Uni
         TaktTopBar(
             title = title,
             subtitle = list?.completedAt?.let { "Completed" },
+            sidebar = true,
             navigation = if (showBack) {
                 { IconAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TaktTheme.colors.ink, onClick = { shell.navigator.back() }) }
             } else {
                 null
             },
         ) {
-            ListOverflow(vm, hideCompleted, canEditList, list?.completedAt != null, onArchive = onClose) { dialog = it }
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = Metrics.md, vertical = Metrics.xxs),
-            horizontalArrangement = Arrangement.spacedBy(Metrics.xs),
-        ) {
+            // The Mac's mode strip, in the title bar beside the list's name.
             ModeTag(ListViewMode.OUTLINE, PIcons.Outline, mode, "view_outline", vm)
             ModeTag(ListViewMode.BOARD, PIcons.Board, mode, "view_board", vm)
             ModeTag(ListViewMode.MATRIX, PIcons.Grid, mode, "view_matrix", vm)
+            ListOverflow(vm, hideCompleted, canEditList, list?.completedAt != null, onArchive = onClose) { dialog = it }
         }
         QuickAddBar(route.listId, Modifier.fillMaxWidth())
         Box(Modifier.fillMaxSize()) {
@@ -156,17 +166,30 @@ internal fun ListContent(route: ListRoute, showBack: Boolean, onClose: () -> Uni
     ListDialogHost(dialog, vm, actions, title, onClose) { dialog = null }
 }
 
+/** One of the title bar's three modes: an icon, filled in when it is the one shown. */
 @Composable
 private fun ModeTag(mode: ListViewMode, icon: androidx.compose.ui.graphics.vector.ImageVector, current: ListViewMode, tag: String, vm: ListViewModel) {
     val selected = mode == current
-    Tag(
-        mode.title,
-        modifier = Modifier.testTag(tag),
-        color = if (selected) TaktTheme.colors.primary else TaktTheme.colors.mutedText,
-        selected = selected,
-        leading = icon,
-        onClick = { vm.setViewMode(mode) },
-    )
+    Box(
+        Modifier
+            .size(Metrics.touchTarget)
+            .clickable(role = Role.Tab, onClickLabel = mode.title) { vm.setViewMode(mode) }
+            .semantics {
+                contentDescription = mode.title
+                this.selected = selected
+            }
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(32.dp)
+                .background(if (selected) TaktTheme.colors.well else Color.Transparent, Metrics.control),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = if (selected) TaktTheme.colors.ink else TaktTheme.colors.mutedText, modifier = Modifier.size(18.dp))
+        }
+    }
 }
 
 @Composable

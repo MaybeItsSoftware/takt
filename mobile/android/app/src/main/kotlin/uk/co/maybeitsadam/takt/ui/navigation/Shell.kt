@@ -15,6 +15,8 @@ class Shell(
     val layout: WindowLayout,
     val showHistory: () -> Unit,
     val showPalette: () -> Unit,
+    /** Opens the sidebar drawer on a phone; null where the sidebar is always shown. */
+    val openSidebar: (() -> Unit)? = null,
 )
 
 /** The window's width class, decided once at the root from its constraints. */

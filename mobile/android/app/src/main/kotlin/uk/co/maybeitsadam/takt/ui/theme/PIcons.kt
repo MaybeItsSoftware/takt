@@ -48,5 +48,7 @@ object PIcons {
     val Notes by lazy { icon("Notes", "M3,18h12v-2H3v2zM3,6v2h18V6H3zM3,13h18v-2H3v2z") }
     val Calendar by lazy { icon("Calendar", "M19,4h-1V2h-2v2H8V2H6v2H5c-1.11,0 -1.99,0.9 -1.99,2L3,20c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V6c0,-1.1 -0.9,-2 -2,-2zM19,20H5V9h14v11z") }
     val Expand by lazy { icon("Expand", "M5,5h5v2H7v3H5V5zm14,0h-5v2h3v3h2V5zm0,14h-5v-2h3v-3h2v5zm-14,0h5v-2H7v-3H5v5z") }
+    /** Zed's panel-left: a frame with a sidebar ruled off. */
+    val Sidebar by lazy { icon("Sidebar", "M3,4h18v2H3z", "M3,18h18v2H3z", "M3,4h2v16H3z", "M19,4h2v16h-2z", "M9,4h2v16H9z") }
     val Keyboard by lazy { icon("Keyboard", "M20,5H4c-1.1,0 -1.99,0.9 -1.99,2L2,17c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V7c0,-1.1 -0.9,-2 -2,-2zM11,8h2v2h-2V8zM11,11h2v2h-2v-2zM8,8h2v2H8V8zM8,11h2v2H8v-2zM7,13H5v-2h2v2zM7,10H5V8h2v2zM16,17H8v-2h8v2zM16,13h-2v-2h2v2zM16,10h-2V8h2v2zM19,13h-2v-2h2v2zM19,10h-2V8h2v2z") }
 }

@@ -378,6 +378,8 @@ object Metrics {
     /** Indent per outline level; a phone runs out of width four levels down. */
     val indent: Dp = 18.dp
     val headerHeight: Dp = 52.dp
+    /** The sidebar, as a phone's drawer and a wide window's dock. */
+    val sidebarWidth: Dp = 288.dp
     val inspectorWidth: Dp = 380.dp
 }
 

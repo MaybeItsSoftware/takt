@@ -76,7 +76,6 @@ import uk.co.maybeitsadam.takt.ui.components.IconAction
 import uk.co.maybeitsadam.takt.ui.components.MonoText
 import uk.co.maybeitsadam.takt.ui.components.PButton
 import uk.co.maybeitsadam.takt.ui.components.SectionHeader
-import uk.co.maybeitsadam.takt.ui.components.SettingsAction
 import uk.co.maybeitsadam.takt.ui.components.Tag
 import uk.co.maybeitsadam.takt.ui.components.TaktTopBar
 import uk.co.maybeitsadam.takt.ui.navigation.LocalShell
@@ -121,10 +120,10 @@ fun FocusScreen() {
     Column(Modifier.fillMaxSize().background(TaktTheme.colors.paper)) {
         TaktTopBar(
             "Focus",
+            sidebar = true,
             subtitle = if (session != null) null else FocusText.timeTitle(context.endsAt, Instant.now()),
             actions = {
                 if (session == null && state.hasManualOrder) IconAction(Icons.Filled.Refresh, "Reset order", onClick = vm::resetOrder)
-                SettingsAction()
             },
         )
         if (session != null) {

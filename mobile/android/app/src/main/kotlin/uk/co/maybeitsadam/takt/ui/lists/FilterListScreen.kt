@@ -52,7 +52,7 @@ import uk.co.maybeitsadam.takt.ui.theme.parseHexColor
 /** A filter list pushed on the back stack. */
 @Composable
 fun FilterListScreen(route: FilterListRoute) {
-    FilterListContent(route.id, showBack = true)
+    FilterListContent(route.id, showBack = !route.root)
 }
 
 /**
@@ -70,6 +70,7 @@ internal fun FilterListContent(id: String, showBack: Boolean, modifier: Modifier
         TaktTopBar(
             title = state.name.ifEmpty { "Filter list" },
             subtitle = state.summary.ifEmpty { null },
+            sidebar = true,
             navigation = if (showBack) {
                 { IconAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TaktTheme.colors.ink, onClick = { shell.navigator.back() }) }
             } else {
