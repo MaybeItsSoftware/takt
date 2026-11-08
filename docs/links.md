@@ -55,8 +55,9 @@ task's links.
   subtitle. Click or `Return` opens it; `x` removes it; "Add link…" opens the
   picker. The raw address list is still editable under "Edit addresses".
 - **Picker** (`pl`, or `Cmd+Ctrl+L`, palette "Link…"): one field. As you
-  type it fuzzy-matches notes and folders in your Obsidian vaults and, when a
-  Google account with Drive search is connected, searches Drive by name. A
+  type it fuzzy-matches notes and folders in your Obsidian vaults and the
+  Drive files already linked or picked before; "Pick from Google Drive…"
+  opens Google's own file picker in the browser for anything else. A
   pasted address is offered as the first row. `↑`/`↓` choose, `Return`
   links, `Tab` cycles the source (all, Obsidian, Drive), `Esc` closes.
 - **Opening**: `gx` / `Cmd+O` opens the first link, as before.
@@ -64,13 +65,12 @@ task's links.
 
 The Rust app (`desktop/`, installed as `Takt.app`) does the same in
 `desktop/src/state/links.rs`: the picker searches the vaults' notes and
-folders as you type, and Drive by name when Settings → Plugins → Google
-Drive → "Search Google Drive in the link picker" is on. The vaults are the
+folders as you type, and offers Drive when Settings → Plugins → Google
+Drive → "Link Google Drive files you pick" is on. The vaults are the
 Obsidian plugin and Drive the Google Drive plugin; either switched off
 leaves the picker. Its vault folders added by hand and the
 Drive switch are its own settings (`desktop.json`). The Swift app's version is
-`Takt/Plugins/Native/Links/` (`NativeLinksPlugin`), with a settings page for
-the vaults and Drive search.
+`Takt/Plugins/Native/Links/` (`NativeLinksPlugin`), retired with it.
 
 ### Obsidian vaults
 
@@ -86,33 +86,89 @@ refreshed when the picker opens.
 Pasting a Drive, Docs or Sheets address needs no Google access at all, and is
 the path that always works.
 
-Searching Drive by name uses Drive API v3 `files.list` with `q=name contains
-'…' and trashed = false`, through the shared `GoogleAccount`, and needs the
-`https://www.googleapis.com/auth/drive.metadata.readonly` scope. It is off
-until switched on in the Links settings, because asking for it makes the
-next Google sign-in ask for it too.
+Takt asks Google for one Drive scope, `https://www.googleapis.com/auth/drive.file`,
+which reaches only the files a person picks in Google's Picker (or that Takt
+made). It is non-sensitive, so it needs neither Google's verification of a
+restricted scope nor the yearly CASA security assessment that
+`drive.metadata.readonly` (what Drive search used to ask for) would need past
+100 users. The cost is that nothing can list or search all of a Drive: a file
+is first linked by picking it.
 
-Console steps (project `takt-511416`), only if Drive search is wanted:
+**The Picker.** Google shows its JavaScript Picker only on a web page, no
+longer inside an embedded web view, and GPUI has no web view anyway, so every
+client uses Google's
+[Picker for desktop and mobile apps](https://developers.google.com/workspace/drive/picker/guides/desktop-mobile-picker):
+an OAuth consent for `drive.file` alone, with `prompt=consent` and
+`trigger_onepick=true` (plus `allow_multiple` and `allow_folder_selection`),
+that shows the person their Drive and comes back with the ids picked as
+`picked_file_ids` beside the code. Each id is then read with Drive API v3
+`files.get` (`fields=id,name,mimeType,webViewLink`) and linked through the
+client's ordinary "Add Link" path, with the name and type going into
+`linkDetailsJSON`. The address stored is the `webViewLink` when it is a
+`https://docs.google.com/` or `https://drive.google.com/` one, else
+`https://drive.google.com/file/d/<id>/view` (`…/drive/folders/<id>` for a
+folder). This flow needs no API key: only the OAuth client, and the Google
+Picker API enabled on its project.
 
-1. APIs & Services → Library → **Google Drive API** → Enable.
-2. OAuth consent screen → Data access → Add scope →
-   `.../auth/drive.metadata.readonly`.
-3. In Takt: Settings → Plugins → switch on Google Drive, then its Drive
-   search, then sign in to Google again (an existing sign-in does not grow new scopes).
+Google lets `drive.file` be asked for only alone in the Picker, so it is a
+sign-in of its own, kept apart from Calendar's and Tasks':
 
-`drive.metadata.readonly` is a **restricted** scope: an app in production
-using it needs Google's verification (and possibly a security assessment).
-In testing mode with yourself as a test user it works without that. The
-non-sensitive alternative is the **Google Picker API** with the `drive.file`
-scope: Google's own file chooser, which grants access only to the files the
-user picks. It needs a browser surface (a web view on the Mac) and an API key,
-so it is a follow-up rather than what ships.
+- **Mac**: the browser, back to the loopback listener Google sign-in uses
+  (`google::pick_drive_files` in `desktop/src/google/mod.rs`, then
+  `desktop/src/google/drive.rs`), through the person's own OAuth client ID
+  (Settings → Google). The token is its own keychain item (`google-drive`);
+  disconnecting Google forgets both.
+- **iPhone**: the sign-in sheet (`ASWebAuthenticationSession`) against the
+  iOS OAuth client `GOOGLE_IOS_CLIENT_ID` that Calendar uses
+  (`GoogleCalendarAuth.drive()`, `Features/Inspector/DriveLinkButton.swift`),
+  in its own keychain item.
+- **Android**: the Authorization API with `drive.file`,
+  `setOptOutIncludingGrantedScopes(true)`, `Prompt.CONSENT` and the
+  `PICKER_OAUTH_TRIGGER`, `PICKER_ALLOW_MULTIPLE` and
+  `PICKER_ALLOW_FOLDER_SELECTION` resource parameters (play-services-auth
+  21.6), against the package's Android OAuth clients as Calendar is
+  (`settings/GoogleDriveAuth.kt`, `ui/inspector/InspectorDriveLink.kt`,
+  `:data`'s `GoogleDriveFiles`). The ids come back in the result's
+  `tokenResponseParams`.
+
+Where a client has no OAuth client to sign in with (no client ID on the Mac,
+no `GOOGLE_IOS_CLIENT_ID` in an iPhone build, an Android build whose package
+and signing key aren't registered), "Pick from Google Drive" says Drive
+linking isn't set up.
+
+**Finding a file again.** The Mac's picker matches what is typed against
+every Drive link the workspace already holds, by its stored name, which needs
+no Google access; and, once a Drive token exists, against Drive's
+`files.list` by name, which under `drive.file` answers only for files picked
+before. A file linked once is found by name from then on.
+
+**Moving off the old scope.** A Mac signed in while Drive search existed
+holds `drive.metadata.readonly`. Google adds every scope granted before to a
+new consent, so a grant can't be narrowed: the next "Connect Google" revokes
+the old grant first and asks afresh for Calendar and Tasks. The app says so
+once, at launch, when it finds the old scope (`links_drive_legacy_told` in
+`desktop.json`), and Settings → Links says "connect Google again to drop the
+old Drive access" until it's gone.
+
+Console steps (project `takt-511416`):
+
+1. APIs & Services → Library → **Google Picker API** → Enable, and
+   **Google Drive API** → Enable (for `files.get` and `files.list`).
+2. Google Auth Platform → Data access: remove
+   `.../auth/drive.metadata.readonly`, and add `.../auth/drive.file`
+   (non-sensitive).
+3. The OAuth clients Calendar uses serve Drive too: the Mac's Desktop
+   client, the iOS client and the Android clients. No API key is needed for
+   this Picker.
 
 ## Phones
 
 Both phones show a task's links in the inspector, drawn by the core, and open
 them (Android `Intent.ACTION_VIEW`, iOS `openURL`). Adding is by pasting an
-address into the inspector's link field, or into any add field.
+address into the inspector's link field, or into any add field, or with
+"Pick from Google Drive" under the field, which runs Google's Picker (above)
+and links each file picked by name and type. The inspector's draft is saved
+first, so an address being typed isn't lost under the new links.
 
 ## Not yet
 
@@ -120,4 +176,3 @@ address into the inspector's link field, or into any add field.
   (`external_links`); naming them would need a tool entry, a CLI command, a
   read/write classification in `core/src/agent_tools.rs` and the tool count.
 - Reading a link out of a retitled task on the phones.
-- Google Picker with `drive.file`.

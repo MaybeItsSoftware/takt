@@ -117,7 +117,7 @@ So none of it is reachable only by something you already have to know.
 | `f` / `Shift+F` then a letter, `;` | Vim's find: the next / previous task (in the sidebar, list) whose title starts with that letter; `;` repeats it |
 | `gg` / `Shift+G`, `Ctrl+D` / `Ctrl+U` | First / last task, eight down / up (vim) |
 | `gx` / `Cmd+O` | Open the task's first link (vim's open-the-URL-under-the-cursor) |
-| `pl` / `Cmd+Ctrl+L` | Link…: find a note or folder in your Obsidian vaults or, with Drive search on, a file in Google Drive, or paste any address — `↑` `↓` choose, `Return` links, `Tab` narrows to Obsidian or Drive. Rows with links show a small link mark; see [Links](docs/links.md) |
+| `pl` / `Cmd+Ctrl+L` | Link…: find a note or folder in your Obsidian vaults or a Drive file linked before, choose "Pick from Google Drive…" to pick files in Google's own picker in the browser (only the files you pick are shared with Takt), or paste any address — `↑` `↓` choose, `Return` links, `Tab` narrows to Obsidian or Drive. Rows with links show a small link mark; see [Links](docs/links.md) |
 | `]` / `[` | Open the task's subtasks / leave them |
 | `→` / `←` | In the outline, show a task's subtasks and step into them / hide them and step out — without opening the task. Elsewhere, open and leave it. At the top level of a list, `←` goes back to the list in the sidebar |
 | `za` / `Cmd+←` / `Cmd+→` | Fold or unfold the task you are on (outline or board) / fold / unfold the whole outline |
@@ -1461,7 +1461,9 @@ git history holds it.
 | Login keychain, service `uk.co.maybeitsadam.priority` | The app's Checkvist remote key (the service keeps its pre-Takt name) |
 | `~/.config/takt/config.json` | The CLI's own credentials, mode 0600 |
 
-Nothing is sent anywhere except Checkvist, and Google Calendar or Google Tasks if you enable them (Obsidian daily notes are written to a folder on this Mac).
+Nothing is sent anywhere except Checkvist, and Google Calendar, Google Tasks or Google Drive if you enable them (Obsidian daily notes are written to a folder on this Mac).
+
+Google Drive linking reaches only the files you pick. "Pick from Google Drive" (in the Mac's link picker, `pl`, and under the links in the iPhone and Android inspectors) opens Google's own file picker; Takt is granted the files you choose there and nothing else (the `drive.file` scope), and links each one by its Drive address, name and type. Pasting a Drive address needs no Google access at all. See [Links](docs/links.md).
 
 Google Tasks, when enabled, is a **mirror**: each list becomes a Google Tasks list of the same name, and Takt is the source of authority. Ticking a task off on your phone completes it here, notes you add there are kept, and a task you type there is adopted — but an edit that overwrites what Takt holds is replaced and written to a conflict log. `docs/google-tasks.md` has the full table.
 

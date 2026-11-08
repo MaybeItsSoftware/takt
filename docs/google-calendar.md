@@ -154,6 +154,9 @@ consent screen must list them, and past 100 users the app needs Google's
 verification (a privacy policy, a demo video of the scope in use). Until
 then only test users can grant them.
 
+Drive linking signs in separately, with `drive.file` alone, through Google's
+Picker (docs/links.md "Google Drive"); it never joins this grant's scopes.
+
 ## Platforms
 
 | | Two-way sync | Today agenda | Settings |
