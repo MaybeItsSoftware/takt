@@ -240,7 +240,12 @@ impl App {
             }
             "motionBoardColumn" => {
                 let back = key.contains("left") || key == "h";
-                self.move_board_column(if back { -1 } else { 1 });
+                // Past the first column is the sidebar, as it is from Today.
+                if back && self.board.column == 0 {
+                    self.focus_region(Region::Sidebar);
+                } else {
+                    self.move_board_column(if back { -1 } else { 1 });
+                }
             }
             "motionSidebarSelect" => self.move_sidebar_cursor(key),
             "motionSidebarExpand" => self.activate_sidebar_cursor(key != "enter", key == "enter"),
