@@ -61,6 +61,8 @@ public final class SyncSession {
   @ObservationIgnored private let deviceName: String
   @ObservationIgnored private let platform: String
   @ObservationIgnored private var scheduler: SyncScheduler?
+  /// The Realtime listener, while sync is active.
+  @ObservationIgnored private var newsWatch: Task<Void, Never>?
   @ObservationIgnored private var outboxWatch: Task<Void, Never>?
   /// From `setInFront(_:interval:)`, so a scheduler made later (after a
   /// sign-in) starts in the right rhythm.
@@ -152,6 +154,25 @@ public final class SyncSession {
       await scheduler.start()
     }
     watchOutbox()
+    listenForNews(credentials, scheduler: scheduler)
+  }
+
+  /// Holds the account's Realtime channel open while sync is active, so the
+  /// scheduler hears of other devices' pushes without a long-poll.
+  private func listenForNews(_ credentials: SyncCredentials, scheduler: SyncScheduler) {
+    newsWatch?.cancel()
+    guard let accountId = credentials.accountId else { return }
+    let realtime = SyncRealtime(
+      serverURL: credentials.serverURL, endpoints: endpoints, accountId: accountId,
+      tokens: auth, session: urlSession)
+    newsWatch = Task {
+      await realtime.run { signal in
+        switch signal {
+        case .joined(let joined): await scheduler.realtimeJoined(joined)
+        case .news: await scheduler.newsArrived()
+        }
+      }
+    }
   }
 
   /// For an app that keeps running out of sight (the Mac): with `false`, the
@@ -171,6 +192,8 @@ public final class SyncSession {
   public func deactivate() {
     outboxWatch?.cancel()
     outboxWatch = nil
+    newsWatch?.cancel()
+    newsWatch = nil
     if let scheduler { Task { await scheduler.stop() } }
     scheduler = nil
   }

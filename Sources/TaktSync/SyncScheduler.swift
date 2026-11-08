@@ -8,9 +8,12 @@ import TaktWorkspace
 /// second or two without polling a quiet server.
 ///
 /// The long-poll keeps a request open on the server the whole time, and the
-/// hosted server is billed for every second one is open. So a Mac app that
-/// stays running behind other windows drops to `background(every:)`: a quick
-/// cycle every few minutes, with local writes still pushed at once.
+/// hosted server is billed for every second one is open. So while the
+/// account's Realtime channel is joined (`SyncRealtime`, `realtimeJoined`)
+/// there is no long-poll: a quick cycle on each piece of news, and one every
+/// five minutes in case a message was lost. Without the channel, a Mac app
+/// that stays running behind other windows drops to `background(every:)`: a
+/// quick cycle every few minutes, with local writes still pushed at once.
 public actor SyncScheduler {
   public typealias Listener = @Sendable (SyncEngine.Status, SyncEngine.Outcome?) async -> Void
 
@@ -23,6 +26,14 @@ public actor SyncScheduler {
   /// Nil while the app is in front (long-poll); otherwise the gap between
   /// quick cycles.
   private var backgroundInterval: Duration?
+  /// The Realtime channel is joined: news arrives there, not by long-poll.
+  private var realtimeUp = false
+  /// A cycle is running.
+  private var cycling = false
+  /// News came during a cycle: run another straight after it.
+  private var newsPending = false
+  /// The gap between cycles while the channel is up and nothing is said.
+  static let realtimeSafetyInterval: Duration = .seconds(300)
   /// Set when the server refuses the token. Nothing runs after that: every
   /// cycle would get the same 401, so the scheduler waits to be replaced by
   /// one with a fresh sign-in.
@@ -42,8 +53,11 @@ public actor SyncScheduler {
       while !Task.isCancelled {
         guard let self, await !self.isSignedOut else { return }
         let interval = await self.backgroundInterval
-        let delay = await self.runOnce(wait: interval == nil ? 25 : 0)
-        if let wait = delay ?? interval { try? await Task.sleep(for: wait) }
+        let realtime = await self.realtimeUp
+        let delay = await self.runOnce(wait: interval == nil && !realtime ? 25 : 0)
+        if await self.takeNewsPending(), delay == nil { continue }
+        let gap = realtime ? Self.realtimeSafetyInterval : interval
+        if let wait = delay ?? gap { try? await Task.sleep(for: wait) }
       }
     }
   }
@@ -57,6 +71,33 @@ public actor SyncScheduler {
     guard loop != nil else { return }
     stop()
     start()
+  }
+
+  /// The Realtime channel was joined or lost. Joining runs a cycle at once,
+  /// for anything said while nobody listened, and ends any long-poll; losing
+  /// it goes back to the long-poll.
+  public func realtimeJoined(_ joined: Bool) {
+    guard joined != realtimeUp else { return }
+    realtimeUp = joined
+    guard loop != nil else { return }
+    stop()
+    start()
+  }
+
+  /// The Realtime channel says another device pushed.
+  public func newsArrived() {
+    guard loop != nil else { return }
+    if cycling {
+      newsPending = true
+    } else {
+      stop()
+      start()
+    }
+  }
+
+  private func takeNewsPending() -> Bool {
+    defer { newsPending = false }
+    return newsPending
   }
 
   /// Stops the long-poll. Call when the app goes to the background.
@@ -98,6 +139,8 @@ public actor SyncScheduler {
   /// long-poll, or nil to go straight back.
   private func runOnce(wait: Int) async -> Duration? {
     if isSignedOut { return nil }
+    cycling = true
+    defer { cycling = false }
     await listener(.syncing, nil)
     do {
       let outcome = try await engine.sync(wait: wait)
