@@ -68,13 +68,15 @@ pub enum Scope {
     Folder(String),
     /// A saved filter list's matches.
     FilterList(String),
+    /// The day's plan and what to do next, from every list. A list like any
+    /// other: the outline draws it as the plan, the board and the matrix
+    /// draw its tasks as cards.
+    Today,
 }
 
-/// How the main pane draws the scope. Today is a mode, not a scope: the day,
-/// from every list.
+/// How the main pane draws the scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewMode {
-    Today,
     Board,
     Outline,
     Matrix,
@@ -83,7 +85,6 @@ pub enum ViewMode {
 impl ViewMode {
     pub fn title(self) -> &'static str {
         match self {
-            ViewMode::Today => "Today",
             ViewMode::Board => "Board",
             ViewMode::Outline => "Outline",
             ViewMode::Matrix => "Matrix",
@@ -411,7 +412,7 @@ impl App {
             Region::Timeline => CommandSurface::Timeline,
             Region::Agent => CommandSurface::Anywhere,
             Region::Tasks => match self.view_mode {
-                ViewMode::Today => CommandSurface::Today,
+                ViewMode::Outline if self.scope == Scope::Today => CommandSurface::Today,
                 ViewMode::Board => CommandSurface::Board,
                 ViewMode::Outline => CommandSurface::Outline,
                 ViewMode::Matrix => CommandSurface::Matrix,
@@ -462,7 +463,7 @@ impl App {
     pub fn scope_list_ids(&self) -> Vec<String> {
         match &self.scope {
             Scope::List { list_id, .. } => vec![list_id.clone()],
-            Scope::Everything | Scope::FilterList(_) => {
+            Scope::Everything | Scope::FilterList(_) | Scope::Today => {
                 self.lists.iter().map(|list| list.id.clone()).collect()
             }
             Scope::Folder(folder_id) => takt_core::sidebar::outline::sidebar_list_ids_in_folder(
@@ -475,10 +476,8 @@ impl App {
 
     /// The scope's name, for the title bar and the tab.
     pub fn scope_title(&self) -> String {
-        if self.view_mode == ViewMode::Today {
-            return "Today".into();
-        }
         match &self.scope {
+            Scope::Today => "Today".into(),
             Scope::Everything => "Everything".into(),
             Scope::List { list_id, entered } => {
                 let list = self

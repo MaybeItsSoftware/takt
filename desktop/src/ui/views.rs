@@ -6,10 +6,10 @@ use crate::state::columns::ColumnName;
 impl Takt {
     pub(super) fn centre(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let body = match self.app.view_mode {
+            ViewMode::Outline if self.app.scope == Scope::Today => self.today(t, cx),
             ViewMode::Outline => self.outline(t, cx),
             ViewMode::Board => self.board(t, cx),
             ViewMode::Matrix => self.matrix(t, cx),
-            ViewMode::Today => self.today(t, cx),
         };
         div()
             .flex_1()

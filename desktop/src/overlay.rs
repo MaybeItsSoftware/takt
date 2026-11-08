@@ -135,9 +135,6 @@ pub fn apply(app: &mut App, pick: Pick) {
             app.enter_tasks_from_sidebar();
         }
         Pick::Task { id, list_id } => {
-            if app.view_mode == crate::state::ViewMode::Today {
-                app.select_view_mode(crate::state::ViewMode::Outline);
-            }
             app.select_list(&list_id);
             if app.view_mode != crate::state::ViewMode::Outline {
                 app.select_view_mode(crate::state::ViewMode::Outline);

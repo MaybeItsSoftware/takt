@@ -4,7 +4,7 @@
 //! Moving the cursor selects the row it lands on, as the Swift sidebar does,
 //! so `j` through the lists shows each one.
 
-use super::{App, Region, Scope, ViewMode};
+use super::{App, Region, Scope};
 use takt_core::sidebar::outline::{
     SidebarFolder, SidebarList, SidebarNestedList, SidebarRowKind,
     sidebar_outline_rows_with_filter_lists,
@@ -209,10 +209,8 @@ impl App {
 
     /// Whether a row is the place on screen.
     pub fn row_is_current(&self, row: &SidebarRow) -> bool {
-        if self.view_mode == ViewMode::Today {
-            return row.kind == RowKind::Today;
-        }
         match (&row.kind, &self.scope) {
+            (RowKind::Today, Scope::Today) => true,
             (RowKind::Everything, Scope::Everything) => true,
             (
                 RowKind::List(id),
@@ -323,7 +321,7 @@ impl App {
                 }
             }
             Scope::FilterList(_) => self.select_everything(),
-            Scope::Everything => {}
+            Scope::Everything | Scope::Today => {}
         }
         self.sidebar_cursor = None;
     }

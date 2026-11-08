@@ -111,7 +111,7 @@ impl App {
         let tasks = self.region != Region::Sidebar;
         match id {
             // Go
-            "goToday" => self.select_view_mode(ViewMode::Today),
+            "goToday" => self.select_today(),
             "goBoard" => self.select_view_mode(ViewMode::Board),
             "goOutline" => self.select_view_mode(ViewMode::Outline),
             "goMatrix" => self.select_view_mode(ViewMode::Matrix),

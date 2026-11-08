@@ -28,9 +28,7 @@ impl App {
 
     fn current_list_id(&self) -> Option<String> {
         match &self.scope {
-            Scope::List { list_id, .. } if self.view_mode != ViewMode::Today => {
-                Some(list_id.clone())
-            }
+            Scope::List { list_id, .. } => Some(list_id.clone()),
             _ => None,
         }
     }
@@ -49,8 +47,7 @@ impl App {
     /// A different list opens in its own default mode; the same one keeps
     /// the mode you had.
     pub fn select_list(&mut self, id: &str) {
-        let same = matches!(&self.scope, Scope::List { list_id, entered: None } if list_id == id)
-            && self.view_mode != ViewMode::Today;
+        let same = matches!(&self.scope, Scope::List { list_id, entered: None } if list_id == id);
         if same {
             return;
         }
@@ -84,34 +81,33 @@ impl App {
     }
 
     pub fn select_everything(&mut self) {
-        if self.scope == Scope::Everything && self.view_mode != ViewMode::Today {
+        if self.scope == Scope::Everything {
             return;
         }
         self.arrive(Scope::Everything, ViewMode::Board);
     }
 
     pub fn select_folder(&mut self, id: &str) {
-        if self.scope == Scope::Folder(id.into()) && self.view_mode != ViewMode::Today {
+        if self.scope == Scope::Folder(id.into()) {
             return;
         }
         self.arrive(Scope::Folder(id.into()), ViewMode::Board);
     }
 
     pub fn select_filter_list(&mut self, id: &str) {
-        if self.scope == Scope::FilterList(id.into()) && self.view_mode != ViewMode::Today {
+        if self.scope == Scope::FilterList(id.into()) {
             return;
         }
         self.arrive(Scope::FilterList(id.into()), ViewMode::Outline);
     }
 
+    /// Today opens as its plan, an outline; the strip draws it as cards.
     pub fn select_today(&mut self) {
-        if self.view_mode == ViewMode::Today {
+        if self.scope == Scope::Today {
             return;
         }
-        self.view_mode = ViewMode::Today;
-        self.editing = None;
         self.reload_today();
-        self.save_place();
+        self.arrive(Scope::Today, ViewMode::Outline);
     }
 
     pub fn select_inbox(&mut self) {
@@ -120,24 +116,14 @@ impl App {
         }
     }
 
-    /// `1`–`4`, the mode strip: the same scope drawn another way. Leaving
-    /// Today goes back to the scope you were in.
+    /// `⌘1`–`⌘3`, the mode strip: the same scope drawn another way.
     pub fn select_view_mode(&mut self, mode: ViewMode) {
-        if mode == ViewMode::Today {
-            self.select_today();
-            return;
-        }
         if self.view_mode == mode {
             return;
         }
-        let from_today = self.view_mode == ViewMode::Today;
         self.view_mode = mode;
         self.editing = None;
-        if from_today {
-            self.reload_rows();
-        } else {
-            self.layout_board();
-        }
+        self.layout_board();
         if self.selected_index().is_none() {
             self.selected_task = self.visible_ids().first().cloned();
         }
@@ -318,6 +304,7 @@ impl App {
             } => format!("task:{list_id}:{task}"),
             Scope::Folder(id) => format!("folder:{id}"),
             Scope::FilterList(id) => format!("filter:{id}"),
+            Scope::Today => "today".into(),
         };
         self.prefs.view_mode = self.view_mode.title().to_lowercase();
         self.prefs.save();
@@ -330,6 +317,7 @@ impl App {
         let mut parts = saved.splitn(3, ':');
         let scope = match (parts.next(), parts.next(), parts.next()) {
             (Some("everything"), _, _) => Some(Scope::Everything),
+            (Some("today"), _, _) => Some(Scope::Today),
             (Some("list"), Some(id), _) if self.list(id).is_some() => Some(Scope::List {
                 list_id: id.into(),
                 entered: None,
@@ -357,8 +345,14 @@ impl App {
                 entered: None,
             })
         });
+        // Today was once a mode, saved as one; it is a scope now.
+        let scope = if self.prefs.view_mode == "today" {
+            Some(Scope::Today)
+        } else {
+            scope
+        };
         let mode = match self.prefs.view_mode.as_str() {
-            "today" => ViewMode::Today,
+            "today" => ViewMode::Outline,
             "board" => ViewMode::Board,
             "matrix" => ViewMode::Matrix,
             "outline" => ViewMode::Outline,
@@ -369,9 +363,9 @@ impl App {
         };
         self.scope = scope.unwrap_or(Scope::Everything);
         self.view_mode = mode;
-        self.reload_rows();
-        if mode == ViewMode::Today {
+        if self.scope == Scope::Today {
             self.reload_today();
         }
+        self.reload_rows();
     }
 }

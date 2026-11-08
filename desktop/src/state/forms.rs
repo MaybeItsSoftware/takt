@@ -599,7 +599,7 @@ impl App {
                 super::Scope::List { list_id, .. } => Some(RowKind::List(list_id.clone())),
                 super::Scope::Folder(id) => Some(RowKind::Folder(id.clone())),
                 super::Scope::FilterList(id) => Some(RowKind::FilterList(id.clone())),
-                super::Scope::Everything => None,
+                super::Scope::Everything | super::Scope::Today => None,
             }
         };
         self.editing = match kind {

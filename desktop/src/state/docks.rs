@@ -187,9 +187,6 @@ impl App {
 
     /// A task from a dock tab shown where it lives, with the keyboard on it.
     pub fn reveal_task(&mut self, id: &str, list_id: &str) {
-        if self.view_mode == super::ViewMode::Today {
-            self.select_view_mode(super::ViewMode::Outline);
-        }
         self.select_list(list_id);
         if !self.prefs.hide_completed {
             self.selected_task = Some(id.to_string());

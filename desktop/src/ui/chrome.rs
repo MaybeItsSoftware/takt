@@ -2,12 +2,7 @@ use super::*;
 
 impl Takt {
     pub(super) fn title_bar(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
-        let modes = [
-            ViewMode::Today,
-            ViewMode::Board,
-            ViewMode::Outline,
-            ViewMode::Matrix,
-        ];
+        let modes = [ViewMode::Board, ViewMode::Outline, ViewMode::Matrix];
         div()
             .h(px(TITLE_BAR_HEIGHT))
             .flex_none()
@@ -1240,7 +1235,6 @@ impl Takt {
 /// The command that goes to a view, for its key hint.
 fn mode_command(mode: ViewMode) -> &'static str {
     match mode {
-        ViewMode::Today => "goToday",
         ViewMode::Board => "goBoard",
         ViewMode::Outline => "goOutline",
         ViewMode::Matrix => "goMatrix",

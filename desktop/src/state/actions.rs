@@ -448,7 +448,7 @@ impl App {
             _ => match &self.scope {
                 Scope::List { list_id, .. } => Some(list_id.clone()),
                 Scope::Folder(id) | Scope::FilterList(id) => Some(id.clone()),
-                Scope::Everything => None,
+                Scope::Everything | Scope::Today => None,
             },
         };
         if let Some(row_id) = id {

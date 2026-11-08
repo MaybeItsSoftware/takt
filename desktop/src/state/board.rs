@@ -31,7 +31,8 @@ impl App {
     /// The board's key in the core, as the Swift app spells it.
     pub fn board_key(&self) -> String {
         match &self.scope {
-            Scope::Everything | Scope::FilterList(_) => "everything/root".into(),
+            // Today's cards sit in the columns they have in Everything.
+            Scope::Everything | Scope::FilterList(_) | Scope::Today => "everything/root".into(),
             Scope::Folder(id) => format!("folder:{id}/root"),
             Scope::List { list_id, entered } => {
                 format!("{list_id}/{}", entered.as_deref().unwrap_or("root"))

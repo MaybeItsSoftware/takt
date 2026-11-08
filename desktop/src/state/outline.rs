@@ -113,6 +113,15 @@ impl App {
                     has_children: false,
                 })
                 .collect()),
+            Scope::Today => Ok(self
+                .today
+                .rows()
+                .map(|row| OutlineRow {
+                    task: row.task.clone(),
+                    depth: 0,
+                    has_children: false,
+                })
+                .collect()),
             Scope::FilterList(id) => {
                 let Some(filter) = self.filter_lists.iter().find(|f| f.id == id).cloned() else {
                     return Vec::new();
@@ -205,11 +214,11 @@ impl App {
         self.layout_board();
     }
 
-    /// The ids the keys move through: Today's rows there, the outline's
-    /// everywhere else.
+    /// The ids the keys move through: Today's plan in its outline, the
+    /// outline's or the cards' everywhere else.
     pub fn visible_ids(&self) -> Vec<String> {
         match self.view_mode {
-            ViewMode::Today => self.today_ids(),
+            ViewMode::Outline if self.scope == Scope::Today => self.today_ids(),
             ViewMode::Board | ViewMode::Matrix => self.board_ids(),
             ViewMode::Outline => self.rows.iter().map(|row| row.task.id.clone()).collect(),
         }
@@ -520,8 +529,12 @@ impl App {
             self.begin_new_card();
             return;
         }
-        // Only the outline draws the draft row: from anywhere else the
-        // typing would go into a field nobody can see.
+        // Only a list's outline draws the draft row: from anywhere else the
+        // typing would go into a field nobody can see. Today's plan is not
+        // one, so the draft opens in the task's own list.
+        if self.scope == Scope::Today {
+            self.select_list(&list_id);
+        }
         if self.view_mode != ViewMode::Outline {
             self.select_view_mode(ViewMode::Outline);
         }

@@ -116,10 +116,15 @@ impl App {
                     .selected_task
                     .as_deref()
                     .is_some_and(|id| today.rows().any(|row| row.task.id == id));
-                if !keep && self.view_mode == super::ViewMode::Today {
-                    self.selected_task = today.rows().next().map(|row| row.task.id.clone());
-                }
+                let first = today.rows().next().map(|row| row.task.id.clone());
                 self.today = today;
+                if self.scope == super::Scope::Today {
+                    // The board and the matrix draw the same tasks as cards.
+                    self.reload_rows();
+                    if !keep {
+                        self.selected_task = first;
+                    }
+                }
             }
             Err(error) => self.message = Some(error),
         }
