@@ -15,14 +15,16 @@ Kotlin ones. A new case is added to the list in
 `corelogic-tests/ThemeConformanceTests.swift`. The theme format itself is in
 [`docs/themes.md`](../../docs/themes.md).
 
-## `priority.json`, `chalk.json`, `chalk-dark.json`
+## `priority.json`, `chalk.json`, `chalk-dark.json`, `grape.json`, `one.json`
 
 The built-ins as complete theme files. Every colour and every structural value
 is stated, `extends` is `null`, `structure` holds the Mac's values, and
 `platforms.ios` / `platforms.android` hold the phones' differences from them.
 They resolve like any other file, so a reader needs no built-in of its own.
 `priority.json` is the default; `chalk.json` and `chalk-dark.json` are Zed and
-Zed Dark, under their old file names. It
+Zed Dark, under their old file names; `one.json` is Zed One, Zed's own One
+Light and One Dark, which the Rust Mac app draws and writes as the synced
+choice so the phones wear it too. It
 loads these as its built-ins. The Android app copies them into its assets.
 
 ## `conformance/*.json`

@@ -360,7 +360,10 @@ The built-ins are defined once, in the Rust core
 (`core/src/theme/builtins.rs`), which the Mac, the iPhone and Android all
 take them from, and exported as complete JSON to
 `shared/themes/priority.json`, `shared/themes/chalk.json` (Zed),
-`shared/themes/chalk-dark.json` (Zed Dark) and `shared/themes/grape.json`.
+`shared/themes/chalk-dark.json` (Zed Dark), `shared/themes/grape.json` and
+`shared/themes/one.json` (Zed One: Zed's own One Light and One Dark, the Rust
+Mac app's look, which it writes to `theme.selected` once and on every change
+so the phones follow it).
 The core's tests fail if those files and its definitions disagree; run them
 with `TAKT_REGENERATE_THEMES=1` to rewrite them. There is one resolver, so the
 three apps cannot drift apart on a hex value.

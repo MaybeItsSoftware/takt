@@ -33,7 +33,7 @@ fn check(path: &Path, expected: &str) {
 #[test]
 fn the_shared_built_in_files_match_the_core() {
     let files = theme_shared_files();
-    assert_eq!(files.len(), 4);
+    assert_eq!(files.len(), 5);
     for file in files {
         check(&shared_themes().join(&file.name), &file.json);
     }

@@ -4,7 +4,7 @@ import uniffi.takt_core.themeBuiltins
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Priority (the default, shown as Takt), then Zed, Zed Dark and Grape,
+ * Priority (the default, shown as Takt), then Zed, Zed Dark, Grape and Zed One,
  * resolved per platform.
  *
  * They are defined once, in the Rust core (`core/src/theme/builtins.rs`),
@@ -28,6 +28,9 @@ object BuiltInThemeSpecifications {
 
     /** Grape: the house design language — Zed's palette with Arvo, Geist Mono and small capitals. */
     const val GRAPE_IDENTIFIER = "native.theme.grape"
+
+    /** Zed One: Zed's own One Light and One Dark, the Rust Mac app's look. */
+    const val ONE_IDENTIFIER = "native.theme.one"
 
     /** The identifier a device uses when nothing has been chosen. */
     const val DEFAULT_IDENTIFIER = PRIORITY_IDENTIFIER

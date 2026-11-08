@@ -302,10 +302,10 @@ class ThemeFileTest {
         for (platform in ThemePlatform.entries) {
             val all = BuiltInThemeSpecifications.all(platform)
             assertEquals(
-                listOf("native.theme.priority", "native.theme.chalk", "native.theme.chalk.dark", "native.theme.grape"),
+                listOf("native.theme.priority", "native.theme.chalk", "native.theme.chalk.dark", "native.theme.grape", "native.theme.one"),
                 all.map { it.identifier },
             )
-            assertEquals(listOf("Takt", "Zed", "Zed Dark", "Grape"), all.map { it.name })
+            assertEquals(listOf("Takt", "Zed", "Zed Dark", "Grape", "Zed One"), all.map { it.name })
             assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, BuiltInThemeSpecifications.defaultTheme(platform).identifier)
         }
         val type = priority.structure.typography
@@ -532,7 +532,7 @@ class ThemeFileTest {
     @Test
     fun theSharedBuiltInsStateEveryValueAndLoadCleanly() {
         val folder = java.io.File(System.getProperty("priority.sharedThemesDir") ?: "../../shared/themes")
-        val sources = listOf("priority.json", "chalk.json", "chalk-dark.json", "grape.json").map {
+        val sources = listOf("priority.json", "chalk.json", "chalk-dark.json", "grape.json", "one.json").map {
             ThemeFileSource(it, folder.resolve(it).readText())
         }
         for (platform in ThemePlatform.entries) {

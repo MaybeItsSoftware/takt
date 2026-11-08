@@ -3,7 +3,7 @@
 //! held to (`shared/themes/README.md`).
 
 use super::builtins::{
-    self, CHALK_DARK_IDENTIFIER, CHALK_IDENTIFIER, GRAPE_IDENTIFIER, IDENTIFIERS,
+    self, CHALK_DARK_IDENTIFIER, CHALK_IDENTIFIER, GRAPE_IDENTIFIER, IDENTIFIERS, ONE_IDENTIFIER,
 };
 use super::color::hex_string;
 use super::export::file_from_specification;
@@ -281,6 +281,7 @@ pub fn shared_file_name(identifier: &str) -> String {
         CHALK_IDENTIFIER => "chalk",
         CHALK_DARK_IDENTIFIER => "chalk-dark",
         GRAPE_IDENTIFIER => "grape",
+        ONE_IDENTIFIER => "one",
         _ => "priority",
     }
     .to_string()

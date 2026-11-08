@@ -25,14 +25,17 @@ pub const CHALK_IDENTIFIER: &str = "native.theme.chalk";
 pub const CHALK_DARK_IDENTIFIER: &str = "native.theme.chalk.dark";
 /// The house design language, whole.
 pub const GRAPE_IDENTIFIER: &str = "native.theme.grape";
+/// Zed's own default pair, One Light and One Dark: what the Rust Mac app draws.
+pub const ONE_IDENTIFIER: &str = "native.theme.one";
 pub const DEFAULT_IDENTIFIER: &str = PRIORITY_IDENTIFIER;
 
 /// The built-ins, default first.
-pub const IDENTIFIERS: [&str; 4] = [
+pub const IDENTIFIERS: [&str; 5] = [
     PRIORITY_IDENTIFIER,
     CHALK_IDENTIFIER,
     CHALK_DARK_IDENTIFIER,
     GRAPE_IDENTIFIER,
+    ONE_IDENTIFIER,
 ];
 
 fn hex(value: &str) -> CoreThemeColor {
@@ -178,6 +181,69 @@ fn chalk() -> CoreThemeSpecification {
             uses_shadows: false,
             uses_gradients_on_chrome: false,
         },
+    }
+}
+
+/// Zed's One Light and One Dark, role for role as the Rust Mac app draws
+/// them (`desktop/src/theme.rs`): the editor's background as the page, the
+/// panels' as the raised surface, the status colours as Zed's.
+fn one_palette() -> CoreThemePalette {
+    let mut light = table(&[
+        ("paper", "#fafafa"),
+        ("raised", "#ebebec"),
+        ("altRow", "#ebebec"),
+        ("hover", "#dfdfe0"),
+        ("well", "#dcdcdd"),
+        ("border", "#c9c9ca"),
+        ("borderMuted", "#dfdfe0"),
+        ("inputBorder", "#c9c9ca"),
+        ("ink", "#242529"),
+        ("mutedText", "#58585a"),
+        ("dimText", "#7e8086"),
+        ("primary", "#5c78e2"),
+        ("success", "#669f59"),
+        ("danger", "#d36151"),
+        ("warning", "#a48819"),
+        ("categoricalPurple", PURPLE),
+        ("categoricalPink", PINK),
+        ("categoricalOrange", ORANGE),
+        ("mediaLetterbox", "#000000"),
+        ("mediaScrimInk", "#ffffff"),
+    ]);
+    light.insert("mediaScrim".into(), scrim());
+    let dark = table(&[
+        ("paper", "#282c33"),
+        ("raised", "#2f343e"),
+        ("altRow", "#2f343e"),
+        ("hover", "#363c46"),
+        ("well", "#3b414d"),
+        ("border", "#464b57"),
+        ("borderMuted", "#363c46"),
+        ("inputBorder", "#464b57"),
+        ("ink", "#dce0e5"),
+        ("mutedText", "#a9afbc"),
+        ("dimText", "#878a98"),
+        ("primary", "#74ade8"),
+        ("success", "#a1c181"),
+        ("danger", "#d07277"),
+        ("warning", "#dec184"),
+        ("categoricalPurple", PURPLE),
+        ("categoricalPink", PINK),
+        ("categoricalOrange", ORANGE),
+    ]);
+    CoreThemePalette { light, dark }
+}
+
+/// Zed One: the Zed look in Zed's own colours, the Rust Mac app's theme,
+/// so the phones can wear it too.
+fn one() -> CoreThemeSpecification {
+    CoreThemeSpecification {
+        identifier: ONE_IDENTIFIER.into(),
+        name: "Zed One".into(),
+        summary: "Zed's own One Light and One Dark: IBM Plex Sans and Lilex, square panels, hairlines, as the Mac app draws them."
+            .into(),
+        palette: one_palette(),
+        ..chalk()
     }
 }
 
@@ -375,7 +441,7 @@ pub fn platform_structure(
     match identifier {
         // 13pt is right at a desk and too small in the hand: the platform's
         // body size, panels and controls rounded a little, hit areas grown.
-        CHALK_IDENTIFIER | CHALK_DARK_IDENTIFIER => Some(CoreThemeFileStructure {
+        CHALK_IDENTIFIER | CHALK_DARK_IDENTIFIER | ONE_IDENTIFIER => Some(CoreThemeFileStructure {
             radius: radius(8.0, 0.0, 6.0),
             spacing: Some(CoreThemeFileSpacing {
                 xxs: Some(2.0),
@@ -433,7 +499,7 @@ pub fn all(platform: CoreThemePlatform) -> &'static [CoreThemeSpecification] {
     static CACHE: OnceLock<[Vec<CoreThemeSpecification>; 3]> = OnceLock::new();
     let cache = CACHE.get_or_init(|| {
         CoreThemePlatform::ALL.map(|platform| {
-            [priority(), chalk(), chalk_dark(), grape()]
+            [priority(), chalk(), chalk_dark(), grape(), one()]
                 .into_iter()
                 .map(|specification| for_platform(specification, platform))
                 .collect()

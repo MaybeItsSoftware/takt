@@ -1,0 +1,155 @@
+{
+  "extends" : null,
+  "identifier" : "native.theme.one",
+  "lockedAppearance" : null,
+  "name" : "Zed One",
+  "palette" : {
+    "dark" : {
+      "altRow" : "#2f343e",
+      "border" : "#464b57",
+      "borderMuted" : "#363c46",
+      "categoricalOrange" : "#ff6b2b",
+      "categoricalPink" : "#ff88dc",
+      "categoricalPurple" : "#7a4de8",
+      "danger" : "#d07277",
+      "dimText" : "#878a98",
+      "hover" : "#363c46",
+      "ink" : "#dce0e5",
+      "inputBorder" : "#464b57",
+      "mutedText" : "#a9afbc",
+      "paper" : "#282c33",
+      "primary" : "#74ade8",
+      "raised" : "#2f343e",
+      "success" : "#a1c181",
+      "warning" : "#dec184",
+      "well" : "#3b414d"
+    },
+    "light" : {
+      "altRow" : "#ebebec",
+      "border" : "#c9c9ca",
+      "borderMuted" : "#dfdfe0",
+      "categoricalOrange" : "#ff6b2b",
+      "categoricalPink" : "#ff88dc",
+      "categoricalPurple" : "#7a4de8",
+      "danger" : "#d36151",
+      "dimText" : "#7e8086",
+      "hover" : "#dfdfe0",
+      "ink" : "#242529",
+      "inputBorder" : "#c9c9ca",
+      "mediaLetterbox" : "#000000",
+      "mediaScrim" : "#000000b3",
+      "mediaScrimInk" : "#ffffff",
+      "mutedText" : "#58585a",
+      "paper" : "#fafafa",
+      "primary" : "#5c78e2",
+      "raised" : "#ebebec",
+      "success" : "#669f59",
+      "warning" : "#a48819",
+      "well" : "#dcdcdd"
+    }
+  },
+  "platforms" : {
+    "android" : {
+      "structure" : {
+        "radius" : {
+          "control" : 6,
+          "panel" : 8
+        },
+        "touchTarget" : 48,
+        "typography" : {
+          "bodySize" : 16,
+          "scale" : {
+            "body" : 16,
+            "caption" : 12,
+            "display" : 32,
+            "hero" : 72,
+            "title" : 20
+          }
+        }
+      }
+    },
+    "ios" : {
+      "structure" : {
+        "radius" : {
+          "control" : 6,
+          "panel" : 8
+        },
+        "touchTarget" : 44,
+        "typography" : {
+          "bodySize" : 17,
+          "microLabel" : {
+            "size" : 13
+          },
+          "scale" : {
+            "body" : 17,
+            "caption" : 13,
+            "display" : 34,
+            "hero" : 72,
+            "title" : 20
+          }
+        }
+      }
+    }
+  },
+  "structure" : {
+    "border" : {
+      "emphasis" : 2,
+      "focusRing" : 2,
+      "hairline" : 1
+    },
+    "radius" : {
+      "control" : 4,
+      "panel" : 0,
+      "pill" : 9999,
+      "row" : 0,
+      "shell" : 20
+    },
+    "spacing" : {
+      "lg" : 16,
+      "md" : 12,
+      "sm" : 8,
+      "xl" : 24,
+      "xs" : 4,
+      "xxs" : 2
+    },
+    "touchTarget" : 0,
+    "typography" : {
+      "body" : {
+        "design" : "sans",
+        "families" : [
+          "IBM Plex Sans"
+        ]
+      },
+      "bodySize" : 13,
+      "display" : {
+        "design" : "sans",
+        "families" : [
+          "IBM Plex Sans"
+        ]
+      },
+      "microLabel" : {
+        "role" : "mutedText",
+        "size" : 12,
+        "tracking" : 0,
+        "uppercase" : false,
+        "weight" : "regular"
+      },
+      "mono" : {
+        "design" : "monospaced",
+        "families" : [
+          "Lilex"
+        ]
+      },
+      "scale" : {
+        "body" : 13,
+        "caption" : 12,
+        "display" : 28,
+        "hero" : 64,
+        "title" : 15
+      }
+    },
+    "usesGradientsOnChrome" : false,
+    "usesShadows" : false
+  },
+  "summary" : "Zed's own One Light and One Dark: IBM Plex Sans and Lilex, square panels, hairlines, as the Mac app draws them."
+}
