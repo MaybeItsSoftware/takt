@@ -322,6 +322,46 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 app.reveal_task(&back, &task.list_id);
             }
         }
+        // The calendar under Due: a day on, set; then cleared. The repeat
+        // picker: every day, then none.
+        if app.selected_task.is_some() {
+            let value = |app: &mut state::App, id: &str| {
+                app.inspector_stops()
+                    .into_iter()
+                    .find(|s| s.id == id)
+                    .map(|s| s.value)
+                    .unwrap_or_default()
+            };
+            let due_before = value(app, "due");
+            let started = Instant::now();
+            app.open_date_edit("due");
+            let opened = matches!(app.editing, Some(state::Editing::Date(_)));
+            for key in ["t", "right", "enter"] {
+                app.date_key(key);
+            }
+            let set = value(app, "due");
+            app.open_date_edit("due");
+            app.date_key("backspace");
+            let cleared = value(app, "due");
+            let task_id = app.selected_task.clone().unwrap_or_default();
+            let picker = state::pickers::Picker::Repeat {
+                task_id,
+                current: None,
+            };
+            let rows = app.picker_rows(&picker, "");
+            app.apply_choice(
+                picker.clone(),
+                state::pickers::Choice::Repeat(Some("daily".into())),
+            );
+            let repeating = value(app, "repeat");
+            app.apply_choice(picker, state::pickers::Choice::Repeat(None));
+            report.push(format!(
+                "inspector dates {:.2} ms: calendar {opened}, due {due_before:?} -> {set:?} -> {cleared:?}; repeat {} presets, set {repeating:?}, now {:?}",
+                started.elapsed().as_secs_f64() * 1000.0,
+                rows.len(),
+                value(app, "repeat"),
+            ));
+        }
         let started = Instant::now();
         app.start_focus_on_selected(true);
         let running = app

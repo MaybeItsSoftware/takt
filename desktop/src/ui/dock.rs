@@ -261,6 +261,13 @@ impl Takt {
                                     |d, keys| d.child(super::widgets::key_hint(keys, t)),
                                 ),
                         )
+                        .when_some(
+                            match &self.app.editing {
+                                Some(Editing::Date(edit)) if edit.stop == stop.id => Some(edit),
+                                _ => None,
+                            },
+                            |d, edit| d.child(self.date_panel(edit, t, cx)),
+                        )
                         .into_any_element()
                 })
                 .collect()

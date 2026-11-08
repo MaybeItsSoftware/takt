@@ -6,6 +6,7 @@
 //! second copy in GPUI's binding tables. Rendering reads only what is held.
 
 pub mod board_links;
+mod calendar;
 pub mod capture;
 mod celebrate;
 mod chrome;
@@ -792,6 +793,13 @@ impl Takt {
     }
 
     fn editing_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        // The inspector's calendar takes its keys whole: nothing is typed.
+        if matches!(self.app.editing, Some(Editing::Date(_))) {
+            if let Some(key) = spell(&Press::from_keystroke(keystroke)) {
+                self.app.date_key(&key);
+            }
+            return true;
+        }
         if matches!(self.app.editing, Some(Editing::AgentMessage)) {
             let m = &keystroke.modifiers;
             match keystroke.key.as_str() {
@@ -1363,7 +1371,8 @@ impl Takt {
     fn active_field(&mut self) -> Option<&mut TextField> {
         if self.app.overlay.is_some() {
             Some(&mut self.overlay.field)
-        } else if self.app.editing.is_some() {
+        } else if self.app.editing.is_some() && !matches!(self.app.editing, Some(Editing::Date(_)))
+        {
             Some(&mut self.field)
         } else if self.app.settings_page.is_some() {
             Some(&mut self.settings_field)

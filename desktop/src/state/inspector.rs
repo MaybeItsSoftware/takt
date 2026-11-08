@@ -202,7 +202,12 @@ pub fn stops(
     }
     stops.push(
         Stop::new("start", "Start", Text { multiline: false })
-            .value(planning.start_at_ms.map(format_moment), "Add start")
+            .value(
+                planning
+                    .start_at_ms
+                    .map(|ms| format!("Starts {}", format_moment(ms))),
+                "Add start date",
+            )
             .grouped(),
     );
     let due = snapshot
@@ -210,7 +215,10 @@ pub fn stops(
         .map(format_moment)
         .or_else(|| planning.due_date.as_deref().map(format_day_string));
     let has_due = due.is_some();
-    stops.push(Stop::new("due", "Due", Text { multiline: false }).value(due, "Add date"));
+    stops.push(
+        Stop::new("due", "Due", Text { multiline: false })
+            .value(due.map(|d| format!("Due {d}")), "Add due date"),
+    );
     if has_due {
         stops.push(Stop {
             value: if snapshot.due_at_ms.is_some() {
@@ -443,6 +451,16 @@ impl App {
         let Some(task_id) = self.selected_task.clone() else {
             return;
         };
+        match stop.id {
+            "start" | "due" => return self.open_date_edit(stop.id),
+            "repeat" => {
+                let current = self
+                    .inspected()
+                    .and_then(|snapshot| snapshot.metadata.recurrence_rule);
+                return self.open_picker(super::pickers::Picker::Repeat { task_id, current });
+            }
+            _ => {}
+        }
         match stop.kind {
             StopKind::Text { .. } => {
                 self.editing = Some(Editing::InspectorField {
@@ -727,6 +745,197 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+/// The calendar under the start or due row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DateEdit {
+    pub task_id: String,
+    /// `start` or `due`.
+    pub stop: &'static str,
+    /// The day the keyboard is on.
+    pub day: chrono::NaiveDate,
+    /// Minutes after midnight; None is the day with no time (due only).
+    pub time: Option<u32>,
+}
+
+/// The times offered under the calendar, in minutes after midnight.
+pub const DATE_TIMES: [u32; 6] = [9 * 60, 12 * 60, 14 * 60, 17 * 60, 19 * 60, 21 * 60];
+
+fn local_parts(ms: i64) -> Option<(chrono::NaiveDate, u32)> {
+    use chrono::{Local, TimeZone, Timelike};
+    let time = Local.timestamp_millis_opt(ms).single()?;
+    Some((time.date_naive(), time.hour() * 60 + time.minute()))
+}
+
+fn local_ms(day: chrono::NaiveDate, minutes: u32) -> Option<i64> {
+    use chrono::{Local, TimeZone};
+    let at = day.and_hms_opt(minutes / 60, minutes % 60, 0)?;
+    Local
+        .from_local_datetime(&at)
+        .earliest()
+        .map(|time| time.timestamp_millis())
+}
+
+pub fn today() -> chrono::NaiveDate {
+    chrono::Local::now().date_naive()
+}
+
+impl App {
+    /// Return on the start or due row: the calendar opens on its day.
+    pub fn open_date_edit(&mut self, stop: &'static str) {
+        let Some(task_id) = self.selected_task.clone() else {
+            return;
+        };
+        let Some(snapshot) = self.inspected() else {
+            return;
+        };
+        let planning = snapshot.planning.clone().unwrap_or_default();
+        let (day, time) = match stop {
+            "start" => planning
+                .start_at_ms
+                .and_then(local_parts)
+                .map(|(d, t)| (d, Some(t)))
+                .unwrap_or((today(), Some(9 * 60))),
+            _ => snapshot
+                .due_at_ms
+                .and_then(local_parts)
+                .map(|(d, t)| (d, Some(t)))
+                .or_else(|| {
+                    planning
+                        .due_date
+                        .as_deref()
+                        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                        .map(|d| (d, None))
+                })
+                .unwrap_or((today(), None)),
+        };
+        self.region = Region::Inspector;
+        self.editing = Some(Editing::Date(DateEdit {
+            task_id,
+            stop,
+            day,
+            time,
+        }));
+    }
+
+    fn date_edit(&mut self) -> Option<&mut DateEdit> {
+        match self.editing.as_mut() {
+            Some(Editing::Date(edit)) => Some(edit),
+            _ => None,
+        }
+    }
+
+    /// A key while the calendar is open: arrows and hjkl move the day, [ ]
+    /// and page keys the month, t today, Return sets it, Delete clears it,
+    /// Esc leaves it as it was.
+    pub fn date_key(&mut self, key: &str) {
+        use chrono::{Duration, Months};
+        let Some(edit) = self.date_edit() else {
+            return;
+        };
+        let day = edit.day;
+        let moved = match key {
+            "left" | "h" => day.checked_sub_signed(Duration::days(1)),
+            "right" | "l" => day.checked_add_signed(Duration::days(1)),
+            "up" | "k" => day.checked_sub_signed(Duration::days(7)),
+            "down" | "j" => day.checked_add_signed(Duration::days(7)),
+            "[" | "pageup" => day.checked_sub_months(Months::new(1)),
+            "]" | "pagedown" => day.checked_add_months(Months::new(1)),
+            "t" => Some(today()),
+            _ => None,
+        };
+        if let Some(day) = moved {
+            edit.day = day;
+            return;
+        }
+        match key {
+            "-" => edit.time = Some(edit.time.unwrap_or(9 * 60).saturating_sub(15)),
+            "=" | "+" => edit.time = Some((edit.time.unwrap_or(9 * 60) + 15).min(23 * 60 + 45)),
+            "enter" | "space" => self.commit_date(),
+            "backspace" | "delete" => self.clear_date(),
+            "escape" => self.editing = None,
+            _ => {}
+        }
+    }
+
+    /// A day clicked: it is set at once.
+    pub fn pick_date_day(&mut self, day: chrono::NaiveDate) {
+        if let Some(edit) = self.date_edit() {
+            edit.day = day;
+        }
+        self.commit_date();
+    }
+
+    /// A time chosen under the calendar; None is no time (due only).
+    pub fn pick_date_time(&mut self, time: Option<u32>) {
+        if let Some(edit) = self.date_edit() {
+            edit.time = if edit.stop == "start" {
+                time.or(Some(9 * 60))
+            } else {
+                time
+            };
+        }
+    }
+
+    /// The month shown moved by `by`.
+    pub fn step_date_month(&mut self, by: i32) {
+        use chrono::Months;
+        if let Some(edit) = self.date_edit() {
+            let months = Months::new(by.unsigned_abs());
+            let moved = if by < 0 {
+                edit.day.checked_sub_months(months)
+            } else {
+                edit.day.checked_add_months(months)
+            };
+            if let Some(day) = moved {
+                edit.day = day;
+            }
+        }
+    }
+
+    pub fn commit_date(&mut self) {
+        let Some(Editing::Date(edit)) = self.editing.take() else {
+            return;
+        };
+        if self.selected_task.as_deref() != Some(edit.task_id.as_str()) {
+            return;
+        }
+        match edit.stop {
+            "start" => {
+                let at = local_ms(edit.day, edit.time.unwrap_or(9 * 60));
+                self.schedule_selected(at);
+            }
+            _ => {
+                let day = edit.day.format("%Y-%m-%d").to_string();
+                let at = edit.time.and_then(|t| local_ms(edit.day, t));
+                self.edit_selected(|snapshot| {
+                    let mut planning = snapshot.planning.clone().unwrap_or_default();
+                    match at {
+                        Some(ms) => {
+                            snapshot.due_at_ms = Some(ms);
+                            planning.due_date = None;
+                        }
+                        None => {
+                            snapshot.due_at_ms = None;
+                            planning.due_date = Some(day);
+                        }
+                    }
+                    snapshot.planning = planning.normalized();
+                });
+            }
+        }
+    }
+
+    pub fn clear_date(&mut self) {
+        let Some(Editing::Date(edit)) = self.editing.take() else {
+            return;
+        };
+        match edit.stop {
+            "start" => self.schedule_selected(None),
+            _ => self.apply_typed("clear due"),
         }
     }
 }

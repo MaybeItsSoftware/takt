@@ -175,6 +175,9 @@ pub enum Editing {
         task_id: String,
         stop: &'static str,
     },
+    /// A calendar open under the inspector's start or due row: the day the
+    /// keyboard is on and the time it would be set at.
+    Date(inspector::DateEdit),
 }
 
 pub struct App {
