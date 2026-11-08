@@ -638,6 +638,46 @@ impl Tools {
                 ))
             }
 
+            "agent_instructions_get"
+                if as_string(arguments.get("scope")).as_deref() == Some("task") =>
+            {
+                let id = as_id(arguments.get("id"))
+                    .ok_or_else(|| ToolError::new("The task scope needs a task's id."))?;
+                Ok(outcome(
+                    "Agent context",
+                    self.workspace.task_agent_context(&id)?,
+                ))
+            }
+
+            "agent_instructions_set"
+                if as_string(arguments.get("scope")).as_deref() == Some("task") =>
+            {
+                let id = as_id(arguments.get("id"))
+                    .ok_or_else(|| ToolError::new("The task scope needs a task's id."))?;
+                let text = arguments
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| ToolError::new("text is required."))?;
+                let append = match as_string(arguments.get("mode")).as_deref() {
+                    None | Some("replace") => false,
+                    Some("append") => true,
+                    Some(other) => {
+                        return Err(ToolError::new(format!(
+                            "Unknown mode {other}. Use replace or append."
+                        )));
+                    }
+                };
+                let payload = self.workspace.set_task_agent_context(&id, text, append)?;
+                Ok(outcome(
+                    if payload["changed"] == json!(false) {
+                        "Agent context unchanged"
+                    } else {
+                        "Agent context saved"
+                    },
+                    payload,
+                ))
+            }
+
             "agent_instructions_get" => {
                 let scope = crate::workspace_tasks::instruction_scope(
                     as_string(arguments.get("scope")).as_deref(),

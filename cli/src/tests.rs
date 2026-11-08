@@ -1648,6 +1648,19 @@ fn instructions_set_names_its_scope_and_refuses_without_one() {
     assert_eq!(arguments["text"], json!("Modules by code"));
     assert_eq!(arguments["mode"], json!("append"));
 
+    let (tool, arguments) = resolved(&[
+        "takt",
+        "ws",
+        "instructions-set",
+        "--task",
+        "T",
+        "Warm",
+        "up",
+    ]);
+    assert_eq!(tool, "agent_instructions_set");
+    assert_eq!(arguments["scope"], json!("task"));
+    assert_eq!(arguments["id"], json!("T"));
+
     let (tool, arguments) = resolved(&["takt", "ws", "instructions", "--account"]);
     assert_eq!(tool, "agent_instructions_get");
     assert_eq!(arguments["scope"], json!("account"));

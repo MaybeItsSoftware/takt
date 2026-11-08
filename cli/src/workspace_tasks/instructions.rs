@@ -114,4 +114,51 @@ impl Workspace {
             Ok(payload)
         })
     }
+
+    /// What the agent should know about one task, kept apart from its notes
+    /// (`task_metadata.agentContext`, v36).
+    pub fn task_agent_context(&self, task_id: &str) -> Result<Value> {
+        let connection = self.open()?;
+        require_context(&connection)?;
+        let text = core::task_agent_context(&connection, task_id).map_err(map_core_error)?;
+        Ok(json!({ "scope": "task", "id": task_id, "text": text }))
+    }
+
+    /// Replaces a task's agent context, or with `append` adds a paragraph,
+    /// as one undo step. Blank text with replace clears it.
+    pub fn set_task_agent_context(&self, task_id: &str, text: &str, append: bool) -> Result<Value> {
+        self.journalled("Edit Agent Context", |tx, _now| {
+            require_context(tx)?;
+            let before = core::task_agent_context(tx, task_id).map_err(map_core_error)?;
+            let after = core::set_task_agent_context(
+                tx,
+                task_id,
+                text,
+                append,
+                Utc::now().timestamp_millis(),
+            )
+            .map_err(map_core_error)?;
+            Ok(json!({
+                "scope": "task",
+                "id": task_id,
+                "text": after,
+                "previous": before,
+                "changed": before != after,
+            }))
+        })
+    }
+}
+
+/// What adds a task's agent context. Before it, the task scope refuses.
+const CONTEXT_MIGRATION: &str = "v36_task_agent_context";
+
+fn require_context(connection: &Connection) -> Result<()> {
+    if has_migration(connection, CONTEXT_MIGRATION)? {
+        Ok(())
+    } else {
+        Err(ToolError::new(format!(
+            "This workspace predates a task's agent context ({CONTEXT_MIGRATION}). \
+             Open an up-to-date Takt once, then try again."
+        )))
+    }
 }

@@ -346,7 +346,10 @@ message: the account's, then each enclosing folder's, then the list's
 (`agent_instructions`, written by `core/src/agent_instructions.rs`), so the
 app's settings fields, these commands and the agent's own
 `agent_instructions_set` tool all edit the same rows, and they sync. Without
-`--append` the text replaces what the scope holds.
+`--append` the text replaces what the scope holds. `--task ID` is one task's
+agent context instead (`task_metadata.agentContext`, v36): what the agent
+should know about that task, kept apart from its notes, which the Mac's
+inspector edits too and the agent panel sends while the task is selected.
 
 ### The escape hatch
 

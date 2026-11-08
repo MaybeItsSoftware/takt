@@ -2308,3 +2308,35 @@ fn a_column_in_the_same_call_wins_and_clearing_who_and_when_stops_waiting() {
         .unwrap_err();
     assert!(error.contains("follow_up_at"), "{error}");
 }
+
+#[test]
+fn a_tasks_agent_context_is_the_task_scope_and_not_its_notes() {
+    let fixture = Fixture::new();
+    let task = fixture.add(PROJECTS, "Essay", None);
+    let empty = fixture.call(
+        "agent_instructions_get",
+        json!({ "scope": "task", "id": task }),
+    );
+    assert_eq!(empty["text"], json!(""));
+    let saved = fixture.call(
+        "agent_instructions_set",
+        json!({ "scope": "task", "id": task, "text": "Marked by Dr Lee; she wants citations." }),
+    );
+    assert_eq!(saved["changed"], json!(true));
+    let appended = fixture.call(
+        "agent_instructions_set",
+        json!({ "scope": "task", "id": task, "text": "Harvard style.", "mode": "append" }),
+    );
+    assert_eq!(
+        appended["text"],
+        json!("Marked by Dr Lee; she wants citations.\n\nHarvard style.")
+    );
+    let notes: String = fixture.scalar("SELECT notes FROM tasks WHERE id = ?1", &task);
+    assert_eq!(notes, "");
+    let undoable: String = fixture.scalar(
+        "SELECT label FROM change_log WHERE tableName = 'task_metadata' AND rowId = ?1
+           ORDER BY rowid DESC LIMIT 1",
+        &task,
+    );
+    assert!(undoable.contains("Edit Agent Context"), "{undoable}");
+}

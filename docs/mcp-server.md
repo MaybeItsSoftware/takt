@@ -88,8 +88,8 @@ workspace's uppercase UUIDs, not Checkvist's integers:
 | `workspace_board_columns` | A board's columns (`board`: a list id, `everything` or `default`), with `source` (own, default or builtin) and each rule column's rules | read |
 | `workspace_board_column_set` | Add a column (`title`, optional `position`), or rename one or set its `rules` (`column_id`); an empty `rules` makes it ordinary | write |
 | `workspace_board_column_delete` | Delete a column; its filed tasks move to `move_to` (default the first ordinary column) in the same step | write |
-| `agent_instructions_get` | The agent panel's standing instructions: every scope that has any, or one (`scope`: `account`, `folder` or `list`, with the folder's or list's `id`), each with its `scope`, `id`, `name`, `text` and `updated_at` | read |
-| `agent_instructions_set` | Replace a scope's instructions, or add a paragraph with `mode: append`; blank text clears it. Returns `previous`, the new `text` and whether it `changed`; an unchanged save writes nothing | write |
+| `agent_instructions_get` | The agent panel's standing instructions: every scope that has any, or one (`scope`: `account`, `folder` or `list`, with the folder's or list's `id`), each with its `scope`, `id`, `name`, `text` and `updated_at`. `scope: task` with a task's `id` is that task's agent context, kept apart from its notes | read |
+| `agent_instructions_set` | Replace a scope's instructions (or, with `scope: task`, a task's agent context), or add a paragraph with `mode: append`; blank text clears it. Returns `previous`, the new `text` and whether it `changed`; an unchanged save writes nothing | write |
 
 Notes:
 

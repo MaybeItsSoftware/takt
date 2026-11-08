@@ -628,7 +628,8 @@ pub enum WsCommand {
     },
 }
 
-/// Which scope's agent instructions: --account, --folder ID or --list ID.
+/// Which scope's agent instructions: --account, --folder ID, --list ID, or
+/// --task ID for one task's agent context.
 #[derive(Args)]
 #[group(multiple = false)]
 pub struct InstructionScopeArgs {
@@ -639,6 +640,9 @@ pub struct InstructionScopeArgs {
     folder: Option<String>,
     #[arg(long, value_name = "LIST_ID")]
     list: Option<String>,
+    /// One task's agent context, kept apart from its notes.
+    #[arg(long, value_name = "TASK_ID")]
+    task: Option<String>,
 }
 
 impl InstructionScopeArgs {
@@ -651,6 +655,9 @@ impl InstructionScopeArgs {
         } else if let Some(list) = &self.list {
             arguments.insert("scope".into(), json!("list"));
             arguments.insert("id".into(), json!(list));
+        } else if let Some(task) = &self.task {
+            arguments.insert("scope".into(), json!("task"));
+            arguments.insert("id".into(), json!(task));
         }
     }
 }
@@ -1353,9 +1360,13 @@ fn resolve_workspace(
             append,
             text,
         } => {
-            if !(scope.account || scope.folder.is_some() || scope.list.is_some()) {
+            if !(scope.account
+                || scope.folder.is_some()
+                || scope.list.is_some()
+                || scope.task.is_some())
+            {
                 return Err(ToolError::new(
-                    "Say which scope: --account, --folder ID or --list ID.",
+                    "Say which scope: --account, --folder ID, --list ID or --task ID.",
                 ));
             }
             scope.insert(arguments);
@@ -1495,6 +1506,9 @@ pub fn render(tool: &str, outcome: &ToolOutcome, as_json: bool) {
             render_filter_list(payload)
         }
         "workspace_filter_list_tasks" => render_filter_list_tasks(payload),
+        "agent_instructions_get" if payload["scope"] == json!("task") => {
+            render_instruction(payload)
+        }
         "agent_instructions_get" => {
             let instructions = payload["instructions"].as_array();
             if instructions.is_none_or(|all| all.is_empty()) {

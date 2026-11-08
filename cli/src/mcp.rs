@@ -1040,11 +1040,11 @@ fn workspace_tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "agent_instructions_get",
-            "description": "The user's standing instructions for the agent: what they want kept in mind for the whole account, a folder or a list. With no scope, every scope that has any, each with its scope, id and name. With a scope, that one (empty text when none is written).",
+            "description": "The user's standing instructions for the agent: what they want kept in mind for the whole account, a folder or a list. With no scope, every account, folder and list scope that has any, each with its scope, id and name. With a scope, that one (empty text when none is written). The task scope (with a task's id) is that task's agent context: what to know about it, kept apart from its notes.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "scope": { "type": "string", "enum": ["account", "folder", "list"] },
+                    "scope": { "type": "string", "enum": ["account", "folder", "list", "task"] },
                     "id": id("A folder or list id from workspace_tree. Not for account."),
                 },
                 "additionalProperties": false,
@@ -1127,11 +1127,11 @@ fn workspace_tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "agent_instructions_set",
-            "description": "Save the user's standing instructions for the account, a folder or a list: durable preferences, facts and conventions they want kept, never a one-off request. Pick the narrowest scope that fits. mode replace (the default) writes the whole text, so read the scope first and merge rather than duplicate; append adds a paragraph. Blank text with replace clears the scope. Keep it short. Returns the text before and after. One undo step.",
+            "description": "Save the user's standing instructions for the account, a folder or a list, or the agent context of one task (scope task, with its id): durable preferences, facts and conventions they want kept, never a one-off request. Pick the narrowest scope that fits. A task's agent context is not its notes, which are the user's own. mode replace (the default) writes the whole text, so read the scope first and merge rather than duplicate; append adds a paragraph. Blank text with replace clears the scope. Keep it short. Returns the text before and after. One undo step.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "scope": { "type": "string", "enum": ["account", "folder", "list"] },
+                    "scope": { "type": "string", "enum": ["account", "folder", "list", "task"] },
                     "id": id("A folder or list id from workspace_tree. Not for account."),
                     "text": { "type": "string" },
                     "mode": { "type": "string", "enum": ["replace", "append"], "description": "Default: replace." },
