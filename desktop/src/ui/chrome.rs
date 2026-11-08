@@ -139,14 +139,10 @@ impl Takt {
             .flex()
             .flex_col()
             .bg(t.surface)
+            // A plain hairline: which pane has the keyboard shows in its
+            // cursor, not in the edge.
             .border_r_1()
-            .border_color(
-                if matches!(self.app.region, Region::Sidebar | Region::Agent) {
-                    t.accent
-                } else {
-                    t.border
-                },
-            )
+            .border_color(t.border)
             .child(if agent {
                 self.agent_pane(t).into_any_element()
             } else {
