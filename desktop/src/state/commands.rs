@@ -382,6 +382,20 @@ impl App {
             "listMembers" => self.show_list_members(),
             "listLeave" => self.ask_to_unshare(true),
             "listStopSharing" => self.ask_to_unshare(false),
+            "taskAssign" => {
+                self.step_assignee(1);
+                if let Some(id) = self.selected_task.clone()
+                    && let Some(sharing) = self.task_sharing(&id)
+                {
+                    self.message = Some(match sharing.assignee {
+                        Some(member) => format!(
+                            "Assigned to {}. Again for the next person.",
+                            takt_core::assignment::shared_member_name(member)
+                        ),
+                        None => "Assigned to nobody: anyone in the list.".into(),
+                    });
+                }
+            }
             "folderSelectPrevious" => self.select_adjacent_folder(-1),
             "folderSelectNext" => self.select_adjacent_folder(1),
             "listNewTaskDestination" => {

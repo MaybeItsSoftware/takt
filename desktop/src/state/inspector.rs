@@ -55,6 +55,7 @@ impl Stop {
             "complete" => "taskComplete",
             "convert" => "taskConvertToList",
             "pin" => "taskPromoteList",
+            "assignee" => "taskAssign",
             _ => return None,
         })
     }
@@ -120,6 +121,8 @@ impl Stop {
             "complete" => "circle-check",
             "archive" => "archive",
             "convert" => "arrow-left-right",
+            "assignee" => "users",
+            "authorship" => "user",
             _ => return None,
         })
     }
@@ -545,6 +548,34 @@ impl App {
                 .task_links(task.id.clone())
                 .unwrap_or_default();
         }
+        // In a shared list: who holds it, and who added and finished it.
+        if let Some(sharing) = self.task_sharing(&task.id) {
+            let at = stops
+                .iter()
+                .position(|s| s.id == "move")
+                .map_or(stops.len(), |ix| ix + 1);
+            let name = takt_core::assignment::shared_member_name;
+            let mut assignee = Stop::new("assignee", "Assigned to", StopKind::Choice).value(
+                sharing.assignee.clone().map(|m| capitalise(&name(m))),
+                "Nobody: anyone in the list",
+            );
+            assignee.group = true;
+            let mut said = Vec::new();
+            if let Some(by) = sharing.created_by.clone() {
+                said.push(format!("Added by {}", name(by)));
+            }
+            if let Some(by) = sharing.completed_by.clone() {
+                said.push(format!("completed by {}", name(by)));
+            }
+            stops.insert(at, assignee);
+            if !said.is_empty() {
+                stops.insert(
+                    at + 1,
+                    Stop::new("authorship", "", StopKind::Action)
+                        .value(Some(capitalise(&said.join(", "))), ""),
+                );
+            }
+        }
         // The commitment it has, or carries, in place of the offer to make one.
         let commitment = self.commitment_of(&task.id);
         if let Some(stop) = stops.iter_mut().find(|s| s.id == "commit")
@@ -640,6 +671,12 @@ impl App {
     }
 
     fn step_inspector_choice(&mut self, by: i64) {
+        if self
+            .inspector_stop()
+            .is_some_and(|stop| stop.id == "assignee")
+        {
+            return self.step_assignee(by);
+        }
         let Some(snapshot) = self.inspected() else {
             return;
         };
@@ -771,6 +808,7 @@ impl App {
                 }
             }
             "priority" => self.edit_selected(|edit| edit.metadata.priority = None),
+            "assignee" => self.assign_selected(None),
             "tags" => self.edit_selected(|edit| edit.metadata.tags.clear()),
             "repeat" => self.edit_selected(|edit| edit.metadata.recurrence_rule = None),
             "links" => self.edit_selected(|edit| edit.metadata.external_links.clear()),
@@ -1172,6 +1210,57 @@ fn day_noon_ms(day: &str) -> Option<i64> {
         .from_local_datetime(&date.and_hms_opt(12, 0, 0)?)
         .earliest()
         .map(|time| time.timestamp_millis())
+}
+
+fn capitalise(text: &str) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
+impl App {
+    /// The selected task's part in a shared list, when it is in one.
+    pub fn task_sharing(&self, task_id: &str) -> Option<takt_core::assignment::TaskSharing> {
+        self.store.core.task_sharing(task_id.into()).ok().flatten()
+    }
+
+    /// Assigns the selected task to a member of its shared list, or to
+    /// nobody, as one undo step.
+    pub fn assign_selected(&mut self, account_id: Option<String>) {
+        let Some(id) = self.selected_task.clone() else {
+            return;
+        };
+        if self.task_sharing(&id).is_none() {
+            self.message = Some("Only a task in a shared list can be assigned.".into());
+            return;
+        }
+        let now = now_ms();
+        if self
+            .write(|s| s.core.assign_task(id, account_id, now))
+            .is_some()
+        {
+            self.reload_all();
+        }
+    }
+
+    /// Steps who holds the selected task through nobody and each member.
+    pub fn step_assignee(&mut self, by: i64) {
+        let Some(id) = self.selected_task.clone() else {
+            return;
+        };
+        let Some(sharing) = self.task_sharing(&id) else {
+            self.message = Some("Only a task in a shared list can be assigned.".into());
+            return;
+        };
+        let mut choices: Vec<Option<String>> = vec![None];
+        choices.extend(sharing.members.iter().map(|m| Some(m.account_id.clone())));
+        let current = sharing.assignee.map(|m| m.account_id);
+        let ix = choices.iter().position(|c| *c == current).unwrap_or(0) as i64;
+        let next = choices[(ix + by).rem_euclid(choices.len() as i64) as usize].clone();
+        self.assign_selected(next);
+    }
 }
 
 #[cfg(test)]
