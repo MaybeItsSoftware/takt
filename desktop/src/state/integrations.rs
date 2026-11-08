@@ -29,6 +29,7 @@ impl App {
             Phase::Idle(Some(at)) => format!("Synced {}", ago(*at)),
             Phase::Idle(None) => "On".to_string(),
             Phase::Failed(why) => why.clone(),
+            Phase::NeedsSubscription => "Paused: needs Takt Sync".to_string(),
         };
         if self.sync.signed_in() {
             let who = status.email.clone().unwrap_or_else(|| "signed in".into());
@@ -52,6 +53,14 @@ impl App {
                 })
                 .unwrap_or_else(|| "Return to look".into());
             rows.push(("sync-devices", "Sync", "Devices", devices));
+            if let Some(subscription) = status.subscription.as_ref().filter(|s| s.required) {
+                rows.push((
+                    "sync-subscription",
+                    "Sync",
+                    "Takt Sync",
+                    subscription_line(subscription),
+                ));
+            }
             if status.needs_new_password {
                 rows.push((
                     "sync-new-password",
@@ -141,7 +150,7 @@ impl App {
                 self.sync.sync_now();
                 self.sync.refresh_account();
             }
-            "sync-devices" => self.sync.refresh_account(),
+            "sync-devices" | "sync-subscription" => self.sync.refresh_account(),
             "sync-new-password" => self.ask(Ask::SyncNewPassword),
             "sync-sign-out" => self.sync.sign_out(),
             "sync-delete" => self.ask(Ask::SyncDelete),
@@ -183,5 +192,23 @@ impl App {
             None => rows.push(("Sync".into(), "not paired".into())),
         }
         rows
+    }
+}
+
+/// Takt Sync in a line: paid until when, given, or what to do.
+fn subscription_line(subscription: &crate::sync::Subscription) -> String {
+    if subscription.comp {
+        return "Included".into();
+    }
+    if !subscription.active {
+        return "Not subscribed. £1 a year, from the iPhone or Android app".into();
+    }
+    match subscription
+        .expires_at
+        .as_deref()
+        .and_then(|at| at.get(..10))
+    {
+        Some(day) => format!("£1 a year · paid until {day}"),
+        None => "£1 a year · active".into(),
     }
 }

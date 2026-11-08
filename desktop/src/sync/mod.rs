@@ -72,7 +72,44 @@ pub enum Phase {
     /// Synced, when, in ms.
     Idle(Option<i64>),
     Failed(String),
+    /// The hosted server wants Takt Sync and this account hasn't got it.
+    /// Not an error: sync waits, and tries again now and then.
+    NeedsSubscription,
 }
+
+/// Takt Sync, as `GET /v1/account` reports it (`docs/sync.md`,
+/// "Subscription"). Read here rather than through the core, whose account
+/// record predates it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Subscription {
+    /// Whether this server charges at all; a self-hosted one doesn't.
+    pub required: bool,
+    pub active: bool,
+    /// When the paid year runs out, as the server wrote it.
+    pub expires_at: Option<String>,
+    pub comp: bool,
+}
+
+impl Subscription {
+    pub fn from_account(body: &str) -> Option<Subscription> {
+        let value: serde_json::Value = serde_json::from_str(body).ok()?;
+        let sub = value.get("subscription")?;
+        Some(Subscription {
+            required: sub["required"].as_bool().unwrap_or(false),
+            active: sub["active"].as_bool().unwrap_or(true),
+            expires_at: sub["expiresAt"].as_str().map(str::to_string),
+            comp: sub["comp"].as_bool().unwrap_or(false),
+        })
+    }
+}
+
+/// What a lapsed account is told, wherever sync stops for it.
+pub const SUBSCRIPTION_NEEDED: &str = "Hosted sync needs Takt Sync (£1 a year). Subscribe in the iPhone or Android app, or self-host the server.";
+
+/// How long sync waits before asking again once the server wants a
+/// subscription: a purchase on a phone is noticed through "Sync now" or
+/// the next launch sooner than this.
+const SUBSCRIPTION_RECHECK: Duration = Duration::from_secs(60 * 60);
 
 /// What the settings rows read.
 #[derive(Debug, Clone, Default)]
@@ -81,6 +118,9 @@ pub struct Status {
     pub email: Option<String>,
     pub server: String,
     pub account: Option<SyncAccountBody>,
+    /// Takt Sync, from the last account fetch; none from a server that
+    /// predates it.
+    pub subscription: Option<Subscription>,
     /// After a password-reset link: the next thing is a new password.
     pub needs_new_password: bool,
 }
@@ -93,6 +133,8 @@ enum Wake {
 
 enum Fail {
     Unauthorized,
+    /// `402`: the hosted server wants Takt Sync.
+    Subscription,
     Other(String),
 }
 
@@ -100,6 +142,7 @@ impl Fail {
     fn message(&self) -> String {
         match self {
             Fail::Unauthorized => "Signed out. Sign in again to keep syncing.".into(),
+            Fail::Subscription => SUBSCRIPTION_NEEDED.into(),
             Fail::Other(text) => text.clone(),
         }
     }
@@ -411,18 +454,7 @@ impl Sync {
     /// Who this device is signed in as, and the account's devices.
     pub fn refresh_account(&self) {
         let inner = self.inner.clone();
-        std::thread::spawn(move || {
-            match inner.call("GET", "v1/account", None, Duration::from_secs(30)) {
-                Ok(body) => match wire::sync_decode_account(body) {
-                    Ok(account) => {
-                        lock(&inner.status).account = Some(account);
-                        inner.changed(false);
-                    }
-                    Err(error) => inner.say(&error.to_string()),
-                },
-                Err(fail) => inner.say(&fail.message()),
-            }
-        });
+        std::thread::spawn(move || inner.fetch_account());
     }
 
     /// Leaves sync on this device, telling the server and Supabase.
@@ -477,6 +509,26 @@ impl Sync {
 }
 
 impl Inner {
+    /// Who this device is signed in as, its devices and its subscription.
+    fn fetch_account(&self) {
+        match self.call("GET", "v1/account", None, Duration::from_secs(30)) {
+            Ok(body) => {
+                let subscription = Subscription::from_account(&body);
+                match wire::sync_decode_account(body) {
+                    Ok(account) => {
+                        let mut status = lock(&self.status);
+                        status.account = Some(account);
+                        status.subscription = subscription;
+                        drop(status);
+                        self.changed(false);
+                    }
+                    Err(error) => self.say(&error.to_string()),
+                }
+            }
+            Err(fail) => self.say(&fail.message()),
+        }
+    }
+
     fn wake(&self, wake: Wake) {
         if let Some(sender) = lock(&self.wake).as_ref() {
             let _ = sender.send(wake);
@@ -651,6 +703,14 @@ impl Inner {
                     self.refused();
                     return;
                 }
+                Err(Fail::Subscription) => {
+                    // Calm, and slow: nothing will change until a phone buys
+                    // it, and "Sync now" asks again at once.
+                    failures = 0;
+                    next = SUBSCRIPTION_RECHECK;
+                    self.set_phase(Phase::NeedsSubscription);
+                    self.fetch_account();
+                }
                 Err(Fail::Other(message)) => {
                     failures += 1;
                     next = Duration::from_secs(wire::sync_backoff_seconds(failures).into());
@@ -682,7 +742,10 @@ impl Inner {
                 || {
                     self.token().map_err(|fail| match fail {
                         Fail::Unauthorized => realtime::Stop::Unauthorized,
-                        Fail::Other(why) => realtime::Stop::Failed { joined: false, why },
+                        other => realtime::Stop::Failed {
+                            joined: false,
+                            why: other.message(),
+                        },
                     })
                 },
                 || {
@@ -758,6 +821,7 @@ impl Inner {
                 }
             }
             Err(Fail::Unauthorized) => return false,
+            Err(Fail::Subscription) => std::thread::sleep(SUBSCRIPTION_RECHECK),
             Err(Fail::Other(_)) => std::thread::sleep(Duration::from_secs(15)),
         }
         true
@@ -894,6 +958,9 @@ impl Inner {
                 return Err(Fail::Unauthorized);
             }
         }
+        if reply.status == 402 {
+            return Err(Fail::Subscription);
+        }
         if !reply.ok() {
             return Err(Fail::Other(wire::sync_failure_message(
                 reply.status.into(),
@@ -955,6 +1022,17 @@ fn dirs_cache() -> std::path::PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_subscription_reads_from_the_account_and_is_absent_from_an_older_server() {
+        let body = r#"{"accountId":"a","devices":[],"subscription":{"required":true,"active":false,"expiresAt":null,"comp":false}}"#;
+        let sub = Subscription::from_account(body).expect("subscription");
+        assert!(sub.required && !sub.active && !sub.comp);
+        assert_eq!(
+            Subscription::from_account(r#"{"accountId":"a","devices":[]}"#),
+            None
+        );
+    }
 
     #[test]
     fn old_hosted_addresses_read_as_the_new_one() {

@@ -109,7 +109,7 @@ fn button_label(id: &str) -> Option<&'static str> {
         "keymap-open" => "Edit keymap.json",
         "diagnostics" => "Open",
         "sync-now" | "google-sync-now" => "Sync now",
-        "sync-devices" => "Refresh",
+        "sync-devices" | "sync-subscription" => "Refresh",
         "sync-new-password" => "Change",
         "sync-sign-out" => "Sign out",
         "sync-delete" => "Delete",
@@ -192,6 +192,9 @@ impl SettingRow {
             "celebration-sound" => "A quiet system sound with it.",
             "sync-now" => "Send and fetch changes now rather than waiting.",
             "sync-devices" => "The devices signed in to this account.",
+            "sync-subscription" => {
+                "Hosted sync costs £1 a year, bought in the iPhone or Android app; one purchase covers every device. A server you host yourself is free."
+            }
             "sync-new-password" => "The password that unlocks the workspace on a new device.",
             "sync-sign-out" => "Stop syncing this Mac; its workspace stays here.",
             "sync-delete" => "Remove the account and everything the server holds for it.",
