@@ -3,8 +3,8 @@
 # so this artifact will not pass Gatekeeper on another Mac; it exists so a tag
 # always has a reproducible, downloadable build next to it. The signed and
 # notarised path — the one users should actually install from — is
-# `scripts/build_dmg.sh <version>` run on a Mac that holds the Developer ID
-# certificate.
+# `scripts/build_desktop_dmg.sh <version>` run on a Mac that holds the
+# Developer ID certificate.
 name: Release Build
 
 on:
@@ -25,16 +25,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      # The app build cargo-builds the `takt` CLI and bundles it as the MCP
-      # server (scripts/bundle_cli.sh), so an xcodebuild here needs Rust.
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -42,14 +32,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             cli/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('cli/Cargo.lock') }}
-
-      # Package.swift's `takt_coreFFI` binary target is built, not committed:
-      # the Rust core has to exist before the package can even resolve.
-      - name: Build the Rust core
-        run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
-          scripts/build_core_apple.sh
+            desktop/target
+          key: cargo-release-${{ runner.os }}-${{ hashFiles('cli/Cargo.lock', 'desktop/Cargo.lock', 'core/Cargo.lock') }}
 
       - name: Resolve version
         id: version
@@ -59,31 +43,15 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      # MARKETING_VERSION comes from the tag and CURRENT_PROJECT_VERSION from
-      # the commit count (fetch-depth: 0 above makes that count real), the same
-      # way scripts/build_dmg.sh and scripts/build_app_store.sh set them, so
-      # the bundle's Info.plist says what the release page says.
-      #
-      # CODE_SIGNING_ALLOWED=NO: the project signs Manual with an "Apple
-      # Development" identity that no runner has; without this flag the build
-      # fails looking for it (docs/signing.md).
+      # The Rust app's bundle (scripts/install_desktop.sh), stopped before
+      # /Applications and signed ad hoc: runners have no signing identity
+      # (docs/signing.md). Its version is desktop/Cargo.toml's and its build
+      # number the commit count, which fetch-depth: 0 above makes real.
       - name: Build release app
         run: |
-          VERSION='${{ steps.version.outputs.version }}'
-          DERIVED_DIR="$RUNNER_TEMP/derived-release"
-          xcodebuild -project 'Takt.xcodeproj' \
-            -scheme 'Takt' \
-            -configuration Release \
-            -derivedDataPath "$DERIVED_DIR" \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            MARKETING_VERSION="${VERSION}" \
-            CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)" \
-            build
-
-          APP_PATH="$DERIVED_DIR/Build/Products/Release/Takt.app"
+          TAKT_BUNDLE_ONLY=1 TAKT_SIGN_IDENTITY=- scripts/install_desktop.sh
           mkdir -p dist
-          cp -R "$APP_PATH" "dist/Takt.app"
+          cp -R build/desktop/Takt.app dist/Takt.app
 
       # The MCP server is the bundled CLI. A DMG without it has a --mcp-server
       # that execs nothing, which breaks every MCP client configuration on the
@@ -92,7 +60,7 @@ jobs:
         run: |
           HELPER="dist/Takt.app/Contents/Helpers/takt"
           if [ ! -x "$HELPER" ]; then
-            echo "::error::Built app is missing the bundled CLI at $HELPER (was TAKT_SKIP_CLI_BUNDLE set?)"
+            echo "::error::Built app is missing the bundled CLI at $HELPER"
             exit 1
           fi
           echo "Bundled MCP server present: $HELPER"
@@ -128,7 +96,7 @@ jobs:
             **This DMG is unsigned and not notarised** — CI has no signing
             certificate, so Gatekeeper will block it on another Mac unless you
             right-click → Open or clear the quarantine attribute. The signed,
-            notarised build comes from `scripts/build_dmg.sh` run on a Mac with
+            notarised build comes from `scripts/build_desktop_dmg.sh` run on a Mac with
             the Developer ID certificate; see docs/signing.md.
           files: |
             dist/takt-v${{ steps.version.outputs.version }}-unsigned.dmg

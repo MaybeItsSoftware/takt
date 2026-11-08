@@ -1,5 +1,8 @@
 # Architecture Improvement Plan
 
+> **Historical, 2026-11-08.** The Swift Mac app this describes (`Takt/`) has been
+> retired; the Mac app is `desktop/` (Rust, GPUI). See `docs/rust-desktop-plan.md`.
+
 > **Superseded in part, 2026-10-13.** The Checkvist-era task stack this plan
 > decomposes (`TaskRepository`, `SyncService`, `TaskMutationService`,
 > `UndoService`, `NavigationState`, the offline and list-scoped stores, the

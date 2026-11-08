@@ -10,8 +10,8 @@ lists, their answers, the files they left on disk, and their HTTP requests.
 
 There is now one implementation. The Swift server is gone; the app bundles the
 CLI at `Contents/Helpers/takt` and `--mcp-server` hands the process over to
-it (see `Takt/MCPServerShim.swift`). Correctness of the server itself is
-`cargo test`'s job.
+it (see `exec_mcp_server` in `desktop/src/platform`). Correctness of the
+server itself is `cargo test`'s job.
 
 What is left to check is the seam — that the handover works, and in particular
 that a client configuration written *before* this change, naming
@@ -20,7 +20,8 @@ once that path names `Takt.app/Contents/MacOS/Takt` instead.
 That is the compatibility promise the migration was built on, and nothing else
 covers it.
 
-Reads no real data and needs no credentials. Needs a Debug app build.
+Reads no real data and needs no credentials. Needs the app bundle:
+`TAKT_BUNDLE_ONLY=1 scripts/install_desktop.sh` (or an installed /Applications/Takt.app).
 """
 
 from __future__ import annotations
@@ -36,31 +37,11 @@ PROTOCOL_VERSION = "2024-11-05"
 
 
 def find_app() -> pathlib.Path | None:
-    """The most recently built Debug bundle, wherever DerivedData put it."""
-    candidates = [
-        *(REPO / "build").rglob("Takt.app"),
-        *pathlib.Path.home().joinpath("Library/Developer/Xcode/DerivedData").glob(
-            "Takt-*/Build/Products/Debug/Takt.app"
-        ),
-    ]
-    binaries = [c for c in candidates if (c / "Contents/MacOS/Takt").exists()]
-    if not binaries:
-        return None
-    # Stale bundles from earlier builds linger — `scripts/run.sh` keeps its own
-    # under `build/`. Prefer one that actually carries the helper, so a leftover
-    # from before this change doesn't shadow the build under test.
-    with_helper = [c for c in binaries if (c / "Contents/Helpers/takt").exists()]
-
-    def freshness(app: pathlib.Path) -> float:
-        # The *helper's* mtime, not the bundle directory's. A directory's mtime
-        # only moves when its own entries change, and a rebuild replaces files
-        # deeper inside — so keying on the bundle picked a months-old app over
-        # the one just built and reported it as passing.
-        helper = app / "Contents/Helpers/takt"
-        target = helper if helper.exists() else app / "Contents/MacOS/Takt"
-        return target.stat().st_mtime
-
-    return max(with_helper or binaries, key=freshness)
+    """The bundle install_desktop.sh assembles, else the installed one."""
+    for app in (REPO / "build/desktop/Takt.app", pathlib.Path("/Applications/Takt.app")):
+        if (app / "Contents/MacOS/Takt").exists():
+            return app
+    return None
 
 
 def speak_mcp(argv: list[str], env: dict[str, str]) -> list[dict]:
@@ -99,9 +80,8 @@ def main() -> int:
     app = find_app()
     if app is None:
         print(
-            "error: no Debug Takt.app found. Build it first:\n"
-            "  xcodebuild -project Takt.xcodeproj -scheme Takt "
-            "-configuration Debug -destination 'platform=macOS' build",
+            "error: no Takt.app found. Bundle it first:\n"
+            "  TAKT_BUNDLE_ONLY=1 scripts/install_desktop.sh",
             file=sys.stderr,
         )
         return 2
@@ -110,8 +90,7 @@ def main() -> int:
     if not helper.exists():
         print(
             f"error: {helper} is missing — the app has no MCP server.\n"
-            "       scripts/bundle_cli.sh should have installed it during the build.\n"
-            "       (Was TAKT_SKIP_CLI_BUNDLE=1 set?)",
+            "       scripts/install_desktop.sh copies it in while it bundles the app.",
             file=sys.stderr,
         )
         return 1

@@ -237,13 +237,13 @@ passing `active_weekdays` to `daily_update` clears an existing cycle.
 ### One server, two ways to name it
 
 There is one implementation: the `takt` CLI (`cli/src/mcp.rs`). The app
-**ships** it, at `Contents/Helpers/takt`, installed during the build by
-`scripts/bundle_cli.sh` and signed with the app.
+**ships** it, at `Contents/Helpers/takt`, copied in by
+`scripts/install_desktop.sh` and signed with the app.
 
 | Command | What happens |
 |---|---|
 | `takt mcp` | The server, directly. What newly written configurations use. |
-| `Takt --mcp-server` | `MCPServerShim` `execv`s the bundled helper. What configurations written before this change say (as `Priority --mcp-server`, from before the rename). |
+| `Takt --mcp-server` | The app `execv`s the bundled helper (`exec_mcp_server`, `desktop/src/platform/mod.rs`). What configurations written before this change say (as `Priority --mcp-server`, from before the rename). |
 
 Because the app bundles the CLI, `Takt --mcp-server` works on a machine
 where the CLI was never installed separately — which is what made retiring the

@@ -4,8 +4,8 @@ The Mac app is to be Rust from end to end: `desktop/` (`takt-desktop`), drawn
 with GPUI, Zed's own UI framework, linking `takt-core` as a Rust crate. It
 was built beside the Swift app under `Takt/` until it did everything that
 app does; since 2026-11-07 `install_local.sh` installs it as `Takt.app`
-instead. The Swift app is not deleted: it stays in the tree and keeps
-building, and `scripts/install_swift.sh` puts it back. The iPhone and Android apps stay native (GPUI has no mobile
+instead, and on 2026-11-08 the Swift Mac app was deleted from the tree (git
+history holds it). The iPhone and Android apps stay native (GPUI has no mobile
 target) and keep calling the core through UniFFI.
 
 ## Why
@@ -126,6 +126,13 @@ keeps working throughout.
    and its package targets stay in the tree and keep building
    (`scripts/install_swift.sh` installs it at the same path);
    `TaktWorkspace` and the bindings are the iPhone's in any case.
+9. **Retirement — done, 2026-11-08.** `Takt/`, `Takt.xcodeproj`, the
+   `TaktPlugins` target and its tests, and the Swift-only scripts
+   (`install_swift.sh`, `build_dmg.sh`, `run.sh`, `bundle_cli.sh`,
+   `profile_switching.sh`) are gone. What the iPhone still needed moved out:
+   the fonts to `shared/fonts`, the editor drafts to
+   `Sources/TaktWorkspaceEditing`, the Mac icon to `desktop/icon`. CI's
+   release job and MCP smoke check build the Rust bundle instead.
 
 ## Risks
 

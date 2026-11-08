@@ -5,9 +5,9 @@
 #   Sources/TaktRustCore/TaktRustCore.swift      (committed; the UniFFI bindings)
 #
 # Package.swift's `takt_coreFFI` binary target points at the xcframework, so
-# the Swift package — and with it the Mac app, `swift test` and the iPhone
-# app — cannot resolve until this has run once. The scripts that build those
-# (run.sh, install_swift.sh, build_dmg.sh, install_ios.sh) call it first.
+# the Swift package — and with it `swift test` and the iPhone app — cannot
+# resolve until this has run once. The scripts that build those
+# (install_ios.sh, build_app_store.sh) call it first.
 #
 #   scripts/build_core_apple.sh              release build (what the apps ship)
 #   PROFILE=debug scripts/build_core_apple.sh

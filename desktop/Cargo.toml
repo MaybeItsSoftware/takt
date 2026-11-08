@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
 publish = false
-description = "Takt's desktop app, in Rust on GPUI: the replacement for the Swift app under Takt/. See docs/rust-desktop-plan.md."
+description = "Takt's desktop app, in Rust on GPUI. See docs/rust-desktop-plan.md."
 
 [[bin]]
 name = "takt-desktop"

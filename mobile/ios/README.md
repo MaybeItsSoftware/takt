@@ -64,7 +64,7 @@ store would let the screens use it instead of the revision counter.
 ## Design
 
 The Mac's Zed look: IBM Plex Sans for UI, Lilex for numbers and clocks
-(bundled from `Takt/Fonts` with their OFL licences), sentence-case muted
+(bundled from `shared/fonts` with their OFL licences), sentence-case muted
 labels, hairlines instead of shadows, and the Chalk palette, read from
 `BuiltInThemeSpecifications.chalk` and following the system's light or dark
 mode. Navigation, sheets, swipe actions and haptics stay native.

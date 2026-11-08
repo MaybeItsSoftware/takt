@@ -12,7 +12,7 @@ import SwiftUI
 /// standard-colour "G" from Google's download kit (`GoogleG` in each app's
 /// asset catalogue, rendered from the kit's SVG), Google Sans Medium 14/20
 /// (`GoogleSansSignIn-Medium`, subset to the approved labels, in
-/// `Takt/Fonts`), and the light (#FFFFFF, #747775 border, #1F1F1F text) or
+/// `shared/fonts`), and the light (#FFFFFF, #747775 border, #1F1F1F text) or
 /// dark (#131314, #8E918F, #E3E3E3) button.
 ///
 /// Apple (HIG, Sign in with Apple): black with white in a light appearance,

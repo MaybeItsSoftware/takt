@@ -1,5 +1,8 @@
 # Plugin Development Guide
 
+> Historical: this describes the Swift Mac app under `Takt/`, retired on
+> 2026-11-08. The Mac app is now `desktop/` (Rust, GPUI).
+
 Takt ships with native plugins only. Plugins are self-contained and live under:
 
 - `Takt/Plugins/Native/Checkvist/`

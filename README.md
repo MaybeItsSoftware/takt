@@ -1384,41 +1384,50 @@ Built-in plugins are fully functional; user-installed plugins are manifest-drive
 
 ## Build from source
 
-Requirements: macOS 15.6+, Xcode 17+, and [Rust](https://rustup.rs) for the CLI.
+Requirements: macOS 15.6+ and [Rust](https://rustup.rs). Xcode 17+ for the
+iPhone app and the Swift package tests.
 
 ```bash
 git clone https://github.com/MaybeItsSoftware/takt.git
-cd priority
+cd takt
 
-# The app
-xcodebuild -project 'Takt.xcodeproj' -scheme 'Takt' -configuration Debug -destination 'platform=macOS' build
+# The Mac app (Rust, on GPUI): build, bundle, install as /Applications/Takt.app
+./scripts/install_local.sh
 
-# Headless logic (658 tests)
-swift test
+# Its tests, and the shared core's
+cargo test --manifest-path desktop/Cargo.toml
+cargo test --manifest-path core/Cargo.toml
 
-# The CLI (92 tests) — also the app's MCP server, bundled during the app build
+# The CLI — also the app's MCP server, bundled into Takt.app
 cargo test --manifest-path cli/Cargo.toml
 
-# `Takt --mcp-server` still reaches it
+# `Takt --mcp-server` still reaches it (after install_local.sh, or
+# TAKT_BUNDLE_ONLY=1 scripts/install_desktop.sh)
 python3 scripts/mcp_smoke_check.py
 
-# Build + launch Debug, or produce a release DMG
-./scripts/run.sh
-./scripts/build_dmg.sh <version>
+# The Swift package the iPhone app links
+scripts/build_core_apple.sh && swift test
+
+# A signed, notarised DMG
+./scripts/build_desktop_dmg.sh <version>
 ```
 
 ### Layout
 
 | Path | What |
 | --- | --- |
-| `Takt/` | The macOS app. |
-| `Sources/TaktCore/` | Pure, headless, UI-free logic. The app links it as a package product. |
-| `Takt/Plugins/` | Integration plugins, one folder each, behind protocols |
-| `cli/` | The Rust CLI crate — shares no source with the Swift side |
-| `scripts/` | Build, install, bundle the CLI into the app, and the MCP smoke check |
-| `docs/` | [CLI](docs/cli.md) · [MCP](docs/mcp-server.md) · [plugins](docs/plugins.md) · [state ownership](docs/state-ownership.md) · [sync](docs/sync.md) · [self-hosting sync](docs/self-hosting.md) |
+| `desktop/` | The Mac app, in Rust on GPUI ([plan](docs/rust-desktop-plan.md)) |
+| `core/` | `takt-core`, the shared Rust core every client calls |
+| `cli/` | The `takt` CLI, terminal UI and MCP server |
+| `mobile/ios`, `mobile/android` | The iPhone and Android apps |
+| `Sources/` | The Swift package the iPhone app links: `TaktCore`, `TaktWorkspace`, `TaktWorkspaceEditing`, `TaktSync`, and `TaktRustCore` (the core's generated bindings) |
+| `sync-server/` | The sync server ([protocol](docs/sync.md)) |
+| `shared/` | Fixtures and assets every client shares: themes, fonts |
+| `scripts/` | Build, install, release, and the MCP smoke check |
+| `docs/` | [CLI](docs/cli.md) · [MCP](docs/mcp-server.md) · [sync](docs/sync.md) · [self-hosting sync](docs/self-hosting.md) |
 
-The same source tree is compiled by two build systems: the Xcode project builds the app, and `Package.swift` exposes SPM libraries so the headless logic can be tested without the app shell — `TaktCore` (pure logic), `TaktWorkspace` (the workspace store over the Rust core), `TaktWorkspaceEditing` (the outline editing engine), `TaktSync` (the client half of multi-device sync), and `TaktPlugins` (integration plugins) — each with a test target of the same name plus `Tests` (`TaktCoreTests`, `TaktWorkspaceTests`, `TaktWorkspaceEditingTests`, `TaktSyncTests`, `TaktPluginTests`). The first four are real single-directory targets under `Sources/` and `Takt/Editing`; the last is a curated `sources:` list over `Takt/`, so adding or moving a file there means updating `Package.swift` too — see [CLAUDE.md](CLAUDE.md).
+The Swift Mac app that used to live under `Takt/` was retired on 2026-11-08;
+git history holds it.
 
 ## Where your data lives
 

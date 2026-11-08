@@ -49,7 +49,7 @@ targets:
       - path: Shared
       - path: WatchShared/Contract
         group: WatchShared
-      - path: ../../Takt/Fonts
+      - path: ../../shared/fonts
         group: Fonts
         buildPhase: resources
     dependencies:
@@ -154,7 +154,7 @@ targets:
     sources:
       - path: TaktWidgets
       - path: Shared
-      - path: ../../Takt/Fonts
+      - path: ../../shared/fonts
         group: WidgetFonts
         buildPhase: resources
         includes:

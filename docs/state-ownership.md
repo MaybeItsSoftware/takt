@@ -1,5 +1,8 @@
 # State Ownership Map
 
+> Historical: this describes the Swift Mac app under `Takt/`, retired on
+> 2026-11-08. The Mac app is now `desktop/` (Rust, GPUI).
+
 > Navigation reference for "where does this piece of state actually live, who derives
 > from it, and what happens when it changes." Written to cut through the
 > `AppCoordinator` forwarding layer — many properties you reach through

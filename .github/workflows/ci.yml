@@ -81,120 +81,6 @@ jobs:
       - name: Lint
         run: swiftlint lint --reporter github-actions-logging
 
-  macos-build:
-    runs-on: macos-15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      # The app build now cargo-builds the `takt` CLI and bundles it as the
-      # MCP server (scripts/bundle_cli.sh), so an xcodebuild here needs Rust.
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            cli/target
-            core/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('cli/Cargo.lock', 'core/Cargo.lock') }}
-
-      # Package.swift's `takt_coreFFI` binary target is built, not committed:
-      # the Rust core has to exist before the package can even resolve.
-      - name: Build the Rust core
-        run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
-          scripts/build_core_apple.sh
-
-      # Both configurations now sign with a real "Apple Development" identity so
-      # local rebuilds keep a stable designated requirement (and stop
-      # re-prompting for keychain access). CI runners have no such certificate
-      # in their keychain, so signing has to be off here.
-      - name: Build app (Debug)
-        run: |
-          xcodebuild -project 'Takt.xcodeproj' \
-            -scheme 'Takt' \
-            -configuration Debug \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
-      # Release is the configuration that actually ships (scripts/build_dmg.sh)
-      # and, unlike Debug, it enables the app sandbox with a different
-      # entitlements file. Building only Debug meant sandbox-only breakage —
-      # e.g. a missing entitlement for the OAuth loopback listener — reached
-      # users without ever failing CI.
-      - name: Build app (Release)
-        run: |
-          xcodebuild -project 'Takt.xcodeproj' \
-            -scheme 'Takt' \
-            -configuration Release \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
-      # Guards the entitlements the app depends on at runtime, which a compile
-      # alone cannot check.
-      #
-      # The sandbox is deliberately OFF and this asserts that it stays off.
-      # Under the sandbox, keychain access is scoped to an access group that
-      # comes from `com.apple.application-identifier`, which only an embedded
-      # provisioning profile grants — and the project signs manually with none.
-      # The sandboxed build therefore had no access group, every `SecItemAdd`
-      # failed, and the app silently forgot the Checkvist remote key on every
-      # relaunch. Turning it back on means provisioning a profile and adding
-      # `keychain-access-groups` first; see the entitlements file.
-      - name: Verify release entitlements
-        run: |
-          ENTITLEMENTS='Takt/Takt.release.entitlements'
-          read_key() {
-            /usr/libexec/PlistBuddy -c "Print :$1" "$ENTITLEMENTS" 2>/dev/null || echo missing
-          }
-
-          sandbox=$(read_key com.apple.security.app-sandbox)
-          if [ "$sandbox" != "false" ]; then
-            echo "::error::$ENTITLEMENTS re-enables the app sandbox (got: $sandbox)."
-            echo "::error::That breaks keychain access without a provisioning profile."
-            exit 1
-          fi
-
-          # The build setting is what actually decides this — an earlier attempt
-          # to unsandbox by editing the plist alone changed nothing, because
-          # Xcode synthesises entitlements from ENABLE_APP_SANDBOX.
-          if grep -q 'ENABLE_APP_SANDBOX = YES' 'Takt.xcodeproj/project.pbxproj'; then
-            echo "::error::ENABLE_APP_SANDBOX is YES in project.pbxproj, which overrides the plist."
-            exit 1
-          fi
-
-          # Kept true so that re-enabling the sandbox one day doesn't silently
-          # drop capabilities the app needs — notably the OAuth loopback
-          # listener, which `GoogleOAuthLoopbackReceiver` cannot bind without
-          # network.server.
-          for key in \
-            com.apple.security.network.client \
-            com.apple.security.network.server \
-            com.apple.security.files.user-selected.read-write
-          do
-            value=$(read_key "$key")
-            if [ "$value" != "true" ]; then
-              echo "::error::$ENTITLEMENTS is missing or disables $key (got: $value)"
-              exit 1
-            fi
-          done
-          echo "Release entitlements OK"
-
-  # The CLI is a separate cargo crate sharing no code with the Swift targets, so
-  # it gets its own job. It is also now the *only* MCP server — the app bundles
-  # it and `--mcp-server` hands over to it — so these tests are what hold the
-  # server itself correct. `mcp-smoke` below checks the handover.
   # The shared Rust core (core/, docs/rust-core-migration.md).
   core:
     runs-on: macos-15
@@ -229,6 +115,9 @@ jobs:
           cargo clippy --manifest-path sync-server/rules/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path sync-server/rules/Cargo.toml
 
+  # The CLI is the *only* MCP server — the app bundles it and `--mcp-server`
+  # hands over to it — so these tests are what hold the server itself correct.
+  # `mcp-smoke` below checks the handover.
   cli:
     runs-on: macos-15
     timeout-minutes: 15
@@ -254,8 +143,7 @@ jobs:
       - name: Test
         run: cargo test --manifest-path cli/Cargo.toml
 
-  # The Rust desktop app on GPUI (docs/rust-desktop-plan.md), which is to
-  # replace the Swift one under Takt/.
+  # The Mac app: Rust on GPUI (docs/rust-desktop-plan.md).
   desktop:
     runs-on: macos-15
     timeout-minutes: 30
@@ -289,15 +177,10 @@ jobs:
   # needs no credentials.
   mcp-smoke:
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -306,26 +189,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             cli/target
-            core/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('cli/Cargo.lock', 'core/Cargo.lock') }}
+            desktop/target
+          key: cargo-smoke-${{ runner.os }}-${{ hashFiles('cli/Cargo.lock', 'desktop/Cargo.lock', 'core/Cargo.lock') }}
 
-      # Package.swift's `takt_coreFFI` binary target is built, not committed:
-      # the Rust core has to exist before the package can even resolve.
-      - name: Build the Rust core
-        run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
-          scripts/build_core_apple.sh
-
-      # The build phase runs scripts/bundle_cli.sh, which cargo-builds the CLI
-      # and installs it into the bundle, so this covers the bundling too.
-      - name: Build app (Debug)
-        run: |
-          xcodebuild -project 'Takt.xcodeproj' \
-            -scheme 'Takt' \
-            -configuration Debug \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+      # The same bundle install_local.sh installs, stopped before /Applications
+      # and signed ad hoc: runners have no signing identity.
+      - name: Bundle the app
+        run: TAKT_BUNDLE_ONLY=1 TAKT_SIGN_IDENTITY=- scripts/install_desktop.sh
 
       - name: Check the --mcp-server handover
         run: python3 scripts/mcp_smoke_check.py

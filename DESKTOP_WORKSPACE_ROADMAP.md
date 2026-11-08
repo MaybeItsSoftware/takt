@@ -1,5 +1,8 @@
 # Takt desktop workspace roadmap
 
+> **Historical, 2026-11-08.** The Swift Mac app this describes (`Takt/`) has been
+> retired; the Mac app is `desktop/` (Rust, GPUI). See `docs/rust-desktop-plan.md`.
+
 ## Purpose
 
 Turn Takt from its original Checkvist-first menu-bar utility into a local-first macOS planning app: fast list outlines and focus flow in the spirit of Blitzit, with the planning, time-tracking, reporting, and project capabilities associated with Super Productivity.

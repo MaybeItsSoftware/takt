@@ -2,14 +2,14 @@
 set -euo pipefail
 
 # Builds the Rust desktop app (desktop/, takt-desktop) as a .app bundle and
-# installs it as /Applications/Takt.app, then launches it. It supersedes the
-# Swift app: same name, same bundle ID (so notification and login-item grants
+# installs it as /Applications/Takt.app, then launches it. It keeps the
+# retired Swift app's name and bundle ID (so notification and login-item grants
 # carry over), and the executable is still Contents/MacOS/Takt, so an MCP
-# client configured with `Takt --mcp-server` keeps working. The Swift app
-# and the interim "Takt Desktop.app" are quit and removed, as is an old
-# Priority.app, so two apps never share one workspace.
+# client configured with `Takt --mcp-server` keeps working. Whatever is at
+# that path, the interim "Takt Desktop.app" and an old Priority.app are quit
+# and removed, so two apps never share one workspace.
 #
-# The bundle is the Swift app's shape: the executable, the `takt` CLI as a
+# The bundle holds the executable, the `takt` CLI as a
 # signed helper at Contents/Helpers/takt (its MCP server: `--mcp-server`
 # execs it), and the app icon. It is signed with the first valid Apple
 # Development identity, or ad hoc when there is none; set
@@ -45,9 +45,9 @@ mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Helpers" "$APP_PATH/Cont
 cp "$ROOT_DIR/desktop/target/release/$BINARY" "$APP_PATH/Contents/MacOS/$EXECUTABLE"
 cp "$ROOT_DIR/cli/target/release/takt" "$APP_PATH/Contents/Helpers/takt"
 
-# The icon, from the Swift app's asset catalogue.
+# The icon (desktop/icon, written by scripts/build_icons.sh).
 ICONSET="$STAGE_DIR/AppIcon.iconset"
-SOURCE="$ROOT_DIR/Takt/Assets.xcassets/AppIcon.appiconset"
+SOURCE="$ROOT_DIR/desktop/icon"
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
 for size in 16 32 128 256 512; do
@@ -110,7 +110,7 @@ fi
 [[ -z "$IDENTITY" ]] && IDENTITY="-"
 echo "==> Signing with ${IDENTITY}…"
 # Inside out: the helper before the bundle around it. No entitlements: like
-# the Swift app it isn't sandboxed, so there is nothing for one to grant.
+# the Swift app before it, it isn't sandboxed, so there is nothing for one to grant.
 TIMESTAMP="--timestamp=none"
 [[ "${TAKT_SIGN_TIMESTAMP:-0}" == "1" ]] && TIMESTAMP="--timestamp"
 codesign --force --sign "$IDENTITY" --options runtime "$TIMESTAMP" \

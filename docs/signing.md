@@ -1,5 +1,11 @@
 # Code Signing, Notarization, and Distribution
 
+> The Xcode project this page describes was retired with the Swift Mac app on
+> 2026-11-08. The Mac app is now signed by `scripts/install_desktop.sh` (the
+> first valid Apple Development identity, else ad hoc; `TAKT_SIGN_IDENTITY`
+> chooses) and distributed by `scripts/build_desktop_dmg.sh`, which uses the
+> same Developer ID certificate and `priority-notary` profile described below.
+
 Team: **DEMOPOL LABS LIMITED** — Team ID `6NQNU5YSC2`.
 
 ## What is configured
@@ -58,7 +64,7 @@ new `xcodebuild` step you add there.
 
 ## Distribution: two things are still missing
 
-`scripts/build_dmg.sh` handles signing and notarization automatically, but only
+`scripts/build_desktop_dmg.sh` handles signing and notarization automatically, but only
 once these exist. Until then it prints a warning and produces a DMG that works
 on this machine and nowhere else. **Neither step can be done from the command
 line** — both need a human with Account Holder access.
@@ -96,7 +102,7 @@ one.
 ### Then
 
 ```bash
-./scripts/build_dmg.sh 2.2.0
+./scripts/build_desktop_dmg.sh 2.2.0
 ```
 
 The script signs the app with Developer ID, signs the DMG, submits it to Apple,

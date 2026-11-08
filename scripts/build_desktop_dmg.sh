@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# A DMG of the Rust desktop app (desktop/), the way scripts/build_dmg.sh
-# makes one of the Swift app: signed with a Developer ID when one is
+# A DMG of the Rust desktop app (desktop/): signed with a Developer ID when one is
 # installed, then notarised and stapled when credentials are found, else
 # signed for this Mac only and said so. The bundle itself is
 # scripts/install_desktop.sh's, built with TAKT_BUNDLE_ONLY=1.

@@ -451,13 +451,9 @@ cli/
 tool, so the CLI and the MCP server cannot drift apart — a command that cannot
 be expressed as a tool call does not belong in `cli.rs`.
 
-The crate is deliberately outside both `Package.swift` and the Xcode project: it
-shares no source with them, and nothing in `Takt/` should ever `import` it.
-The app *runs* it — `scripts/bundle_cli.sh`, from an Xcode build phase, cargo-
-builds it and installs it into the bundle — but that is a process boundary, not
-a source dependency. One consequence worth knowing: **building the app needs
-cargo.** `TAKT_SKIP_CLI_BUNDLE=1` opts out, and produces an app with no MCP
-server.
+The app *runs* it — `scripts/install_desktop.sh` release-builds it and copies
+it into the bundle at `Contents/Helpers/takt` — but that is a process boundary,
+not a source dependency: the desktop app does not link the CLI crate.
 
 ## Developing
 

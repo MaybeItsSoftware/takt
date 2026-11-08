@@ -181,13 +181,11 @@ Worth an eye from someone who owns the palette:
 
 ### Known-good backlog, not yet claimed
 
-- SwiftLint's standing warnings. After the 2026-10-07 cleanup the count over
-  `Takt/` and `Sources/` is **1 warning, 0 errors** (2026-10-13): one
-  `function_body_length` (`WorkspaceViewModel+Commands.swift`'s dispatch).
-  `TaskMutationService` and the long `AppCoordinator` init went with the
-  Checkvist-era task stack. `DayView` and `WorkspaceStore` no longer
-  trip `type_body_length`, and the `TaskVisibilityEngine` complexity warning
-  went with the engine in roadmap Phase 6. **This is the single place that number
+- SwiftLint's standing warnings. With the Swift Mac app (`Takt/`) retired on
+  2026-11-08 the count over `Sources/` is **0 warnings, 0 errors**; the test
+  folders carry `line_length` warnings and one `line_length` error
+  (`corelogic-tests/AgentAntigravityProtocolTests.swift:55`, 420 characters),
+  which fails CI's lint job until it is wrapped. **This is the single place that number
   lives** — `ci.yml` and `ARCHITECTURE_IMPROVEMENT_PLAN.md` point here rather
   than carrying their own copy. Do not add to it;
   `ARCHITECTURE_IMPROVEMENT_PLAN.md` tracks the decomposition that would clear

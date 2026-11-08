@@ -1,5 +1,5 @@
 //! Takt's desktop app, in Rust on GPUI, styled after Zed. See
-//! `docs/rust-desktop-plan.md`. The Swift app under `Takt/` stays beside it.
+//! `docs/rust-desktop-plan.md`.
 //!
 //! `TAKT_DESKTOP_DB` names the database; without it the app's own is used.
 //! `TAKT_DESKTOP_SMOKE=1` drives the model through a set of keys, waits for
@@ -25,13 +25,15 @@ use std::time::Instant;
 
 fn load_fonts(cx: &App) {
     let fonts: Vec<Cow<'static, [u8]>> = vec![
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/IBMPlexSans-Regular.ttf")),
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/IBMPlexSans-Medium.ttf")),
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/IBMPlexSans-SemiBold.ttf")),
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/IBMPlexSans-Bold.ttf")),
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/IBMPlexSans-Italic.ttf")),
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/Lilex-Regular.ttf")),
-        Cow::Borrowed(include_bytes!("../../Takt/Fonts/Lilex-Medium.ttf")),
+        Cow::Borrowed(include_bytes!("../../shared/fonts/IBMPlexSans-Regular.ttf")),
+        Cow::Borrowed(include_bytes!("../../shared/fonts/IBMPlexSans-Medium.ttf")),
+        Cow::Borrowed(include_bytes!(
+            "../../shared/fonts/IBMPlexSans-SemiBold.ttf"
+        )),
+        Cow::Borrowed(include_bytes!("../../shared/fonts/IBMPlexSans-Bold.ttf")),
+        Cow::Borrowed(include_bytes!("../../shared/fonts/IBMPlexSans-Italic.ttf")),
+        Cow::Borrowed(include_bytes!("../../shared/fonts/Lilex-Regular.ttf")),
+        Cow::Borrowed(include_bytes!("../../shared/fonts/Lilex-Medium.ttf")),
     ];
     if let Err(error) = cx.text_system().add_fonts(fonts) {
         eprintln!("takt-desktop: could not load the bundled fonts: {error}");
