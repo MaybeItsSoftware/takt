@@ -286,6 +286,85 @@ Arvo is bundled, so this looks the same on every device; Rockwell is only the
 fallback for a family that fails to load. The labels' text is written in sentence case and uppercased by the
 theme, so it comes out as it did.
 
+## Zed themes
+
+A Zed theme file can go straight into the themes folder. Zed's format is a
+*family*:
+
+```json
+{
+  "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
+  "name": "Meadow",
+  "author": "Takt",
+  "themes": [
+    { "name": "Meadow Dusk", "appearance": "dark", "style": { "editor.background": "#161c1aff", "text": "#dfe8e2ff", "…": "…" } },
+    { "name": "Meadow Morning", "appearance": "light", "style": { "…": "…" } }
+  ]
+}
+```
+
+A file with a `themes` list, or a `$schema` on zed.dev, is read as one. Each
+entry in `themes` becomes a theme of its own (the whole of this example is
+[`shared/themes/zed/meadow.json`](../shared/themes/zed/meadow.json)):
+
+| | |
+| --- | --- |
+| Identifier | `zed.` and the variant's name, lowercased and hyphenated: `zed.meadow-dusk`. Zed keys a theme by its name, and so does this, so the same file gives the same identifiers on every device. Two variants with the same name are one identifier, and the second is skipped. |
+| Name | The variant's `name`. The summary names the family and its `author`. |
+| `lockedAppearance` | The variant's `appearance`. A variant without one, or with something other than `light` or `dark`, is guessed from its page and warned about. |
+| `extends` | `native.theme.one`, Zed One: so the structure is Zed's — IBM Plex Sans and Lilex, square panels, hairlines, and the phones' sizes — and any role the mapping cannot fill is One Light's or One Dark's. |
+| Palette | Every role, the same in `light` and `dark`, from the table below. |
+
+How a variant's `style` maps onto the roles — the first key it states wins,
+and it is the mapping the Mac app uses to draw Zed's own One Dark and One
+Light:
+
+| Role | Zed keys, in order |
+| --- | --- |
+| `paper` | `editor.background`, `background` |
+| `raised` | `elevated_surface.background`, `surface.background`, `panel.background` |
+| `altRow` | `panel.background`, `surface.background` |
+| `hover` | `element.hover`, `ghost_element.hover` |
+| `well` | `background`, `element.background` |
+| `border` | `border` |
+| `borderMuted` | `border.variant`, `border` |
+| `inputBorder` | `border` |
+| `ink` | `text`, `editor.foreground` |
+| `mutedText` | `text.muted` |
+| `dimText` | `text.placeholder`, `text.disabled` |
+| `primary` | the first of `text.accent`, `icon.accent`, `border.focused`, `players[0].cursor`, `accents[0]`, `info`, `link_text.hover`, `terminal.ansi.blue`, then any colour below, that stands 3:1 off the page (it carries the focus ring); failing all, the one that stands furthest off it |
+| `success` | `success`, `created` |
+| `danger` | `error`, `deleted` |
+| `warning` | `warning`, `modified` |
+| `categoricalPurple`, `categoricalPink`, `categoricalOrange` | the colour nearest violet (265°), pink (320°) and orange (25°), within 30° and not grey, from `accents`, each of `players`' `cursor`, the `terminal.ansi.*` colours (not the dim ones) and `syntax.*.color`, in that order |
+| `mediaLetterbox`, `mediaScrim`, `mediaScrimInk` | not mapped: Zed One's |
+
+A role none of its keys gives is grown from the variant's page and text, the
+way [seeds](#a-theme-can-be-three-colours) grow one, so a sparse variant still
+looks like itself rather than like One. Zed's colours may be translucent
+(`#ffffff14`, and `#rgba` is read as well as `#rgb`, `#rrggbb` and
+`#rrggbbaa`): the page is laid over `background` (or white or black for the
+appearance), and every other colour over the page, so each role is opaque.
+Takt has no role for `hint`, `players`' selections, `syntax` as such, the
+scrollbars, tabs, title bar or terminal, so those are only read for the
+identity colours above. A value that is not a colour is a warning and skipped;
+the rest of the variant still loads.
+
+Zed themes go through the same loader as every other file, so the audit runs
+on them, they sync as `themes` rows (one row per file, under its first
+variant's identifier), and the phones' **Import** takes them. A theme can
+`extends` a Zed variant by its identifier from another file in the same folder.
+
+### Zed's own themes folder, on the Mac
+
+Zed reads `~/.config/zed/themes/*.json` (`$XDG_CONFIG_HOME/zed/themes` where
+that is set). The Mac app reads that folder as well, read-only, so the themes
+you have in Zed are in Takt's picker too, marked "Zed theme". Nothing there is
+written, synced or reported beyond what stops a file loading; a file in Takt's
+own folder with the same identifier wins. To take one of them to your phone,
+copy the file into Takt's folder. `TAKT_ZED_THEMES` points the app at another
+folder, or, set empty, at none.
+
 ## Across the Mac, iPhone and Android
 
 One theme file works on all three apps. The palette is the same everywhere:
@@ -457,8 +536,8 @@ The format is read, merged, audited and written by the Rust core
 (`core/src/theme/`: `json.rs` reads and writes the JSON dialect Swift's
 `JSONDecoder` and `JSONEncoder` defined, `file.rs` the format, `merge.rs` and
 `loader.rs` resolution, `audit.rs` the audit, `seeds.rs` the seed arithmetic,
-`builtins.rs` the built-ins, `export.rs` and `conformance.rs` the files it
-writes) and tested there (`core/src/theme/tests.rs`). `TaktCore`
+`builtins.rs` the built-ins, `zed.rs` Zed's format, read into the same
+files, `export.rs` and `conformance.rs` the files it writes) and tested there (`core/src/theme/tests.rs`). `TaktCore`
 (`Sources/TaktCore/Theming/`, conversions in `Theme+Core.swift`) and Android's
 `:core` (`core/theme/`, conversions in `ThemeCore.kt`) keep their own types
 and call it once per folder or file; `corelogic-tests/ThemeFileTests.swift`

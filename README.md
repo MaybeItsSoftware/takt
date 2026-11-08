@@ -1176,6 +1176,14 @@ command palette — it writes a complete copy, opens it and switches to it.
 **Open the themes folder** and **Reload** are there too. A broken file is
 reported on the status line and in Diagnostics, never fatal.
 
+**Zed themes work as they are.** Drop a Zed theme file (the kind Zed keeps in
+`~/.config/zed/themes/`, or exports from a theme extension) into the same
+folder, and each theme in it — Zed files are families, usually a dark and a
+light — appears in the gallery under its own name, fixed to its appearance, in
+Zed's type and square panels. On the Mac, the themes already in Zed's own
+`~/.config/zed/themes/` are listed too, read-only and on that Mac only; copy a
+file into Takt's folder (or import it on a phone) to sync it.
+
 **Format and a full example: [docs/themes.md](docs/themes.md)**
 
 ## Diagnostics
