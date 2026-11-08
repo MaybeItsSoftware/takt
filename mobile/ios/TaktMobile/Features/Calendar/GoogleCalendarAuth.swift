@@ -224,7 +224,7 @@ final class GoogleCalendarAuth {
     [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: keychainService,
-      kSecAttrAccount as String: keychainAccount,
+      kSecAttrAccount as String: Self.keychainAccount,
     ]
   }
 
