@@ -68,6 +68,7 @@ impl Stop {
         Some(match self.id {
             "notes" => "Notes",
             "focus" => "Focus",
+            "log" => "Log time",
             "commit" => "Commitment",
             "apply-planning" => "Requirements",
             "pin" => "Sidebar",
@@ -94,6 +95,7 @@ impl Stop {
     pub fn icon(&self) -> Option<&'static str> {
         Some(match self.id {
             "focus" => "play",
+            "log" => "clock",
             "start" => "sunrise",
             "due" => "calendar",
             "due.exact" => "clock",
@@ -209,6 +211,12 @@ pub fn stops(
                 None => action.into(),
             },
             ..Stop::new("focus", "", Action)
+        });
+        // Work done away from the timer counts as much as work timed.
+        stops.push(Stop {
+            value: "Log time worked".into(),
+            empty: true,
+            ..Stop::new("log", "", Text { multiline: false })
         });
     }
     let estimated = snapshot.estimate_seconds.is_some();
@@ -393,6 +401,41 @@ fn span(seconds: i64) -> String {
         (h, 0) => format!("{h}h"),
         (h, m) => format!("{h}h {m}m"),
     }
+}
+
+/// A typed length of time in seconds: "25" and "25m" are minutes, "1h",
+/// "1.5h" and "1h 20m" hours and minutes. Empty is zero; nonsense is none.
+pub fn parse_span(text: &str) -> Option<i64> {
+    let text = text.trim().to_lowercase().replace(' ', "");
+    if text.is_empty() {
+        return Some(0);
+    }
+    if let Ok(minutes) = text.parse::<f64>() {
+        return (minutes >= 0.0).then(|| (minutes * 60.0).round() as i64);
+    }
+    let mut seconds = 0.0;
+    let mut number = String::new();
+    let mut any = false;
+    for c in text.chars() {
+        if c.is_ascii_digit() || c == '.' {
+            number.push(c);
+            continue;
+        }
+        let value: f64 = number.parse().ok()?;
+        number.clear();
+        seconds += value
+            * match c {
+                'h' => 3600.0,
+                'm' => 60.0,
+                _ => return None,
+            };
+        any = true;
+    }
+    if !number.is_empty() {
+        // "1h20": the trailing number is minutes.
+        seconds += number.parse::<f64>().ok()? * 60.0;
+    }
+    any.then(|| seconds.round() as i64)
 }
 
 /// "1h 20m of 2h logged · 2 of 5 subtasks", or nothing when it has neither.
@@ -800,6 +843,21 @@ impl App {
         }
     }
 
+    /// Records time worked on the selected task without a focus session.
+    fn log_selected_work(&mut self, seconds: i64) {
+        let Some(id) = self.selected_task.clone() else {
+            return;
+        };
+        let zone = self.store.zone.clone();
+        let now = now_ms();
+        if self
+            .write(|s| s.core.log_task_work(id, seconds, now, zone))
+            .is_some()
+        {
+            self.message = Some(format!("Logged {}.", span(seconds)));
+        }
+    }
+
     /// Saves the task's agent context, or its list's, as one undo step.
     fn set_agent_context(&mut self, stop: &str, text: &str) {
         let Some(task) = self.selected().cloned() else {
@@ -842,6 +900,15 @@ impl App {
             }
             "agent-context" => self.set_agent_context(stop, text),
             "list-context" => self.set_agent_context(stop, text),
+            "log" => match parse_span(trimmed) {
+                Some(seconds) if seconds > 0 => self.log_selected_work(seconds),
+                Some(_) => {}
+                None => {
+                    self.message = Some(format!(
+                        "\u{201c}{trimmed}\u{201d} isn't a length of time: try 25, 25m or 1h 20m."
+                    ))
+                }
+            },
             "estimate" | "minimum-block" => match editor_parse_minutes(trimmed.into()) {
                 Ok(seconds) => {
                     if stop == "estimate" {
@@ -1157,6 +1224,17 @@ mod tests {
         assert!(due.empty);
         assert!(!stops.iter().any(|s| s.id == "due.exact"));
         assert!(stops.iter().any(|s| s.id == "blockers"));
+    }
+
+    #[test]
+    fn spans_read_as_people_type_them() {
+        assert_eq!(parse_span("25"), Some(1500));
+        assert_eq!(parse_span("25m"), Some(1500));
+        assert_eq!(parse_span("1h 20m"), Some(4800));
+        assert_eq!(parse_span("1h20"), Some(4800));
+        assert_eq!(parse_span("1.5h"), Some(5400));
+        assert_eq!(parse_span(""), Some(0));
+        assert_eq!(parse_span("soon"), None);
     }
 
     #[test]

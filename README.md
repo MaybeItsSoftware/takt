@@ -152,7 +152,10 @@ opens the same panel's menu, each item with its sidebar key beside it.
 The **inspector** is modal, as vim is. With the keyboard in it, `j` / `k` (or
 `↓` / `↑`) move a row cursor down every row, grouped by what you do with a task:
 the title; working on it (Start focus, which says how far it has got — time
-logged against the estimate and subtasks done — then the estimate, how it may
+logged against the estimate and subtasks done — and Log time worked, where on
+the Mac you type `25`, `25m` or `1h 20m` to record work done without the
+timer and without finishing the task, which counts toward a daily due today
+as a timed block would; then the estimate, how it may
 be split once it has one, daily progress and the commitment); when (start,
 due, repeat); the notes; where it is filed (List, Priority, Tags); what it
 waits on (Conditions, Blocked by, Waiting on); Links; and the actions —

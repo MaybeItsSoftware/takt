@@ -1369,6 +1369,12 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func reviewProgress(days: UInt32, nowMs: Int64, zone: String) throws  -> ReviewProgress
     
     /**
+     * Logs time worked on a task without a focus session, and without
+     * finishing it. Returns the block's id.
+     */
+    func logTaskWork(taskId: String, seconds: Int64, nowMs: Int64, zone: String) throws  -> String
+    
+    /**
      * A task's subtasks and logged work, counted in the core.
      */
     func taskWorkFacts(taskId: String) throws  -> TaskWorkFacts
@@ -3347,6 +3353,23 @@ open func reviewProgress(days: UInt32, nowMs: Int64, zone: String)throws  -> Rev
     uniffi_takt_core_fn_method_coreworkspace_review_progress(
             self.uniffiCloneHandle(),
         FfiConverterUInt32.lower(days),
+        FfiConverterInt64.lower(nowMs),
+        FfiConverterString.lower(zone),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Logs time worked on a task without a focus session, and without
+     * finishing it. Returns the block's id.
+     */
+open func logTaskWork(taskId: String, seconds: Int64, nowMs: Int64, zone: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_log_task_work(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),
+        FfiConverterInt64.lower(seconds),
         FfiConverterInt64.lower(nowMs),
         FfiConverterString.lower(zone),uniffiCallStatus
     )
@@ -33116,6 +33139,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_review_progress() != 23968) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_log_task_work() != 9488) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_task_work_facts() != 33291) {

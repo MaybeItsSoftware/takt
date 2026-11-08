@@ -354,6 +354,14 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 context,
                 app.inspector_field_text("agent-context"),
             ));
+            // Time worked without the timer.
+            let focus_before = value(app, "focus");
+            app.commit_inspector_field("log", "25m");
+            report.push(format!(
+                "log time: {:?} -> {:?}",
+                focus_before,
+                value(app, "focus")
+            ));
             app.open_repeat_edit();
             let selector = matches!(app.editing, Some(state::Editing::Repeat(_)));
             for key in ["3", "right", "down", "enter"] {

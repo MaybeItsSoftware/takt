@@ -1271,6 +1271,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_review_progress(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_log_task_work(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_task_work_facts(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_acknowledge_sync_changes(
@@ -1798,6 +1800,8 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_method_coreworkspace_reminders(`ptr`: Long,`settings`: RustBuffer.ByValue,`nowMs`: Long,`zone`: RustBuffer.ByValue,`days`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_review_progress(`ptr`: Long,`days`: Int,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_log_task_work(`ptr`: Long,`taskId`: RustBuffer.ByValue,`seconds`: Long,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_task_work_facts(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -3530,6 +3534,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_review_progress() and 0xFFFF) != 23968) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_log_task_work() and 0xFFFF) != 9488) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_task_work_facts() and 0xFFFF) != 33291) {
@@ -5400,6 +5407,12 @@ public interface CoreWorkspaceInterface {
      * in the core. `ReviewModel.readProgress`.
      */
     fun `reviewProgress`(`days`: kotlin.UInt, `nowMs`: kotlin.Long, `zone`: kotlin.String): ReviewProgress
+    
+    /**
+     * Logs time worked on a task without a focus session, and without
+     * finishing it. Returns the block's id.
+     */
+    fun `logTaskWork`(`taskId`: kotlin.String, `seconds`: kotlin.Long, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.String
     
     /**
      * A task's subtasks and logged work, counted in the core.
@@ -7800,6 +7813,28 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         it,
         
         FfiConverterUInt.lower(`days`),
+        FfiConverterLong.lower(`nowMs`),
+        FfiConverterString.lower(`zone`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Logs time worked on a task without a focus session, and without
+     * finishing it. Returns the block's id.
+     */
+    @Throws(CoreException::class)override fun `logTaskWork`(`taskId`: kotlin.String, `seconds`: kotlin.Long, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_log_task_work(
+        it,
+        
+        FfiConverterString.lower(`taskId`),
+        FfiConverterLong.lower(`seconds`),
         FfiConverterLong.lower(`nowMs`),
         FfiConverterString.lower(`zone`),_status)
 }
