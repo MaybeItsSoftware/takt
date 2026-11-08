@@ -769,6 +769,20 @@ impl App {
     }
 }
 
+impl App {
+    /// The key a command answers to, as glyphs, for the hint beside its
+    /// control; None when it has none or hints are hidden.
+    pub fn key_hint(&self, command: &str) -> Option<String> {
+        if self.prefs.hide_key_hints {
+            return None;
+        }
+        self.bindings
+            .entry(command)
+            .and_then(|entry| entry.keys.first())
+            .map(|key| crate::keys::Bindings::glyphs(key))
+    }
+}
+
 /// The commands that reach an AI, which "AI off" takes away.
 pub const AI_COMMANDS: [&str; 2] = ["taskAskAgent", "windowToggleAgentPanel"];
 

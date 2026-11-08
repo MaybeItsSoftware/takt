@@ -54,7 +54,13 @@ impl Takt {
                                 this.after_change(cx);
                                 cx.notify();
                             }))
+                            .flex()
+                            .items_center()
+                            .gap_1()
                             .child(mode.title())
+                            .when_some(self.app.key_hint(mode_command(mode)), |d, keys| {
+                                d.child(super::widgets::key_hint(keys, t))
+                            })
                     })),
             )
             .child(self.account_button(t, cx))
@@ -450,7 +456,7 @@ impl Takt {
     fn status_icon(
         &self,
         id: &'static str,
-        icon: &'static str,
+        (icon, name, command): (&'static str, &'static str, &'static str),
         lit: bool,
         t: Tokens,
         cx: &mut Context<Self>,
@@ -465,6 +471,13 @@ impl Takt {
             .justify_center()
             .rounded(px(4.))
             .hover(|d| d.bg(t.hover))
+            .tooltip(super::widgets::tip(
+                match self.app.key_hint(command) {
+                    Some(keys) => format!("{name}  {keys}"),
+                    None => name.to_string(),
+                },
+                t,
+            ))
             .child(super::icons::icon(icon, 15.).text_color(if lit { t.accent } else { t.muted }))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 click(this, cx);
@@ -486,32 +499,53 @@ impl Takt {
             let agent = p.sidebar_visible && p.left_dock_tab == "agent";
             let ai = !p.ai_off;
             let mut icons = vec![
-                self.status_icon("status-lists", "panel-left", lists, t, cx, |this, _| {
-                    let p = &mut this.app.prefs;
-                    if p.sidebar_visible && p.left_dock_tab != "agent" {
-                        this.app.toggle_sidebar();
-                    } else {
-                        p.sidebar_visible = true;
-                        p.left_dock_tab = "lists".into();
-                        if this.app.region == Region::Agent {
-                            this.app.region = Region::Sidebar;
-                            this.app.editing = None;
+                self.status_icon(
+                    "status-lists",
+                    ("panel-left", "Lists", "windowToggleSidebar"),
+                    lists,
+                    t,
+                    cx,
+                    |this, _| {
+                        let p = &mut this.app.prefs;
+                        if p.sidebar_visible && p.left_dock_tab != "agent" {
+                            this.app.toggle_sidebar();
+                        } else {
+                            p.sidebar_visible = true;
+                            p.left_dock_tab = "lists".into();
+                            if this.app.region == Region::Agent {
+                                this.app.region = Region::Sidebar;
+                                this.app.editing = None;
+                            }
+                            this.app.prefs.save();
                         }
-                        this.app.prefs.save();
-                    }
-                }),
+                    },
+                ),
                 Self::status_divider(t).into_any_element(),
-                self.status_icon("status-agent", "sparkles", agent, t, cx, |this, _| {
-                    this.app.toggle_agent_panel();
-                    if matches!(this.app.editing, Some(Editing::AgentMessage)) {
-                        this.begin_editing();
-                    }
-                }),
+                self.status_icon(
+                    "status-agent",
+                    ("sparkles", "Agent", "windowToggleAgentPanel"),
+                    agent,
+                    t,
+                    cx,
+                    |this, _| {
+                        this.app.toggle_agent_panel();
+                        if matches!(this.app.editing, Some(Editing::AgentMessage)) {
+                            this.begin_editing();
+                        }
+                    },
+                ),
                 Self::status_divider(t).into_any_element(),
-                self.status_icon("status-search", "search", false, t, cx, |this, _| {
-                    this.app.open_overlay(Overlay::Search);
-                    this.open_overlay_field();
-                }),
+                self.status_icon(
+                    "status-search",
+                    ("search", "Search", "goSearch"),
+                    false,
+                    t,
+                    cx,
+                    |this, _| {
+                        this.app.open_overlay(Overlay::Search);
+                        this.open_overlay_field();
+                    },
+                ),
             ];
             if !ai {
                 // The agent's icon and the divider after it.
@@ -521,35 +555,92 @@ impl Takt {
         }
         let bottom = |tab: &str| p.bottom_dock_visible && p.bottom_dock_tab == tab;
         let right = |tab: &str| p.right_dock_visible && p.right_dock_tab == tab;
-        let bottom_icon =
-            |this: &Self, id: &'static str, tab: &'static str, icon, cx: &mut Context<Self>| {
-                this.status_icon(id, icon, bottom(tab), t, cx, move |this, _| {
+        let bottom_icon = |this: &Self,
+                           id: &'static str,
+                           tab: &'static str,
+                           icon,
+                           tip: (&'static str, &'static str),
+                           cx: &mut Context<Self>| {
+            this.status_icon(
+                id,
+                (icon, tip.0, tip.1),
+                bottom(tab),
+                t,
+                cx,
+                move |this, _| {
                     let p = &this.app.prefs;
                     if p.bottom_dock_visible && p.bottom_dock_tab == tab {
                         this.app.hide_bottom_dock();
                     } else {
                         this.app.show_bottom_tab(tab);
                     }
-                })
-            };
-        let right_icon =
-            |this: &Self, id: &'static str, tab: &'static str, icon, cx: &mut Context<Self>| {
-                this.status_icon(id, icon, right(tab), t, cx, move |this, _| {
+                },
+            )
+        };
+        let right_icon = |this: &Self,
+                          id: &'static str,
+                          tab: &'static str,
+                          icon,
+                          tip: (&'static str, &'static str),
+                          cx: &mut Context<Self>| {
+            this.status_icon(
+                id,
+                (icon, tip.0, tip.1),
+                right(tab),
+                t,
+                cx,
+                move |this, _| {
                     let p = &this.app.prefs;
                     if p.right_dock_visible && p.right_dock_tab == tab {
                         this.app.hide_right_dock();
                     } else {
                         this.app.show_right_tab(tab, true);
                     }
-                })
-            };
+                },
+            )
+        };
         vec![
-            bottom_icon(self, "status-progress", "progress", "chart", cx),
-            bottom_icon(self, "status-done", "done", "circle-check", cx),
-            bottom_icon(self, "status-timeline", "timeline", "clock", cx),
+            bottom_icon(
+                self,
+                "status-progress",
+                "progress",
+                "chart",
+                ("Progress", "windowToggleProgressDock"),
+                cx,
+            ),
+            bottom_icon(
+                self,
+                "status-done",
+                "done",
+                "circle-check",
+                ("Done", "windowToggleDoneRail"),
+                cx,
+            ),
+            bottom_icon(
+                self,
+                "status-timeline",
+                "timeline",
+                "clock",
+                ("Timeline", "goTimeline"),
+                cx,
+            ),
             Self::status_divider(t).into_any_element(),
-            right_icon(self, "status-inspector", "inspector", "info", cx),
-            right_icon(self, "status-conditions", "conditions", "sliders", cx),
+            right_icon(
+                self,
+                "status-inspector",
+                "inspector",
+                "info",
+                ("Inspector", "windowToggleInspectorPane"),
+                cx,
+            ),
+            right_icon(
+                self,
+                "status-conditions",
+                "conditions",
+                "sliders",
+                ("Conditions", "focusSetAvailable"),
+                cx,
+            ),
         ]
     }
 
@@ -1143,5 +1234,15 @@ impl Takt {
                     .children(rows),
             )
             .into_any_element()
+    }
+}
+
+/// The command that goes to a view, for its key hint.
+fn mode_command(mode: ViewMode) -> &'static str {
+    match mode {
+        ViewMode::Today => "goToday",
+        ViewMode::Board => "goBoard",
+        ViewMode::Outline => "goOutline",
+        ViewMode::Matrix => "goMatrix",
     }
 }

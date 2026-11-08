@@ -38,6 +38,27 @@ pub struct Stop {
 }
 
 impl Stop {
+    /// The command that does what this row does, for its key hint.
+    pub fn command(&self) -> Option<&'static str> {
+        Some(match self.id {
+            "title" => "taskRenameInsert",
+            "focus" => "taskStartFocus",
+            "notes" => "taskEditNotes",
+            "estimate" => "taskEditEstimate",
+            "tags" => "taskEditTags",
+            "conditions" => "taskConditions",
+            "move" => "taskMove",
+            "blockers" => "taskAddBlocker",
+            "waiting" => "taskWaiting",
+            "commit" => "taskToggleDaily",
+            "links" => "taskAddLink",
+            "complete" => "taskComplete",
+            "convert" => "taskConvertToList",
+            "pin" => "taskPromoteList",
+            _ => return None,
+        })
+    }
+
     /// What its icon says on hover: its label, or what the row is when it
     /// has none.
     pub fn tip(&self) -> Option<&'static str> {

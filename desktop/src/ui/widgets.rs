@@ -341,3 +341,20 @@ pub(super) fn tip(
         .into()
     }
 }
+
+/// A key, small and dim, beside the control it works: the reference
+/// marking the settings can hide.
+pub(super) fn key_hint(keys: String, t: Tokens) -> AnyElement {
+    div()
+        .flex_none()
+        .px(px(4.))
+        .rounded(px(4.))
+        .border_1()
+        .border_color(t.border_variant)
+        .font_family(MONO_FONT)
+        .text_size(px(10.))
+        .line_height(px(14.))
+        .text_color(t.placeholder)
+        .child(keys)
+        .into_any_element()
+}

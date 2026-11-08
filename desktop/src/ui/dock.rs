@@ -253,7 +253,13 @@ impl Takt {
                                             })),
                                     )
                                 })
-                                .child(value),
+                                .child(value)
+                                .when_some(
+                                    stop.command()
+                                        .filter(|_| !open && stop.id != "title")
+                                        .and_then(|c| self.app.key_hint(c)),
+                                    |d, keys| d.child(super::widgets::key_hint(keys, t)),
+                                ),
                         )
                         .into_any_element()
                 })
