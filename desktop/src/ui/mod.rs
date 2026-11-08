@@ -313,6 +313,8 @@ impl Takt {
             Event::Url(url) => {
                 if url.starts_with(crate::sync::auth::CALLBACK) {
                     self.app.sync.callback(&url);
+                } else if url.starts_with("takt://join/") {
+                    self.app.join_from_link(&url);
                 }
             }
             Event::Menu(action) => match action.as_str() {

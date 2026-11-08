@@ -19,6 +19,7 @@ pub mod auth;
 pub mod http;
 pub mod keychain;
 pub mod realtime;
+pub mod sharing;
 
 use auth::{AuthError, Session, Supabase};
 use serde::{Deserialize, Serialize};

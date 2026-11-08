@@ -331,6 +331,8 @@ impl Takt {
             RowKind::List(id) => (
                 if self.app.inbox().is_some_and(|inbox| &inbox.id == id) {
                     "inbox"
+                } else if self.app.shared_list_ids.contains(id) {
+                    "users"
                 } else {
                     "list"
                 },

@@ -35,6 +35,8 @@ pub enum Ask {
     ReminderTime {
         dailies: bool,
     },
+    /// An invite link or code for a shared list.
+    JoinList,
 }
 
 impl Ask {
@@ -55,6 +57,7 @@ impl Ask {
             Ask::ObsidianVault => "Add an Obsidian vault",
             Ask::ReminderTime { dailies: false } => "Morning reminder at",
             Ask::ReminderTime { dailies: true } => "Evening reminder at",
+            Ask::JoinList => "Join a shared list",
         }
     }
 
@@ -69,6 +72,7 @@ impl Ask {
             Ask::GoogleClientId => "….apps.googleusercontent.com",
             Ask::ObsidianVault => "~/Documents/Notes",
             Ask::ReminderTime { .. } => "09:00",
+            Ask::JoinList => "The invite link or code",
         }
     }
 
@@ -83,6 +87,9 @@ impl Ask {
                 "A self-hosted server must trust the same Supabase project.".into()
             }
             Ask::CheckvistKey { email } => format!("For {email}. Kept in the keychain."),
+            Ask::JoinList => {
+                "Someone who shares a list with you sends an invite. Its tasks are everyone's to edit; where it sits in your sidebar and your board columns stay yours.".into()
+            }
             _ => String::new(),
         }
     }
@@ -117,6 +124,7 @@ impl App {
             }
             Ask::SyncServer => self.sync.status().server,
             Ask::GoogleClientId => self.google_client_id(),
+            Ask::JoinList => clipboard_invite().unwrap_or_default(),
             Ask::ReminderTime { dailies } => super::reminders::clock(if *dailies {
                 self.prefs.remind_dailies_left_minute
             } else {
@@ -190,16 +198,27 @@ impl App {
                 self.set_reminder_time(dailies, text);
                 self.open_overlay(Overlay::Settings);
             }
+            Ask::JoinList => self.answer_join(text),
         }
     }
 
     /// Esc on the sheet: back to settings.
     pub fn leave_ask(&mut self) {
-        if matches!(self.editing, Some(Editing::Ask(Ask::Agent))) {
+        if matches!(self.editing, Some(Editing::Ask(Ask::Agent | Ask::JoinList))) {
             self.editing = None;
             return;
         }
         self.editing = None;
         self.open_overlay(Overlay::Settings);
     }
+}
+
+/// The clipboard, when it holds an invite link or code.
+fn clipboard_invite() -> Option<String> {
+    let output = std::process::Command::new("/usr/bin/pbpaste")
+        .output()
+        .ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    takt_core::sync::spaces::sync_invite_code(text.clone())?;
+    Some(text.trim().to_string())
 }

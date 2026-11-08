@@ -66,7 +66,8 @@ fn entry(client: &McpClientDescriptor) -> Option<McpServerEntry> {
     })
 }
 
-fn copy(text: &str) -> bool {
+/// Puts `text` on the clipboard.
+pub(crate) fn copy(text: &str) -> bool {
     use std::io::Write;
     let Ok(mut child) = std::process::Command::new("/usr/bin/pbcopy")
         .stdin(std::process::Stdio::piped())

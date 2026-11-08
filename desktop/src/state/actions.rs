@@ -15,6 +15,15 @@ pub enum PendingDelete {
     List(String),
     Folder(String),
     Column(String),
+    /// Leaving a list someone else shared.
+    LeaveList(String),
+    /// Stopping sharing a list you own.
+    StopSharing(String),
+    /// Taking someone out of a list you own.
+    RemoveMember {
+        list_id: String,
+        account_id: String,
+    },
 }
 
 impl App {
@@ -358,6 +367,11 @@ impl App {
                     self.message = Some("The inbox can't be deleted.".into());
                     return;
                 }
+                if let Some(shared) = self.shared_list(&id) {
+                    // A member leaves rather than deletes; an owner stops
+                    // sharing first, so nobody is left in an empty list.
+                    return self.ask_to_unshare_list(&shared.list_id, !shared.is_owner());
+                }
                 (PendingDelete::List(id.clone()), list.name.clone())
             }
             Some(RowKind::Folder(id)) => {
@@ -399,6 +413,9 @@ impl App {
                     }
                 }
             }
+            unshare @ (PendingDelete::LeaveList(_)
+            | PendingDelete::StopSharing(_)
+            | PendingDelete::RemoveMember { .. }) => self.carry_out_unshare(unshare),
             PendingDelete::Folder(id) => {
                 if self.write(|s| s.core.delete_folder(id.clone())).is_some() {
                     self.reload_sidebar();

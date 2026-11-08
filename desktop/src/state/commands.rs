@@ -373,6 +373,11 @@ impl App {
             "listRestore" => self.restore_last_archived(),
             "listComplete" => self.toggle_list_completed(),
             "listDelete" => self.ask_to_delete_list(),
+            "listShare" => self.share_commanded_list(),
+            "listJoin" => self.begin_join_list(),
+            "listMembers" => self.show_list_members(),
+            "listLeave" => self.ask_to_unshare(true),
+            "listStopSharing" => self.ask_to_unshare(false),
             "folderSelectPrevious" => self.select_adjacent_folder(-1),
             "folderSelectNext" => self.select_adjacent_folder(1),
             "listNewTaskDestination" => {

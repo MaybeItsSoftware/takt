@@ -123,7 +123,8 @@ impl App {
 
     pub fn change_platform_setting(&mut self, id: &str) {
         self.message = None;
-        if self.change_google_setting(id)
+        if self.change_shared_list_setting(id)
+            || self.change_google_setting(id)
             || self.change_links_setting(id)
             || self.change_celebration_setting(id)
         {

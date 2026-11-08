@@ -87,6 +87,12 @@ impl App {
             Err(error) => self.message = Some(error.to_string()),
         }
         self.folders = core.folders(workspace.clone()).unwrap_or_default();
+        self.shared_list_ids = core
+            .shared_lists()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|shared| shared.list_id)
+            .collect();
         self.filter_lists = core
             .filter_lists(workspace)
             .unwrap_or_default()

@@ -29,7 +29,7 @@ pub struct SettingsPage {
 
 /// The categories, in the order the page lists them; a group no entry here
 /// names goes at the end.
-pub const CATEGORIES: [(&str, &str); 13] = [
+pub const CATEGORIES: [(&str, &str); 14] = [
     ("General", "settings"),
     ("Appearance", "palette"),
     ("Keyboard", "keyboard"),
@@ -37,6 +37,7 @@ pub const CATEGORIES: [(&str, &str); 13] = [
     ("Reminders", "bell"),
     ("Completion", "party"),
     ("Sync", "refresh"),
+    ("Shared lists", "users"),
     ("Google", "calendar"),
     ("Checkvist", "square-check"),
     ("Links", "link"),
@@ -97,6 +98,11 @@ fn button_label(id: &str) -> Option<&'static str> {
         "links-vault-add" => "Add…",
         "links-vault-forget" => "Forget",
         mcp if mcp.starts_with("mcp:") => "Add",
+        "share-join" => "Join…",
+        share if share.starts_with("share:") => "Invite",
+        unshare if unshare.starts_with("unshare:") => "Stop",
+        leave if leave.starts_with("leave:") => "Leave",
+        member if member.starts_with("member:") => "Remove",
         _ => return None,
     })
 }
@@ -186,6 +192,17 @@ impl SettingRow {
             "links-vault-forget" => "Drop the vault folders added by hand; Obsidian's own stay.",
             "links-drive" => "Offer Google Drive files when you link a task.",
             mcp if mcp.starts_with("mcp:") => "Let this assistant read and change your tasks.",
+            "share-join" => "Open an invite someone sent you.",
+            share if share.starts_with("share:") => {
+                "Copy an invite link for one more person. Each works once, for seven days."
+            }
+            unshare if unshare.starts_with("unshare:") => {
+                "It stays yours and goes from everyone else's devices."
+            }
+            leave if leave.starts_with("leave:") => {
+                "Shared with you. Leaving takes it off your devices; the others keep it."
+            }
+            member if member.starts_with("member:") => "Take them out of the list.",
             _ => "",
         }
     }
@@ -445,6 +462,16 @@ impl App {
                 title: title.into(),
                 value,
             })
+            .chain(
+                self.shared_list_rows()
+                    .into_iter()
+                    .map(|(id, group, title, value)| SettingRow {
+                        id,
+                        group,
+                        title,
+                        value,
+                    }),
+            )
             .chain(
                 self.mcp_client_rows()
                     .into_iter()

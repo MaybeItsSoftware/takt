@@ -75,6 +75,7 @@ const NAMES: &[&str] = &[
     "tag",
     "ban",
     "user",
+    "users",
     "repeat",
     "flame",
     "target",
@@ -186,6 +187,9 @@ fn body(name: &str) -> Option<&'static str> {
         }
         "ban" => r#"<circle cx="12" cy="12" r="9.5"/><path d="m5.3 5.3 13.4 13.4"/>"#,
         "user" => r#"<circle cx="12" cy="8" r="4.5"/><path d="M20 21a8 8 0 0 0-16 0"/>"#,
+        "users" => {
+            r#"<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>"#
+        }
         "repeat" => {
             r#"<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>"#
         }

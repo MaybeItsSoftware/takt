@@ -40,6 +40,7 @@ pub mod repeat;
 pub mod review;
 pub mod rules;
 pub mod settings;
+pub mod sharing;
 pub mod sidebar;
 pub mod store;
 pub mod today;
@@ -197,6 +198,8 @@ pub struct App {
     pub nested_lists: Vec<OutlineItem>,
     pub filter_lists: Vec<FilterListRow>,
     pub task_counts: std::collections::HashMap<String, i64>,
+    /// The lists shared with other accounts, read with the sidebar.
+    pub shared_list_ids: std::collections::HashSet<String>,
     pub sidebar_rows: Vec<SidebarRow>,
     /// A right-click menu, while one is open.
     pub context_menu: Option<context_menu::ContextMenu>,
@@ -321,6 +324,7 @@ impl App {
             nested_lists: Vec::new(),
             filter_lists: Vec::new(),
             task_counts: Default::default(),
+            shared_list_ids: Default::default(),
             sidebar_rows: Vec::new(),
             context_menu: None,
             sidebar_cursor: None,
