@@ -146,7 +146,7 @@ internal fun InspectorBody(
         WaitingSection(vm, task, around, today, zone)
         SharingSection(vm, task)
         BlockedBySection(vm, task, around)
-        LinksSection(values, edit)
+        LinksSection(values, edit) { DriveLinkButton(task.id) { vm.save() } }
         PlacementSection(vm, around)
         AboutSection(task, around, zone)
         DeleteSection(task, onClose)
@@ -765,7 +765,11 @@ private fun DailyScheduleEditor(vm: TaskInspectorViewModel, daily: WorkspaceDail
 }
 
 @Composable
-private fun LinksSection(values: TaskEditorValues, edit: ((TaskEditorValues) -> TaskEditorValues) -> Unit) {
+private fun LinksSection(
+    values: TaskEditorValues,
+    edit: ((TaskEditorValues) -> TaskEditorValues) -> Unit,
+    pickers: @Composable () -> Unit = {},
+) {
     val context = LocalContext.current
     val undo = LocalShell.current.container.undo
     val colors = TaktTheme.colors
@@ -781,6 +785,7 @@ private fun LinksSection(values: TaskEditorValues, edit: ((TaskEditorValues) -> 
             modifier = Modifier.testTag("inspector_links"),
             contentDescription = "Links, one per line",
         )
+        pickers()
         for (link in links) {
             // What the link is, read by the core from the address (docs/links.md):
             // a Drive file's kind, an Obsidian note's name, a page's host.
