@@ -407,6 +407,10 @@ pub enum WsCommand {
         /// How long it takes, in minutes; 0 clears.
         #[arg(long, short = 'e', value_name = "MINUTES")]
         estimate: Option<i64>,
+        /// Who in its shared list does it: an email, account id or "me";
+        /// "" assigns it to nobody.
+        #[arg(long, value_name = "WHO")]
+        assign: Option<String>,
     },
     /// Complete a task.
     Done { task_id: String },
@@ -1112,6 +1116,7 @@ fn resolve_workspace(
             start,
             priority,
             estimate,
+            assign,
         } => {
             arguments.insert("task_id".into(), json!(task_id));
             insert_if_some(arguments, "title", title.as_deref());
@@ -1137,6 +1142,9 @@ fn resolve_workspace(
             }
             if let Some(minutes) = estimate {
                 arguments.insert("estimate_minutes".into(), json!(minutes));
+            }
+            if let Some(who) = assign {
+                arguments.insert("assignee".into(), json!(who));
             }
             "workspace_task_update"
         }
@@ -2039,6 +2047,12 @@ fn render_workspace_task(task: &Value, depth: usize) {
     let mut details = Vec::new();
     if let Some(priority) = task["priority"].as_i64() {
         details.push(format!("!{priority}"));
+    }
+    if let Some(who) = task["assignee"].as_str() {
+        details.push(format!("assigned to {who}"));
+    }
+    if let Some(who) = task["completed_by"].as_str() {
+        details.push(format!("done by {who}"));
     }
     if let Some(due) = task["due_date"].as_str().or(task["due_at"].as_str()) {
         details.push(format!("due {due}"));

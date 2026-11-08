@@ -2340,3 +2340,54 @@ fn a_tasks_agent_context_is_the_task_scope_and_not_its_notes() {
     );
     assert!(undoable.contains("Edit Agent Context"), "{undoable}");
 }
+
+#[test]
+fn a_task_in_a_shared_list_is_assigned_and_says_who_did_it() {
+    let fixture = Fixture::new();
+    fixture
+        .db()
+        .execute_batch(&format!(
+            "INSERT INTO sync_spaces (spaceId, listId, role, name, membersJSON) VALUES ('s', '{PROJECTS}', 'owner', 'Projects',
+               '[{{\"accountId\":\"me\",\"email\":\"me@example.com\",\"role\":\"owner\",\"you\":true}},
+                 {{\"accountId\":\"sam\",\"email\":\"sam@example.com\",\"role\":\"member\",\"you\":false}}]');"
+        ))
+        .expect("share");
+    let id = fixture.call(
+        "workspace_task_add",
+        json!({ "list_id": PROJECTS, "title": "Buy milk" }),
+    )["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    fixture.call(
+        "workspace_task_update",
+        json!({ "task_id": id, "assignee": "SAM@example.com", "status": "completed" }),
+    );
+    let tree = fixture.call(
+        "workspace_tasks",
+        json!({ "list_id": PROJECTS, "include_closed": true }),
+    );
+    let task = &tree["tasks"][0];
+    assert_eq!(task["assignee"], json!("sam@example.com"));
+    assert_eq!(task["completed_by"], json!("you"));
+    assert_eq!(task["added_by"], json!("you"));
+
+    assert!(
+        fixture
+            .try_call(
+                "workspace_task_update",
+                json!({ "task_id": id, "assignee": "stranger@example.com" })
+            )
+            .unwrap_err()
+            .contains("isn't in this list")
+    );
+    fixture.call(
+        "workspace_task_update",
+        json!({ "task_id": id, "assignee": null }),
+    );
+    let tree = fixture.call(
+        "workspace_tasks",
+        json!({ "list_id": PROJECTS, "include_closed": true }),
+    );
+    assert!(tree["tasks"][0].get("assignee").is_none());
+}

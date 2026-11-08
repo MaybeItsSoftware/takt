@@ -64,7 +64,7 @@ workspace's uppercase UUIDs, not Checkvist's integers:
 | `workspace_tasks` | One list's task tree: ids, titles, notes, status, kind, kanban column, external links, `requires` (its conditions by name), `blocked: true` on a task waiting on an open task | read |
 | `workspace_task_dependencies` | What a task waits on (`blocked_by`) and what waits on it (`blocking`), each with id, title, status and list, and whether it is blocked now | read |
 | `workspace_task_add` | Create a task or nested list, at a list's top level or under a parent, with notes, links and a column | write |
-| `workspace_task_update` | Title, notes, links, status, column, kind (task ⇄ nested list), sidebar pin, `waiting_on`, `follow_up_at` (both file the task in Waiting on) and `follow_up_every_days` (chase again that many days after each follow-up is done), `due`, `start`, `priority` and `estimate_minutes`; null clears any of them | write |
+| `workspace_task_update` | Title, notes, links, status, column, kind (task ⇄ nested list), sidebar pin, `waiting_on`, `follow_up_at` (both file the task in Waiting on) and `follow_up_every_days` (chase again that many days after each follow-up is done), `due`, `start`, `priority`, `estimate_minutes` and `assignee` (a shared list's member by email, account id or `me`); null clears any of them | write |
 | `workspace_task_move` | Reparent (subtree follows, across lists too) and/or reorder by 1-based position | write |
 | `workspace_task_to_list` | Promote a task to a standalone list, optionally in a folder, keeping its subtasks | write |
 | `workspace_task_delete` | Delete a task and its subtree | write |

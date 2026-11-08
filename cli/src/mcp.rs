@@ -777,7 +777,11 @@ fn workspace_tool_definitions() -> Vec<Value> {
                         "type": ["string", "null"],
                         "description": "When to chase it: 2026-10-08 14:00 (local) or RFC 3339. Files it in the waiting-on column; if it is still waiting then, Takt adds a 'Follow up' task to Today. Null or empty clears it; clearing it and waiting_on both takes the task out of the waiting-on column.",
                     },
-                    "follow_up_every_days": {
+        "assignee": {
+                        "type": ["string", "null"],
+                        "description": "Who in a shared list does it: a member's email, account id or \"me\" (workspace_shared_lists names them). Null assigns it to nobody. A task assigned to someone else leaves your Today and focus. Refused for a task in a list that isn't shared.",
+                    },
+                                        "follow_up_every_days": {
                         "type": ["integer", "null"],
                         "description": "Chase again every this many days (1 to 365): when the follow-up task is completed while this task is still waiting, its next follow-up is set that many days on, at the same time of day, and the next follow-up is numbered ('Follow up #2 with Sam: ...'). One never completed makes no more. Null or 0 makes it once. Needs a follow-up time: refused on a task with no follow_up_at unless one is passed in the same call.",
                     },

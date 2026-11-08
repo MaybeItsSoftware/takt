@@ -456,6 +456,10 @@ impl Tools {
                         .get("estimate_minutes")
                         .map(|value| as_optional_int(Some(value)))
                         .transpose()?,
+                    // Present-but-null (or empty) assigns it to nobody.
+                    assignee: arguments
+                        .get("assignee")
+                        .map(|value| as_string(Some(value))),
                 };
                 Ok(outcome(
                     "Task updated",

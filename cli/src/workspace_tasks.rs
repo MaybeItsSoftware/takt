@@ -95,6 +95,9 @@ const REPEAT_COLUMNS: &str = "m.waitingFollowUpEveryDays, COALESCE(m.waitingFoll
 const NO_REPEAT_COLUMNS: &str = "NULL, 0";
 const REPEAT_MIGRATION: &str = "v32_follow_up_repeat";
 
+/// What adds who added, finished and holds a task in a shared list.
+const AUTHORSHIP_MIGRATION: &str = "v38_task_authorship";
+
 /// What adds `task_dependencies`. Before it, the dependency reads come back
 /// empty and the dependency writes are refused.
 const DEPENDENCIES_MIGRATION: &str = "v21_task_dependencies";
@@ -329,6 +332,9 @@ pub struct TaskEdit {
     pub priority: Option<Option<i64>>,
     /// How long it takes, in minutes. `Some(None)` clears it.
     pub estimate_minutes: Option<Option<i64>>,
+    /// Who in its shared list does it: an email, an account id or "me".
+    /// `Some(None)` assigns it to nobody.
+    pub assignee: Option<Option<String>>,
 }
 
 impl TaskEdit {
@@ -356,6 +362,7 @@ impl TaskEdit {
             self.start.is_some(),
             self.priority.is_some(),
             self.estimate_minutes.is_some(),
+            self.assignee.is_some(),
         ]
         .iter()
         .filter(|set| **set)
@@ -385,6 +392,9 @@ impl TaskEdit {
         }
         if self.priority.is_some() {
             return "Set Priority";
+        }
+        if self.assignee.is_some() {
+            return "Assign Task";
         }
         match (self.kind.as_deref(), self.pinned) {
             (Some("list"), _) => "Convert to List",
@@ -564,6 +574,12 @@ impl Workspace {
             &mut shown,
         );
 
+        let mut tree = tree;
+        if has_migration(&connection, AUTHORSHIP_MIGRATION)? {
+            for node in &mut tree {
+                attach_sharing(&connection, node)?;
+            }
+        }
         Ok(json!({
             "list": list.to_json(),
             "parent_task_id": parent_task_id,
@@ -634,8 +650,8 @@ impl Workspace {
         if edit.is_empty() {
             return Err(ToolError::new(
                 "No updates provided. Pass title, notes, external_links, status, kanban_column, \
-                 kind, pinned, waiting_on, follow_up_at, follow_up_every_days, due, start, priority and/or \
-                 estimate_minutes.",
+                 kind, pinned, waiting_on, follow_up_at, follow_up_every_days, due, start, priority, \
+                 estimate_minutes and/or assignee.",
             ));
         }
         let title = edit
@@ -789,6 +805,15 @@ impl Workspace {
                     metadata.priority = priority;
                 }
                 takt_core::editor::update_editor_metadata(tx, &task.id, &metadata, now_ms)
+                    .map_err(map_core_error)?;
+            }
+
+            if let Some(assignee) = &edit.assignee {
+                let account = match assignee.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+                    None => None,
+                    Some(who) => Some(resolve_member(tx, &task.list_id, who)?),
+                };
+                takt_core::assignment::assign_task(tx, &task.id, account.as_deref(), now_ms)
                     .map_err(map_core_error)?;
             }
 
@@ -1641,4 +1666,63 @@ fn shared_summary(shared: &takt_core::sync::spaces::SharedList) -> Value {
             "you": member.you,
         })).collect::<Vec<_>>(),
     })
+}
+
+/// A shared list's member by email, account id or "me".
+fn resolve_member(connection: &Connection, list_id: &str, who: &str) -> Result<String> {
+    let shared = takt_core::sync::spaces::shared_list(connection, list_id)
+        .map_err(map_core_error)?
+        .ok_or_else(|| ToolError::new("Only a task in a shared list can be assigned."))?;
+    shared
+        .members
+        .iter()
+        .find(|member| {
+            (who.eq_ignore_ascii_case("me") && member.you)
+                || member.account_id == who
+                || member
+                    .email
+                    .as_deref()
+                    .is_some_and(|email| email.eq_ignore_ascii_case(who))
+        })
+        .map(|member| member.account_id.clone())
+        .ok_or_else(|| {
+            let emails: Vec<String> = shared
+                .members
+                .iter()
+                .filter_map(|member| member.email.clone())
+                .collect();
+            ToolError::new(format!(
+                "{who} isn't in this list. Its people: {}.",
+                emails.join(", ")
+            ))
+        })
+}
+
+/// Adds who added, finished and holds a task in a shared list to its node
+/// and its children's: an email, or "you".
+fn attach_sharing(connection: &Connection, node: &mut Value) -> Result<()> {
+    if let Some(id) = node["id"].as_str().map(str::to_string)
+        && let Some(sharing) =
+            takt_core::assignment::task_sharing(connection, &id).map_err(map_core_error)?
+        && let Some(object) = node.as_object_mut()
+    {
+        for (key, member) in [
+            ("added_by", sharing.created_by),
+            ("completed_by", sharing.completed_by),
+            ("assignee", sharing.assignee),
+        ] {
+            if let Some(member) = member {
+                object.insert(
+                    key.into(),
+                    json!(takt_core::assignment::shared_member_name(member)),
+                );
+            }
+        }
+    }
+    if let Some(children) = node.get_mut("children").and_then(Value::as_array_mut) {
+        for child in children {
+            attach_sharing(connection, child)?;
+        }
+    }
+    Ok(())
 }
