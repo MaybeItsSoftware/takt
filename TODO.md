@@ -183,9 +183,7 @@ Worth an eye from someone who owns the palette:
 
 - SwiftLint's standing warnings. With the Swift Mac app (`Takt/`) retired on
   2026-11-08 the count over `Sources/` is **0 warnings, 0 errors**; the test
-  folders carry `line_length` warnings and one `line_length` error
-  (`corelogic-tests/AgentAntigravityProtocolTests.swift:55`, 420 characters),
-  which fails CI's lint job until it is wrapped. **This is the single place that number
+  folders carry a few advisory `line_length` warnings and no errors. **This is the single place that number
   lives** — `ci.yml` and `ARCHITECTURE_IMPROVEMENT_PLAN.md` point here rather
   than carrying their own copy. Do not add to it;
   `ARCHITECTURE_IMPROVEMENT_PLAN.md` tracks the decomposition that would clear

@@ -52,7 +52,9 @@ final class AgentAntigravityProtocolTests: XCTestCase {
   func testARefusedCallIsAFailedResult() {
     var parser = AgentAntigravityStreamParser()
     let events = parser.events(
-      fromLine: #"{"event":"step_update","step_update":{"conversation_id":"c1","step_index":6,"state":"ERROR","step_type":"tool","tool_name":"call_mcp_tool","duration_seconds":0.03,"tool_info":{"name":"call_mcp_tool","parameters":{"Arguments":{"title":"probe"},"ServerName":"takt","ToolName":"workspace_task_add"},"error":{"type":"TOOL_ERROR","message":"permission check failed for mcp \"takt/workspace_task_add\""}}}}"#
+      fromLine: #"{"event":"step_update","step_update":{"conversation_id":"c1","step_index":6,"state":"ERROR","step_type":"tool","tool_name":"call_mcp_tool","duration_seconds":0.03,"#
+        + #""tool_info":{"name":"call_mcp_tool","parameters":{"Arguments":{"title":"probe"},"ServerName":"takt","ToolName":"workspace_task_add"},"#
+        + #""error":{"type":"TOOL_ERROR","message":"permission check failed for mcp \"takt/workspace_task_add\""}}}}"#
     )
     XCTAssertEqual(
       events,
