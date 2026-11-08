@@ -8,7 +8,7 @@ use super::store::app_support;
 use crate::keys::Bindings;
 use std::path::PathBuf;
 use takt_core::theme::loader::CoreThemeFileSource;
-use takt_core::theme::model::{CoreThemePlatform, CoreThemeSpecification};
+use takt_core::theme::model::{CoreThemeIssueSeverity, CoreThemePlatform, CoreThemeSpecification};
 
 pub fn keymap_path() -> PathBuf {
     app_support().join("keymap.json")
@@ -16,6 +16,39 @@ pub fn keymap_path() -> PathBuf {
 
 pub fn themes_dir() -> PathBuf {
     app_support().join("Themes")
+}
+
+/// Zed's own themes folder, where Zed's theme extensions and hand-made
+/// themes live: `$XDG_CONFIG_HOME/zed/themes`, else `~/.config/zed/themes`.
+/// Takt reads it, never writes it. `TAKT_ZED_THEMES` names another folder,
+/// or, empty, none.
+pub fn zed_themes_dir() -> Option<PathBuf> {
+    if let Some(dir) = std::env::var_os("TAKT_ZED_THEMES") {
+        return (!dir.is_empty()).then(|| PathBuf::from(dir));
+    }
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|d| !d.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+    Some(config.join("zed").join("themes"))
+}
+
+/// Every `.json` in `dir`, named by its file name; nothing if it is missing.
+fn theme_sources(dir: &std::path::Path) -> Vec<CoreThemeFileSource> {
+    std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+                .filter_map(|e| {
+                    Some(CoreThemeFileSource {
+                        name: e.file_name().to_string_lossy().into_owned(),
+                        data: std::fs::read(e.path()).ok()?,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 const KEYMAP_TEMPLATE: &str = r#"// Your own keys, laid over Takt's. The keyboard reference lists every
@@ -83,53 +116,58 @@ impl App {
         self.library.keymap_issues = issues;
     }
 
-    /// The built-in themes and every `.json` in the themes folder.
+    /// The built-in themes, every theme in Zed's themes folder, and every
+    /// `.json` in Takt's own. A Zed theme family gives one theme per
+    /// variant (the core reads Zed's format); a theme in Takt's folder wins
+    /// over one of the same identifier in Zed's.
     pub fn reload_themes(&mut self) {
         let built_ins = takt_core::theme::theme_builtins(CoreThemePlatform::Macos);
-        let sources: Vec<CoreThemeFileSource> = std::fs::read_dir(themes_dir())
-            .map(|entries| {
-                entries
-                    .flatten()
-                    .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
-                    .filter_map(|e| {
-                        Some(CoreThemeFileSource {
-                            name: e.file_name().to_string_lossy().into_owned(),
-                            data: std::fs::read(e.path()).ok()?,
-                        })
-                    })
-                    .collect()
-            })
+        let load = |sources: Vec<CoreThemeFileSource>| {
+            takt_core::theme::theme_load(
+                sources,
+                CoreThemePlatform::Macos,
+                Some(built_ins.clone()),
+                built_ins.first().cloned(),
+            )
+        };
+        let zed = zed_themes_dir()
+            .map(|dir| load(theme_sources(&dir)))
             .unwrap_or_default();
-        let outcomes = takt_core::theme::theme_load(
-            sources,
-            CoreThemePlatform::Macos,
-            Some(built_ins.clone()),
-            built_ins.first().cloned(),
-        );
+        let own = load(theme_sources(&themes_dir()));
         // Zed One is the core's too, for the phones; here it is drawn from
         // Zed's own tokens, so the core's copy is not listed twice.
         let mut themes = vec![Theme::Zed];
         themes.extend(
             built_ins
-                .into_iter()
+                .iter()
                 .filter(|s| s.identifier != ONE)
+                .cloned()
                 .map(|s| Theme::Spec(Box::new(s))),
         );
         let mut issues = Vec::new();
-        for outcome in outcomes {
-            for issue in &outcome.issues {
-                issues.push(format!("{}: {}", outcome.source, issue.message));
-            }
-            match outcome.specification {
-                Some(spec) => {
-                    themes.retain(|t| t.id() != spec.identifier);
-                    themes.push(Theme::Spec(Box::new(spec)));
+        for (folder, outcomes) in [("Zed themes/", zed), ("", own)] {
+            for outcome in outcomes {
+                // Zed's folder is Zed's to keep tidy: only what stops a
+                // theme there loading is worth saying.
+                let errors_only = !folder.is_empty();
+                for issue in &outcome.issues {
+                    if errors_only && issue.severity != CoreThemeIssueSeverity::Error {
+                        continue;
+                    }
+                    issues.push(format!("{folder}{}: {}", outcome.source, issue.message));
                 }
-                None => issues.push(format!(
-                    "{}: skipped, {}",
-                    outcome.source,
-                    outcome.skipped_reason.unwrap_or_default()
-                )),
+                match outcome.specification {
+                    Some(spec) => {
+                        themes.retain(|t| t.id() != spec.identifier);
+                        themes.push(Theme::Spec(Box::new(spec)));
+                    }
+                    None if errors_only => {}
+                    None => issues.push(format!(
+                        "{}: skipped, {}",
+                        outcome.source,
+                        outcome.skipped_reason.unwrap_or_default()
+                    )),
+                }
             }
         }
         self.library.themes = themes;

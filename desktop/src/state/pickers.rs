@@ -331,6 +331,11 @@ impl App {
                             theme.name(),
                             if theme.id() == current {
                                 "in force"
+                            } else if theme
+                                .id()
+                                .starts_with(takt_core::theme::zed::IDENTIFIER_PREFIX)
+                            {
+                                "Zed theme"
                             } else {
                                 ""
                             },
