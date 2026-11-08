@@ -522,6 +522,26 @@ class SyncController(private val container: AppContainer) {
         }
     }
 
+    /**
+     * A shared-list request, signed in: [block] with this device's transport,
+     * its answer or the sentence to show. A refused session signs the device
+     * out, as any other request does.
+     */
+    internal suspend fun <T> sharing(fallback: String, block: suspend (OkHttpSyncTransport, SyncCredentials) -> T): Result<T> {
+        ready.await()
+        val current = active.value ?: return Result.failure(IllegalStateException("Sign in to sync first: shared lists travel through it."))
+        return try {
+            Result.success(block(transport(current.credentials), current.credentials))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: SyncException.Unauthorized) {
+            expire(current.credentials)
+            Result.failure(IllegalStateException("Sign in to sync again."))
+        } catch (error: Exception) {
+            Result.failure(IllegalStateException(message(error, fallback)))
+        }
+    }
+
     /** Signs out of the account. The workspace stays as it is on this device. */
     fun signOut() {
         container.scope.launch {

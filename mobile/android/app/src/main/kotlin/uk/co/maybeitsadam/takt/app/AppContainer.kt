@@ -103,6 +103,9 @@ class AppContainer(
     val commands = TaskCommands(this)
     val clashes = RecurrenceClashes(this)
     val sync = SyncController(this)
+
+    /** Sharing lists with other accounts, through [sync]. */
+    val sharedLists = uk.co.maybeitsadam.takt.settings.SharedLists(this)
     val calendar = GoogleCalendarController(this)
     val reminders = ReminderController(this)
     private val engines = ForegroundEngines(this)

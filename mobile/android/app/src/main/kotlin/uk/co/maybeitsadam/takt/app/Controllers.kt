@@ -84,4 +84,18 @@ class ListsPromptController {
 
     /** The prompt, once: the tree opens it and clears it. */
     fun take(): ListsPrompt? = _pending.value.also { _pending.value = null }
+
+    private val _join = MutableStateFlow<String?>(null)
+
+    /** An invite to join (a followed `takt://join/…` link, or "" from a button): the shell opens the join sheet with it. */
+    val join: StateFlow<String?> = _join.asStateFlow()
+
+    fun requestJoin(text: String) {
+        _join.value = text
+    }
+
+    /** The join sheet closed. */
+    fun clearJoin() {
+        _join.value = null
+    }
 }

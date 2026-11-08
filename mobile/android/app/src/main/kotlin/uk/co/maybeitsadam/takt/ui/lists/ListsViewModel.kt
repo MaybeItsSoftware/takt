@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uk.co.maybeitsadam.takt.app.AppContainer
+import uk.co.maybeitsadam.takt.data.workspace.observeSharedListIds
 import uk.co.maybeitsadam.takt.data.workspace.observeSidebar
 
 /** The Lists tree: folders, lists and nested lists, and every edit to them. */
@@ -28,6 +29,10 @@ class ListsViewModel(private val container: AppContainer) : ViewModel() {
         ListsTreeShaping.shape(data, collapsedIds, archived)
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListsTreeState.Empty)
+
+    /** The lists shared with other accounts, for their icon and menu. */
+    val sharedIds: StateFlow<Set<String>> = container.withSession { it.repository.observeSharedListIds() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     fun toggleFolder(id: String) {
         container.scope.launch {

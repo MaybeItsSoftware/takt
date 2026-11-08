@@ -83,6 +83,7 @@ private sealed interface ListsDialog {
     data class DeleteFolder(val id: String, val name: String) : ListsDialog
     data class MoveList(val id: String, val name: String, val folderId: String?) : ListsDialog
     data class MoveFolder(val id: String, val name: String, val parentId: String?) : ListsDialog
+    data class Share(val id: String, val name: String) : ListsDialog
 }
 
 /**
@@ -197,6 +198,7 @@ private fun ListsTree(
             KeyCommand.LIST_NEW.palette { dialog = ListsDialog.NewList(null) },
             KeyCommand.FOLDER_NEW.palette { dialog = ListsDialog.NewFolder(null) },
             KeyCommand.GO_EVERYTHING.palette { onOpen(null, null) },
+            KeyCommand.LIST_JOIN.palette { container.listsPrompt.requestJoin("") },
         ),
     )
 
@@ -216,6 +218,7 @@ private fun ListsTree(
                 },
         ) {
             TaktTopBar("Lists", sidebar = true) {
+                IconAction(PIcons.Shared, "Join a shared list", onClick = { container.listsPrompt.requestJoin("") })
                 IconAction(PIcons.Folder, "New folder", onClick = { dialog = ListsDialog.NewFolder(null) })
                 IconAction(Icons.Filled.Add, "New list", onClick = { dialog = ListsDialog.NewList(null) })
             }
@@ -314,14 +317,22 @@ private fun TreeRowView(
         )
         is TreeRow.ListRow -> {
             var menu by remember { mutableStateOf(false) }
+            val shared by vm.sharedIds.collectAsStateWithLifecycle()
+            val isShared = row.id in shared
             Box {
                 TreeLine(
-                    title = row.name, icon = if (row.isInbox) PIcons.Inbox else PIcons.ListIcon, depth = row.depth,
+                    title = row.name,
+                    icon = when {
+                        row.isInbox -> PIcons.Inbox
+                        isShared -> PIcons.Shared
+                        else -> PIcons.ListIcon
+                    },
+                    depth = row.depth,
                     count = row.openCount, selected = selectedKey == row.id, muted = row.isCompleted,
                     onClick = { onOpen(row.id, null) }, onLongClick = { menu = true },
                 )
                 PMenu(menu, { menu = false }) {
-                    ListMenu(row, vm, show) { menu = false }
+                    ListMenu(row, isShared, vm, show) { menu = false }
                 }
             }
         }
@@ -430,7 +441,7 @@ private fun TreeLine(
 }
 
 @Composable
-private fun ListMenu(row: TreeRow.ListRow, vm: ListsViewModel, show: (ListsDialog) -> Unit, close: () -> Unit) {
+private fun ListMenu(row: TreeRow.ListRow, isShared: Boolean, vm: ListsViewModel, show: (ListsDialog) -> Unit, close: () -> Unit) {
     fun run(block: () -> Unit): () -> Unit = {
         close()
         block()
@@ -446,8 +457,12 @@ private fun ListMenu(row: TreeRow.ListRow, vm: ListsViewModel, show: (ListsDialo
     PMenuDivider()
     PMenuItem(if (row.isCompleted) "Reopen list" else "Complete list", Icons.Filled.Check, onClick = run { vm.setCompleted(row.id, !row.isCompleted) })
     PMenuItem("Archive", PIcons.Archive, onClick = run { vm.setArchived(row.id, true) })
-    PMenuItem("Convert to task", ListIcons.Nested, onClick = run { vm.convertListToTask(row.id) })
-    PMenuItem("Delete…", Icons.Filled.Delete, destructive = true, onClick = run { show(ListsDialog.DeleteList(row.id, row.name)) })
+    PMenuItem(if (isShared) "Sharing…" else "Share…", PIcons.Shared, onClick = run { show(ListsDialog.Share(row.id, row.name)) })
+    // A shared list is left or unshared from its sharing sheet, not deleted.
+    if (!isShared) {
+        PMenuItem("Convert to task", ListIcons.Nested, onClick = run { vm.convertListToTask(row.id) })
+        PMenuItem("Delete…", Icons.Filled.Delete, destructive = true, onClick = run { show(ListsDialog.DeleteList(row.id, row.name)) })
+    }
 }
 
 @Composable
@@ -491,5 +506,6 @@ private fun ListsDialogHost(dialog: ListsDialog?, vm: ListsViewModel, folders: I
         is ListsDialog.MoveFolder -> ChoiceSheet("Move ${dialog.name} to", folderChoices(dialog.parentId, dialog.id), onDismiss = dismiss) {
             vm.moveFolderTo(dialog.id, it.id)
         }
+        is ListsDialog.Share -> SharedListSheet(dialog.id, dialog.name, onDismiss = dismiss)
     }
 }

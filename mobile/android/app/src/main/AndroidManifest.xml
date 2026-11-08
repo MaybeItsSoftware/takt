@@ -40,6 +40,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="takt" android:host="auth-callback" />
             </intent-filter>
+            <!-- An invite to a shared list: takt://join/<code>, which the
+                 server's /join/<code> page opens. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="takt" android:host="join" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

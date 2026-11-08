@@ -203,6 +203,11 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
         }
     }
 
+    val joining by container.listsPrompt.join.collectAsStateWithLifecycle()
+    joining?.let { text ->
+        uk.co.maybeitsadam.takt.ui.lists.JoinListSheet(text, onDismiss = container.listsPrompt::clearJoin)
+    }
+
     LaunchedEffect(pendingIntent) {
         val intent = pendingIntent ?: return@LaunchedEffect
         when {
@@ -211,6 +216,7 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
                 container.sync.handleAuthRedirect(intent.data!!)
                 navigator.openSettings()
             }
+            intent.data?.scheme == "takt" && intent.data?.host == "join" -> container.listsPrompt.requestJoin(intent.data.toString())
             else -> {
                 intent.getStringExtra(ShellIntents.EXTRA_TAB)?.let { name ->
                     Tab.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }?.let(navigator::openTab)

@@ -84,6 +84,8 @@ enum class KeyCommand(
     LIST_ARCHIVE("listArchive"),
     LIST_COMPLETE("listComplete"),
     LIST_DELETE("listDelete"),
+    LIST_SHARE("listShare"),
+    LIST_JOIN("listJoin"),
     FOLDER_NEW("folderNew"),
     WINDOW_UNDO("windowUndo"),
     WINDOW_REDO("windowRedo"),

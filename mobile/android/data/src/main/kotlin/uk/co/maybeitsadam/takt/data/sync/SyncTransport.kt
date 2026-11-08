@@ -118,6 +118,13 @@ class OkHttpSyncTransport(
         send(endpoint("v1/account/delete")) { post(EMPTY_OBJECT.toRequestBody(JSON)) }
     }
 
+    /**
+     * Any other request to the server, signed in: the shared-list calls
+     * (`docs/sync.md`, "Shared lists"), whose paths and bodies the core makes.
+     */
+    suspend fun request(method: String, path: String, body: String? = null): String =
+        send(endpoint(path)) { method(method, body?.toRequestBody(JSON) ?: if (method == "POST") EMPTY_OBJECT.toRequestBody(JSON) else null) }
+
     private fun endpoint(path: String): HttpUrl = serverURL.trim().toHttpUrl().newBuilder().addPathSegments(path).build()
 
     /** The answer's body, after one refresh and retry on a 401. */

@@ -140,7 +140,7 @@ class SyncStore(private val database: WorkspaceDatabase) {
     private companion object {
         /** Every table a sync write can change: the synced ones and sync's own. */
         val SYNC_TABLES: Set<String> = WorkspaceSchema.syncedTables.map { it.first }.toSet() +
-            setOf("sync_state", "sync_control", "sync_outbox", "change_log")
+            setOf("sync_state", "sync_control", "sync_outbox", "change_log", "sync_spaces")
     }
 }
 
