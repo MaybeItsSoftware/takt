@@ -888,9 +888,15 @@ async fn what_a_shared_space_refuses(pool: PgPool) {
     };
     let task = json!({"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(1, "x"),
                       "values": {"title": "x"}, "space": space});
+    // A stranger's change is skipped, not refused: a device just removed from
+    // a list mustn't be stuck retrying it.
     assert_eq!(
         refused(stranger.clone(), task.clone()).await,
-        StatusCode::FORBIDDEN
+        StatusCode::OK
+    );
+    assert!(
+        ids(&server.changes(&owner, "since=0").await).is_empty(),
+        "and nothing was written"
     );
     assert_eq!(
         refused(
@@ -919,8 +925,8 @@ async fn what_a_shared_space_refuses(pool: PgPool) {
                    "space": space})
         )
         .await,
-        StatusCode::FORBIDDEN,
-        "a member leaves rather than deletes"
+        StatusCode::OK,
+        "a member leaves rather than deletes: skipped"
     );
     // Only the owner invites, and a member can't share the list as theirs.
     let (status, _) = server
@@ -992,7 +998,8 @@ async fn leaving_removal_and_stopping_sharing(pool: PgPool) {
             ),
         )
         .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "a leaver can't write to it");
+    assert_eq!(status, StatusCode::OK, "a leaver's change is skipped");
+    assert!(ids(&server.changes(&owner, "since=0").await).is_empty());
 
     // Back in by a new invite, then the owner stops sharing.
     let invite = server

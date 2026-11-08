@@ -100,15 +100,23 @@ fn validate(change: WireChange) -> Result<(Option<Uuid>, Change)> {
     ))
 }
 
+/// What to do with a change for a shared space the caller named.
+enum Shared {
+    Write,
+    /// Not written, and not an error: the caller was removed from the list,
+    /// or a member's device deleted the list itself, and only finds out on
+    /// its next pull. Refusing the batch would leave that device retrying it
+    /// for ever; skipping lets the pull put it right.
+    Skip(&'static str),
+}
+
 /// Whether the caller may write `change` into the shared space they named:
 /// they are in it, the row is one a shared list holds, and deleting the list
 /// itself is the owner's. A list's rows can't be smuggled into another
 /// list's space: the list row and its instructions must be that list's.
-fn check_shared(membership: Option<&spaces::Membership>, change: &Change) -> Result<()> {
+fn check_shared(membership: Option<&spaces::Membership>, change: &Change) -> Result<Shared> {
     let Some(membership) = membership else {
-        return Err(AppError::Forbidden(
-            "you aren't in that shared list any more".into(),
-        ));
+        return Ok(Shared::Skip("not a member"));
     };
     if !spaces::SHARED_TABLES.contains(&change.table.as_str()) {
         return Err(AppError::BadRequest(format!(
@@ -123,9 +131,7 @@ fn check_shared(membership: Option<&spaces::Membership>, change: &Change) -> Res
             ));
         }
         "task_lists" if matches!(change.op, Op::Delete) && membership.role != "owner" => {
-            return Err(AppError::Forbidden(
-                "only the list's owner can delete it; leave it instead".into(),
-            ));
+            return Ok(Shared::Skip("a member deleting the list"));
         }
         "agent_instructions" if change.id != format!("list:{}", membership.list_id) => {
             return Err(AppError::BadRequest(
@@ -134,7 +140,7 @@ fn check_shared(membership: Option<&spaces::Membership>, change: &Change) -> Res
         }
         _ => {}
     }
-    Ok(())
+    Ok(Shared::Write)
 }
 
 pub async fn push(
@@ -158,19 +164,24 @@ pub async fn push(
     let memberships = spaces::memberships(&mut *tx, account).await?;
     // Checked before anything is written, so a batch is applied whole or
     // refused whole.
-    let changes = changes
-        .into_iter()
-        .map(|(space, change)| {
-            let space = match space {
-                Some(space) if space != account => {
-                    check_shared(memberships.get(&space), &change)?;
-                    space
+    let received = changes.len();
+    let mut skipped = 0usize;
+    let mut accepted = Vec::with_capacity(received);
+    for (space, change) in changes {
+        match space {
+            Some(space) if space != account => {
+                match check_shared(memberships.get(&space), &change)? {
+                    Shared::Write => accepted.push((space, change)),
+                    Shared::Skip(why) => {
+                        skipped += 1;
+                        tracing::info!(%account, %space, table = %change.table, why, "skipped a shared change");
+                    }
                 }
-                _ => account,
-            };
-            Ok((space, change))
-        })
-        .collect::<Result<Vec<_>>>()?;
+            }
+            _ => accepted.push((account, change)),
+        }
+    }
+    let changes = accepted;
 
     let mut written = BTreeSet::new();
     for (space, change) in &changes {
@@ -193,9 +204,9 @@ pub async fn push(
     tx.commit().await?;
 
     let written = written.len();
-    tracing::info!(%device, %account, received = changes.len(), spaces = written, cursor, "push");
+    tracing::info!(%device, %account, received, skipped, spaces = written, cursor, "push");
     Ok(Json(PushResponse {
-        accepted: changes.len(),
+        accepted: received,
         cursor,
     }))
 }
