@@ -34,6 +34,8 @@ import uk.co.maybeitsadam.takt.core.WorkspaceTask
 import uk.co.maybeitsadam.takt.data.workspace.FieldEdit
 import uk.co.maybeitsadam.takt.data.workspace.TaskDependencies
 import uk.co.maybeitsadam.takt.data.workspace.TaskSearchResult
+import uk.co.maybeitsadam.takt.data.workspace.assignTask
+import uk.co.maybeitsadam.takt.data.workspace.taskSharing
 import uk.co.maybeitsadam.takt.data.workspace.addBlocker
 import uk.co.maybeitsadam.takt.data.workspace.observeTaskDependencies
 import uk.co.maybeitsadam.takt.data.workspace.removeBlocker
@@ -298,6 +300,19 @@ class TaskInspectorViewModel(private val container: AppContainer) : ViewModel() 
     }
 
     /** Stops the task waiting on [blockerId], as one "Remove Blocker" step. */
+    /** Who added, finished and holds the task, when it is in a shared list. */
+    suspend fun sharing(id: String): uniffi.takt_core.TaskSharing? =
+        container.repository().taskSharing(id)
+
+    /** Assigns the task to a member of its shared list, or to nobody. */
+    fun assign(accountId: String?, then: () -> Unit = {}) {
+        val id = taskId.value ?: return
+        container.undo.perform {
+            it.assignTask(id, accountId)
+            then()
+        }
+    }
+
     fun removeBlocker(blockerId: String) {
         val id = taskId.value ?: return
         container.undo.perform { it.removeBlocker(id, blockerId) }

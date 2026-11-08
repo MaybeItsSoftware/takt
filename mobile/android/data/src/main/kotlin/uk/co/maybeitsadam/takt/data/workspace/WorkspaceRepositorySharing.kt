@@ -30,3 +30,11 @@ suspend fun WorkspaceRepository.forgetSharedSpace(spaceId: String, stoppedSharin
 /** The ids of the lists that are shared, for the tree's icons and menus. */
 fun WorkspaceRepository.observeSharedListIds(): Flow<Set<String>> =
     database.observe(setOf("sync_spaces")) { db -> db.strings("SELECT listId FROM sync_spaces").toSet() }
+
+/** Who added, finished and holds a task in a shared list; null for a task in a list of your own. */
+suspend fun WorkspaceRepository.taskSharing(taskId: String): uniffi.takt_core.TaskSharing? = coreRead { it.taskSharing(taskId) }
+
+/** Assigns a task in a shared list to a member, or to nobody, as one undo step. */
+suspend fun WorkspaceRepository.assignTask(taskId: String, accountId: String?) {
+    coreWrite { it.assignTask(taskId, accountId, java.time.Instant.now().toEpochMilli()) }
+}

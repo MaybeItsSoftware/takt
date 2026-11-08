@@ -144,6 +144,7 @@ internal fun InspectorBody(
         ConditionsSection(vm, values, around, problem(TaskEditorField.MINIMUM_BLOCK), problem(TaskEditorField.SINGLE_SITTING), edit)
         TodaySection(vm, values, draft, around, edit)
         WaitingSection(vm, task, around, today, zone)
+        SharingSection(vm, task)
         BlockedBySection(vm, task, around)
         LinksSection(values, edit)
         PlacementSection(vm, around)
