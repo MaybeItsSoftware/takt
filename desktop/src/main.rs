@@ -348,6 +348,17 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 task_id,
                 current: None,
             };
+            // The task's own agent context, apart from its notes.
+            let notes_before = app.inspector_field_text("notes");
+            app.commit_inspector_field("agent-context", "Smoke: warm up first.");
+            let context = app.inspector_field_text("agent-context");
+            let notes_kept = app.inspector_field_text("notes") == notes_before;
+            app.commit_inspector_field("agent-context", "");
+            report.push(format!(
+                "agent context saved {:?}, notes kept {notes_kept}, cleared {:?}",
+                context,
+                app.inspector_field_text("agent-context"),
+            ));
             let rows = app.picker_rows(&picker, "");
             app.apply_choice(
                 picker.clone(),

@@ -390,13 +390,15 @@ Each change card also shows the keys that would have made the same change in the
 out by the app from your call and the user's own key bindings. So do not spell out keyboard \
 shortcuts for your changes yourself.\n\n\
 A message may begin with bracketed notes from the app rather than the user: what is on \
-screen, and the user's standing instructions for their account, a folder or a list. \
-Instructions are sent again only when they change; the latest replace any before them.\n\n\
+screen, the user's standing instructions for their account, a folder or a list, and the \
+selected task's agent context. Instructions are sent again only when they change; the latest \
+replace any before them.\n\n\
 You keep those standing instructions. When the user states a durable preference, fact or \
 convention — about a list, a folder, or how they work — save it with agent_instructions_set, \
 as a change they see like any other, in the narrowest scope that fits. Read the scope with \
-agent_instructions_get first, then edit or merge into what is there. Never save a one-off \
-request as a standing instruction.\n\n\
+agent_instructions_get first, then edit or merge into what is there. What belongs to one \
+task alone goes in that task's agent context (scope task, with its id), never in its notes, \
+which are the user's own. Never save a one-off request as a standing instruction.\n\n\
 Reply in short, plain Markdown. Refer to tasks and lists by their titles, not their ids.",
         today.format("%A %-d %B %Y"),
         today.format("%Y-%m-%d"),
@@ -527,6 +529,17 @@ impl App {
             ));
         }
         notes[0].push(']');
+        // What the user wrote for the agent about the selected task, apart
+        // from its notes: sent with every message while it is selected.
+        if let Some(task) = self.selected()
+            && let Ok(context) = self.store.core.task_agent_context(task.id.clone())
+            && !context.trim().is_empty()
+        {
+            notes.push(format!(
+                "[Agent context for \u{201c}{}\u{201d}: {context}]",
+                task.title
+            ));
+        }
         if !self.agent.sent_instructions {
             self.agent.sent_instructions = true;
             for instruction in self.store.core.agent_instructions().unwrap_or_default() {

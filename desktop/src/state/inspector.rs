@@ -102,6 +102,8 @@ impl Stop {
             "minimum-block" => "timer",
             "single-sitting" => "armchair",
             "notes" => "text",
+            "agent-context" => "sparkles",
+            "list-context" => "sparkles",
             "priority" => "flag",
             "tags" => "tag",
             "move" => "list",
@@ -392,6 +394,42 @@ impl App {
             .map(|list| list.name.clone())
             .unwrap_or_default();
         let mut stops = stops(&snapshot, &task, &list, self.focus_session.is_some());
+        // What the agent is told about the task, and about its list: each
+        // its own field, apart from the notes, and none while AI is off.
+        if !self.prefs.ai_off
+            && let Some(at) = stops.iter().position(|s| s.id == "notes")
+        {
+            let core = &self.store.core;
+            let own = core.task_agent_context(task.id.clone()).unwrap_or_default();
+            let of_list = core
+                .agent_instructions()
+                .unwrap_or_default()
+                .into_iter()
+                .find(|i| {
+                    i.kind == takt_core::agent_instructions::AgentInstructionKind::List
+                        && i.id.as_deref() == Some(task.list_id.as_str())
+                })
+                .map(|i| i.text)
+                .unwrap_or_default();
+            stops.insert(
+                at + 1,
+                Stop::new(
+                    "agent-context",
+                    "Agent context",
+                    StopKind::Text { multiline: true },
+                )
+                .value(Some(own), "Add agent context"),
+            );
+            stops.insert(
+                at + 2,
+                Stop::new(
+                    "list-context",
+                    "List agent context",
+                    StopKind::Text { multiline: true },
+                )
+                .value(Some(of_list), &format!("Add agent context for {list}")),
+            );
+        }
         if let Some(stop) = stops.iter_mut().find(|s| s.id == "links")
             && !stop.empty
         {
@@ -619,6 +657,7 @@ impl App {
                 self.edit_planning(|planning| planning.requires_single_sitting = None)
             }
             "notes" => self.edit_selected(|edit| edit.notes.clear()),
+            "agent-context" | "list-context" => self.set_agent_context(stop.id, ""),
             "commit" => {
                 if let Some(id) = self.selected_task.clone()
                     && let Some(c) = self.commitment_of(&id)
@@ -661,6 +700,27 @@ impl App {
         match stop {
             "title" => snapshot.title,
             "notes" => snapshot.notes,
+            "agent-context" => self
+                .store
+                .core
+                .task_agent_context(snapshot.task_id.clone())
+                .unwrap_or_default(),
+            "list-context" => self
+                .selected()
+                .map(|t| t.list_id.clone())
+                .and_then(|list_id| {
+                    self.store
+                        .core
+                        .agent_instructions()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .find(|i| {
+                            i.kind == takt_core::agent_instructions::AgentInstructionKind::List
+                                && i.id.as_deref() == Some(list_id.as_str())
+                        })
+                })
+                .map(|i| i.text)
+                .unwrap_or_default(),
             "estimate" => snapshot
                 .estimate_seconds
                 .map(|s| editor_minutes_text(s, true))
@@ -682,6 +742,33 @@ impl App {
         }
     }
 
+    /// Saves the task's agent context, or its list's, as one undo step.
+    fn set_agent_context(&mut self, stop: &str, text: &str) {
+        let Some(task) = self.selected().cloned() else {
+            return;
+        };
+        let text = text.trim().to_string();
+        let now = now_ms();
+        let saved = if stop == "list-context" {
+            let list = task.list_id.clone();
+            self.write(|s| {
+                s.core.set_agent_instructions(
+                    takt_core::agent_instructions::AgentInstructionKind::List,
+                    Some(list),
+                    text,
+                    false,
+                    now,
+                )
+            })
+        } else {
+            let id = task.id.clone();
+            self.write(|s| s.core.set_task_agent_context(id, text, false, now))
+        };
+        if saved.is_some() {
+            self.message = Some("Agent context saved.".into());
+        }
+    }
+
     /// The field closed with Return: save what was typed.
     pub fn commit_inspector_field(&mut self, stop: &str, text: &str) {
         let trimmed = text.trim();
@@ -695,6 +782,8 @@ impl App {
                 let notes = text.trim_end().to_string();
                 self.edit_selected(|edit| edit.notes = notes);
             }
+            "agent-context" => self.set_agent_context(stop, text),
+            "list-context" => self.set_agent_context(stop, text),
             "estimate" | "minimum-block" => match editor_parse_minutes(trimmed.into()) {
                 Ok(seconds) => {
                     if stop == "estimate" {
