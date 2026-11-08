@@ -7,6 +7,7 @@
 //! in the keychain; a token for another client ID is dropped, not sent.
 
 pub mod calendar;
+pub mod drive;
 pub mod tasks;
 
 use crate::sync::{http, keychain};
@@ -22,9 +23,17 @@ pub const CALENDAR_SCOPES: [&str; 2] = [
     "https://www.googleapis.com/auth/calendar.readonly",
 ];
 pub const TASKS_SCOPES: [&str; 1] = ["https://www.googleapis.com/auth/tasks"];
+/// The Drive files the person picks in Google's Picker, and no others: a
+/// non-sensitive scope, so no yearly security assessment (docs/links.md).
+pub const DRIVE_FILE_SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
+/// What Drive search asked for before the Picker: every file's name and
+/// type. Restricted, so never asked for again; a grant that has it is
+/// revoked at the next sign-in so it drops off.
+pub const LEGACY_DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.metadata.readonly";
 
 const AUTHORIZE: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN: &str = "https://oauth2.googleapis.com/token";
+const REVOKE: &str = "https://oauth2.googleapis.com/revoke";
 const CALLBACK_PATH: &str = "/google-oauth-callback";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,7 +48,7 @@ pub struct Token {
 }
 
 impl Token {
-    fn has(&self, scopes: &[&str]) -> bool {
+    pub fn has(&self, scopes: &[&str]) -> bool {
         let granted: BTreeSet<&str> = self.scopes.split([' ', ',']).collect();
         scopes.iter().all(|scope| granted.contains(scope))
     }
@@ -78,6 +87,22 @@ pub fn connected() -> bool {
 
 pub fn disconnect() {
     keychain::clear("google");
+}
+
+/// The sign-in still holds the restricted Drive scope from before the
+/// Picker: connecting again sheds it.
+pub fn holds_legacy_drive() -> bool {
+    token().is_some_and(|t| t.has(&[LEGACY_DRIVE_SCOPE]))
+}
+
+/// Tells Google to drop this client's whole grant, then forgets the token.
+fn revoke(token: &Token) {
+    let _ = http::form(
+        REVOKE,
+        &[("token", &token.refresh_token)],
+        Duration::from_secs(15),
+    );
+    disconnect();
 }
 
 /// The Swift app's client ID, for a first prefill.
@@ -170,13 +195,23 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
     let redirect = format!("http://127.0.0.1:{port}{CALLBACK_PATH}");
     let (verifier, challenge) = crate::sync::auth::pkce();
     let state = uuid::Uuid::new_v4().simple().to_string();
-    let mut wanted: BTreeSet<String> = scopes.iter().map(|s| s.to_string()).collect();
+    let mut wanted: BTreeSet<String> = scopes
+        .iter()
+        .filter(|s| **s != LEGACY_DRIVE_SCOPE)
+        .map(|s| s.to_string())
+        .collect();
+    // A grant with the restricted Drive scope can't be narrowed: Google
+    // adds every scope granted before to a new consent. So it is revoked,
+    // and this sign-in asks afresh for what is wanted now.
+    if let Some(old) = token().filter(|t| t.has(&[LEGACY_DRIVE_SCOPE])) {
+        revoke(&old);
+    }
     if let Some(token) = token().filter(|t| t.client_id == client_id) {
         wanted.extend(
             token
                 .scopes
                 .split(' ')
-                .filter(|s| !s.is_empty())
+                .filter(|s| !s.is_empty() && *s != LEGACY_DRIVE_SCOPE)
                 .map(str::to_string),
         );
     }

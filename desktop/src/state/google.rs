@@ -101,6 +101,7 @@ impl App {
         if std::env::var_os("TAKT_DESKTOP_SMOKE").is_some() || self.google.wake.is_some() {
             return;
         }
+        self.tell_drive_legacy_once();
         let (sender, receiver) = mpsc::channel::<bool>();
         self.google.wake = Some(sender.clone());
         let core = self.store.core.clone();

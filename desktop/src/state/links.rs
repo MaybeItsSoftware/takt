@@ -1,13 +1,19 @@
-//! What the link picker (`pl`) searches beyond a pasted address: the notes
-//! and folders in this Mac's Obsidian vaults, and Google Drive by name when
-//! that is switched on (`docs/links.md`, `NativeLinksPlugin.swift`,
-//! `ObsidianVaultIndex.swift`, `GoogleDriveSearch.swift`).
+//! What the link picker (`pl`) offers beyond a pasted address: the notes
+//! and folders in this Mac's Obsidian vaults, and Google Drive when Drive
+//! linking is switched on (`docs/links.md`).
 //!
 //! The vaults are the ones Obsidian lists in its own `obsidian.json`, plus
 //! any added in Settings. The index is a walk of their Markdown and canvas
 //! files and folders, dot-folders skipped, made each time the picker opens.
-//! Drive is searched on a thread a moment after typing stops; its answer is
-//! kept against the text it was for, and the picker redrawn.
+//!
+//! Drive is reached through the `drive.file` scope, which sees only the
+//! files picked in Google's Picker (`google::drive`), so "Pick from Google
+//! Drive…" is how a file is first linked. After that the picker finds it by
+//! name two ways: among the Drive links the workspace already holds, which
+//! needs no Google access, and by Drive's own `files.list`, which with
+//! `drive.file` answers only for files granted before. That is searched on
+//! a thread a moment after typing stops; its answer is kept against the
+//! text it was for, and the picker redrawn.
 
 use super::App;
 use crate::google;
@@ -15,9 +21,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// Reading Drive file names and types, never contents. A restricted scope,
-/// so asked for only once Drive search is switched on.
-pub const DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.metadata.readonly";
+/// The files picked in Google's Picker, and no others.
+pub const DRIVE_SCOPE: &str = google::DRIVE_FILE_SCOPE;
 /// The most entries one vault contributes.
 const ENTRY_LIMIT: usize = 20_000;
 /// The most vault rows the picker shows for one query.
@@ -49,7 +54,18 @@ pub struct Links {
     pub vaults: Vec<PathBuf>,
     pub entries: Vec<Candidate>,
     drive: Arc<Mutex<Drive>>,
+    /// The workspace's Drive links, read once each time the picker opens.
+    known: Mutex<Option<Vec<Candidate>>>,
+    /// Files picked in the browser, for the task they were picked for,
+    /// waiting for the app to link them (`take_drive_picks`).
+    picked: Arc<Mutex<Vec<DrivePick>>>,
 }
+
+/// The files picked for one task.
+type DrivePick = (String, Vec<google::drive::Picked>);
+
+/// The `Event::Menu` that says Drive picks are waiting.
+pub const DRIVE_PICKED: &str = "drive-picked";
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|p| p.into_inner())
@@ -191,6 +207,19 @@ fn drive_candidates(body: &str) -> Result<Vec<Candidate>, String> {
         .collect())
 }
 
+/// A token for Drive, signing in first (and shedding the old restricted
+/// scope) when the sign-in doesn't allow it yet.
+fn drive_token(client_id: &str, scopes: &[&str]) -> Result<String, String> {
+    match google::access_token(client_id, &[DRIVE_SCOPE], "Google Drive") {
+        Ok(token) => Ok(token),
+        Err(google::GoogleError::SignIn(_)) => {
+            google::connect(client_id, scopes)?;
+            google::access_token(client_id, &[DRIVE_SCOPE], "Google Drive").map_err(|e| e.message())
+        }
+        Err(error) => Err(error.message()),
+    }
+}
+
 fn search_drive(client_id: &str, text: &str) -> Result<Vec<Candidate>, String> {
     let token =
         google::access_token(client_id, &[DRIVE_SCOPE], "Google Drive").map_err(|e| e.message())?;
@@ -223,20 +252,179 @@ impl App {
                 .is_some_and(|token| token.scopes.split(' ').any(|s| s == DRIVE_SCOPE))
     }
 
-    /// The picker's rows for `query` from the vaults and Drive: Drive's
-    /// answer for this text if it has come, else a search started for it.
+    /// Drive linking is switched on in Settings → Links.
+    pub fn drive_linking_on(&self) -> bool {
+        self.prefs.links_drive_search && self.plugin_on(super::plugins::Plugin::GoogleDrive)
+    }
+
+    /// The Picker's API key: Settings', else `TAKT_GOOGLE_API_KEY`; empty
+    /// when neither is set, and then Drive linking isn't set up.
+    pub fn google_api_key(&self) -> String {
+        self.prefs
+            .google_api_key
+            .clone()
+            .filter(|k| !k.trim().is_empty())
+            .or_else(|| std::env::var("TAKT_GOOGLE_API_KEY").ok())
+            .map(|k| k.trim().to_string())
+            .unwrap_or_default()
+    }
+
+    pub fn set_google_api_key(&mut self, text: &str) {
+        let text = text.trim();
+        self.prefs.google_api_key = (!text.is_empty()).then(|| text.to_string());
+        self.prefs.save();
+    }
+
+    /// Once, when the sign-in still holds the restricted Drive scope from
+    /// before the Picker: says that connecting again drops it.
+    pub fn tell_drive_legacy_once(&mut self) {
+        if self.prefs.links_drive_legacy_told || !google::holds_legacy_drive() {
+            return;
+        }
+        self.prefs.links_drive_legacy_told = true;
+        self.prefs.save();
+        self.message = Some(
+            "Drive linking now uses Google's file picker and no longer reads your whole Drive. \
+             Choose Connect Google in Settings once to drop the old access."
+                .into(),
+        );
+    }
+
+    /// Every Drive link in the workspace, by name: what the picker finds
+    /// without asking Google. Read once per opening of the picker.
+    fn known_drive_links(&self) -> Vec<Candidate> {
+        let mut known = lock(&self.links.known);
+        if let Some(found) = known.as_ref() {
+            return found.clone();
+        }
+        let mut found: Vec<Candidate> = Vec::new();
+        for task_id in self.store.core.linked_task_ids().unwrap_or_default() {
+            for link in self.store.core.task_links(task_id).unwrap_or_default() {
+                if link.kind != takt_core::links::LinkKind::Drive
+                    || found.iter().any(|c| c.url == link.url)
+                {
+                    continue;
+                }
+                found.push(Candidate {
+                    search: link.title.clone(),
+                    url: link.url,
+                    title: link.title,
+                    subtitle: link.subtitle,
+                    mime_type: link.mime_type,
+                });
+            }
+        }
+        *known = Some(found.clone());
+        found
+    }
+
+    /// The next opening of the picker reads the workspace's Drive links again.
+    pub fn forget_known_drive_links(&self) {
+        *lock(&self.links.known) = None;
+    }
+
+    /// Opens Google's Picker in the browser for `task_id`, signing in first
+    /// when the sign-in doesn't allow Drive yet; the files come back through
+    /// `take_drive_picks`.
+    pub fn pick_drive(&mut self, task_id: &str) {
+        let key = self.google_api_key();
+        let client = self.google_client_id();
+        if key.is_empty() {
+            self.message = Some(
+                "Drive linking isn't set up: add the Google Picker API key in Settings → Links."
+                    .into(),
+            );
+            return;
+        }
+        if client.trim().is_empty() {
+            self.message = Some("Set the Google OAuth client ID in Settings first.".into());
+            return;
+        }
+        let Some(app_id) = google::drive::project_number(&client) else {
+            self.message = Some(
+                "The Google client ID should start with the project's number (…-….apps.googleusercontent.com)."
+                    .into(),
+            );
+            return;
+        };
+        let picked = self.links.picked.clone();
+        let task_id = task_id.to_string();
+        self.message = Some("Choose the files in the browser…".into());
+        std::thread::spawn(move || {
+            let mut scopes: Vec<&str> = google::CALENDAR_SCOPES.to_vec();
+            scopes.extend(google::TASKS_SCOPES);
+            scopes.push(DRIVE_SCOPE);
+            let result = drive_token(&client, &scopes)
+                .and_then(|token| google::drive::pick(&token, &key, &app_id));
+            match result {
+                Ok(files) if files.is_empty() => {
+                    crate::sync::announce("Nothing linked from Drive.", false)
+                }
+                Ok(files) => {
+                    lock(&picked).push((task_id, files));
+                    crate::platform::push(crate::platform::Event::Menu(DRIVE_PICKED.into()));
+                }
+                Err(error) => crate::sync::announce(&error, false),
+            }
+        });
+    }
+
+    /// Links the files picked in the browser, each as its own "Add Link".
+    pub fn take_drive_picks(&mut self) {
+        let waiting = std::mem::take(&mut *lock(&self.links.picked));
+        let now = super::store::now_ms();
+        let mut linked = 0;
+        for (task_id, files) in waiting {
+            for file in files {
+                if self
+                    .write(|s| {
+                        s.core.add_task_link(
+                            task_id.clone(),
+                            file.url,
+                            Some(file.name),
+                            file.mime_type,
+                            now,
+                        )
+                    })
+                    .is_some()
+                {
+                    linked += 1;
+                }
+            }
+            self.patch_details(&task_id);
+        }
+        self.forget_known_drive_links();
+        if linked > 0 {
+            self.message = Some(match linked {
+                1 => "Linked from Drive.".to_string(),
+                n => format!("Linked {n} files from Drive."),
+            });
+        }
+    }
+
+    /// The picker's rows for `query` from the vaults and Drive: the Drive
+    /// links the workspace holds, then Drive's answer for this text if it
+    /// has come, else a search started for it.
     pub fn link_candidates(&self, query: &str) -> (Vec<Candidate>, Vec<Candidate>, Option<String>) {
         let query = query.trim();
         if query.is_empty() {
+            self.forget_known_drive_links();
             return (Vec::new(), Vec::new(), None);
         }
         let notes = rank(&self.links.entries, query);
+        let known = rank(&self.known_drive_links(), query);
         if !self.drive_search_ready() {
-            return (notes, Vec::new(), None);
+            return (notes, known, None);
         }
         let mut drive = lock(&self.links.drive);
         if drive.answered == query {
-            return (notes, drive.found.clone(), drive.error.clone());
+            let mut found = known;
+            for file in &drive.found {
+                if !found.iter().any(|c| c.url == file.url) {
+                    found.push(file.clone());
+                }
+            }
+            return (notes, found, drive.error.clone());
         }
         if drive.asked != query {
             drive.asked = query.to_string();
@@ -268,7 +456,7 @@ impl App {
                 crate::platform::push(crate::platform::Event::Sync { workspace: false });
             });
         }
-        (notes, Vec::new(), None)
+        (notes, known, None)
     }
 
     pub fn links_rows(&self) -> Vec<(&'static str, &'static str, &'static str, String)> {
@@ -287,12 +475,21 @@ impl App {
             "Off".to_string()
         } else if self.google_client_id().is_empty() {
             "On · set a Google client ID".to_string()
-        } else if self.drive_search_ready() {
+        } else if self.google_api_key().is_empty() {
+            "On · not set up: add the Picker API key".to_string()
+        } else if google::holds_legacy_drive() {
+            "On · connect Google again to drop the old Drive access".to_string()
+        } else if self.drive_search_ready() || !google::connected() {
             "On".to_string()
-        } else if google::connected() {
-            "On · connect Google again to allow it".to_string()
         } else {
-            "On · connect Google".to_string()
+            "On · Google asks when you first pick".to_string()
+        };
+        let key = if self.prefs.google_api_key.is_some() {
+            "Set".to_string()
+        } else if !self.google_api_key().is_empty() {
+            "From TAKT_GOOGLE_API_KEY".to_string()
+        } else {
+            "Not set".to_string()
         };
         vec![
             (
@@ -310,9 +507,10 @@ impl App {
             (
                 "links-drive",
                 "Links",
-                "Search Google Drive in the link picker",
+                "Link Google Drive files you pick",
                 drive,
             ),
+            ("links-drive-key", "Links", "Google Picker API key", key),
         ]
     }
 
@@ -330,12 +528,14 @@ impl App {
             "links-drive" => {
                 self.prefs.links_drive_search = !self.prefs.links_drive_search;
                 self.prefs.save();
-                if self.prefs.links_drive_search
-                    && google::connected()
-                    && !self.drive_search_ready()
-                {
-                    self.message = Some("Choose Connect Google to let Takt search Drive.".into());
+                if self.prefs.links_drive_search && self.google_api_key().is_empty() {
+                    self.message =
+                        Some("Add the Google Picker API key to finish setting up Drive.".into());
                 }
+            }
+            "links-drive-key" => {
+                self.ask(super::ask::Ask::GooglePickerKey);
+                return true;
             }
             _ => return false,
         }

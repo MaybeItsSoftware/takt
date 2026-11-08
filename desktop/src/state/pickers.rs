@@ -98,6 +98,8 @@ pub enum Choice {
         title: String,
         mime_type: Option<String>,
     },
+    /// Google's Drive Picker, in the browser, for files to link.
+    PickDrive,
     OpenLink(String),
     RemoveLink(String),
     Waiting(String),
@@ -577,6 +579,16 @@ impl App {
         if let Some(error) = drive_error {
             rows.push(row("Google Drive", error, Choice::Nothing));
         }
+        // Whether anything but the Drive row is offered: none means the
+        // task's own links are what the query is matched against.
+        let offered = !rows.is_empty();
+        if self.drive_linking_on() {
+            rows.push(row(
+                "Pick from Google Drive\u{2026}",
+                "Google's file picker, in the browser",
+                Choice::PickDrive,
+            ));
+        }
         if found {
             return rows;
         }
@@ -602,7 +614,7 @@ impl App {
                 ]
             })
             .collect();
-        rows.extend(ranked(existing, if rows.is_empty() { query } else { "" }));
+        rows.extend(ranked(existing, if offered { "" } else { query }));
         rows
     }
 
@@ -872,6 +884,7 @@ impl App {
                     self.message = Some("Linked.".into());
                 }
             }
+            (Picker::Link { task_id }, Choice::PickDrive) => self.pick_drive(&task_id),
             (Picker::Link { .. }, Choice::OpenLink(url)) => open_address(&url),
             (Picker::Link { task_id }, Choice::RemoveLink(url)) => {
                 if self

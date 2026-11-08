@@ -326,6 +326,7 @@ impl Takt {
                     self.open_requested_windows(cx);
                 }
                 "quit" => cx.quit(),
+                crate::state::links::DRIVE_PICKED => self.app.take_drive_picks(),
                 "pick-google-calendar" => {
                     self.app
                         .open_picker(crate::state::pickers::Picker::GoogleCalendar);
