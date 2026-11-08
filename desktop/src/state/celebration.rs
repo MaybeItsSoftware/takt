@@ -68,6 +68,9 @@ impl Style {
 
 impl App {
     pub fn celebration_style(&self) -> Style {
+        if !self.plugin_on(super::plugins::Plugin::Celebration) {
+            return Style::None;
+        }
         self.prefs
             .celebration
             .as_deref()

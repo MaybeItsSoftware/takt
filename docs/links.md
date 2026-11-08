@@ -64,8 +64,10 @@ task's links.
 
 The Rust app (`desktop/`, installed as `Takt.app`) does the same in
 `desktop/src/state/links.rs`: the picker searches the vaults' notes and
-folders as you type, and Drive by name when Settings → Links → "Search Google
-Drive in the link picker" is on. Its vault folders added by hand and the
+folders as you type, and Drive by name when Settings → Plugins → Google
+Drive → "Search Google Drive in the link picker" is on. The vaults are the
+Obsidian plugin and Drive the Google Drive plugin; either switched off
+leaves the picker. Its vault folders added by hand and the
 Drive switch are its own settings (`desktop.json`). The Swift app's version is
 `Takt/Plugins/Native/Links/` (`NativeLinksPlugin`), with a settings page for
 the vaults and Drive search.
@@ -95,8 +97,8 @@ Console steps (project `takt-511416`), only if Drive search is wanted:
 1. APIs & Services → Library → **Google Drive API** → Enable.
 2. OAuth consent screen → Data access → Add scope →
    `.../auth/drive.metadata.readonly`.
-3. In Takt: Settings → Links → switch on Drive search, then sign in to Google
-   again (an existing sign-in does not grow new scopes).
+3. In Takt: Settings → Plugins → switch on Google Drive, then its Drive
+   search, then sign in to Google again (an existing sign-in does not grow new scopes).
 
 `drive.metadata.readonly` is a **restricted** scope: an app in production
 using it needs Google's verification (and possibly a security assessment).

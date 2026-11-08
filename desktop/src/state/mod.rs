@@ -34,6 +34,7 @@ pub mod menubar;
 pub mod navigation;
 pub mod outline;
 pub mod pickers;
+pub mod plugins;
 pub mod prefs;
 pub mod reminders;
 pub mod repeat;
@@ -405,6 +406,7 @@ impl App {
         app.adopt_swift_celebration();
         app.adopt_shared_theme();
         app.adopt_finished_tasks_leave();
+        app.seed_plugins();
         app.start_google();
         Ok(app)
     }

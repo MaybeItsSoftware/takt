@@ -3,6 +3,7 @@
 //! seconds after local writes go quiet, and their settings rows. The
 //! passes themselves are `crate::google`'s.
 
+use super::plugins::Plugin;
 use super::{App, Overlay};
 use crate::google::{self, CALENDAR_SCOPES, TASKS_SCOPES};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
@@ -81,8 +82,8 @@ impl App {
     fn google_config(&self) -> Config {
         Config {
             client_id: self.google_client_id(),
-            calendar: self.prefs.google_calendar,
-            tasks: self.prefs.google_tasks,
+            calendar: self.prefs.google_calendar && self.plugin_on(Plugin::GoogleCalendar),
+            tasks: self.prefs.google_tasks && self.plugin_on(Plugin::GoogleTasks),
         }
     }
 
@@ -137,7 +138,7 @@ impl App {
         }
     }
 
-    fn google_now(&mut self) {
+    pub(super) fn google_now(&mut self) {
         *lock(&self.google.config) = self.google_config();
         if let Some(wake) = &self.google.wake {
             let _ = wake.send(true);
@@ -229,7 +230,7 @@ impl App {
                 let client = self.google_client_id();
                 let mut scopes: Vec<&str> = CALENDAR_SCOPES.to_vec();
                 scopes.extend(TASKS_SCOPES);
-                if self.prefs.links_drive_search {
+                if self.prefs.links_drive_search && self.plugin_on(Plugin::GoogleDrive) {
                     scopes.push(super::links::DRIVE_SCOPE);
                 }
                 self.message = Some("Finish connecting Google in the browser…".into());

@@ -218,6 +218,7 @@ impl App {
 
     pub fn drive_search_ready(&self) -> bool {
         self.prefs.links_drive_search
+            && self.plugin_on(super::plugins::Plugin::GoogleDrive)
             && google::token()
                 .is_some_and(|token| token.scopes.split(' ').any(|s| s == DRIVE_SCOPE))
     }

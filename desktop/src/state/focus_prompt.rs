@@ -398,6 +398,9 @@ impl App {
     /// A finished task, marked: the celebration the Swift app plays, here
     /// a line in the status bar saying what it closed.
     pub fn celebrate(&mut self, task_id: &str) {
+        if !self.plugin_on(super::plugins::Plugin::Celebration) {
+            return;
+        }
         let title = self
             .store
             .core

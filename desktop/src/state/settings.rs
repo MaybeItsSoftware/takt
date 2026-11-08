@@ -7,6 +7,7 @@
 
 use super::Editing;
 use super::pickers::Picker;
+use super::plugins::{self, Plugin};
 use super::{App, Overlay};
 use crate::platform::hotkeys::{self, Hotkey};
 
@@ -35,22 +36,26 @@ pub const CATEGORIES: [(&str, &str); 8] = [
     ("Keyboard", "keyboard"),
     ("Focus", "timer"),
     ("Sync", "refresh"),
-    ("Integrations", "plug"),
+    ("Plugins", "plug"),
     ("AI", "sparkles"),
     ("Advanced", "wrench"),
 ];
 
 /// The groups too small for a category of their own: each is a headed
 /// section of the category it sits under, in this order after the
-/// category's own settings.
-const SECTIONS: [(&str, &str); 7] = [
-    ("Completion", "General"),
+/// category's own settings. Under Plugins, the category's own settings are
+/// the plugins' switches, and each section one plugin's settings.
+const SECTIONS: [(&str, &str); 10] = [
     ("Reminders", "General"),
     ("Shared lists", "Sync"),
-    ("Google", "Integrations"),
-    ("Checkvist", "Integrations"),
-    ("Links", "Integrations"),
-    ("MCP", "AI"),
+    (plugins::GOOGLE_ACCOUNT, "Plugins"),
+    ("Google Calendar", "Plugins"),
+    ("Google Tasks", "Plugins"),
+    ("Google Drive", "Plugins"),
+    ("Checkvist", "Plugins"),
+    ("Obsidian", "Plugins"),
+    ("MCP", "Plugins"),
+    ("Celebration", "Plugins"),
 ];
 
 /// The category a row's group is shown under.
@@ -133,7 +138,7 @@ fn button_label(id: &str) -> Option<&'static str> {
 
 impl SettingRow {
     pub fn control(&self) -> Control {
-        if SWITCHES.contains(&self.id.as_str()) {
+        if SWITCHES.contains(&self.id.as_str()) || self.id.starts_with("plugin:") {
             let value = self.value.as_str();
             let on = value.starts_with("On") || value.starts_with("At ");
             let note = match value.split_once(" · ") {
@@ -230,6 +235,9 @@ impl SettingRow {
                 "Shared with you. Leaving takes it off your devices; the others keep it."
             }
             member if member.starts_with("member:") => "Take them out of the list.",
+            plugin if plugin.starts_with("plugin:") => {
+                Plugin::from_id(&plugin["plugin:".len()..]).map_or("", Plugin::description)
+            }
             _ => "",
         }
     }
@@ -485,9 +493,17 @@ impl App {
         }
     }
 
-    /// Rows the integrations add: sync, Google, Checkvist, the agent, MCP,
-    /// the daily log. Each is the platform module's to describe.
+    /// Rows the integrations add: sync, then each plugin's switch and,
+    /// for those switched on, their own settings under their name. Each is
+    /// the platform module's to describe; the page only files them.
     fn integration_settings(&self) -> Vec<SettingRow> {
+        let google = self.any_google_plugin_on();
+        let plugin_rows = self.plugins_shown().into_iter().map(|plugin| SettingRow {
+            id: format!("plugin:{}", plugin.id()),
+            group: "Plugins",
+            title: plugin.name().into(),
+            value: on(self.plugin_on(plugin)),
+        });
         self.platform_settings()
             .into_iter()
             .map(|(id, group, title, value)| SettingRow {
@@ -496,6 +512,7 @@ impl App {
                 title: title.into(),
                 value,
             })
+            .chain(plugin_rows)
             .chain(
                 self.shared_list_rows()
                     .into_iter()
@@ -517,6 +534,20 @@ impl App {
                         value,
                     }),
             )
+            .filter_map(|mut row| {
+                if let Some(plugin) = Plugin::of_row(&row.id) {
+                    if !self.plugin_on(plugin) {
+                        return None;
+                    }
+                    row.group = plugin.name();
+                } else if plugins::is_google_account_row(&row.id) {
+                    if !google {
+                        return None;
+                    }
+                    row.group = plugins::GOOGLE_ACCOUNT;
+                }
+                Some(row)
+            })
             .collect()
     }
 
@@ -533,6 +564,12 @@ impl App {
             "keymap-reload" => return self.reload_keymap(),
             "diagnostics" => return self.open_overlay(Overlay::Diagnostics),
             "quick-capture-list" => return self.open_picker(Picker::CaptureList),
+            plugin if plugin.starts_with("plugin:") => {
+                if let Some(plugin) = Plugin::from_id(&plugin["plugin:".len()..]) {
+                    self.toggle_plugin(plugin);
+                }
+                return self.open_overlay(Overlay::Settings);
+            }
             "confirm-delete" => p.confirm_delete = !p.confirm_delete,
             "key-hints" => p.hide_key_hints = !p.hide_key_hints,
             "ai-off" => {

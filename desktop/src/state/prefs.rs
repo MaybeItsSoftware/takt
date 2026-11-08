@@ -69,8 +69,14 @@ pub struct Prefs {
     pub adopted_swift: bool,
     /// Vault folders added by hand, beyond the ones Obsidian lists.
     pub links_obsidian_vaults: Vec<String>,
-    /// The link picker searches Google Drive by name.
+    /// Drive linking is on: the link picker offers Google's Picker and
+    /// finds the files picked before by name. The name is from when it
+    /// searched all of Drive.
     pub links_drive_search: bool,
+    /// The Google Picker's API key (a browser key), else `TAKT_GOOGLE_API_KEY`.
+    pub google_api_key: Option<String>,
+    /// The sign-in's restricted Drive scope was pointed out once.
+    pub links_drive_legacy_told: bool,
     /// The completion celebration (`celebration::Style`), once chosen or
     /// carried over from the Swift app.
     pub celebration: Option<String>,
@@ -87,6 +93,9 @@ pub struct Prefs {
     pub ai_off: bool,
     /// Key hints drawn beside the controls that have a key.
     pub hide_key_hints: bool,
+    /// Which built-in plugins are on, by `plugins::Plugin::id`; one not
+    /// named is seeded at launch from whether it is in use.
+    pub plugins: HashMap<String, bool>,
 }
 
 impl Default for Prefs {
@@ -137,12 +146,15 @@ impl Default for Prefs {
             adopted_swift: false,
             links_obsidian_vaults: Vec::new(),
             links_drive_search: false,
+            google_api_key: None,
+            links_drive_legacy_told: false,
             celebration: None,
             celebration_sound: false,
             finished_tasks_leave: false,
             theme_shared: false,
             ai_off: false,
             hide_key_hints: false,
+            plugins: HashMap::new(),
         }
     }
 }
