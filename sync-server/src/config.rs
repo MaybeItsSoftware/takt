@@ -1,6 +1,6 @@
 use std::env;
 
-/// The process's settings, all from the environment, as Railway provides them.
+/// The process's settings, all from the environment, as Cloud Run provides them.
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,

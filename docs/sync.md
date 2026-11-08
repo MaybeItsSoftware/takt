@@ -3,7 +3,7 @@
 Priority's workspace is a local SQLite database on every device. The Mac, the
 iPhone and the Android phone each keep a full copy and work offline. Sync
 copies row changes between them through one small server (`sync-server/`,
-hosted on Railway). The server stores rows and merges them; it knows nothing
+on Google Cloud Run, with its rows in the Supabase project's Postgres). The server stores rows and merges them; it knows nothing
 about tasks.
 
 The client half is the Rust core's (`core/src/sync.rs`): the outbox, the
@@ -11,7 +11,8 @@ cycle's push body and the pulled pages (`core/src/sync/wire.rs`, with the
 server's own structs from `takt-sync-rules`), the clock, applying a pull, and
 reading a typed server address (`core/src/sync/endpoints.rs`). The Mac and
 iPhone (`Sources/TaktSync`) and Android (`mobile/android/data`) keep only the
-transport: HTTP, the Supabase token and the long poll, moving bodies the core
+transport: HTTP, the Supabase token and waiting for news (a Realtime channel,
+or the long poll), moving bodies the core
 made and handing back pages as the server sent them. The Rust CLI syncs
 passively: it never talks to the server, but its writes go through the same
 triggers, so they sync the next time the app does.
@@ -472,8 +473,46 @@ Re-applying your own row is harmless. It also returns the cursor to resume
 from. If there is nothing to send and `wait > 0` (at most 25), the request
 waits for new rows, woken through Postgres `LISTEN/NOTIFY`.
 
+The long poll is the fallback. Cloud Run bills every second a request is
+open, so a device holding one all day cost money while nothing changed; where
+the server says Realtime is on (below), devices wait there instead.
+
 ### `GET /health`
-Returns `200 {"ok":true}`.
+Returns `200 {"ok":true,"realtime":<bool>}`. Unauthenticated. `realtime`
+says how a device should wait for other devices' changes.
+
+### News on Supabase Realtime
+
+When `realtime` is true, every push that writes at least one row also
+broadcasts, inside its transaction, on the account's **private** Realtime
+channel `sync:<account id>`:
+
+```json
+{ "event": "changed", "payload": { "cursor": 1234 } }
+```
+
+It means only "there is something to pull"; the rows still come from
+`/v1/changes`. The pushing device hears its own broadcast too, which costs
+one empty pull.
+
+A device joins `realtime:sync:<account id>` on the app's Supabase project
+(`wss://<ref>.supabase.co/realtime/v1/websocket?apikey=<publishable
+key>&vsn=1.0.0`) with `config.private = true` and its Supabase access token.
+The policy the server keeps on `realtime.messages`
+(`sync-server/src/realtime.rs`) lets a signed-in user read only the channel
+named after their own id. The server makes it at boot, and reports
+`realtime: false` if it can't, or if the database has no `realtime` schema
+(plain Postgres, self-hosting).
+
+While joined, a device:
+- pulls once on joining, for whatever was sent while it wasn't listening;
+- pulls on every `changed`;
+- hands the channel a fresh token when it refreshes its session (or rejoins);
+- still runs a cycle every five minutes, in case a message was lost.
+
+If it can't connect or join, it long-polls as before and retries the channel
+with backoff. The websocket's heartbeats go to Supabase, not to the server,
+so an idle device costs the server nothing.
 
 ## A client sync cycle
 
@@ -528,7 +567,8 @@ Returns `200 {"ok":true}`.
    - These writes run with recording on, so they sync.
 
 When it runs: when the app comes to the foreground, 2 s after the last local write,
-in a long-poll loop while the app is in front, and in background refresh.
+when the Realtime channel says there is news (or, without it, in a long-poll
+loop while the app is in front), and in background refresh.
 
 ## Server storage (Postgres)
 

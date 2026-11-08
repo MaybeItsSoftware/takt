@@ -166,7 +166,7 @@ first call across the boundary, which is what the two version tests catch.
 
 ### Phones and sync
 
-The iPhone app (`mobile/ios`, XcodeGen) and the Android app (`mobile/android`, Gradle) share the workspace with the Mac through `sync-server/` (Railway). The protocol is `docs/sync.md`. The theme format and its per-platform rules are in `docs/themes.md`. The shared fixtures they're held to are `cli/src/fixtures/workspace_schema.sql` and `shared/themes/`.
+The iPhone app (`mobile/ios`, XcodeGen) and the Android app (`mobile/android`, Gradle) share the workspace with the Mac through `sync-server/`, which runs on Google Cloud Run (service `takt-sync`, project `takt-511416`, europe-west1, behind `api.takt.maybeitssoftware.co.uk`) against the Supabase project's Postgres; Railway is retired. `scripts/deploy_sync_server.sh` deploys it. Cloud Run bills only while a request is open, so nothing may hold one open while idle: the apps learn of news from a Supabase Realtime broadcast (`sync:<account id>`) the server sends on every push, and fall back to the long-poll only where Realtime is unavailable. The protocol is `docs/sync.md`. The theme format and its per-platform rules are in `docs/themes.md`. The shared fixtures they're held to are `cli/src/fixtures/workspace_schema.sql` and `shared/themes/`.
 
 - **Schema changes** are one change, in the Rust core, and every client picks it up: the Mac and iPhone through `WorkspaceStore.init`, Android through `WorkspaceDatabase.open`. Add the migration at the end of `MIGRATIONS` in `core/src/schema/mod.rs` with its SQL file beside it. If it adds or removes a column on a journalled or synced table, call `triggers::reinstall` at the end of it. Then regenerate the fixture (`scripts/dump_workspace_schema.sh`) and commit it; the core's, the CLI's and Android's tests all check against it. Identifiers are permanent: a database records which ones it ran.
 - **Theme format changes** go into the Rust core, `core/src/theme/`; `Sources/TaktCore/Theming` and Android's `core/theme` only wrap it. Then run the core's gates, rerun `TAKT_REGENERATE_THEMES=1 swift test --filter ThemeConformance` and commit the regenerated `shared/themes`. Android must still pass every conformance case.
@@ -195,7 +195,7 @@ cargo clippy --manifest-path sync-server/Cargo.toml --workspace --all-targets --
 cargo fmt --manifest-path sync-server/Cargo.toml --all --check
 ```
 
-`sync-server/rules/` (`takt-sync-rules`) is the clock and the merge, and the Rust core depends on it, so a change there also needs the core's and clients' gates above. It sits inside `sync-server/` because Railway builds from that directory alone.
+`sync-server/rules/` (`takt-sync-rules`) is the clock and the merge, and the Rust core depends on it, so a change there also needs the core's and clients' gates above. It sits inside `sync-server/` because Cloud Run builds from that directory alone.
 
 ## Working Loop
 

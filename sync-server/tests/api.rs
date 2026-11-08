@@ -46,6 +46,7 @@ struct Server {
 }
 
 async fn server(pool: PgPool) -> Server {
+    let realtime = takt_sync_server::realtime::prepare(&pool).await;
     let changes = notify::spawn_listener(&pool).await.expect("listen");
     let (stop, shutdown) = watch::channel(false);
     let admin = Arc::new(FakeAdmin::default());
@@ -55,6 +56,7 @@ async fn server(pool: PgPool) -> Server {
         admin: Some(admin.clone()),
         changes,
         shutdown,
+        realtime,
     };
     Server {
         app: router(state),
@@ -185,7 +187,7 @@ async fn health_answers_ok(pool: PgPool) {
     let server = server(pool).await;
     let (status, body) = server.call("GET", "/health", None, None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({"ok": true}));
+    assert_eq!(body, json!({"ok": true, "realtime": false}));
 }
 
 #[sqlx::test(migrator = "MIGRATOR")]
@@ -609,4 +611,92 @@ async fn every_route_but_health_needs_a_valid_token(pool: PgPool) {
         )
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+/// Gives a plain Postgres the corner of Supabase's `realtime` schema the
+/// server touches: `realtime.send` records what it was asked to broadcast.
+async fn fake_supabase_realtime(pool: &PgPool) {
+    sqlx::raw_sql(
+        r#"
+        DO $$ BEGIN CREATE ROLE authenticated NOLOGIN;
+        EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END $$;
+        CREATE SCHEMA realtime;
+        CREATE SCHEMA auth;
+        CREATE TABLE realtime.messages (
+          topic TEXT, event TEXT, payload JSONB, private BOOLEAN, extension TEXT);
+        ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+        CREATE FUNCTION realtime.topic() RETURNS TEXT LANGUAGE sql STABLE
+          AS $f$ SELECT current_setting('realtime.topic', true) $f$;
+        CREATE FUNCTION auth.uid() RETURNS UUID LANGUAGE sql STABLE
+          AS $f$ SELECT NULL::uuid $f$;
+        CREATE FUNCTION realtime.send(payload JSONB, event TEXT, topic TEXT, private BOOLEAN DEFAULT true)
+          RETURNS void LANGUAGE sql
+          AS $f$ INSERT INTO realtime.messages VALUES (topic, event, payload, private, 'broadcast') $f$;
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("fake realtime");
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn without_realtime_a_push_broadcasts_nothing_and_health_says_long_poll(pool: PgPool) {
+    let server = server(pool).await;
+    let (_, body) = server.call("GET", "/health", None, None).await;
+    assert_eq!(body["realtime"], false);
+    let (_, mac) = server.sign_up("me@example.com", "Mac").await;
+    server
+        .push(
+            &mac,
+            json!([{"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(1000, "mac"), "values": {"title": "a"}}]),
+        )
+        .await;
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn a_push_that_writes_broadcasts_on_the_accounts_channel(pool: PgPool) {
+    fake_supabase_realtime(&pool).await;
+    let server = server(pool.clone()).await;
+
+    let (_, body) = server.call("GET", "/health", None, None).await;
+    assert_eq!(
+        body["realtime"], true,
+        "the policy was made and health says so"
+    );
+    let policies: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pg_policies WHERE schemaname = 'realtime' AND policyname = $1",
+    )
+    .bind(takt_sync_server::realtime::POLICY)
+    .fetch_one(&pool)
+    .await
+    .expect("policies");
+    assert_eq!(policies, 1);
+
+    let (_, mac) = server.sign_up("me@example.com", "Mac").await;
+    let account = server.users.lock().expect("lock")["me@example.com"];
+    let batch = json!([
+        {"table": "tasks", "id": "T1", "op": "upsert", "hlc": hlc(1000, "mac"), "values": {"title": "a"}},
+    ]);
+    let pushed = server.push(&mac, batch.clone()).await;
+    // Nothing new: no row written, so nobody is woken.
+    server.push(&mac, batch).await;
+
+    let sent: Vec<(String, String, Value, bool)> =
+        sqlx::query_as("SELECT topic, event, payload, private FROM realtime.messages")
+            .fetch_all(&pool)
+            .await
+            .expect("messages");
+    assert_eq!(
+        sent,
+        vec![(
+            format!("sync:{account}"),
+            "changed".to_owned(),
+            json!({"cursor": pushed["cursor"]}),
+            true
+        )]
+    );
+
+    // A second boot finds the policy rather than making another.
+    let again = takt_sync_server::realtime::prepare(&pool).await;
+    assert!(again);
 }

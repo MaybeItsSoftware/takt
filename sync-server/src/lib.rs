@@ -18,8 +18,9 @@ pub use takt_sync_rules::merge;
 pub mod notify;
 pub mod pages;
 pub mod push;
+pub mod realtime;
 
-use axum::extract::DefaultBodyLimit;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::routing::{get, post};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
@@ -31,7 +32,7 @@ use tower_http::trace::TraceLayer;
 
 /// A first sync pushes every row a device has in batches of 500; this leaves
 /// room for wide rows (long notes) without letting one request eat the memory
-/// of a small Railway container.
+/// of a small container.
 const BODY_LIMIT: usize = 10 * 1024 * 1024;
 
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
@@ -49,6 +50,9 @@ pub struct AppState {
     /// Flips to true on SIGTERM so long-polls answer at once rather than
     /// holding the shutdown up for their full 25 seconds.
     pub shutdown: watch::Receiver<bool>,
+    /// Pushes broadcast on the account's Supabase Realtime channel, and
+    /// `/health` tells the apps to listen there. See `realtime.rs`.
+    pub realtime: bool,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -73,6 +77,8 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-async fn health() -> Json<Value> {
-    Json(json!({ "ok": true }))
+/// `realtime` tells an app whether to wait for news on the account's
+/// Realtime channel or by long-polling `/v1/changes`.
+async fn health(State(state): State<AppState>) -> Json<Value> {
+    Json(json!({ "ok": true, "realtime": state.realtime }))
 }

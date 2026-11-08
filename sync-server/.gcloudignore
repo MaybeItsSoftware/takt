@@ -1,0 +1,9 @@
+# What `gcloud run deploy --source` leaves behind (scripts/deploy_sync_server.sh).
+# The Dockerfile copies only Cargo.*, rules, migrations, static and src.
+.gcloudignore
+.git
+.env
+target/
+rules/target/
+supabase/
+tests/

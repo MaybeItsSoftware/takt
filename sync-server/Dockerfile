@@ -1,5 +1,6 @@
-# The sync server, for Railway. Build context is this directory (Railway's
-# Root Directory is `sync-server`), so nothing outside it is copied.
+# The sync server, for Cloud Run (scripts/deploy_sync_server.sh) or
+# docker-compose. Build context is this directory, so nothing outside it is
+# copied.
 
 FROM rust:1-slim AS builder
 WORKDIR /build
@@ -34,6 +35,6 @@ COPY --from=builder /build/target/release/takt-sync-server /usr/local/bin/takt-s
 USER priority
 ENV PORT=8080
 EXPOSE 8080
-# Exec form, so the server is PID 1 and receives Railway's SIGTERM itself; it
+# Exec form, so the server is PID 1 and receives Cloud Run's SIGTERM itself; it
 # handles it with a graceful shutdown that answers open long-polls first.
 CMD ["/usr/local/bin/takt-sync-server"]

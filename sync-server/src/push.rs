@@ -5,6 +5,7 @@ use crate::auth::{Caller, DEVICE_HEADER};
 use crate::error::{AppError, Result};
 use crate::merge::{self, Change, Op, Outcome, StoredRow};
 use crate::notify::CHANNEL;
+use crate::realtime;
 use axum::extract::State;
 use axum::{Extension, Json};
 use serde_json::{Map, Value};
@@ -129,6 +130,18 @@ pub async fn push(
     .bind(account)
     .fetch_one(&mut *tx)
     .await?;
+    if written > 0 && state.realtime {
+        // Rides the transaction, like the NOTIFY: Realtime reads it from the
+        // log once the push commits, and never if it rolls back.
+        // `realtime.send` catches its own errors, so a Realtime outage costs
+        // the nudge, not the push.
+        sqlx::query("SELECT realtime.send(jsonb_build_object('cursor', $1::bigint), $2, $3, true)")
+            .bind(cursor)
+            .bind(realtime::EVENT)
+            .bind(realtime::topic(account))
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
 
     tracing::info!(%device, %account, received = changes.len(), written, cursor, "push");

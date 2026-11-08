@@ -4,13 +4,13 @@ use std::time::Duration;
 use takt_sync_server::auth::Verifier;
 use takt_sync_server::config::Config;
 use takt_sync_server::devices::{AccountAdmin, SupabaseAdmin};
-use takt_sync_server::{AppState, MIGRATOR, notify, router};
+use takt_sync_server::{AppState, MIGRATOR, notify, realtime, router};
 use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // JSON lines, because Railway's log viewer indexes the fields.
+    // JSON lines, because Cloud Logging indexes the fields.
     tracing_subscriber::fmt()
         .json()
         .with_env_filter(
@@ -64,6 +64,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("migrations applied");
 
     let changes = notify::spawn_listener(&pool).await?;
+    let realtime = realtime::prepare(&pool).await;
+    tracing::info!(realtime, "realtime nudges");
     let (stop, shutdown) = watch::channel(false);
     let state = AppState {
         pool,
@@ -71,6 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         admin,
         changes,
         shutdown,
+        realtime,
     };
 
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", config.port)).await?;
@@ -85,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// SIGTERM is what Railway sends on redeploy; ctrl-c is for running locally.
+/// SIGTERM is what Cloud Run sends on redeploy; ctrl-c is for running locally.
 async fn shutdown_signal() {
     let ctrl_c = async {
         if let Err(error) = tokio::signal::ctrl_c().await {

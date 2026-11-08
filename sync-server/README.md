@@ -17,6 +17,7 @@ see [`docs/self-hosting.md`](../docs/self-hosting.md).
 | `src/push.rs` | `POST /v1/push`: one transaction per push, serialised by an advisory lock |
 | `src/changes.rs` | `GET /v1/changes`: the paged feed and its long-poll |
 | `src/notify.rs` | `LISTEN rows_changed`, fanned out to waiting long-polls |
+| `src/realtime.rs` | The Supabase Realtime broadcast a push sends, and the access policy that lets an account's devices hear it |
 | `src/auth.rs` | Checking the Supabase access token each request carries |
 | `src/devices.rs` | Registering a device, the account's devices, signing out, deleting an account |
 | `migrations/` | The Postgres schema, applied at boot |
@@ -75,7 +76,10 @@ docker build .
 
 ## Deploying
 
-Takt's own: Railway, from this directory; see the comments in `railway.toml`.
+Takt's own: Google Cloud Run, service `takt-sync` in project `takt-511416`
+(europe-west1), with `api.takt.maybeitssoftware.co.uk` mapped to it, built from
+this directory by `../scripts/deploy_sync_server.sh`. Its database is the
+Supabase project's Postgres, through the session pooler.
 
 Anyone else's: `docker-compose.yml` here runs the server with a Postgres of
 its own, and Caddy for HTTPS behind the `tls` profile (`.env.example` lists
