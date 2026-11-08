@@ -1174,8 +1174,8 @@ impl Takt {
         div()
             .flex_none()
             .flex()
-            // The bottom dock spans the window; the side docks keep their
-            // width and run its height.
+            // The bottom dock spans the centre; the side docks keep their
+            // width and run the window's height.
             .when(matches!(pane, Pane::Bottom), |d| d.w_full().flex_col())
             .on_mouse_down(
                 gpui::MouseButton::Left,
@@ -1244,6 +1244,8 @@ impl Render for Takt {
             .child(self.title_bar(t, cx))
             .when(settings, |d| d.child(self.settings_page(t, cx)))
             .when(!settings, |d| {
+                let bottom = (self.app.prefs.bottom_dock_visible)
+                    .then(|| self.bottom_dock(t, cx).into_any_element());
                 d.child(
                     div()
                         .flex_1()
@@ -1253,39 +1255,48 @@ impl Render for Takt {
                             let dock = self.left_dock(t, cx);
                             d.child(self.pane(Pane::Left, dock, cx))
                         })
+                        // The bottom dock sits under the centre, between the
+                        // side docks, as Zed's does: they run the full height.
                         .child(
                             div()
-                                .id("centre")
                                 .flex_1()
                                 .min_w_0()
                                 .flex()
-                                .on_mouse_down(
-                                    gpui::MouseButton::Left,
-                                    cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
-                                        this.focus_pane(Pane::Centre, cx);
-                                    }),
+                                .flex_col()
+                                .child(
+                                    div()
+                                        .id("centre")
+                                        .flex_1()
+                                        .min_w_0()
+                                        .flex()
+                                        .on_mouse_down(
+                                            gpui::MouseButton::Left,
+                                            cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
+                                                this.focus_pane(Pane::Centre, cx);
+                                            }),
+                                        )
+                                        .on_mouse_down(
+                                            gpui::MouseButton::Right,
+                                            cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
+                                                this.app.open_pane_menu(
+                                                    f32::from(e.position.x),
+                                                    f32::from(e.position.y),
+                                                );
+                                                cx.notify();
+                                            }),
+                                        )
+                                        .min_h_0()
+                                        .child(self.centre(t, cx)),
                                 )
-                                .on_mouse_down(
-                                    gpui::MouseButton::Right,
-                                    cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
-                                        this.app.open_pane_menu(
-                                            f32::from(e.position.x),
-                                            f32::from(e.position.y),
-                                        );
-                                        cx.notify();
-                                    }),
-                                )
-                                .child(self.centre(t, cx)),
+                                .when_some(bottom, |d, dock| {
+                                    d.child(self.pane(Pane::Bottom, dock, cx))
+                                }),
                         )
                         .when_some(inspector, |d, stops| {
                             let dock = self.right_dock(t, stops, cx).into_any_element();
                             d.child(self.pane(Pane::Right, dock, cx))
                         }),
                 )
-                .when(self.app.prefs.bottom_dock_visible, |d| {
-                    let dock = self.bottom_dock(t, cx).into_any_element();
-                    d.child(self.pane(Pane::Bottom, dock, cx))
-                })
                 .child(self.status_bar(t, cx))
             })
             .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
