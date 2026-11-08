@@ -50,6 +50,19 @@ import uk.co.maybeitsadam.takt.ui.theme.parseHexColor
  */
 @Composable
 internal fun CalendarSection(calendar: GoogleCalendarController) {
+    // The integrations under one heading, as the Mac's Settings → Plugins.
+    // Google Calendar is the one this phone has.
+    Column(verticalArrangement = Arrangement.spacedBy(Metrics.md)) {
+        Text(
+            "Plugins", style = TaktTheme.type.heading, color = TaktTheme.colors.ink,
+            modifier = Modifier.testTag("settings_plugins"),
+        )
+        GoogleCalendarPlugin(calendar)
+    }
+}
+
+@Composable
+private fun GoogleCalendarPlugin(calendar: GoogleCalendarController) {
     val scope = rememberCoroutineScope()
     val connected by calendar.connected.collectAsStateWithLifecycle()
     val needsConsent by calendar.needsConsent.collectAsStateWithLifecycle()
