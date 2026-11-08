@@ -13,7 +13,7 @@ A ranked Today list, an outline, a board, focus timers, dailies, and a command l
 | --- | --- |
 | **Source** | [github.com/MaybeItsSoftware/takt](https://github.com/MaybeItsSoftware/takt) — open source under the [GNU AGPL-3.0](LICENSE) |
 | **Open source** | Every app, the CLI and the sync server, under the [GNU AGPL-3.0](LICENSE) — no ads, no tracking. The apps are free and work offline with no account |
-| **Sync** | [Host it yourself](docs/self-hosting.md) with the server in this repo, with every feature, or use Takt's hosted server |
+| **Sync** | [Host it yourself](docs/self-hosting.md) with the server in this repo, free and with every feature, or use Takt's hosted server for £1 a year (Takt Sync, bought in the iPhone or Android app; one purchase covers every device) |
 | **Platforms** | macOS 15.6+, iPhone and iPad, Android and Wear OS, and a terminal CLI |
 | **For AI agents** | [`llms.txt`](site/llms.txt) and an [MCP server](docs/mcp-server.md) over the whole workspace |
 | **Website** | [maybeitssoftware.github.io/takt](https://maybeitssoftware.github.io/takt/) |

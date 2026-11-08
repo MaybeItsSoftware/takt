@@ -10,7 +10,10 @@ if sync or analytics change, change these.
   with its contact line filled in at serve time; change both together.
 - **Bundle / package id:** `uk.co.maybeitssoftware.takt` on both stores
 - **Category:** Productivity
-- **Price:** free, no in-app purchases, no ads
+- **Price:** free to download, no ads. One in-app purchase: **Takt Sync**,
+  an auto-renewing yearly subscription (`takt_sync_yearly`, £1 a year; Apple
+  price tier nearest £1 in the UK, the same in Play), for syncing through
+  Takt's hosted server. Both stores' listings must declare it.
 
 ## Shared text
 
@@ -57,10 +60,12 @@ EVERYWHERE
 • Themes: three built in, or make your own from three colours
 • Widgets, and a quick-add shortcut
 
-OPEN SOURCE AND FREE
+OPEN SOURCE
 • Open source under the GNU AGPL-3.0:
   github.com/MaybeItsSoftware/takt
-• Sync between your devices is free, and you can self-host it for free
+• Everything works on one device, free, with no account
+• Sync through Takt's server: Takt Sync, £1 a year, one purchase for every
+  device on your account. Or host the server yourself and sync for free
 
 No ads, no tracking, no analytics.
 ```
