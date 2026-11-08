@@ -297,8 +297,12 @@ impl App {
     }
 
     /// `h` on an open parent folds it; on anything else goes to its parent.
+    /// `←` in the outline: fold the subtasks, else step out to the parent,
+    /// else (at the top level, or with nothing to stand on) back to the
+    /// sidebar, as `←` past the board's first column does.
     pub fn fold_or_ascend(&mut self) {
         let Some(index) = self.selected_index() else {
+            self.focus_region(super::Region::Sidebar);
             return;
         };
         let row = &self.rows[index];
@@ -313,7 +317,9 @@ impl App {
             && self.rows.iter().any(|r| r.task.id == parent)
         {
             self.selected_task = Some(parent);
+            return;
         }
+        self.focus_region(super::Region::Sidebar);
     }
 
     pub fn set_all_folded(&mut self, folded: bool) {
