@@ -268,6 +268,13 @@ impl Takt {
                             },
                             |d, edit| d.child(self.date_panel(edit, t, cx)),
                         )
+                        .when_some(
+                            match &self.app.editing {
+                                Some(Editing::Repeat(edit)) if stop.id == "repeat" => Some(edit),
+                                _ => None,
+                            },
+                            |d, edit| d.child(self.repeat_panel(edit, t, cx)),
+                        )
                         .into_any_element()
                 })
                 .collect()

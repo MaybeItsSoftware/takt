@@ -36,6 +36,7 @@ pub mod outline;
 pub mod pickers;
 pub mod prefs;
 pub mod reminders;
+pub mod repeat;
 pub mod review;
 pub mod rules;
 pub mod settings;
@@ -179,6 +180,8 @@ pub enum Editing {
     /// A calendar open under the inspector's start or due row: the day the
     /// keyboard is on and the time it would be set at.
     Date(inspector::DateEdit),
+    /// The repeat selector open under the inspector's repeat row.
+    Repeat(repeat::RepeatEdit),
 }
 
 pub struct App {

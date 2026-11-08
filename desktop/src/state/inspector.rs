@@ -491,12 +491,7 @@ impl App {
         };
         match stop.id {
             "start" | "due" => return self.open_date_edit(stop.id),
-            "repeat" => {
-                let current = self
-                    .inspected()
-                    .and_then(|snapshot| snapshot.metadata.recurrence_rule);
-                return self.open_picker(super::pickers::Picker::Repeat { task_id, current });
-            }
+            "repeat" => return self.open_repeat_edit(),
             _ => {}
         }
         match stop.kind {

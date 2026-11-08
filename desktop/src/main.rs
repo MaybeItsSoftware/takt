@@ -323,7 +323,7 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             }
         }
         // The calendar under Due: a day on, set; then cleared. The repeat
-        // picker: every day, then none.
+        // selector: every 3 weeks by its keys, then none.
         if app.selected_task.is_some() {
             let value = |app: &mut state::App, id: &str| {
                 app.inspector_stops()
@@ -343,11 +343,6 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             app.open_date_edit("due");
             app.date_key("backspace");
             let cleared = value(app, "due");
-            let task_id = app.selected_task.clone().unwrap_or_default();
-            let picker = state::pickers::Picker::Repeat {
-                task_id,
-                current: None,
-            };
             // The task's own agent context, apart from its notes.
             let notes_before = app.inspector_field_text("notes");
             app.commit_inspector_field("agent-context", "Smoke: warm up first.");
@@ -359,17 +354,17 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 context,
                 app.inspector_field_text("agent-context"),
             ));
-            let rows = app.picker_rows(&picker, "");
-            app.apply_choice(
-                picker.clone(),
-                state::pickers::Choice::Repeat(Some("daily".into())),
-            );
+            app.open_repeat_edit();
+            let selector = matches!(app.editing, Some(state::Editing::Repeat(_)));
+            for key in ["3", "right", "down", "enter"] {
+                app.repeat_key(key);
+            }
             let repeating = value(app, "repeat");
-            app.apply_choice(picker, state::pickers::Choice::Repeat(None));
+            app.open_repeat_edit();
+            app.repeat_key("backspace");
             report.push(format!(
-                "inspector dates {:.2} ms: calendar {opened}, due {due_before:?} -> {set:?} -> {cleared:?}; repeat {} presets, set {repeating:?}, now {:?}",
+                "inspector dates {:.2} ms: calendar {opened}, due {due_before:?} -> {set:?} -> {cleared:?}; repeat selector {selector}, set {repeating:?}, now {:?}",
                 started.elapsed().as_secs_f64() * 1000.0,
-                rows.len(),
                 value(app, "repeat"),
             ));
         }

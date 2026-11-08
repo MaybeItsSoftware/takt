@@ -156,8 +156,13 @@ Waiting on, Repeat and each commitment's Edit and Stop, Links, the actions —
 and `gg` / `Shift+G` (or `Home` / `End`) go to the first and last. Landing on
 a text row only highlights it, so the notes no longer keep the keyboard.
 `Return`, `i` or `e` edits the row: it puts the caret in a field, presses a
-button, flips a switch, opens a menu, the date picker or, on Conditions, the
-`cc` finder. `x` or `Delete` clears it — empties a field, takes a date or a
+button, flips a switch, opens a menu, the date picker, the repeat selector or,
+on Conditions, the `cc` finder. On the Mac the repeat selector reads "Every
+‹3› ‹days›": `↑` / `↓` change the part in focus, `←` / `→` move between the
+count and the unit (day, week, weekday, or a named day), digits type the
+count, `d` and `w` pick days and weeks, `Return` sets it, `⌫` stops it
+repeating and `Esc` leaves it; it shows the next four times it would come
+round. `x` or `Delete` clears it — empties a field, takes a date or a
 blocker away, sets the priority back to none. `←` / `→` step a menu such as
 Priority, `h` (and `←` elsewhere) hands the keyboard back to the tasks, and so
 does `Esc`. In a one-line field `Return` keeps what you typed and `Esc` puts

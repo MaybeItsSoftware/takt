@@ -63,12 +63,6 @@ pub enum Picker {
     CaptureList,
     /// The Google calendar timed tasks are mirrored to.
     GoogleCalendar,
-    /// How often a task comes round.
-    Repeat {
-        task_id: String,
-        /// The rule it has now, marked in the list.
-        current: Option<String>,
-    },
 }
 
 impl Picker {
@@ -125,8 +119,6 @@ pub enum Choice {
     Appearance(String),
     CaptureList(Option<String>),
     GoogleCalendar(Option<String>),
-    /// A repeat rule, or none.
-    Repeat(Option<String>),
 }
 
 /// A row: title, detail, the key hint, and what picking it does.
@@ -215,13 +207,11 @@ impl App {
             Picker::Appearance => "Light, dark, or the system's…",
             Picker::CaptureList => "Where quick capture lands…",
             Picker::GoogleCalendar => "The two-way Google calendar…",
-            Picker::Repeat { .. } => "Repeats… or type \u{201c}every 3 days\u{201d}",
         }
     }
 
     pub fn picker_rows(&self, picker: &Picker, query: &str) -> Vec<Row> {
         match picker {
-            Picker::Repeat { current, .. } => repeat_rows(current.as_deref(), query),
             Picker::MoveTask { task_id } => self.move_task_rows(task_id, query),
             Picker::MoveList { list_id } => self.move_list_rows(list_id, query),
             Picker::Blocker { task_id } => self.blocker_rows(task_id, query),
@@ -739,11 +729,6 @@ impl App {
                 self.prefs.save();
                 self.share_theme_choice();
             }
-            (Picker::Repeat { task_id, .. }, Choice::Repeat(rule)) => {
-                if self.selected_task.as_deref() == Some(task_id.as_str()) {
-                    self.edit_selected(|edit| edit.metadata.recurrence_rule = rule);
-                }
-            }
             (Picker::GoogleCalendar, Choice::GoogleCalendar(id)) => {
                 self.choose_google_calendar(id);
             }
@@ -1048,61 +1033,6 @@ pub fn read_waiting(raw: &str, zone: &str) -> Option<WaitingReading> {
 
 /// The repeats the core understands, the current one marked, and what
 /// was typed when it reads as one too.
-fn repeat_rows(current: Option<&str>, query: &str) -> Vec<Row> {
-    let current = current.unwrap_or_default();
-    let mark = |rule: &str| {
-        if rule.eq_ignore_ascii_case(current) {
-            "now"
-        } else {
-            ""
-        }
-    };
-    let mut presets: Vec<(String, String)> = vec![
-        ("Every day".into(), "daily".into()),
-        ("Every weekday".into(), "weekdays".into()),
-        ("Every week".into(), "weekly".into()),
-        ("Every 2 weeks".into(), "every 2 weeks".into()),
-    ];
-    for day in [
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-    ] {
-        let mut name = day.to_string();
-        name[..1].make_ascii_uppercase();
-        presets.push((format!("Every {name}"), format!("every {day}")));
-    }
-    let mut rows: Vec<Row> = presets
-        .into_iter()
-        .map(|(title, rule)| row(title, mark(&rule), Choice::Repeat(Some(rule))))
-        .collect();
-    if !current.is_empty() {
-        rows.push(row("Doesn\u{2019}t repeat", "", Choice::Repeat(None)));
-    }
-    let typed = query.trim();
-    let mut rows = ranked(rows, query);
-    if !typed.is_empty()
-        && takt_core::recurrence::periodic_cadence(typed.to_lowercase()).is_some()
-        && !rows.iter().any(
-            |r| matches!(&r.choice, Choice::Repeat(Some(rule)) if rule.eq_ignore_ascii_case(typed)),
-        )
-    {
-        rows.insert(
-            0,
-            row(
-                format!("Repeat {typed}"),
-                "",
-                Choice::Repeat(Some(typed.to_lowercase())),
-            ),
-        );
-    }
-    rows
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

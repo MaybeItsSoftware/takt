@@ -13,6 +13,7 @@ mod chrome;
 mod dock;
 pub mod icons;
 pub mod panel;
+mod repeat;
 mod settings;
 mod views;
 mod widgets;
@@ -805,6 +806,13 @@ impl Takt {
             }
             return true;
         }
+        // So does the repeat selector: only the count's digits are typed.
+        if matches!(self.app.editing, Some(Editing::Repeat(_))) {
+            if let Some(key) = spell(&Press::from_keystroke(keystroke)) {
+                self.app.repeat_key(&key);
+            }
+            return true;
+        }
         if matches!(self.app.editing, Some(Editing::AgentMessage)) {
             let m = &keystroke.modifiers;
             match keystroke.key.as_str() {
@@ -1393,7 +1401,11 @@ impl Takt {
     fn active_field(&mut self) -> Option<&mut TextField> {
         if self.app.overlay.is_some() {
             Some(&mut self.overlay.field)
-        } else if self.app.editing.is_some() && !matches!(self.app.editing, Some(Editing::Date(_)))
+        } else if self.app.editing.is_some()
+            && !matches!(
+                self.app.editing,
+                Some(Editing::Date(_) | Editing::Repeat(_))
+            )
         {
             Some(&mut self.field)
         } else if self.app.settings_page.is_some() {
