@@ -13,6 +13,8 @@ public actor SyncEngine {
     case failed(String)
     /// The server refused the token. Retrying cannot help; signing in can.
     case signedOut
+    /// The hosted server wants Takt Sync. Not an error: sync waits.
+    case needsSubscription
   }
 
   public struct Outcome: Equatable, Sendable {
@@ -80,7 +82,11 @@ public actor SyncEngine {
       status = .idle(lastSyncedAt: wallClock())
       return outcome
     } catch {
-      status = error as? SyncError == .unauthorized ? .signedOut : .failed(error.localizedDescription)
+      switch error as? SyncError {
+      case .unauthorized: status = .signedOut
+      case .subscriptionRequired: status = .needsSubscription
+      default: status = .failed(error.localizedDescription)
+      }
       throw error
     }
   }

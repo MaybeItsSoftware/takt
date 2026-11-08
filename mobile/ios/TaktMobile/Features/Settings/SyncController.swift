@@ -167,6 +167,7 @@ enum SyncPhaseText {
     case .needsSignIn: return "Signed out — sign in again"
     case .syncing: return "Syncing…"
     case .failed(let message): return "Couldn't sync: \(message)"
+    case .needsSubscription: return "Paused — needs Takt Sync"
     case .idle(let last):
       guard let last else { return "Signed in" }
       if now.timeIntervalSince(last) < 60 { return "Synced just now" }
@@ -182,13 +183,14 @@ enum SyncPhaseText {
     case .needsSignIn: "Signed out"
     case .syncing: "Syncing"
     case .failed: "Error"
+    case .needsSubscription: "Paused"
     case .idle: "On"
     }
   }
 
   static func symbol(_ phase: SyncSession.Phase) -> String {
     switch phase {
-    case .unpaired: "icloud.slash"
+    case .unpaired, .needsSubscription: "icloud.slash"
     case .needsSignIn, .failed: "exclamationmark.icloud"
     case .syncing: "arrow.triangle.2.circlepath"
     case .idle: "checkmark.icloud"

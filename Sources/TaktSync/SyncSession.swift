@@ -23,6 +23,9 @@ public final class SyncSession {
     case idle(lastSyncedAt: Date?)
     case syncing
     case failed(String)
+    /// The hosted server wants Takt Sync (£1 a year), and this account
+    /// hasn't it. Sync waits; buying it, or self-hosting, starts it again.
+    case needsSubscription
   }
 
   /// What making an account came to.
@@ -210,6 +213,9 @@ public final class SyncSession {
       return true
     } catch SyncError.unauthorized {
       sessionWasRefused()
+      return false
+    } catch SyncError.subscriptionRequired {
+      report(.needsSubscription, nil)
       return false
     } catch {
       report(.failed(error.localizedDescription), nil)
@@ -466,6 +472,9 @@ public final class SyncSession {
     case .syncing: phase = .syncing
     case .failed(let message): phase = .failed(message)
     case .signedOut: sessionWasRefused()
+    case .needsSubscription:
+      phase = .needsSubscription
+      Task { try? await refreshAccount() }
     }
     if outcome?.changedWorkspace == true { onRemoteChanges?() }
   }

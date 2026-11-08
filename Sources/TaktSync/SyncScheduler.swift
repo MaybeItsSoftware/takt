@@ -150,6 +150,11 @@ public actor SyncScheduler {
     } catch where Task.isCancelled || (error as? URLError)?.code == .cancelled || error is CancellationError {
       // A long-poll restarted to push a local edit, not a failure.
       return nil
+    } catch SyncError.subscriptionRequired {
+      // Calm and slow: nothing changes until a purchase, which syncs at once.
+      failures = 0
+      await listener(.needsSubscription, nil)
+      return .seconds(60 * 60)
     } catch SyncError.unauthorized {
       isSignedOut = true
       stop()

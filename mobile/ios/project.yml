@@ -30,6 +30,12 @@ settings:
 packages:
   Takt:
     path: ../..
+  # Takt Sync, the hosted server's £1-a-year subscription: the App Store
+  # purchase, merged with Google Play's by RevenueCat (docs/sync.md,
+  # "Subscription"). Pinned to an exact release.
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm
+    exactVersion: 5.97.0
 
 # The Apple Watch companion (`watch.yml`), embedded in the iPhone app when
 # generated with `TAKT_WATCH=YES xcodegen generate`. Opt-in because
@@ -61,6 +67,8 @@ targets:
         product: TaktWorkspaceEditing
       - package: Takt
         product: TaktSync
+      - package: RevenueCat
+        product: RevenueCat
       - target: TaktWidgets
         embed: true
     entitlements:
@@ -105,6 +113,9 @@ targets:
         # Google Calendar's iOS OAuth client (docs/google-calendar.md). Empty
         # hides the Calendar settings' Connect button.
         GoogleIOSClientID: $(GOOGLE_IOS_CLIENT_ID)
+        # RevenueCat's public Apple SDK key (`appl_…`). Empty: the Takt Sync
+        # purchase says it isn't available in this build.
+        RevenueCatAPIKey: $(REVENUECAT_IOS_KEY)
         UIBackgroundModes:
           - fetch
         UIAppFonts:
@@ -144,6 +155,9 @@ targets:
         # The iOS OAuth client from Google Cloud project takt-511416, of the
         # form `<number>-<id>.apps.googleusercontent.com`.
         GOOGLE_IOS_CLIENT_ID: ""
+        # RevenueCat project → Apps → the App Store app → Public API key.
+        # Pass it to xcodebuild (`REVENUECAT_IOS_KEY=appl_…`) or set it here.
+        REVENUECAT_IOS_KEY: ""
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SUPPORTS_MACCATALYST: NO

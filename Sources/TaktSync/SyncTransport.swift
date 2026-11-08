@@ -57,11 +57,50 @@ public struct SyncAccount: Equatable, Sendable {
   public var accountId: String
   public var email: String?
   public var devices: [SyncDevice]
-  public init(accountId: String, email: String?, devices: [SyncDevice]) {
+  /// Takt Sync; nil from a server that predates it.
+  public var subscription: SyncSubscription?
+  public init(accountId: String, email: String?, devices: [SyncDevice], subscription: SyncSubscription? = nil) {
     self.accountId = accountId
     self.email = email
     self.devices = devices
+    self.subscription = subscription
   }
+}
+
+/// Takt Sync, the hosted server's £1-a-year subscription, as `GET
+/// /v1/account` reports it (docs/sync.md, "Subscription"). A self-hosted
+/// server reports `required: false`.
+public struct SyncSubscription: Equatable, Sendable, Decodable {
+  /// Whether this server charges at all.
+  public var required: Bool
+  /// Whether this account may sync here now.
+  public var active: Bool
+  public var expiresAt: String?
+  /// Granted rather than bought.
+  public var comp: Bool
+
+  public init(required: Bool, active: Bool, expiresAt: String?, comp: Bool) {
+    self.required = required
+    self.active = active
+    self.expiresAt = expiresAt
+    self.comp = comp
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    required = try container.decodeIfPresent(Bool.self, forKey: .required) ?? false
+    active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+    expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt)
+    comp = try container.decodeIfPresent(Bool.self, forKey: .comp) ?? false
+  }
+
+  private enum CodingKeys: String, CodingKey { case required, active, expiresAt, comp }
+
+  public var expiresDate: Date? { expiresAt.flatMap(SyncDate.parse) }
+
+  /// What a lapsed account is told, wherever sync stops for it.
+  public static let neededMessage =
+    "Hosted sync needs Takt Sync (£1 a year). Subscribe here, or self-host the server."
 }
 
 public struct SyncDevice: Equatable, Sendable, Identifiable {
@@ -117,13 +156,16 @@ extension SyncAccount {
   /// `GET /v1/account`'s body, read by the core.
   init(body: Data) throws {
     let account = try syncDecodeAccount(body: String(decoding: body, as: UTF8.self))
+    struct Wrapper: Decodable { var subscription: SyncSubscription? }
+    let subscription = (try? JSONDecoder().decode(Wrapper.self, from: body))?.subscription
     self.init(
       accountId: account.accountId, email: account.email,
       devices: account.devices.map {
         SyncDevice(
           id: $0.id, name: $0.name, platform: $0.platform, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt,
           current: $0.current)
-      })
+      },
+      subscription: subscription)
   }
 }
 
@@ -210,6 +252,8 @@ public enum SyncError: LocalizedError, Equatable {
   case invalid(String)
   /// The person closed the sign-in window. Not worth a message.
   case cancelled
+  /// `402`: the hosted server wants Takt Sync, and this account hasn't it.
+  case subscriptionRequired
 
   public var errorDescription: String? {
     switch self {
@@ -219,6 +263,7 @@ public enum SyncError: LocalizedError, Equatable {
     case .notPaired: return "This device isn't signed in to sync."
     case .invalid(let message): return message
     case .cancelled: return "Sign-in was cancelled."
+    case .subscriptionRequired: return SyncSubscription.neededMessage
     }
   }
 }
@@ -318,6 +363,7 @@ public struct HTTPSyncTransport: SyncTransport {
       (data, status) = try await send(request, token: tokens.refreshedAccessToken())
       if status == 401 { throw SyncError.unauthorized }
     }
+    if status == 402 { throw SyncError.subscriptionRequired }
     guard (200..<300).contains(status) else {
       throw SyncError.server(status: status, message: syncServerMessage(body: String(decoding: data, as: UTF8.self)))
     }

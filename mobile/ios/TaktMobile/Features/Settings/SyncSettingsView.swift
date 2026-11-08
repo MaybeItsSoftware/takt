@@ -110,6 +110,10 @@ private struct SyncSettingsForm: View {
       try? await session.refreshAccount()
     }
 
+    if session.account?.subscription?.required == true || session.phase == .needsSubscription {
+      TaktSyncSection(theme: theme, controller: controller)
+    }
+
     if session.needsNewPassword {
       Section {
         SecureField("New password", text: $newPassword)
@@ -355,5 +359,74 @@ private struct SyncSettingsForm: View {
 
   private func header(_ text: String) -> some View {
     Text(text).font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+  }
+}
+
+/// Takt Sync on Takt's hosted server: whether this account has it, and the
+/// £1-a-year purchase. A self-hosted server never asks, and never shows it.
+private struct TaktSyncSection: View {
+  let theme: Theme
+  let controller: SyncController
+  @State private var purchase = TaktSyncPurchase.shared
+
+  private var session: SyncSession { controller.session }
+  private var subscription: SyncSubscription? { session.account?.subscription }
+  private var isActive: Bool { subscription?.active == true || purchase.isActive }
+
+  var body: some View {
+    Section {
+      LabeledContent("Takt Sync") {
+        Text(statusText).foregroundStyle(isActive ? theme.ink : theme.muted)
+      }
+      if !isActive {
+        if purchase.isAvailable {
+          Button {
+            Task { await purchase.subscribe(then: refreshed) }
+          } label: {
+            Label("Subscribe — \(purchase.product?.localizedPriceString ?? "£1") a year", systemImage: "icloud")
+          }
+          .disabled(purchase.isWorking || purchase.product == nil)
+          .accessibilityIdentifier("sync.subscribe")
+        } else {
+          Text("Purchases aren't available in this build.").foregroundStyle(theme.muted)
+        }
+      }
+      if purchase.isAvailable {
+        Button("Restore purchases") { Task { await purchase.restore(then: refreshed) } }
+          .disabled(purchase.isWorking)
+      }
+      if let problem = purchase.problem {
+        Text(problem).font(theme.type.footnote).foregroundStyle(theme.danger)
+      }
+    } header: {
+      Text("Takt Sync").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+    } footer: {
+      Text(
+        "Syncing through Takt's server costs £1 a year, and one purchase covers every device on this account. "
+          + "The server is open source: host it yourself and sync is free, with every feature."
+      )
+      .font(theme.type.footnote).foregroundStyle(theme.muted)
+    }
+    .listRowBackground(theme.raised)
+    .task(id: session.credentials?.accountId) {
+      await purchase.prepare(account: session.credentials?.accountId)
+    }
+  }
+
+  private var statusText: String {
+    if subscription?.comp == true { return "Included" }
+    guard isActive else { return "Not subscribed" }
+    if let until = subscription?.expiresDate {
+      return "Until \(until.formatted(date: .abbreviated, time: .omitted))"
+    }
+    return "Active"
+  }
+
+  /// After a purchase: the server hears from RevenueCat within seconds, so
+  /// ask it again and sync.
+  private func refreshed() async {
+    try? await Task.sleep(for: .seconds(2))
+    try? await session.refreshAccount()
+    await controller.syncNow()
   }
 }

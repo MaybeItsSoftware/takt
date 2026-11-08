@@ -439,6 +439,54 @@ final class SyncTransportTests: XCTestCase {
 }
 
 extension SyncTransportTests {
+  func testA402IsTaktSyncAndTheAccountSaysWhetherItIsPaid() async throws {
+    StubURLProtocol.respond(
+      to: "/v1/changes", status: 402,
+      body: #"{"error":"Hosted sync needs Takt Sync (£1 a year).","subscription":"required"}"#)
+    do {
+      _ = try await transport(FakeAuth()).changes(since: 0, limit: 10, wait: 0)
+      XCTFail("a 402 read a page")
+    } catch {
+      XCTAssertEqual(error as? SyncError, .subscriptionRequired)
+    }
+    StubURLProtocol.respond(
+      to: "/v1/account", status: 200,
+      body: #"{"accountId":"a","email":null,"devices":[],"subscription":{"required":true,"active":true,"expiresAt":"2027-11-08T12:00:00Z","comp":false}}"#)
+    let account = try await transport(FakeAuth()).account()
+    XCTAssertEqual(account.subscription?.required, true)
+    XCTAssertEqual(account.subscription?.active, true)
+    XCTAssertNotNil(account.subscription?.expiresDate)
+    StubURLProtocol.respond(to: "/v1/account", status: 200, body: #"{"accountId":"a","email":null,"devices":[]}"#)
+    let older = try await transport(FakeAuth()).account()
+    XCTAssertNil(older.subscription, "a server from before Takt Sync says nothing")
+  }
+
+  func testTheSchedulerWaitsQuietlyWhenTheServerWantsTaktSync() async throws {
+    let transport = UnpaidTransport()
+    let store = try store()
+    try store.beginSync(deviceId: "dev-1", serverURL: "memory://")
+    let engine = SyncEngine(store: store, transport: transport, deviceId: "dev-1")
+    let statuses = StatusLog()
+    let scheduler = SyncScheduler(engine: engine) { status, _ in await statuses.append(status) }
+
+    let synced = await scheduler.syncNow()
+    XCTAssertFalse(synced)
+    let last = await statuses.last
+    XCTAssertEqual(last, .needsSubscription)
+    let isSignedOut = await scheduler.isSignedOut
+    XCTAssertFalse(isSignedOut, "not paying is not being signed out")
+  }
+}
+
+/// A charging server, to an account that hasn't paid.
+private final class UnpaidTransport: SyncTransport, @unchecked Sendable {
+  func push(body: Data) async throws { throw SyncError.subscriptionRequired }
+  func changes(since cursor: Int64, limit: Int, wait: Int) async throws -> Data {
+    throw SyncError.subscriptionRequired
+  }
+}
+
+extension SyncTransportTests {
   func testTheSchedulerHoldsNoLongPollInTheBackground() async throws {
     let transport = RecordingTransport()
     let store = try store()
