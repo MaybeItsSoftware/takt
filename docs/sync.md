@@ -270,6 +270,13 @@ the rest of the row and reinstalls every journal and outbox trigger. A
 client older than v35 drops it on pull, so an occurrence it closes hands on
 its own title, as before. See `core/src/tasks.rs` `keep_series_title`.
 
+`v36_task_agent_context` adds `task_metadata.agentContext TEXT`: what the
+agent should know about one task, kept apart from its notes, NULL when
+nothing is written. The Mac's inspector edits it, the agent reads it beside
+the task, and the `agent_instructions` tools reach it as the `task` scope.
+It merges like the rest of the row and reinstalls every journal and outbox
+trigger. A client older than v36 drops it on pull. See `core/src/agent_instructions.rs` `set_task_agent_context`.
+
 Negative priorities (-1 to -4, behind every task with none) came with no
 migration: `task_metadata.priority` was already an `INTEGER`, so a value
 arrives on every client. A client built before them (core before

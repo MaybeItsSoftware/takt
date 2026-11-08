@@ -251,3 +251,57 @@ fn a_row_for_a_deleted_list_is_not_read_back() {
         .unwrap();
     assert!(agent_instructions(&connection).unwrap().is_empty());
 }
+
+#[test]
+fn a_tasks_agent_context_is_its_own_and_one_undo_step() {
+    let mut connection = workspace();
+    connection
+        .execute_batch(&format!(
+            "INSERT INTO tasks (id, listId, title, notes, sortOrder, createdAt, updatedAt)
+               VALUES ('t', 'groceries', 'Milk', 'oat, not soy', 0, '{T}', '{T}');"
+        ))
+        .unwrap();
+    assert_eq!(task_agent_context(&connection, "t").unwrap(), "");
+    let set_context = |connection: &mut Connection, text: &str, append: bool| {
+        journalled(connection, "Edit Agent Context", |tx| {
+            set_task_agent_context(tx, "t", text, append, NOW)
+        })
+    };
+    // A task with no metadata row gets one.
+    assert_eq!(
+        set_context(&mut connection, "  The shop shuts at six.  ", false).unwrap(),
+        "The shop shuts at six."
+    );
+    assert_eq!(
+        set_context(&mut connection, "Ask before buying more than two.", true).unwrap(),
+        "The shop shuts at six.\n\nAsk before buying more than two."
+    );
+    // The notes are untouched.
+    let notes: String = connection
+        .query_row("SELECT notes FROM tasks WHERE id = 't'", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(notes, "oat, not soy");
+    assert_eq!(
+        undoable_label(&connection).unwrap().as_deref(),
+        Some("Edit Agent Context")
+    );
+    undo(&mut connection).unwrap();
+    assert_eq!(
+        task_agent_context(&connection, "t").unwrap(),
+        "The shop shuts at six."
+    );
+    // Blank clears it to NULL.
+    assert_eq!(set_context(&mut connection, " ", false).unwrap(), "");
+    let stored: Option<String> = connection
+        .query_row(
+            "SELECT agentContext FROM task_metadata WHERE taskId = 't'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stored, None);
+    assert!(matches!(
+        task_agent_context(&connection, "nope"),
+        Err(CoreError::MissingTask { .. })
+    ));
+}

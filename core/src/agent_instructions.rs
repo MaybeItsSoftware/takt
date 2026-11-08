@@ -236,6 +236,68 @@ pub fn set_agent_instructions(
     Ok(next)
 }
 
+/// What the agent should know about one task (`task_metadata.agentContext`),
+/// empty when nothing is written. A task that does not exist is an error.
+pub fn task_agent_context(connection: &Connection, task_id: &str) -> Result<String, CoreError> {
+    let exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = ?1)",
+        [task_id],
+        |row| row.get(0),
+    )?;
+    if !exists {
+        return Err(CoreError::MissingTask {
+            id: task_id.to_string(),
+        });
+    }
+    let text: Option<String> = connection
+        .query_row(
+            "SELECT agentContext FROM task_metadata WHERE taskId = ?1",
+            [task_id],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
+    Ok(text.unwrap_or_default())
+}
+
+/// Replaces a task's agent context, or with `append` adds a paragraph, as
+/// [`set_agent_instructions`] does a scope's; blank text clears it. Returns
+/// the text it holds now, and writes nothing when that is unchanged.
+pub fn set_task_agent_context(
+    transaction: &Transaction,
+    task_id: &str,
+    text: &str,
+    append: bool,
+    now_ms: i64,
+) -> Result<String, CoreError> {
+    let current = task_agent_context(transaction, task_id)?;
+    let addition = text.trim();
+    let next = if append && !current.is_empty() {
+        if addition.is_empty() {
+            current.clone()
+        } else {
+            format!("{current}\n\n{addition}")
+        }
+    } else {
+        addition.to_string()
+    };
+    if next == current {
+        return Ok(next);
+    }
+    let value = (!next.is_empty()).then_some(next.as_str());
+    let updated = transaction.execute(
+        "UPDATE task_metadata SET agentContext = ?1, updatedAt = ?2 WHERE taskId = ?3",
+        params![value, stored(now_ms), task_id],
+    )?;
+    if updated == 0 {
+        transaction.execute(
+            "INSERT INTO task_metadata (taskId, agentContext, updatedAt) VALUES (?1, ?2, ?3)",
+            params![task_id, value, stored(now_ms)],
+        )?;
+    }
+    Ok(next)
+}
+
 /// Brings in instructions kept somewhere older (the Mac's preferences) where
 /// the table has none for that scope yet, outside the journal: it is a move,
 /// not an edit to take back. Blank text, and an entry for a folder or list
@@ -286,6 +348,25 @@ impl CoreWorkspace {
     ) -> Result<String, CoreError> {
         journal::journalled(&mut self.lock(), "Edit Agent Instructions", |tx| {
             set_agent_instructions(tx, kind, id.as_deref(), &text, append, now_ms)
+        })
+    }
+
+    /// A task's agent context; see [`task_agent_context`].
+    pub fn task_agent_context(&self, task_id: String) -> Result<String, CoreError> {
+        task_agent_context(&self.lock(), &task_id)
+    }
+
+    /// Sets a task's agent context as one "Edit Agent Context" step and
+    /// returns the text it holds now.
+    pub fn set_task_agent_context(
+        &self,
+        task_id: String,
+        text: String,
+        append: bool,
+        now_ms: i64,
+    ) -> Result<String, CoreError> {
+        journal::journalled(&mut self.lock(), "Edit Agent Context", |tx| {
+            set_task_agent_context(tx, &task_id, &text, append, now_ms)
         })
     }
 

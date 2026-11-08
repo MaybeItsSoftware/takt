@@ -977,6 +977,17 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func setAgentInstructions(kind: AgentInstructionKind, id: String?, text: String, append: Bool, nowMs: Int64) throws  -> String
     
     /**
+     * Sets a task's agent context as one "Edit Agent Context" step and
+     * returns the text it holds now.
+     */
+    func setTaskAgentContext(taskId: String, text: String, append: Bool, nowMs: Int64) throws  -> String
+    
+    /**
+     * A task's agent context; see [`task_agent_context`].
+     */
+    func taskAgentContext(taskId: String) throws  -> String
+    
+    /**
      * Board `key`'s columns over `list_ids`, and where its tasks are drawn.
      */
     func boardColumns(key: String, listIds: [String], nowMs: Int64, zone: String) throws  -> BoardColumns
@@ -2295,6 +2306,36 @@ open func setAgentInstructions(kind: AgentInstructionKind, id: String?, text: St
         FfiConverterString.lower(text),
         FfiConverterBool.lower(append),
         FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Sets a task's agent context as one "Edit Agent Context" step and
+     * returns the text it holds now.
+     */
+open func setTaskAgentContext(taskId: String, text: String, append: Bool, nowMs: Int64)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_set_task_agent_context(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),
+        FfiConverterString.lower(text),
+        FfiConverterBool.lower(append),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * A task's agent context; see [`task_agent_context`].
+     */
+open func taskAgentContext(taskId: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_task_agent_context(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),uniffiCallStatus
     )
 })
 }
@@ -32853,6 +32894,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_agent_instructions() != 65220) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_set_task_agent_context() != 16526) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_task_agent_context() != 34750) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_board_columns() != 666) {

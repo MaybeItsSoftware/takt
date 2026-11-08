@@ -42,7 +42,8 @@ pub(super) fn finish(transaction: &Transaction, identifier: &str) -> Result<(), 
         | "v32_follow_up_repeat"
         | "v33_recurrence_series"
         | "v34_condition_provides"
-        | "v35_series_title" => Ok(super::triggers::reinstall(transaction)?),
+        | "v35_series_title"
+        | "v36_task_agent_context" => Ok(super::triggers::reinstall(transaction)?),
         "v24_condition_categories" => {
             super::triggers::reinstall(transaction)?;
             file_places_under_location(transaction)

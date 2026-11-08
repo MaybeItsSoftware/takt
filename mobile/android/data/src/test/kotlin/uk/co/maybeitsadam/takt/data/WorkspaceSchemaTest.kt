@@ -61,7 +61,7 @@ class WorkspaceSchemaTest {
             assertTrue("missing: ${expected - present}", present.containsAll(expected))
 
             val migrations = workspace.database.read { it.strings("SELECT identifier FROM grdb_migrations") }
-            assertEquals(35, migrations.size)
+            assertEquals(36, migrations.size)
             assertTrue("v17_sync" in migrations)
             assertTrue("v18_themes_and_preferences" in migrations)
             assertTrue("v19_habit_options" in migrations)
@@ -81,6 +81,7 @@ class WorkspaceSchemaTest {
             assertTrue("v33_recurrence_series" in migrations)
             assertTrue("v34_condition_provides" in migrations)
             assertTrue("v35_series_title" in migrations)
+            assertTrue("v36_task_agent_context" in migrations)
             assertEquals(listOf(0L to 0L), workspace.database.read { db ->
                 db.query("SELECT recording, applying FROM sync_control") { it.long("recording") to it.long("applying") }
             })
@@ -108,7 +109,19 @@ class WorkspaceSchemaTest {
     // install that lacks one migration lacks every later one too, since they
     // only ever apply in order, so each rewind takes the later ones off first.
 
+    private fun rewindV36(connection: SQLiteConnection) {
+        // The journal's and the outbox's metadata triggers name the new
+        // column, so they come off first; v36 reinstalls them.
+        for (op in listOf("insert", "update", "delete")) {
+            connection.execSQL("DROP TRIGGER IF EXISTS change_log_task_metadata_$op")
+            connection.execSQL("DROP TRIGGER IF EXISTS sync_outbox_task_metadata_$op")
+        }
+        connection.execSQL("ALTER TABLE task_metadata DROP COLUMN agentContext")
+        connection.execSQL("DELETE FROM grdb_migrations WHERE identifier = 'v36_task_agent_context'")
+    }
+
     private fun rewindV35(connection: SQLiteConnection) {
+        rewindV36(connection)
         // The journal's and the outbox's metadata triggers name the new
         // column, so they come off first; v35 reinstalls them.
         for (op in listOf("insert", "update", "delete")) {
@@ -326,8 +339,8 @@ class WorkspaceSchemaTest {
         try {
             assertEquals(expected, upgraded.read { schema(it) })
             val migrations = upgraded.read { it.strings("SELECT identifier FROM grdb_migrations") }
-            assertEquals(35, migrations.size)
-            assertEquals(35, migrations.toSet().size)
+            assertEquals(36, migrations.size)
+            assertEquals(36, migrations.toSet().size)
         } finally {
             upgraded.close()
             dir.deleteRecursively()
@@ -337,6 +350,10 @@ class WorkspaceSchemaTest {
     /** A v25 database takes `stacksMissedFrom` on `dailies`. */
     @Test
     fun aV25DatabaseUpgradesToTheFixture() = assertUpgradesToTheFixture("v25", ::rewindV26)
+
+    /** A v35 database takes `agentContext` on `task_metadata`. */
+    @Test
+    fun aV35DatabaseUpgradesToTheFixture() = assertUpgradesToTheFixture("v35", ::rewindV36)
 
     /** A v34 database takes `seriesTitle` on `task_metadata`. */
     @Test

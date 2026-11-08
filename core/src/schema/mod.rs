@@ -162,6 +162,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "v35_series_title",
         include_str!("migrations/v35_series_title.sql"),
     ),
+    (
+        "v36_task_agent_context",
+        include_str!("migrations/v36_task_agent_context.sql"),
+    ),
 ];
 
 /// Brings the database at `path` up to date, creating it if it does not

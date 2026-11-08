@@ -1123,6 +1123,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_agent_instructions(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_set_task_agent_context(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_task_agent_context(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_board_columns(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_delete_board_column(
@@ -1646,6 +1650,10 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_method_coreworkspace_import_agent_instructions(`ptr`: Long,`seeds`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
     external fun uniffi_takt_core_fn_method_coreworkspace_set_agent_instructions(`ptr`: Long,`kind`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,`append`: Byte,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_set_task_agent_context(`ptr`: Long,`taskId`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,`append`: Byte,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_task_agent_context(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_board_columns(`ptr`: Long,`key`: RustBuffer.ByValue,`listIds`: RustBuffer.ByValue,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -3300,6 +3308,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_agent_instructions() and 0xFFFF) != 65220) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_task_agent_context() and 0xFFFF) != 16526) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_task_agent_context() and 0xFFFF) != 34750) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_board_columns() and 0xFFFF) != 666) {
@@ -4996,6 +5010,17 @@ public interface CoreWorkspaceInterface {
     fun `setAgentInstructions`(`kind`: AgentInstructionKind, `id`: kotlin.String?, `text`: kotlin.String, `append`: kotlin.Boolean, `nowMs`: kotlin.Long): kotlin.String
     
     /**
+     * Sets a task's agent context as one "Edit Agent Context" step and
+     * returns the text it holds now.
+     */
+    fun `setTaskAgentContext`(`taskId`: kotlin.String, `text`: kotlin.String, `append`: kotlin.Boolean, `nowMs`: kotlin.Long): kotlin.String
+    
+    /**
+     * A task's agent context; see [`task_agent_context`].
+     */
+    fun `taskAgentContext`(`taskId`: kotlin.String): kotlin.String
+    
+    /**
      * Board `key`'s columns over `list_ids`, and where its tasks are drawn.
      */
     fun `boardColumns`(`key`: kotlin.String, `listIds`: List<kotlin.String>, `nowMs`: kotlin.Long, `zone`: kotlin.String): BoardColumns
@@ -6364,6 +6389,46 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         FfiConverterString.lower(`text`),
         FfiConverterBoolean.lower(`append`),
         FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Sets a task's agent context as one "Edit Agent Context" step and
+     * returns the text it holds now.
+     */
+    @Throws(CoreException::class)override fun `setTaskAgentContext`(`taskId`: kotlin.String, `text`: kotlin.String, `append`: kotlin.Boolean, `nowMs`: kotlin.Long): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_set_task_agent_context(
+        it,
+        
+        FfiConverterString.lower(`taskId`),
+        FfiConverterString.lower(`text`),
+        FfiConverterBoolean.lower(`append`),
+        FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * A task's agent context; see [`task_agent_context`].
+     */
+    @Throws(CoreException::class)override fun `taskAgentContext`(`taskId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_task_agent_context(
+        it,
+        
+        FfiConverterString.lower(`taskId`),_status)
 }
     }
     )
