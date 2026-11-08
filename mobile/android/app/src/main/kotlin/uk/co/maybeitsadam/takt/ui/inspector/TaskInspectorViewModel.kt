@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.maybeitsadam.takt.app.AppContainer
+import uk.co.maybeitsadam.takt.ui.components.Format
 import uk.co.maybeitsadam.takt.core.MatrixQuadrant
 import uk.co.maybeitsadam.takt.core.TaskCondition
 import uk.co.maybeitsadam.takt.core.TaskPlanningException
@@ -329,6 +330,12 @@ class TaskInspectorViewModel(private val container: AppContainer) : ViewModel() 
 
     fun setDailyInterval(dailyId: String, days: Int?) {
         container.undo.perform { it.updateDaily(dailyId, intervalDays = FieldEdit.To(days?.coerceIn(1, 366))) }
+    }
+
+    /** Records time worked on the task without a focus session or finishing it. */
+    fun logWork(seconds: Int) {
+        val id = taskId.value ?: return
+        container.undo.perform(message = "Logged ${Format.duration(seconds)}") { it.logTaskWork(id, seconds) }
     }
 
     fun setDailyTarget(dailyId: String, seconds: Int?) {

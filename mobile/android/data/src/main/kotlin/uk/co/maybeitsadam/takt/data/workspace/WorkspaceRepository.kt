@@ -833,6 +833,14 @@ class WorkspaceRepository(
         coreWrite { it.updateDaily(id, edit, now.toEpochMilli()) }
     }
 
+    /**
+     * Records [seconds] worked on a task without a focus session and without
+     * finishing it; a daily due today is credited as a timed block would be.
+     */
+    suspend fun logTaskWork(taskId: String, seconds: Int, now: Instant = now(), zone: ZoneId = this.zone) {
+        coreWrite { it.logTaskWork(taskId, seconds.toLong(), now.toEpochMilli(), zone.id) }
+    }
+
     /** Records progress for today, accumulating onto any contribution already logged. */
     /** Logs progress on a daily for the day [now] falls on in [zone]: the Rust core's `dailies::log_contribution`. */
     suspend fun logContribution(

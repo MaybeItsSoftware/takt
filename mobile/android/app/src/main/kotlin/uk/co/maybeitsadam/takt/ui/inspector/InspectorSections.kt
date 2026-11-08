@@ -104,7 +104,7 @@ internal fun InspectorBody(
         TitleBlock(vm, values, task, around, problem(TaskEditorField.TITLE), onClose)
 
         WhenSection(values, today, zone, problem(TaskEditorField.START_AT), edit)
-        PlanSection(values, task, around, problem(TaskEditorField.ESTIMATE_MINUTES), edit)
+        PlanSection(vm, values, task, around, problem(TaskEditorField.ESTIMATE_MINUTES), edit)
 
         var fullscreenNotes by rememberSaveable(task.id) { mutableStateOf(false) }
 
@@ -290,6 +290,7 @@ private fun WhenSection(
 
 @Composable
 private fun PlanSection(
+    vm: TaskInspectorViewModel,
     values: TaskEditorValues,
     task: WorkspaceTask,
     around: InspectorSurroundings,
@@ -320,6 +321,34 @@ private fun PlanSection(
             }
             MonoText(line, color = if (estimate != null && logged >= estimate) colors.warning else colors.mutedText)
         }
+
+        // Progress without finishing: time worked away from the timer is
+        // written straight away, as placement is, not held for Save.
+        FieldLabel("Log time worked")
+        var logText by rememberSaveable(task.id) { mutableStateOf("") }
+        val logSeconds = Format.parseSpan(logText)
+        val log = {
+            val seconds = logSeconds ?: 0
+            if (seconds > 0) {
+                vm.logWork(seconds)
+                logText = ""
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Metrics.sm)) {
+            ChalkField(
+                logText,
+                onValueChange = { logText = it },
+                placeholder = "25m or 1h 20m",
+                style = TaktTheme.type.mono.copy(fontSize = TaktTheme.type.body.fontSize),
+                isError = logSeconds == null,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { log() }),
+                modifier = Modifier.weight(1f).testTag("inspector_log"),
+                contentDescription = "Time worked",
+            )
+            PButton("Log", enabled = (logSeconds ?: 0) > 0, onClick = log, modifier = Modifier.testTag("inspector_log_button"))
+        }
+        Hint(if (logSeconds == null) "Try 25, 25m or 1h 20m." else "Work done without the timer; the task stays open.", color = if (logSeconds == null) colors.danger else colors.dimText)
 
         FieldLabel("Priority")
         Segmented(

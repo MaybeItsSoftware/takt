@@ -20,6 +20,36 @@ object Format {
         return if (rest == 0) "${minutes / 60}h" else "${minutes / 60}h ${rest}m"
     }
 
+    /**
+     * A typed length of time in seconds, as the Mac reads it: "25" and "25m"
+     * are minutes, "1h", "1.5h" and "1h 20m" hours and minutes. Blank is
+     * zero; anything else is null.
+     */
+    fun parseSpan(text: String): Int? {
+        val compact = text.trim().lowercase().replace(" ", "")
+        if (compact.isEmpty()) return 0
+        compact.toDoubleOrNull()?.let { return if (it >= 0) Math.round(it * 60).toInt() else null }
+        var seconds = 0.0
+        val number = StringBuilder()
+        var any = false
+        for (c in compact) {
+            if (c.isDigit() || c == '.') {
+                number.append(c)
+                continue
+            }
+            val value = number.toString().toDoubleOrNull() ?: return null
+            number.clear()
+            seconds += value * when (c) {
+                'h' -> 3600.0
+                'm' -> 60.0
+                else -> return null
+            }
+            any = true
+        }
+        if (number.isNotEmpty()) seconds += (number.toString().toDoubleOrNull() ?: return null) * 60
+        return if (any) Math.round(seconds).toInt() else null
+    }
+
     /** `12:05` or `1:02:05` for a running clock. */
     fun clock(seconds: Int): String {
         val s = maxOf(0, seconds)
