@@ -1,3 +1,4 @@
+use super::icons::icon;
 use super::*;
 
 impl Takt {
@@ -172,6 +173,9 @@ impl Takt {
                         } else {
                             t.text
                         };
+                        if !stop.links.is_empty() {
+                            return link_rows(ix, &stop.links, t, cx);
+                        }
                         let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
                         div()
                             .flex_1()
@@ -230,13 +234,19 @@ impl Takt {
                                     this.after_change(cx);
                                     cx.notify();
                                 }))
-                                .when(!stop.label.is_empty(), |d| {
+                                .when_some(stop.icon(), |d, glyph| {
                                     d.child(
                                         div()
-                                            .w(px(84.))
+                                            .w(px(16.))
+                                            .h(px(18.))
                                             .flex_none()
-                                            .text_color(t.muted)
-                                            .child(stop.label),
+                                            .flex()
+                                            .items_center()
+                                            .child(icon(glyph, 14.).text_color(if ringed {
+                                                t.accent
+                                            } else {
+                                                t.muted
+                                            })),
                                     )
                                 })
                                 .child(value),
@@ -640,4 +650,70 @@ impl Takt {
                     .child(div().text_color(t.accent).child("■ focus")),
             )
     }
+}
+
+/// The icon for a link's kind (`TaskLink::icon`), and its colour.
+fn link_glyph(kind: &str, t: Tokens) -> (&'static str, gpui::Hsla) {
+    match kind {
+        "doc" => ("file-text", t.accent),
+        "sheet" => ("sheet", t.success),
+        "slides" => ("presentation", t.warning),
+        "form" => ("form", t.accent),
+        "pdf" => ("file-text", t.error),
+        "image" => ("image", t.muted),
+        "folder" => ("folder", t.muted),
+        "note" => ("gem", t.accent),
+        "file" => ("file", t.muted),
+        _ => ("globe", t.muted),
+    }
+}
+
+/// The links row: each link its kind's icon, its name and where it is. A
+/// click on one opens it; anywhere else on the row edits the addresses.
+fn link_rows(
+    stop: usize,
+    links: &[takt_core::links::TaskLink],
+    t: Tokens,
+    cx: &mut Context<Takt>,
+) -> AnyElement {
+    div()
+        .flex_1()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .gap(px(2.))
+        .children(links.iter().enumerate().map(|(ix, link)| {
+            let (glyph, colour) = link_glyph(&link.icon, t);
+            let url = link.url.clone();
+            div()
+                .id(("inspector-link", stop * 1000 + ix))
+                .px_1()
+                .flex()
+                .items_center()
+                .gap_2()
+                .rounded(px(4.))
+                .hover(|d| d.bg(t.hover))
+                .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                    cx.stop_propagation();
+                    crate::state::pickers::open_address(&url);
+                }))
+                .child(icon(glyph, 14.).text_color(colour))
+                .child(
+                    div()
+                        .flex_none()
+                        .max_w(px(180.))
+                        .truncate()
+                        .child(link.title.clone()),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_size(px(11.))
+                        .text_color(t.placeholder)
+                        .child(link.subtitle.clone()),
+                )
+        }))
+        .into_any_element()
 }

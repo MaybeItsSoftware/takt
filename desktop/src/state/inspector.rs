@@ -33,6 +33,8 @@ pub struct Stop {
     pub kind: StopKind,
     /// A hairline goes above this row: the start of a group.
     pub group: bool,
+    /// On the links row: each link as the core reads it, for its icon.
+    pub links: Vec<takt_core::links::TaskLink>,
 }
 
 impl Stop {
@@ -44,7 +46,38 @@ impl Stop {
             empty: false,
             kind,
             group: false,
+            links: Vec::new(),
         }
+    }
+
+    /// The icon drawn in place of the label: what the row is, at a glance.
+    pub fn icon(&self) -> Option<&'static str> {
+        Some(match self.id {
+            "focus" => "play",
+            "start" => "sunrise",
+            "due" => "calendar",
+            "due.exact" => "clock",
+            "conditions" => "sliders",
+            "estimate" => "hourglass",
+            "minimum-block" => "timer",
+            "single-sitting" => "armchair",
+            "notes" => "text",
+            "priority" => "flag",
+            "tags" => "tag",
+            "move" => "list",
+            "blockers" => "ban",
+            "waiting" => "user",
+            "repeat" => "repeat",
+            "daily" => "flame",
+            "commit" => "target",
+            "links" => "link",
+            "apply-planning" => "copy",
+            "pin" => "pin",
+            "complete" => "circle-check",
+            "archive" => "archive",
+            "convert" => "arrow-left-right",
+            _ => return None,
+        })
     }
 
     fn value(mut self, value: Option<String>, add: &str) -> Self {
@@ -311,6 +344,15 @@ impl App {
             .map(|list| list.name.clone())
             .unwrap_or_default();
         let mut stops = stops(&snapshot, &task, &list, self.focus_session.is_some());
+        if let Some(stop) = stops.iter_mut().find(|s| s.id == "links")
+            && !stop.empty
+        {
+            stop.links = self
+                .store
+                .core
+                .task_links(task.id.clone())
+                .unwrap_or_default();
+        }
         // The commitment it has, or carries, in place of the offer to make one.
         let commitment = self.commitment_of(&task.id);
         if let Some(stop) = stops.iter_mut().find(|s| s.id == "commit")

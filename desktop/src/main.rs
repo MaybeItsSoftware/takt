@@ -279,6 +279,32 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             snapshot.as_ref().and_then(|s| s.estimate_seconds),
             snapshot.as_ref().map_or(0, |s| s.notes.lines().count()),
         ));
+        // A linked task's links reach the inspector with their kinds, for
+        // the icons drawn beside them.
+        let linked = app
+            .store
+            .core
+            .linked_task_ids()
+            .ok()
+            .and_then(|ids| ids.into_iter().next());
+        if let Some(id) = linked
+            && let Ok(Some(task)) = app.store.core.task(id.clone())
+        {
+            let back = app.selected_task.clone();
+            app.reveal_task(&id, &task.list_id);
+            let kinds: Vec<String> = app
+                .inspector_stops()
+                .into_iter()
+                .find(|s| s.id == "links")
+                .map(|s| s.links.into_iter().map(|l| l.icon).collect())
+                .unwrap_or_default();
+            report.push(format!("inspector links: {}", kinds.join(" ")));
+            if let Some(back) = back
+                && let Ok(Some(task)) = app.store.core.task(back.clone())
+            {
+                app.reveal_task(&back, &task.list_id);
+            }
+        }
         let started = Instant::now();
         app.start_focus_on_selected(true);
         let running = app
