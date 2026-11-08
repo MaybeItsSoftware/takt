@@ -260,6 +260,8 @@ pub struct App {
     pub celebration: Option<(String, i64)>,
     /// The rows mid-celebration, by task id, and when each began.
     pub celebrating: std::collections::HashMap<String, i64>,
+    /// The settings page, while it is open over the workspace (⌘,).
+    pub settings_page: Option<settings::SettingsPage>,
     /// The floating focus panel asked for (true) or away (false).
     pub wants_panel: Option<bool>,
     /// The quick capture window, asked for.
@@ -353,6 +355,7 @@ impl App {
             focus_checkpointed_at: 0,
             celebration: None,
             celebrating: Default::default(),
+            settings_page: None,
             wants_panel: None,
             wants_capture: false,
             hotkeys_changed: false,

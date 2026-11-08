@@ -386,6 +386,15 @@ impl App {
 
     pub fn open_overlay(&mut self, overlay: Overlay) {
         self.sequence.reset();
+        // Settings is a page, not a list over the window: whatever asked
+        // for it (a setting changed, a sheet closed) leaves the page open.
+        if overlay == Overlay::Settings {
+            self.overlay = None;
+            if self.settings_page.is_none() {
+                self.settings_page = Some(Default::default());
+            }
+            return;
+        }
         self.overlay = Some(overlay);
     }
 

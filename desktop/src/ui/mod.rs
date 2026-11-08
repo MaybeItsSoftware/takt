@@ -12,6 +12,7 @@ mod chrome;
 mod dock;
 pub mod icons;
 pub mod panel;
+mod settings;
 mod views;
 mod widgets;
 
@@ -51,6 +52,9 @@ pub struct Takt {
     this: WeakEntity<Self>,
     field: TextField,
     overlay: OverlayState,
+    /// The settings page's search, and where its list is scrolled.
+    settings_field: TextField,
+    settings_scroll: gpui::ScrollHandle,
     sidebar_scroll: UniformListScrollHandle,
     main_scroll: UniformListScrollHandle,
     last_key_ms: Option<f64>,
@@ -132,6 +136,8 @@ impl Takt {
             this: cx.entity().downgrade(),
             field: TextField::default(),
             overlay: OverlayState::default(),
+            settings_field: TextField::default(),
+            settings_scroll: gpui::ScrollHandle::new(),
             sidebar_scroll: UniformListScrollHandle::new(),
             main_scroll: UniformListScrollHandle::new(),
             last_key_ms: None,
@@ -284,8 +290,7 @@ impl Takt {
                 "focus-panel" => self.app.wants_panel = Some(true),
                 "settings" => {
                     self.show_main_window(cx);
-                    self.app.open_overlay(Overlay::Settings);
-                    self.open_overlay_field();
+                    self.open_settings_page();
                 }
                 "quit" => cx.quit(),
                 "pick-google-calendar" => {
@@ -506,8 +511,7 @@ impl Takt {
             return;
         }
         if keystroke.modifiers.platform && keystroke.key == "," && self.app.editing.is_none() {
-            self.app.open_overlay(crate::state::Overlay::Settings);
-            self.open_overlay_field();
+            self.open_settings_page();
             cx.notify();
             return;
         }
@@ -537,6 +541,8 @@ impl Takt {
             self.overlay_key(keystroke, cx)
         } else if self.app.editing.is_some() {
             self.editing_key(keystroke, cx)
+        } else if self.app.settings_page.is_some() {
+            self.settings_key(keystroke, cx)
         } else {
             self.command_key(keystroke, cx)
         };
@@ -1216,7 +1222,8 @@ impl Render for Takt {
             window.appearance(),
             &self.app.prefs.appearance,
         );
-        let inspector = if self.app.prefs.right_dock_visible {
+        let settings = self.app.settings_page.is_some();
+        let inspector = if self.app.prefs.right_dock_visible && !settings {
             Some(self.app.inspector_stops())
         } else {
             None
@@ -1235,49 +1242,52 @@ impl Render for Takt {
             .font_family(UI_FONT)
             .text_size(px(13.))
             .child(self.title_bar(t, cx))
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .when(self.app.prefs.sidebar_visible, |d| {
-                        let dock = self.left_dock(t, cx);
-                        d.child(self.pane(Pane::Left, dock, cx))
-                    })
-                    .child(
-                        div()
-                            .id("centre")
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .on_mouse_down(
-                                gpui::MouseButton::Left,
-                                cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
-                                    this.focus_pane(Pane::Centre, cx);
-                                }),
-                            )
-                            .on_mouse_down(
-                                gpui::MouseButton::Right,
-                                cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
-                                    this.app.open_pane_menu(
-                                        f32::from(e.position.x),
-                                        f32::from(e.position.y),
-                                    );
-                                    cx.notify();
-                                }),
-                            )
-                            .child(self.centre(t, cx)),
-                    )
-                    .when_some(inspector, |d, stops| {
-                        let dock = self.right_dock(t, stops, cx).into_any_element();
-                        d.child(self.pane(Pane::Right, dock, cx))
-                    }),
-            )
-            .when(self.app.prefs.bottom_dock_visible, |d| {
-                let dock = self.bottom_dock(t, cx).into_any_element();
-                d.child(self.pane(Pane::Bottom, dock, cx))
+            .when(settings, |d| d.child(self.settings_page(t, cx)))
+            .when(!settings, |d| {
+                d.child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .flex()
+                        .when(self.app.prefs.sidebar_visible, |d| {
+                            let dock = self.left_dock(t, cx);
+                            d.child(self.pane(Pane::Left, dock, cx))
+                        })
+                        .child(
+                            div()
+                                .id("centre")
+                                .flex_1()
+                                .min_w_0()
+                                .flex()
+                                .on_mouse_down(
+                                    gpui::MouseButton::Left,
+                                    cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
+                                        this.focus_pane(Pane::Centre, cx);
+                                    }),
+                                )
+                                .on_mouse_down(
+                                    gpui::MouseButton::Right,
+                                    cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
+                                        this.app.open_pane_menu(
+                                            f32::from(e.position.x),
+                                            f32::from(e.position.y),
+                                        );
+                                        cx.notify();
+                                    }),
+                                )
+                                .child(self.centre(t, cx)),
+                        )
+                        .when_some(inspector, |d, stops| {
+                            let dock = self.right_dock(t, stops, cx).into_any_element();
+                            d.child(self.pane(Pane::Right, dock, cx))
+                        }),
+                )
+                .when(self.app.prefs.bottom_dock_visible, |d| {
+                    let dock = self.bottom_dock(t, cx).into_any_element();
+                    d.child(self.pane(Pane::Bottom, dock, cx))
+                })
+                .child(self.status_bar(t, cx))
             })
-            .child(self.status_bar(t, cx))
             .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
                 d.child(self.rules_sheet(t))
             })
@@ -1306,6 +1316,8 @@ impl Takt {
             Some(&mut self.overlay.field)
         } else if self.app.editing.is_some() {
             Some(&mut self.field)
+        } else if self.app.settings_page.is_some() {
+            Some(&mut self.settings_field)
         } else {
             None
         }
@@ -1316,6 +1328,8 @@ impl Takt {
         if self.app.overlay.is_some() {
             self.overlay.index = 0;
             self.overlay.refresh(&self.app);
+        } else if self.app.editing.is_none() && self.app.settings_page.is_some() {
+            self.settings_searched();
         }
         cx.notify();
     }
@@ -1360,6 +1374,8 @@ impl EntityInputHandler for Takt {
             &self.overlay.field
         } else if self.app.editing.is_some() {
             &self.field
+        } else if self.app.settings_page.is_some() {
+            &self.settings_field
         } else {
             return None;
         };

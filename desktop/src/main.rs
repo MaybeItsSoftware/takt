@@ -86,6 +86,11 @@ fn main() {
                         println!("smoke enter: {}", keys.join(", "));
                         smoke_frames(window);
                     }
+                    if std::env::var_os("TAKT_DESKTOP_SMOKE_SETTINGS").is_some() {
+                        let said = view.smoke_settings(window, cx);
+                        println!("smoke settings: {}", said.join(" | "));
+                        smoke_frames(window);
+                    }
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_PANEL").is_some() {
                         view.app.wants_panel = Some(true);
                         view.open_requested_windows(cx);
