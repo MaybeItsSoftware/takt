@@ -3,10 +3,10 @@
 //! title, a line on what it does, and its control. The rows and what a
 //! change does are `state::settings`'; this draws them and takes the keys.
 //!
-//! It is drawn over the workspace in the main window rather than in a
-//! window of its own, so the pickers and fields a setting opens (a theme,
-//! a server address, a shortcut being recorded) come up over it as they
-//! do anywhere else, and it stays where it was once they close.
+//! It is a window of its own, as Zed's is, but a second window onto the
+//! same `Takt` entity rather than a separate view: its keys run on the same
+//! `App`, and the pickers and fields a setting opens (a theme, a server
+//! address, a shortcut being recorded) come up over it while it is in front.
 
 use super::icons::icon;
 use super::widgets::field_text;
@@ -19,11 +19,48 @@ use gpui::{
 };
 
 impl Takt {
-    /// ⌘,: the page, its search empty, where it was left.
+    /// ⌘,: the page, its search empty, where it was left. The window
+    /// follows in `open_requested_windows`.
     pub(super) fn open_settings_page(&mut self) {
-        self.settings_field = TextField::default();
+        if self.app.settings_page.is_none() {
+            self.settings_field = TextField::default();
+        }
         self.app.overlay = None;
         self.app.open_overlay(crate::state::Overlay::Settings);
+        self.settings_wanted_front = true;
+    }
+
+    pub(super) fn is_settings_window(&self, window: &gpui::Window) -> bool {
+        self.settings_window
+            .is_some_and(|handle| handle.window_id() == window.window_handle().window_id())
+    }
+
+    /// The window kept to the state: opened (or brought forward) while the
+    /// page is open, closed once it isn't.
+    pub(super) fn sync_settings_window(&mut self, cx: &mut Context<Self>) {
+        let wanted = self.app.settings_page.is_some();
+        let front = std::mem::take(&mut self.settings_wanted_front);
+        match (wanted, self.settings_window) {
+            (true, Some(handle)) => {
+                if front {
+                    let _ = handle.update(cx, |_, window, _| window.activate_window());
+                }
+            }
+            (true, None) => {
+                // Once this update ends: the window's first draw reads this
+                // entity.
+                let takt = cx.entity();
+                cx.defer(move |cx| open_window(&takt, cx));
+            }
+            (false, Some(handle)) => {
+                self.settings_window = None;
+                self.settings_active = false;
+                cx.defer(move |cx| {
+                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                });
+            }
+            (false, None) => {}
+        }
     }
 
     /// A key while the page is up and nothing is open over it. False for a
@@ -108,7 +145,14 @@ impl Takt {
                     keystroke: gpui::Keystroke::parse(key).expect("a key"),
                     is_held: false,
                 };
-                this.key_down(&event, window, cx);
+                // ⌘, through the window's own handler; the rest as the
+                // settings window's handler takes them, which is not open
+                // until this update ends.
+                if key.starts_with("cmd-") {
+                    this.key_down(&event, window, cx);
+                } else {
+                    this.settings_key(&event.keystroke, cx);
+                }
             };
         let mut said = Vec::new();
         self.app.overlay = None;
@@ -149,10 +193,32 @@ impl Takt {
                 self.app.settings_page.is_some()
             ));
         }
-        press(self, "escape", window, cx);
-        press(self, "escape", window, cx);
-        said.push(format!("closed {}", self.app.settings_page.is_none()));
         said
+    }
+
+    /// The second half, once the window is up: Esc twice through the
+    /// settings window's own handler clears the search and closes it.
+    pub fn smoke_settings_close(
+        &mut self,
+        window: &mut gpui::Window,
+        cx: &mut Context<Self>,
+    ) -> String {
+        let in_window = self.is_settings_window(window);
+        for _ in 0..2 {
+            let event = gpui::KeyDownEvent {
+                keystroke: gpui::Keystroke::parse("escape").expect("a key"),
+                is_held: false,
+            };
+            self.key_down(&event, window, cx);
+        }
+        format!(
+            "window up {in_window}, closed by esc {}",
+            self.app.settings_page.is_none() && self.settings_window.is_none()
+        )
+    }
+
+    pub fn settings_window_handle(&self) -> Option<gpui::WindowHandle<Takt>> {
+        self.settings_window
     }
 
     /// The search changed: what it finds, from the top.
@@ -194,8 +260,6 @@ impl Takt {
             .min_h_0()
             .flex()
             .bg(t.background)
-            .border_t_1()
-            .border_color(t.border)
             .child(self.settings_nav(t, cx))
             .child(self.settings_content(t, cx))
     }
@@ -238,7 +302,7 @@ impl Takt {
             .border_r_1()
             .border_color(t.border)
             .child(
-                div().p_2().child(
+                div().px_2().pb_2().pt(px(40.)).child(
                     div()
                         .h(px(30.))
                         .px_2()
@@ -344,7 +408,7 @@ impl Takt {
             .child(
                 div()
                     .px_8()
-                    .pt_5()
+                    .pt(px(40.))
                     .flex()
                     .items_center()
                     .justify_between()
@@ -362,21 +426,6 @@ impl Takt {
                                     .child("Settings"),
                             )
                             .child(div().text_color(t.text).child("This Mac")),
-                    )
-                    .child(
-                        div()
-                            .id("settings-close")
-                            .size(px(26.))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(6.))
-                            .hover(|d| d.bg(t.hover))
-                            .child(icon("x", 15.).text_color(t.muted))
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.app.close_settings_page();
-                                cx.notify();
-                            })),
                     ),
             )
             .child(
@@ -541,4 +590,40 @@ fn control(control: Control, t: Tokens) -> AnyElement {
             )
             .into_any_element(),
     }
+}
+
+/// Opens the settings window onto `takt`, in front, with the keyboard.
+fn open_window(takt: &gpui::Entity<Takt>, cx: &mut gpui::App) {
+    let bounds = gpui::Bounds::centered(None, gpui::size(px(960.), px(680.)), cx);
+    let root = takt.clone();
+    let Ok(handle) = cx.open_window(
+        gpui::WindowOptions {
+            window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
+            titlebar: Some(gpui::TitlebarOptions {
+                title: Some("Settings".into()),
+                appears_transparent: true,
+                traffic_light_position: Some(gpui::point(px(14.), px(14.))),
+            }),
+            window_min_size: Some(gpui::size(px(640.), px(420.))),
+            ..Default::default()
+        },
+        move |_, _| root,
+    ) else {
+        return;
+    };
+    let focus = takt.read(cx).focus.clone();
+    takt.update(cx, |this, _| {
+        this.settings_window = Some(handle);
+        this.settings_active = true;
+    });
+    let _ = handle.update(cx, |_, window, cx| {
+        window.focus(&focus);
+        cx.observe_window_activation(window, |this, window, cx| {
+            this.settings_active = window.is_window_active();
+            cx.notify();
+        })
+        .detach();
+    });
+    cx.activate(true);
+    takt.update(cx, |_, cx| cx.notify());
 }

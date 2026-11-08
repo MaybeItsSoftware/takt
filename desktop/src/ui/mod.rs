@@ -64,6 +64,14 @@ pub struct Takt {
     /// menu bar, and this entity lives on for the next one.
     main: Option<gpui::WindowHandle<Takt>>,
     capture: Option<gpui::WindowHandle<capture::QuickCapture>>,
+    /// The settings window, while it is open: a second window onto this
+    /// same entity, drawing only the settings page.
+    settings_window: Option<gpui::WindowHandle<Takt>>,
+    /// The settings window is the one in front: sheets and pickers come
+    /// up there rather than in the main window.
+    settings_active: bool,
+    /// ⌘, asked for the settings window to come forward.
+    settings_wanted_front: bool,
     /// The status item and hotkeys are up (not in a smoke run).
     platform_live: bool,
     /// Where the board's link ends were drawn, for the lines over them.
@@ -120,6 +128,19 @@ pub fn window_closed(cx: &mut GpuiApp) {
         takt.update(cx, |this, _| this.main = None);
         crate::platform::set_regular(false);
     }
+    let settings = takt.read(cx).settings_window;
+    if settings.is_some_and(|handle| {
+        !cx.windows()
+            .iter()
+            .any(|w| w.window_id() == handle.window_id())
+    }) {
+        takt.update(cx, |this, cx| {
+            this.settings_window = None;
+            this.settings_active = false;
+            this.app.close_settings_page();
+            cx.notify();
+        });
+    }
 }
 
 impl Focusable for Takt {
@@ -144,6 +165,9 @@ impl Takt {
             panel: None,
             main: None,
             capture: None,
+            settings_window: None,
+            settings_active: false,
+            settings_wanted_front: false,
             platform_live: false,
             board_links: Default::default(),
             hover_card: None,
@@ -289,8 +313,8 @@ impl Takt {
                 "quick-capture" => self.app.wants_capture = true,
                 "focus-panel" => self.app.wants_panel = Some(true),
                 "settings" => {
-                    self.show_main_window(cx);
                     self.open_settings_page();
+                    self.open_requested_windows(cx);
                 }
                 "quit" => cx.quit(),
                 "pick-google-calendar" => {
@@ -393,6 +417,7 @@ impl Takt {
     /// What the state asked for that only the window can do: the focus
     /// panel opened or put away.
     pub fn open_requested_windows(&mut self, cx: &mut Context<Self>) {
+        self.sync_settings_window(cx);
         if self.app.hotkeys_changed {
             self.app.hotkeys_changed = false;
             if self.platform_live {
@@ -512,6 +537,7 @@ impl Takt {
         }
         if keystroke.modifiers.platform && keystroke.key == "," && self.app.editing.is_none() {
             self.open_settings_page();
+            self.open_requested_windows(cx);
             cx.notify();
             return;
         }
@@ -541,7 +567,7 @@ impl Takt {
             self.overlay_key(keystroke, cx)
         } else if self.app.editing.is_some() {
             self.editing_key(keystroke, cx)
-        } else if self.app.settings_page.is_some() {
+        } else if self.is_settings_window(window) {
             self.settings_key(keystroke, cx)
         } else {
             self.command_key(keystroke, cx)
@@ -1222,7 +1248,13 @@ impl Render for Takt {
             window.appearance(),
             &self.app.prefs.appearance,
         );
-        let settings = self.app.settings_page.is_some();
+        let settings = self.is_settings_window(window);
+        // Sheets and pickers come up in the window in front.
+        let popups = if settings {
+            self.settings_active
+        } else {
+            self.settings_window.is_none() || !self.settings_active
+        };
         let inspector = if self.app.prefs.right_dock_visible && !settings {
             Some(self.app.inspector_stops())
         } else {
@@ -1241,77 +1273,83 @@ impl Render for Takt {
             .text_color(t.text)
             .font_family(UI_FONT)
             .text_size(px(13.))
-            .child(self.title_bar(t, cx))
             .when(settings, |d| d.child(self.settings_page(t, cx)))
             .when(!settings, |d| {
                 let bottom = (self.app.prefs.bottom_dock_visible)
                     .then(|| self.bottom_dock(t, cx).into_any_element());
-                d.child(
-                    div()
-                        .flex_1()
-                        .min_h_0()
-                        .flex()
-                        .when(self.app.prefs.sidebar_visible, |d| {
-                            let dock = self.left_dock(t, cx);
-                            d.child(self.pane(Pane::Left, dock, cx))
-                        })
-                        // The bottom dock sits under the centre, between the
-                        // side docks, as Zed's does: they run the full height.
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .flex()
-                                .flex_col()
-                                .child(
-                                    div()
-                                        .id("centre")
-                                        .flex_1()
-                                        .min_w_0()
-                                        .flex()
-                                        .on_mouse_down(
-                                            gpui::MouseButton::Left,
-                                            cx.listener(|this, _: &gpui::MouseDownEvent, _, cx| {
-                                                this.focus_pane(Pane::Centre, cx);
-                                            }),
-                                        )
-                                        .on_mouse_down(
-                                            gpui::MouseButton::Right,
-                                            cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
-                                                this.app.open_pane_menu(
-                                                    f32::from(e.position.x),
-                                                    f32::from(e.position.y),
-                                                );
-                                                cx.notify();
-                                            }),
-                                        )
-                                        .min_h_0()
-                                        .child(self.centre(t, cx)),
-                                )
-                                .when_some(bottom, |d, dock| {
-                                    d.child(self.pane(Pane::Bottom, dock, cx))
-                                }),
-                        )
-                        .when_some(inspector, |d, stops| {
-                            let dock = self.right_dock(t, stops, cx).into_any_element();
-                            d.child(self.pane(Pane::Right, dock, cx))
-                        }),
-                )
-                .child(self.status_bar(t, cx))
+                d.child(self.title_bar(t, cx))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_h_0()
+                            .flex()
+                            .when(self.app.prefs.sidebar_visible, |d| {
+                                let dock = self.left_dock(t, cx);
+                                d.child(self.pane(Pane::Left, dock, cx))
+                            })
+                            // The bottom dock sits under the centre, between the
+                            // side docks, as Zed's does: they run the full height.
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .flex()
+                                    .flex_col()
+                                    .child(
+                                        div()
+                                            .id("centre")
+                                            .flex_1()
+                                            .min_w_0()
+                                            .flex()
+                                            .on_mouse_down(
+                                                gpui::MouseButton::Left,
+                                                cx.listener(
+                                                    |this, _: &gpui::MouseDownEvent, _, cx| {
+                                                        this.focus_pane(Pane::Centre, cx);
+                                                    },
+                                                ),
+                                            )
+                                            .on_mouse_down(
+                                                gpui::MouseButton::Right,
+                                                cx.listener(
+                                                    |this, e: &gpui::MouseDownEvent, _, cx| {
+                                                        this.app.open_pane_menu(
+                                                            f32::from(e.position.x),
+                                                            f32::from(e.position.y),
+                                                        );
+                                                        cx.notify();
+                                                    },
+                                                ),
+                                            )
+                                            .min_h_0()
+                                            .child(self.centre(t, cx)),
+                                    )
+                                    .when_some(bottom, |d, dock| {
+                                        d.child(self.pane(Pane::Bottom, dock, cx))
+                                    }),
+                            )
+                            .when_some(inspector, |d, stops| {
+                                let dock = self.right_dock(t, stops, cx).into_any_element();
+                                d.child(self.pane(Pane::Right, dock, cx))
+                            }),
+                    )
+                    .child(self.status_bar(t, cx))
             })
-            .when(matches!(self.app.editing, Some(Editing::Rules(_))), |d| {
-                d.child(self.rules_sheet(t))
-            })
-            .when(self.app.focus_prompt.is_some(), |d| {
+            .when(
+                !settings && matches!(self.app.editing, Some(Editing::Rules(_))),
+                |d| d.child(self.rules_sheet(t)),
+            )
+            .when(!settings && self.app.focus_prompt.is_some(), |d| {
                 d.child(self.focus_prompt_sheet(t))
             })
-            .when(matches!(self.app.editing, Some(Editing::Ask(_))), |d| {
-                d.child(self.ask_sheet(t))
-            })
-            .when(self.app.overlay.is_some(), |d| {
+            .when(
+                popups && matches!(self.app.editing, Some(Editing::Ask(_))),
+                |d| d.child(self.ask_sheet(t)),
+            )
+            .when(popups && self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))
             })
-            .when(self.app.context_menu.is_some(), |d| {
+            .when(!settings && self.app.context_menu.is_some(), |d| {
                 d.child(self.context_menu_view(t, window.viewport_size(), cx))
             })
     }

@@ -89,7 +89,24 @@ fn main() {
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_SETTINGS").is_some() {
                         let said = view.smoke_settings(window, cx);
                         println!("smoke settings: {}", said.join(" | "));
-                        smoke_frames(window);
+                        // After the deferred open: the window, then Esc in it.
+                        let takt = cx.entity();
+                        cx.defer(move |cx| {
+                            let handle = takt.read(cx).settings_window_handle();
+                            let windows = cx.windows().len();
+                            let closed = handle.and_then(|handle| {
+                                handle
+                                    .update(cx, |view, window, cx| {
+                                        view.smoke_settings_close(window, cx)
+                                    })
+                                    .ok()
+                            });
+                            println!(
+                                "smoke settings window: {} windows, {}",
+                                windows,
+                                closed.unwrap_or_else(|| "no window".into())
+                            );
+                        });
                     }
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_PANEL").is_some() {
                         view.app.wants_panel = Some(true);
