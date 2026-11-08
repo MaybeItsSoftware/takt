@@ -51,6 +51,7 @@ import uk.co.maybeitsadam.takt.data.sync.OkHttpSyncTransport
 import uk.co.maybeitsadam.takt.data.sync.SyncEngine
 import uk.co.maybeitsadam.takt.data.sync.SyncException
 import uk.co.maybeitsadam.takt.data.sync.SyncLocalState
+import uk.co.maybeitsadam.takt.data.sync.SyncRealtime
 import uk.co.maybeitsadam.takt.data.sync.SyncScheduler
 import uk.co.maybeitsadam.takt.data.sync.SyncStore
 
@@ -588,7 +589,11 @@ class SyncController(private val container: AppContainer) {
         val store = SyncStore(database)
         val scope = CoroutineScope(SupervisorJob(container.scope.coroutineContext[Job]) + Dispatchers.Default)
         val engine = SyncEngine(store, transport(credentials), credentials.deviceId)
-        val scheduler = SyncScheduler(engine, scope)
+        val endpoints = _endpoints.value
+        val realtime = credentials.accountId?.let { account ->
+            SyncRealtime(credentials.serverURL, endpoints.supabaseURL, endpoints.supabaseKey, account, accounts.tokens)
+        }
+        val scheduler = SyncScheduler(engine, scope, realtime = realtime)
         scheduler.watchLocalWrites(store)
         active.value = Active(credentials, engine, scheduler, scope)
         _credentials.value = credentials
