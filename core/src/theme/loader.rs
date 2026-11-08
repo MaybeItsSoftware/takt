@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::builtins;
-use super::file::{CoreThemeFile, CoreThemeFileBase, CoreThemeFileIssue, decode};
+use super::file::{CoreThemeFile, CoreThemeFileBase, CoreThemeFileIssue, decode_all};
 use super::merge::{CoreThemeFileOutcome, merge_file, sorted};
 use super::model::{CoreThemeIssueSeverity, CoreThemePlatform, CoreThemeSpecification};
 
@@ -51,8 +51,13 @@ fn skipped(source: &str, reason: &str, issues: &[CoreThemeFileIssue]) -> CoreThe
     }
 }
 
+/// Where an outcome came from: the file, and which of its themes (a Zed
+/// family holds several; any other file one, at 0).
+type OutcomeKey = (String, usize);
+
 struct Candidate {
     source: String,
+    index: usize,
     file: CoreThemeFile,
     issues: Vec<CoreThemeFileIssue>,
 }
@@ -62,7 +67,7 @@ struct Resolver<'a> {
     built_ins: HashMap<String, &'a CoreThemeSpecification>,
     default_base: &'a CoreThemeSpecification,
     candidates: HashMap<String, Candidate>,
-    outcomes: HashMap<String, CoreThemeFileOutcome>,
+    outcomes: HashMap<OutcomeKey, CoreThemeFileOutcome>,
     /// Memoised by identifier; `Some(None)` is settled as not loading.
     resolved: HashMap<String, Option<CoreThemeSpecification>>,
     in_progress: HashSet<String>,
@@ -72,7 +77,8 @@ impl Resolver<'_> {
     fn settle_skipped(&mut self, identifier: &str, reason: &str) {
         let candidate = &self.candidates[identifier];
         let outcome = skipped(&candidate.source, reason, &candidate.issues);
-        self.outcomes.insert(candidate.source.clone(), outcome);
+        self.outcomes
+            .insert((candidate.source.clone(), candidate.index), outcome);
         self.resolved.insert(identifier.to_string(), None);
     }
 
@@ -143,7 +149,7 @@ impl Resolver<'_> {
         issues.extend(outcome.issues);
         let specification = outcome.specification;
         self.outcomes.insert(
-            candidate.source.clone(),
+            (candidate.source.clone(), candidate.index),
             CoreThemeFileOutcome {
                 source: outcome.source,
                 specification: specification.clone(),
@@ -157,7 +163,8 @@ impl Resolver<'_> {
     }
 }
 
-/// Loads every source for `platform`, in name order, resolving `extends`
+/// Loads every source for `platform`, in name order — a Zed theme family
+/// gives one outcome per variant, each under the family's file name — resolving `extends`
 /// against `built_ins` and each other. An identifier that is a built-in's,
 /// or an earlier file's, is skipped. Both default to the built-ins as
 /// resolved for `platform`.
@@ -188,40 +195,49 @@ pub fn load(
         in_progress: HashSet::new(),
     };
 
+    let mut counts: HashMap<String, usize> = HashMap::new();
     for source in &ordered {
-        let (decoded, issues) = decode(&source.data, &source.name);
-        let Some(file) = decoded else {
-            resolver.outcomes.insert(
-                source.name.clone(),
-                skipped(&source.name, "could not be read", &issues),
-            );
-            continue;
+        let themes = match decode_all(&source.data, &source.name) {
+            Ok(themes) => themes,
+            Err(issues) => {
+                resolver.outcomes.insert(
+                    (source.name.clone(), 0),
+                    skipped(&source.name, "could not be read", &issues),
+                );
+                counts.insert(source.name.clone(), 1);
+                continue;
+            }
         };
-        let identifier = identifier(&file, &source.name);
-        if resolver.built_ins.contains_key(&identifier) {
-            let reason = format!(
-                "identifier \"{identifier}\" is a built-in theme's; give it one of its own"
-            );
-            resolver
-                .outcomes
-                .insert(source.name.clone(), skipped(&source.name, &reason, &issues));
-        } else if let Some(earlier) = resolver.candidates.get(&identifier) {
-            let reason = format!(
-                "identifier \"{identifier}\" is already used by {}",
-                earlier.source
-            );
-            resolver
-                .outcomes
-                .insert(source.name.clone(), skipped(&source.name, &reason, &issues));
-        } else {
-            resolver.candidates.insert(
-                identifier,
-                Candidate {
-                    source: source.name.clone(),
-                    file,
-                    issues,
-                },
-            );
+        counts.insert(source.name.clone(), themes.len());
+        for (index, (file, issues)) in themes.into_iter().enumerate() {
+            let key = (source.name.clone(), index);
+            let identifier = identifier(&file, &source.name);
+            if resolver.built_ins.contains_key(&identifier) {
+                let reason = format!(
+                    "identifier \"{identifier}\" is a built-in theme's; give it one of its own"
+                );
+                resolver
+                    .outcomes
+                    .insert(key, skipped(&source.name, &reason, &issues));
+            } else if let Some(earlier) = resolver.candidates.get(&identifier) {
+                let reason = format!(
+                    "identifier \"{identifier}\" is already used by {}",
+                    earlier.source
+                );
+                resolver
+                    .outcomes
+                    .insert(key, skipped(&source.name, &reason, &issues));
+            } else {
+                resolver.candidates.insert(
+                    identifier,
+                    Candidate {
+                        source: source.name.clone(),
+                        index,
+                        file,
+                        issues,
+                    },
+                );
+            }
         }
     }
 
@@ -233,7 +249,11 @@ pub fn load(
 
     ordered
         .iter()
-        .filter_map(|source| resolver.outcomes.get(&source.name).cloned())
+        .flat_map(|source| {
+            let count = counts.get(&source.name).copied().unwrap_or(0);
+            (0..count).map(move |index| (source.name.clone(), index))
+        })
+        .filter_map(|key| resolver.outcomes.remove(&key))
         .collect()
 }
 

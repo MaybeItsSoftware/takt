@@ -200,3 +200,193 @@ fn a_bad_size_keeps_the_inherited_value_and_says_so() {
     );
     assert_eq!(merged.structure.radius.panel, 12.0);
 }
+
+// MARK: - Zed themes
+
+fn meadow() -> Vec<u8> {
+    std::fs::read(shared_themes().join("zed/meadow.json")).unwrap()
+}
+
+fn load_one(name: &str, data: Vec<u8>) -> Vec<CoreThemeFileOutcome> {
+    loader::load(
+        &[CoreThemeFileSource {
+            name: name.into(),
+            data,
+        }],
+        CoreThemePlatform::Macos,
+        None,
+        None,
+    )
+}
+
+fn hex(spec: &CoreThemeSpecification, role: &str, appearance: CoreThemeAppearance) -> String {
+    color::hex_string(&spec.palette.color(role, appearance))
+}
+
+#[test]
+fn a_zed_family_loads_as_one_locked_theme_per_variant() {
+    let outcomes = load_one("meadow.json", meadow());
+    assert_eq!(outcomes.len(), 2);
+    for outcome in &outcomes {
+        assert_eq!(outcome.source, "meadow.json");
+        let problems: Vec<_> = outcome
+            .issues
+            .iter()
+            .filter(|i| !i.is_audit && i.severity != CoreThemeIssueSeverity::Note)
+            .collect();
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+    let dusk = outcomes[0].specification.clone().unwrap();
+    let morning = outcomes[1].specification.clone().unwrap();
+    assert_eq!(dusk.identifier, "zed.meadow-dusk");
+    assert_eq!(dusk.name, "Meadow Dusk");
+    assert_eq!(dusk.summary, "From the Zed theme Meadow, by Takt.");
+    assert_eq!(dusk.locked_appearance, Some(CoreThemeAppearance::Dark));
+    assert_eq!(morning.identifier, "zed.meadow-morning");
+    assert_eq!(morning.locked_appearance, Some(CoreThemeAppearance::Light));
+    // Zed's look: the structure is Zed One's.
+    let one = builtins::specification(builtins::ONE_IDENTIFIER, CoreThemePlatform::Macos).unwrap();
+    assert_eq!(dusk.structure, one.structure);
+}
+
+#[test]
+fn a_zed_variant_maps_its_style_keys_onto_the_roles() {
+    let outcomes = load_one("meadow.json", meadow());
+    let dusk = outcomes[0].specification.clone().unwrap();
+    let dark = CoreThemeAppearance::Dark;
+    for (role, expected) in [
+        ("paper", "#161C1A"),       // editor.background
+        ("raised", "#222B28"),      // elevated_surface.background
+        ("altRow", "#1A201E"),      // panel.background
+        ("hover", "#282E2C"),       // element.hover, #ffffff14 over the page
+        ("well", "#1D2421"),        // background
+        ("border", "#33403A"),      // border
+        ("borderMuted", "#28322E"), // border.variant
+        ("inputBorder", "#33403A"), // border
+        ("ink", "#DFE8E2"),         // text
+        ("mutedText", "#A3B3AA"),   // text.muted
+        ("dimText", "#6F7F77"),     // text.placeholder
+        ("primary", "#5FB3A1"),     // text.accent
+        ("success", "#8CC06B"),
+        ("danger", "#E0706B"), // error
+        ("warning", "#D9B25C"),
+        ("categoricalPurple", "#B48CE6"), // nearest accent to violet
+        ("categoricalPink", "#E48AC0"),
+        ("categoricalOrange", "#E8955A"),
+    ] {
+        assert_eq!(hex(&dusk, role, dark), expected, "{role}");
+    }
+
+    // A sparser variant: what it leaves out is grown from its own page and
+    // text, not taken from Zed One.
+    let morning = outcomes[1].specification.clone().unwrap();
+    let light = CoreThemeAppearance::Light;
+    assert_eq!(hex(&morning, "paper", light), "#FBFCF9");
+    assert_eq!(hex(&morning, "raised", light), "#F2F5F1"); // surface.background
+    assert_eq!(hex(&morning, "well", light), "#EEF2EE");
+    assert_eq!(hex(&morning, "primary", light), "#2F7F6F");
+    let grown = seeds::CoreThemeSeeds {
+        background: color::from_hex("#fbfcf9"),
+        foreground: color::from_hex("#1f2a25"),
+        ..Default::default()
+    }
+    .roles(light)
+    .unwrap();
+    assert_eq!(
+        hex(&morning, "inputBorder", light),
+        hex(&morning, "border", light),
+        "inputBorder is Zed's border"
+    );
+    assert_eq!(
+        morning.palette.color("altRow", light),
+        // panel.background is stated, so not the grown one
+        color::from_hex("#f2f5f1").unwrap()
+    );
+    assert_ne!(grown["altRow"], morning.palette.color("altRow", light));
+}
+
+#[test]
+fn a_zed_family_decodes_as_its_first_variant_through_the_single_file_path() {
+    let decoded = theme_decode(meadow(), "meadow.json".into());
+    let file = decoded.file.unwrap();
+    assert_eq!(
+        theme_identifier(file, "meadow.json".into()),
+        "zed.meadow-dusk"
+    );
+}
+
+#[test]
+fn a_zed_family_is_told_apart_from_a_takt_theme_by_its_shape() {
+    // No $schema: the themes list is enough.
+    let bare = br##"{ "name": "Bare", "themes": [ { "name": "Bare", "appearance": "light", "style": { "background": "#ffffff", "text": "#000000" } } ] }"##;
+    let outcomes = load_one("bare.json", bare.to_vec());
+    assert_eq!(
+        outcomes[0].specification.as_ref().unwrap().identifier,
+        "zed.bare"
+    );
+    // A $schema on zed.dev without a list is a Zed file that says nothing.
+    let empty = br#"{ "$schema": "https://zed.dev/schema/themes/v0.2.0.json", "name": "Empty" }"#;
+    let outcomes = load_one("empty.json", empty.to_vec());
+    assert_eq!(outcomes.len(), 1);
+    assert!(outcomes[0].specification.is_none());
+    assert!(
+        outcomes[0]
+            .issues
+            .iter()
+            .any(|i| i.message == "a Zed theme should have a themes list")
+    );
+    // A Takt theme is still a Takt theme.
+    let takt = br##"{ "name": "Sea", "seeds": { "light": { "background": "#f4f8f9", "foreground": "#14303a" } } }"##;
+    let outcomes = load_one("sea.json", takt.to_vec());
+    assert_eq!(
+        outcomes[0].specification.as_ref().unwrap().identifier,
+        "user.sea"
+    );
+}
+
+#[test]
+fn a_zed_variant_reports_bad_values_and_guesses_a_missing_appearance() {
+    let text = br##"{ "name": "Odd", "themes": [
+        { "name": "Odd", "style": { "editor.background": "#f8f8f8", "text": "#111111", "border": "teal", "text.muted": 4 } },
+        { "name": "Odd", "appearance": "dim", "style": {} }
+    ] }"##;
+    let outcomes = load_one("odd.json", text.to_vec());
+    assert_eq!(outcomes.len(), 2);
+    let first = &outcomes[0];
+    let spec = first.specification.as_ref().unwrap();
+    assert_eq!(spec.locked_appearance, Some(CoreThemeAppearance::Light));
+    let messages: Vec<&str> = first.issues.iter().map(|i| i.message.as_str()).collect();
+    assert!(messages.contains(&"themes.0.appearance is missing; read as light"));
+    assert!(messages.contains(&"themes.0.style.border \"teal\" is not a hex colour; ignored"));
+    assert!(messages.contains(&"themes.0.style.text.muted should be a hex colour; ignored"));
+    // The second variant has the same name, so the same identifier: skipped.
+    assert!(outcomes[1].specification.is_none());
+    assert!(
+        outcomes[1]
+            .skipped_reason
+            .as_deref()
+            .unwrap()
+            .contains("already used by odd.json")
+    );
+}
+
+#[test]
+fn a_zed_variant_takes_a_primary_that_can_carry_the_focus_ring() {
+    // text.accent is the page's own colour; the cursor stands off it.
+    let text = br##"{ "themes": [ { "name": "Flat", "appearance": "dark", "style": {
+        "editor.background": "#202020", "text": "#e0e0e0", "text.accent": "#2020207f",
+        "border.focused": "#202020", "players": [ { "cursor": "#4c9aff" } ],
+        "element.hover": "#fff1"
+    } } ] }"##;
+    let outcomes = load_one("flat.json", text.to_vec());
+    let spec = outcomes[0].specification.clone().unwrap();
+    let dark = CoreThemeAppearance::Dark;
+    assert_eq!(hex(&spec, "primary", dark), "#4C9AFF");
+    // #rgba is Zed's too: #fff1 is white at 1/15.
+    assert_eq!(hex(&spec, "hover", dark), "#2F2F2F");
+    // Both tables say the same, though only the dark one is in force.
+    assert_eq!(
+        spec.palette.color("paper", CoreThemeAppearance::Light),
+        spec.palette.color("paper", dark)
+    );
+}

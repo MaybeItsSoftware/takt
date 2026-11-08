@@ -100,3 +100,10 @@ encouraged but not required.
   written without a fraction (`13`, not `13.0`), so compare them numerically.
 - Keys are sorted and the files are pretty-printed with a trailing newline,
   but compare parsed JSON, not bytes.
+
+## `zed/meadow.json`
+
+Not generated: a small, original Zed theme family (Zed's own format, two
+variants) that the core's tests load to hold the Zed mapping in
+`core/src/theme/zed.rs` to `docs/themes.md` ("Zed themes"). Nothing loads it
+as a built-in.

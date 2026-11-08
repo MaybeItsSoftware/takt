@@ -1,0 +1,76 @@
+{
+  "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
+  "name": "Meadow",
+  "author": "Takt",
+  "themes": [
+    {
+      "name": "Meadow Dusk",
+      "appearance": "dark",
+      "style": {
+        "background": "#1d2421ff",
+        "editor.background": "#161c1aff",
+        "editor.foreground": "#dfe8e2ff",
+        "surface.background": "#1f2724ff",
+        "elevated_surface.background": "#222b28ff",
+        "panel.background": "#1a201eff",
+        "element.background": "#26302cff",
+        "element.hover": "#ffffff14",
+        "ghost_element.hover": "#ffffff10",
+        "border": "#33403aff",
+        "border.variant": "#28322eff",
+        "border.focused": "#5fb3a1ff",
+        "text": "#dfe8e2ff",
+        "text.muted": "#a3b3aaff",
+        "text.placeholder": "#6f7f77ff",
+        "text.disabled": "#55625cff",
+        "text.accent": "#5fb3a1ff",
+        "icon.accent": "#5fb3a1ff",
+        "created": "#8cc06bff",
+        "deleted": "#e0706bff",
+        "modified": "#d9b25cff",
+        "success": "#8cc06bff",
+        "error": "#e0706bff",
+        "warning": "#d9b25cff",
+        "info": "#6aa6e0ff",
+        "hint": "#7d8f86ff",
+        "terminal.ansi.red": "#e0706bff",
+        "terminal.ansi.green": "#8cc06bff",
+        "terminal.ansi.yellow": "#d9b25cff",
+        "terminal.ansi.blue": "#6aa6e0ff",
+        "terminal.ansi.magenta": "#b48ce6ff",
+        "terminal.ansi.cyan": "#5fb3a1ff",
+        "accents": ["#5fb3a1ff", "#b48ce6ff", "#e48ac0ff", "#e8955aff"],
+        "players": [
+          { "cursor": "#5fb3a1ff", "background": "#5fb3a1ff", "selection": "#5fb3a13d" },
+          { "cursor": "#e8955aff", "background": "#e8955aff", "selection": "#e8955a3d" }
+        ],
+        "syntax": {
+          "keyword": { "color": "#b48ce6ff", "font_style": null, "font_weight": 700 },
+          "string": { "color": "#8cc06bff", "font_style": null, "font_weight": null },
+          "number": { "color": "#e8955aff", "font_style": null, "font_weight": null }
+        }
+      }
+    },
+    {
+      "name": "Meadow Morning",
+      "appearance": "light",
+      "style": {
+        "background": "#eef2eeff",
+        "editor.background": "#fbfcf9ff",
+        "surface.background": "#f2f5f1ff",
+        "panel.background": "#f2f5f1ff",
+        "element.hover": "#1d24211a",
+        "border": "#cdd6d0ff",
+        "border.variant": "#dfe5e0ff",
+        "text": "#1f2a25ff",
+        "text.muted": "#56645cff",
+        "text.placeholder": "#86948cff",
+        "text.accent": "#2f7f6fff",
+        "success": "#4f8a32ff",
+        "error": "#c0423cff",
+        "warning": "#9a7212ff",
+        "accents": ["#2f7f6fff", "#7a52c7ff", "#c2478fff", "#c8651eff"]
+      }
+    }
+  ]
+}

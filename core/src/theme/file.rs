@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 use super::json::{self, Json};
 use super::model::{CoreThemeIssueSeverity, CoreThemePlatform};
+use super::zed;
 
 /// Name → hex per appearance: a role under `palette`, a seed under `seeds`.
 #[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
@@ -202,19 +203,52 @@ impl CoreThemeFileIssue {
 // MARK: - Decoding
 
 /// Decodes one file. A document that is not a theme is `None` plus the
-/// reason; keys the format does not have are warnings.
+/// reason; keys the format does not have are warnings. A Zed theme family
+/// decodes as its first variant (see [`decode_all`] for every one).
 pub fn decode(data: &[u8], source: &str) -> (Option<CoreThemeFile>, Vec<CoreThemeFileIssue>) {
+    match decode_all(data, source) {
+        Ok(mut themes) => {
+            let (file, issues) = themes.remove(0);
+            (Some(file), issues)
+        }
+        Err(issues) => (None, issues),
+    }
+}
+
+/// Decodes one file into every theme it holds: one for a Takt theme, one
+/// per variant for a Zed theme family (`zed.rs`), in the family's order.
+/// Never an empty list; a file with no theme in it is its issues.
+pub fn decode_all(
+    data: &[u8],
+    source: &str,
+) -> Result<Vec<(CoreThemeFile, Vec<CoreThemeFileIssue>)>, Vec<CoreThemeFileIssue>> {
     let Some(root) = json::parse(data) else {
-        return (
-            None,
-            vec![CoreThemeFileIssue::new(
-                source,
-                CoreThemeIssueSeverity::Error,
-                "not valid JSON",
-            )],
-        );
+        return Err(vec![CoreThemeFileIssue::new(
+            source,
+            CoreThemeIssueSeverity::Error,
+            "not valid JSON",
+        )]);
     };
-    let file = match read(&root) {
+    if zed::is_family(&root) {
+        return zed::variants(&root, source)
+            .map(|variants| variants.into_iter().map(|v| (v.file, v.issues)).collect())
+            .map_err(|message| {
+                vec![CoreThemeFileIssue::new(
+                    source,
+                    CoreThemeIssueSeverity::Error,
+                    message,
+                )]
+            });
+    }
+    let (file, issues) = decode_takt(&root, source);
+    match file {
+        Some(file) => Ok(vec![(file, issues)]),
+        None => Err(issues),
+    }
+}
+
+fn decode_takt(root: &Json, source: &str) -> (Option<CoreThemeFile>, Vec<CoreThemeFileIssue>) {
+    let file = match read(root) {
         Ok(file) => file,
         Err(message) => {
             return (
@@ -227,7 +261,7 @@ pub fn decode(data: &[u8], source: &str) -> (Option<CoreThemeFile>, Vec<CoreThem
             );
         }
     };
-    let issues = unknown_keys(&root)
+    let issues = unknown_keys(root)
         .into_iter()
         .map(|path| {
             let message = if is_platform_palette(&path) {

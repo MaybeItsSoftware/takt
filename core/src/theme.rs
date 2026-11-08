@@ -15,6 +15,7 @@ pub mod loader;
 pub mod merge;
 pub mod model;
 pub mod seeds;
+pub mod zed;
 
 use std::collections::HashMap;
 
