@@ -13,7 +13,7 @@ use super::widgets::field_text;
 use super::{MONO_FONT, Takt, Tokens};
 use crate::platform::hotkeys::Hotkey;
 use crate::state::Editing;
-use crate::state::plugins::Plugin;
+use crate::state::plugins::{GOOGLE_ACCOUNT, Plugin};
 use crate::state::settings::{self as page, Control, SettingRow, SettingsMenu};
 use crate::text_field::{FieldKey, TextField};
 use gpui::{
@@ -209,6 +209,7 @@ impl Takt {
             FieldKey::Commit => {
                 self.app.choose_setting_menu(&query);
                 self.settings_menu.field = TextField::default();
+                self.setting_chosen(cx);
             }
             FieldKey::Cancel => {
                 if query.is_empty() {
@@ -413,6 +414,15 @@ impl Takt {
         }
     }
 
+    /// After a dropdown's choice: a field it asked for opens (Self-hosted
+    /// asks for the address), and what it changed is applied.
+    fn setting_chosen(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.app.editing, Some(Editing::Ask(_))) {
+            self.begin_editing();
+        }
+        self.after_change(cx);
+    }
+
     /// A setting clicked: it is the one under the keyboard, and it changes.
     fn settings_clicked(&mut self, ix: usize, id: &str, cx: &mut Context<Self>) {
         if let Some(page) = self.app.settings_page.as_mut() {
@@ -458,6 +468,7 @@ impl Takt {
         let current = self.app.settings_category();
         let categories = self.app.settings_categories();
         let mut plugins_headed = false;
+        let google_folded = self.google_folded;
         let keys = self.app.settings_category_keys();
         let show_keys = !self.app.prefs.hide_key_hints;
         let hint = |key: &'static str, what: &'static str| {
@@ -524,27 +535,60 @@ impl Takt {
                     .flex()
                     .flex_col()
                     .gap(px(1.))
-                    .children(categories.into_iter().map(|(name, glyph)| {
+                    .children(categories.into_iter().filter_map(|(name, glyph)| {
                         let chord = keys
                             .iter()
                             .find(|(entry, _)| *entry == name)
                             .map(|(_, chord)| chord.clone())
                             .filter(|_| show_keys);
                         let plugin = page::plugin_named(name).filter(|p| p.home().is_none());
-                        let first_plugin = plugin.is_some() && !plugins_headed;
-                        plugins_headed |= plugin.is_some();
+                        let google = name == GOOGLE_ACCOUNT;
+                        let under_google = plugin.is_some_and(|p| p.is_google());
+                        // Folded, Google's plugins hide, but not the one shown.
+                        if under_google && google_folded && name != current {
+                            return None;
+                        }
+                        let in_plugins = plugin.is_some() || google;
+                        let first_plugin = in_plugins && !plugins_headed;
+                        plugins_headed |= in_plugins;
                         let chosen = !searching && name == current;
                         let entry = div()
                             .id(SharedString::from(format!("settings-category-{name}")))
                             .h(px(28.))
                             .px_2()
+                            .when(under_google, |d| d.pl(px(30.)))
                             .flex()
                             .items_center()
                             .gap_2()
                             .rounded(px(4.))
                             .when(chosen, |d| d.bg(t.selected))
                             .when(!chosen, |d| d.hover(|d| d.bg(t.hover)))
-                            .when(plugin.is_none(), |d| {
+                            .when(google, |d| {
+                                d.child(
+                                    div()
+                                        .id("settings-google-fold")
+                                        .flex_none()
+                                        .rounded(px(4.))
+                                        .hover(|d| d.bg(t.hover))
+                                        .child(
+                                            icon(
+                                                if google_folded {
+                                                    "chevron-right"
+                                                } else {
+                                                    "chevron-down"
+                                                },
+                                                14.,
+                                            )
+                                            .text_color(t.muted),
+                                        )
+                                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                            cx.stop_propagation();
+                                            this.google_folded = !this.google_folded;
+                                            cx.notify();
+                                        })),
+                                )
+                            })
+                            .when(plugin.is_none() && !google, |d| {
                                 d.child(icon(glyph, 14.).text_color(if chosen {
                                     t.text
                                 } else {
@@ -568,25 +612,30 @@ impl Takt {
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.settings_field = TextField::default();
                                 this.app.choose_settings_category(name);
+                                if google {
+                                    this.google_folded = false;
+                                }
                                 this.settings_scroll.set_offset(Default::default());
                                 cx.notify();
                             }));
-                        div()
-                            .flex()
-                            .flex_col()
-                            .when(first_plugin, |d| {
-                                d.child(
-                                    div()
-                                        .px_2()
-                                        .pt_4()
-                                        .pb_1()
-                                        .text_size(px(10.))
-                                        .font_weight(FontWeight::BOLD)
-                                        .text_color(t.placeholder)
-                                        .child("PLUGINS"),
-                                )
-                            })
-                            .child(entry)
+                        Some(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .when(first_plugin, |d| {
+                                    d.child(
+                                        div()
+                                            .px_2()
+                                            .pt_4()
+                                            .pb_1()
+                                            .text_size(px(10.))
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(t.placeholder)
+                                            .child("PLUGINS"),
+                                    )
+                                })
+                                .child(entry),
+                        )
                     })),
             )
             .child(
@@ -886,7 +935,7 @@ impl Takt {
                         cx.stop_propagation();
                         this.app.choose_setting_option(&row, &value);
                         this.settings_menu.field = TextField::default();
-                        this.after_change(cx);
+                        this.setting_chosen(cx);
                         cx.notify();
                     }))
                     .child(div().w(px(14.)).flex_none().when(option.current, |d| {

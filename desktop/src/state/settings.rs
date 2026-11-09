@@ -59,8 +59,9 @@ fn option(value: impl Into<String>, label: impl Into<String>, current: bool) -> 
 }
 
 /// The settings whose control is a dropdown of options.
-const SELECTS: [&str; 7] = [
+const SELECTS: [&str; 8] = [
     "theme",
+    "sync-host",
     "appearance",
     "quick-capture-list",
     "celebration",
@@ -127,26 +128,37 @@ fn section_rank(row: &SettingRow) -> (usize, bool) {
     (section, !row.id.starts_with("plugin:"))
 }
 
-/// A plugin's page in order: its switch, the Google sign-in if it is a
-/// Google plugin, then its own settings.
+/// A plugin's page in order: its switch, then its own settings. The
+/// Google sign-in is the Google page's, above them in the sidebar.
 fn plugin_page(plugin: Plugin, rows: Vec<SettingRow>) -> Vec<SettingRow> {
     let mut shown: Vec<SettingRow> = rows
         .into_iter()
-        .filter(|row| {
-            category_of(row.group) == plugin.name()
-                || (plugin.is_google() && row.group == plugins::GOOGLE_ACCOUNT)
-        })
+        .filter(|row| category_of(row.group) == plugin.name())
         .collect();
-    shown.sort_by_key(|row| {
-        if row.id.starts_with("plugin:") {
-            0
-        } else if row.group == plugins::GOOGLE_ACCOUNT {
-            1
-        } else {
-            2
-        }
-    });
+    shown.sort_by_key(|row| !row.id.starts_with("plugin:"));
     shown
+}
+
+/// The section the Google page lists its plugins' switches under.
+const GOOGLE_SERVICES: &str = "Services";
+
+/// The Google page: the sign-in, then a switch for each Google plugin.
+fn google_page(rows: Vec<SettingRow>) -> Vec<SettingRow> {
+    let (mut account, services): (Vec<SettingRow>, Vec<SettingRow>) = rows
+        .into_iter()
+        .filter_map(|mut row| {
+            if row.group == plugins::GOOGLE_ACCOUNT {
+                return Some(row);
+            }
+            let plugin = row.id.strip_prefix("plugin:").and_then(Plugin::from_id)?;
+            plugin.is_google().then(|| {
+                row.group = GOOGLE_SERVICES;
+                row
+            })
+        })
+        .partition(|row| row.group == plugins::GOOGLE_ACCOUNT);
+    account.extend(services);
+    account
 }
 
 /// `options` narrowed to those with every word of `query` in their label
@@ -335,7 +347,10 @@ impl SettingRow {
             "sync-email" => "Sign in to an account made with an email address.",
             "sync-create" => "Make an account with an email address.",
             "sync-reset" => "Send a link to choose a new password.",
-            "sync-server" => "The server sync talks to.",
+            "sync-host" => {
+                "Takt's own server, or one you run yourself from sync-server/. Changing it signs you out."
+            }
+            "sync-server" => "The address of the server you run.",
             "checkvist-connect" => "Copy your Checkvist lists into the workspace.",
             "checkvist-import" => "Copy in the Checkvist lists the workspace lacks.",
             "checkvist-disconnect" => "Forget the Checkvist account; imported lists stay.",
@@ -536,7 +551,13 @@ impl App {
                 shown.push((category, "settings"));
             }
         }
-        shown.extend(pages.into_iter().map(|p| (p.name(), "plug")));
+        // Google heads its plugins, which the sidebar folds under it.
+        for plugin in pages {
+            if plugin.is_google() && !shown.iter().any(|(n, _)| *n == plugins::GOOGLE_ACCOUNT) {
+                shown.push((plugins::GOOGLE_ACCOUNT, "plug"));
+            }
+            shown.push((plugin.name(), "plug"));
+        }
         shown
     }
 
@@ -547,6 +568,7 @@ impl App {
         let (mut categories, mut plugins) = (0, 0);
         self.settings_categories()
             .into_iter()
+            .filter(|(name, _)| *name != plugins::GOOGLE_ACCOUNT)
             .filter_map(|(name, _)| {
                 let plugin = pages.iter().any(|p| p.name() == name);
                 let n = if plugin {
@@ -626,6 +648,9 @@ impl App {
             let category = self.settings_category();
             if let Some(plugin) = plugin_named(category).filter(|p| p.home().is_none()) {
                 return plugin_page(plugin, rows);
+            }
+            if category == plugins::GOOGLE_ACCOUNT {
+                return google_page(rows);
             }
             let mut shown: Vec<SettingRow> = rows
                 .into_iter()
@@ -770,6 +795,19 @@ impl App {
                     )
                     .collect()
             }
+            "sync-host" => {
+                let hosted = self.sync_hosted();
+                vec![
+                    SelectOption {
+                        detail: "Ours, £1 a year".into(),
+                        ..option("takt", "Takt Sync", hosted)
+                    },
+                    SelectOption {
+                        detail: "A server you run".into(),
+                        ..option("self", "Self-hosted", !hosted)
+                    },
+                ]
+            }
             "remind-due-today-at" => time_options(p.remind_due_today_minute),
             "remind-dailies-at" => time_options(p.remind_dailies_left_minute),
             _ => return None,
@@ -873,6 +911,7 @@ impl App {
                 self.apply_choice(Picker::CaptureList, Choice::CaptureList(some()))
             }
             "google-calendar-choose" => self.choose_google_calendar(some()),
+            "sync-host" => self.choose_sync_host(value == "self"),
             "celebration" => {
                 self.prefs.celebration = Some(value.into());
                 self.prefs.save();
@@ -1138,7 +1177,7 @@ mod tests {
     }
 
     #[test]
-    fn a_google_plugins_page_is_its_switch_the_sign_in_then_its_settings() {
+    fn a_google_plugins_page_is_its_switch_then_its_settings() {
         let rows = [
             row("google-calendar-choose", "Google Calendar"),
             row("google-connect", plugins::GOOGLE_ACCOUNT),
@@ -1155,13 +1194,22 @@ mod tests {
         };
         assert_eq!(
             ids(Plugin::GoogleCalendar),
-            [
-                "plugin:google-calendar",
-                "google-connect",
-                "google-calendar-choose"
-            ]
+            ["plugin:google-calendar", "google-calendar-choose"]
         );
         assert_eq!(ids(Plugin::Checkvist), ["checkvist-import"]);
+        let google: Vec<(String, &str)> =
+            google_page(rows.iter().map(|r| row(&r.id, r.group)).collect())
+                .into_iter()
+                .map(|r| (r.id, r.group))
+                .collect();
+        assert_eq!(
+            google,
+            [
+                ("google-connect".to_string(), plugins::GOOGLE_ACCOUNT),
+                ("plugin:google-calendar".to_string(), GOOGLE_SERVICES),
+                ("plugin:google-drive".to_string(), GOOGLE_SERVICES),
+            ]
+        );
     }
 
     #[test]

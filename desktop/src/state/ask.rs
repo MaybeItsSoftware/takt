@@ -51,7 +51,7 @@ impl Ask {
             Ask::SyncPassword { .. } => "Sign in to sync",
             Ask::SyncResetEmail => "Reset the sync password",
             Ask::SyncNewPassword => "Choose a new password",
-            Ask::SyncServer => "Sync server",
+            Ask::SyncServer => "Self-hosted sync server",
             Ask::SyncDelete => "Delete the sync account",
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
             Ask::Agent => "Ask the agent",
@@ -68,7 +68,7 @@ impl Ask {
         match self {
             Ask::SyncEmail { .. } | Ask::SyncResetEmail | Ask::CheckvistEmail => "Email address",
             Ask::SyncPassword { .. } | Ask::SyncNewPassword => "Password",
-            Ask::SyncServer => "https://… (empty for the hosted server)",
+            Ask::SyncServer => "https://sync.example.com",
             Ask::SyncDelete => "delete",
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
             Ask::Agent => "Make it due Friday, split it up, explain it…",
@@ -88,7 +88,7 @@ impl Ask {
                 "Deletes the account, everything synced to it and its devices. This Mac keeps its workspace. Type delete to go ahead.".into()
             }
             Ask::SyncServer => {
-                "A self-hosted server must trust the same Supabase project.".into()
+                "Run sync-server/ from Takt's repository; it must trust the same Supabase project. Leave it empty for Takt Sync.".into()
             }
             Ask::CheckvistKey { email } => format!("For {email}. Kept in the keychain."),
             Ask::GoogleClientSecret => {
@@ -129,6 +129,7 @@ impl App {
             Ask::SyncEmail { .. } | Ask::SyncResetEmail => {
                 self.sync.status().email.unwrap_or_default()
             }
+            Ask::SyncServer if self.sync_hosted() => String::new(),
             Ask::SyncServer => self.sync.status().server,
             Ask::GoogleClientId => self.google_client_id(),
             Ask::JoinList => clipboard_invite().unwrap_or_default(),

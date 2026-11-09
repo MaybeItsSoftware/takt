@@ -24,9 +24,9 @@ pub enum Plugin {
     Celebration,
 }
 
-/// The section the Google sign-in rows sit in, shown while any Google
-/// plugin is on.
-pub const GOOGLE_ACCOUNT: &str = "Google account";
+/// The Google page: the sign-in every Google plugin shares, and the
+/// plugins themselves, which sit under it in the sidebar.
+pub const GOOGLE_ACCOUNT: &str = "Google";
 
 impl Plugin {
     /// In the order the page lists them.

@@ -59,6 +59,8 @@ pub struct Takt {
     /// The settings page's search, and where its list is scrolled.
     settings_field: TextField,
     settings_scroll: gpui::ScrollHandle,
+    /// The Google plugins folded away under Google in the settings sidebar.
+    google_folded: bool,
     /// The open dropdown's filter and scroll on the settings page.
     settings_menu: settings::MenuView,
     /// The board's columns side to side, and each column's cards.
@@ -170,6 +172,7 @@ impl Takt {
             overlay: OverlayState::default(),
             settings_field: TextField::default(),
             settings_scroll: gpui::ScrollHandle::new(),
+            google_folded: false,
             settings_menu: Default::default(),
             board_scroll: gpui::ScrollHandle::new(),
             card_scrolls: Default::default(),

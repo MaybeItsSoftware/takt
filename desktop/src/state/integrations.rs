@@ -21,6 +21,25 @@ impl App {
     pub fn platform_settings(&self) -> Vec<(&'static str, &'static str, &'static str, String)> {
         let status = self.sync.status();
         let mut rows = Vec::new();
+        rows.push((
+            "sync-host",
+            "Sync",
+            "Server",
+            if self.sync_hosted() {
+                "Takt Sync"
+            } else {
+                "Self-hosted"
+            }
+            .to_string(),
+        ));
+        if !self.sync_hosted() {
+            rows.push((
+                "sync-server",
+                "Sync",
+                "Server address",
+                status.server.clone(),
+            ));
+        }
         let phase = match &status.phase {
             Phase::Unpaired => "Off".to_string(),
             Phase::NeedsSignIn => "Signed out: sign in again".to_string(),
@@ -100,7 +119,6 @@ impl App {
             ));
             rows.push(("sync-reset", "Sync", "Forgot the password", String::new()));
         }
-        rows.push(("sync-server", "Sync", "Sync server", status.server.clone()));
         match self.checkvist_connected() {
             Some(user) => {
                 rows.push((
@@ -128,6 +146,27 @@ impl App {
         rows.extend(self.reminder_rows());
         rows.extend(self.celebration_rows());
         rows
+    }
+
+    /// Whether sync talks to Takt's own server.
+    pub fn sync_hosted(&self) -> bool {
+        self.sync.status().server == crate::sync::HOSTED_SERVER
+    }
+
+    /// The Server dropdown: back to Takt Sync at once, or a self-hosted
+    /// server's address asked for.
+    pub fn choose_sync_host(&mut self, own: bool) {
+        if !own {
+            if !self.sync_hosted()
+                && let Err(problem) = self.sync.use_server("")
+            {
+                self.message = Some(problem);
+            }
+            return;
+        }
+        if self.sync_hosted() {
+            self.ask(Ask::SyncServer);
+        }
     }
 
     pub fn change_platform_setting(&mut self, id: &str) {

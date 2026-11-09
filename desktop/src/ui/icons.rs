@@ -34,6 +34,7 @@ impl gpui::AssetSource for Assets {
 const NAMES: &[&str] = &[
     "chevron-left",
     "chevron-right",
+    "chevron-down",
     "panel-left",
     "sparkles",
     "search",
@@ -244,6 +245,7 @@ fn body(name: &str) -> Option<&'static str> {
         }
         "chevron-left" => r#"<path d="m15 18-6-6 6-6"/>"#,
         "chevron-right" => r#"<path d="m9 18 6-6-6-6"/>"#,
+        "chevron-down" => r#"<path d="m6 9 6 6 6-6"/>"#,
         _ => return None,
     })
 }
