@@ -8,7 +8,7 @@ accent `#007fff`, scale `#b6b3bf`, paper `#faf8f4` — the house palette.
 | --- | --- |
 | `takt-mark.svg` | The mark alone, on nothing. Store art, the web, anything that brings its own ground |
 | `takt-icon.svg` | Full bleed on chalk, for the platforms that cut their own shape: iPhone, watch, Play's 512 |
-| `takt-icon-mac.svg` | The Mac's, which draws its own tile — the 824 grid square, a hairline instead of a shadow |
+| `takt-icon-mac.svg` | The Mac's, which draws its own tile — the 824 grid square, a hairline instead of a shadow. Since 2026-11-09 it is drawn after Zed, as the desktop app is: a dark grape tile (`#1c1a23`), the body as one even white monoline, and the azure pendulum breaking through its top edge, the frame cut back around it. The phones keep the solid mark for now |
 
 `scripts/build_icons.sh` writes every PNG app icon from these. Android's and
 Wear OS's launchers are vector drawables (`res/drawable/ic_launcher_*.xml`)
