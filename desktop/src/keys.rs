@@ -227,6 +227,47 @@ fn inherits(command: &CommandEntry, key: &str, surface: CommandSurface) -> bool 
     }
 }
 
+/// The pomodoro: `gf` starts a plain timer, `gp` a pomodoro.
+pub const START_POMODORO: &str = "taskStartPomodoro";
+
+/// The Mac app's own commands, which the shared catalogue does not carry:
+/// the phones have no pomodoro apart from the timer. Each goes in beside
+/// the catalogue command it sits with, on that command's surface, and
+/// after a keymap is laid over the catalogue, so a key the keymap gave
+/// elsewhere keeps it (the first claimant wins).
+fn with_desktop_commands(mut commands: Vec<CommandEntry>) -> Vec<CommandEntry> {
+    if commands.iter().any(|c| c.id == START_POMODORO) {
+        return commands;
+    }
+    let (at, surface) = commands
+        .iter()
+        .position(|c| c.id == "taskStartFocus")
+        .map(|ix| (ix + 1, commands[ix].surface))
+        .unwrap_or((commands.len(), CommandSurface::Anywhere));
+    let claimed = |key: &str| commands.iter().any(|c| c.keys.iter().any(|k| k == key));
+    let keys = ["gp"]
+        .into_iter()
+        .filter(|key| !claimed(key))
+        .map(str::to_string)
+        .collect();
+    commands.insert(
+        at,
+        CommandEntry {
+            id: START_POMODORO.into(),
+            title: "Start a pomodoro on the task".into(),
+            group: "Task".into(),
+            keys,
+            surface_keys: Vec::new(),
+            surface,
+            motion: false,
+            note: Some(
+                "A block of the suggested length, 25 minutes unless the task says otherwise, with a break offered at its end. gf starts a plain timer instead".into(),
+            ),
+        },
+    );
+    commands
+}
+
 /// The catalogue's keys in force, indexed for lookup by surface.
 pub struct Bindings {
     pub commands: Vec<CommandEntry>,
@@ -237,7 +278,10 @@ pub struct Bindings {
 
 impl Bindings {
     pub fn shipped() -> Self {
-        Self::new(workspace_command_catalog(), HashMap::new())
+        Self::new(
+            with_desktop_commands(workspace_command_catalog()),
+            HashMap::new(),
+        )
     }
 
     /// The catalogue with `keymap.json` laid over it, and what in the file
@@ -257,7 +301,10 @@ impl Bindings {
             .chain(resolved.issues)
             .map(|issue| issue.message)
             .collect();
-        (Self::new(resolved.commands, unbound), issues)
+        (
+            Self::new(with_desktop_commands(resolved.commands), unbound),
+            issues,
+        )
     }
 
     pub fn new(
@@ -523,6 +570,32 @@ mod tests {
             ..press("-")
         };
         assert_eq!(spell(&ctrl_shift_minus).unwrap(), "ctrl+shift+-");
+    }
+
+    #[test]
+    fn gp_starts_a_pomodoro_wherever_gf_starts_a_timer() {
+        let bindings = Bindings::shipped();
+        let catalogue = workspace_command_catalog();
+        assert!(
+            catalogue
+                .iter()
+                .all(|c| c.id != START_POMODORO && !c.keys.iter().any(|k| k == "gp")),
+            "the catalogue now has gp or the pomodoro itself"
+        );
+        for surface in [
+            CommandSurface::Anywhere,
+            CommandSurface::Today,
+            CommandSurface::Outline,
+            CommandSurface::Board,
+        ] {
+            assert_eq!(
+                bindings.command("gp", surface).map(|c| c.id.as_str()),
+                Some(START_POMODORO),
+                "gp on {surface:?}"
+            );
+        }
+        let (keymapped, _) = Bindings::with_user_keymap("[]");
+        assert!(keymapped.entry(START_POMODORO).is_some());
     }
 
     #[test]

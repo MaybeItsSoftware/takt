@@ -270,7 +270,7 @@ pub struct App {
     pub board: board::Board,
     /// The running focus session, and a task waiting on "start anyway".
     pub focus_session: Option<takt_core::rows::SessionRow>,
-    pub pending_focus: Option<String>,
+    pub pending_focus: Option<(String, focus::FocusKind)>,
     /// "How did it go?", while it is asked.
     pub focus_prompt: Option<focus_prompt::FocusPrompt>,
     /// The block (or break) whose end has been announced.

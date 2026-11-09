@@ -6,7 +6,6 @@
 //! and the ways into the app.
 
 use super::App;
-use super::focus::{clock, elapsed_seconds};
 use super::store::now_ms;
 use crate::platform::hotkeys;
 use crate::platform::status_item::{Entry, Snapshot, clip};
@@ -58,23 +57,13 @@ impl App {
         if let Some(session) = &self.focus_session {
             let now = now_ms();
             let title = self.running_title().unwrap_or_else(|| "Focus".into());
-            let (reading, over) = if session.phase == "onBreak" {
-                let left = session
-                    .break_ends_at_ms
-                    .map(|end| (end - now) / 1000)
-                    .unwrap_or(0);
-                (format!("Break {}", clock(left.max(0))), left < 0)
+            let (text, over) = super::focus::reading(session, now);
+            let reading = if session.phase == "onBreak" {
+                format!("Break {text}")
+            } else if session.paused_at_ms.is_some() {
+                format!("⏸ {text}")
             } else {
-                let elapsed = elapsed_seconds(session, now);
-                let planned = session.work_duration_seconds.max(1);
-                let paused = session.paused_at_ms.is_some();
-                let left = planned - elapsed;
-                let text = if left >= 0 {
-                    clock(left)
-                } else {
-                    format!("+{}", clock(-left))
-                };
-                (if paused { format!("⏸ {text}") } else { text }, left < 0)
+                text
             };
             snapshot.title = format!("{}  {reading}", clip(&title, 28));
             snapshot.monospaced = true;

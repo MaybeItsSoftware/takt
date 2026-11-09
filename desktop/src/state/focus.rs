@@ -3,18 +3,59 @@
 //! far logged). `WorkspaceViewModel+Focus.swift`, through the core's focus
 //! calls; the core keeps the clock, this reads it.
 //!
-//! Not yet: the "how did it go?" prompt after a block, breaks, the queue
-//! and the floating focus panel.
+//! Two ways in: `gf` starts a plain timer that counts up, and `gp` a
+//! pomodoro, a block of the suggested length with a break offered after.
 
 use super::store::now_ms;
 use super::{App, Editing};
-use takt_core::focus::FocusContext;
+use takt_core::focus::{FocusContext, Unavailable};
 use takt_core::rows::SessionRow;
 use takt_core::workspace::CoreWorkspace;
 
 /// The Swift app's defaults: 25-minute blocks, 5-minute breaks.
 const WORK_SECONDS: i64 = 25 * 60;
 const BREAK_SECONDS: i64 = 5 * 60;
+
+/// A timer's planned length: a day, which nobody sets a pomodoro to. The
+/// core has no open-ended block, so a timer is a block this long; the clock
+/// counts up and the prompt at its end never comes in practice.
+pub const OPEN_ENDED_SECONDS: i64 = 24 * 60 * 60;
+
+/// How a block was started: `gf`, a plain timer counting up; `gp`, a
+/// pomodoro counting down to a break.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FocusKind {
+    Timer,
+    Pomodoro,
+}
+
+/// A timer, counting up with no length, rather than a pomodoro.
+pub fn is_timer(session: &SessionRow) -> bool {
+    session.work_duration_seconds >= OPEN_ENDED_SECONDS
+}
+
+/// The clock as the pill and the status item read it: up for a timer,
+/// down for a pomodoro (`+` once it runs over), down for a break. The
+/// bool is true once a pomodoro or break has run over.
+pub fn reading(session: &SessionRow, now: i64) -> (String, bool) {
+    if session.phase == "onBreak" {
+        let left = session
+            .break_ends_at_ms
+            .map(|end| (end - now) / 1000)
+            .unwrap_or(0);
+        return (clock(left.max(0)), left < 0);
+    }
+    let elapsed = elapsed_seconds(session, now);
+    if is_timer(session) {
+        return (clock(elapsed), false);
+    }
+    let left = session.work_duration_seconds.max(1) - elapsed;
+    if left >= 0 {
+        (clock(left), false)
+    } else {
+        (format!("+{}", clock(-left)), true)
+    }
+}
 
 /// What holds now (the conditions on, the time available), as last saved.
 pub fn focus_context(core: &CoreWorkspace, workspace_id: &str) -> FocusContext {
@@ -57,10 +98,20 @@ impl App {
         self.focus_session.is_some()
     }
 
-    /// `⌘⇧F` on a task: a block on it, as long as the core suggests for
-    /// it. A task ruled out now (a condition, a start in the future) asks
-    /// first; Return starts it anyway.
+    /// `gf` on a task: a plain timer on it, counting up with no planned
+    /// length and no break at the end. A task ruled out now (a condition,
+    /// a start in the future) asks first; Return starts it anyway.
     pub fn start_focus_on_selected(&mut self, override_availability: bool) {
+        self.start_focus(FocusKind::Timer, override_availability);
+    }
+
+    /// `gp` on a task: a pomodoro, a block as long as the core suggests for
+    /// it (25 minutes by default) with a 5-minute break offered at its end.
+    pub fn start_pomodoro_on_selected(&mut self, override_availability: bool) {
+        self.start_focus(FocusKind::Pomodoro, override_availability);
+    }
+
+    fn start_focus(&mut self, kind: FocusKind, override_availability: bool) {
         let Some(task) = self.selected().cloned() else {
             return;
         };
@@ -77,19 +128,39 @@ impl App {
             .next_up_candidates(now, zone.clone())
             .ok()
             .and_then(|candidates| candidates.into_iter().find(|c| c.id == task.id));
-        let available = candidate.is_some();
+        // A timer has no length, so only what rules the task out itself
+        // (a condition, a start later) holds it back, not the time left.
+        let available =
+            match (kind, &candidate) {
+                (FocusKind::Timer, Some(c)) => takt_core::focus::reasons(c, &context, now)
+                    .iter()
+                    .all(|reason| {
+                        matches!(
+                            reason,
+                            Unavailable::InsufficientTime { .. } | Unavailable::NeedsEstimate
+                        )
+                    }),
+                (FocusKind::Pomodoro, Some(_)) => true,
+                (_, None) => false,
+            };
         if !available && !override_availability {
-            self.pending_focus = Some(task.id.clone());
+            self.pending_focus = Some((task.id.clone(), kind));
             self.message = Some(format!(
                 "\u{201c}{}\u{201d} isn't available now. Return starts it anyway.",
                 task.title
             ));
             return;
         }
-        let planned = candidate
-            .as_ref()
-            .map(|c| takt_core::focus::suggested_seconds(c, &context, now))
-            .unwrap_or(WORK_SECONDS);
+        let planned = match kind {
+            FocusKind::Timer => OPEN_ENDED_SECONDS,
+            FocusKind::Pomodoro => candidate
+                .as_ref()
+                .map(|c| takt_core::focus::suggested_seconds(c, &context, now))
+                .unwrap_or(WORK_SECONDS),
+        };
+        // The timer's availability was settled above; the core would hold
+        // its open length against the time left.
+        let override_core = !available || kind == FocusKind::Timer;
         let started = self.write(|store| {
             store.core.start_focus_session(
                 task.id.clone(),
@@ -97,7 +168,7 @@ impl App {
                 WORK_SECONDS,
                 BREAK_SECONDS,
                 Some(context),
-                !available,
+                override_core,
                 now,
                 zone,
             )
@@ -105,11 +176,14 @@ impl App {
         if started.is_some() {
             self.reload_focus();
             self.reload_today();
-            self.message = Some(format!(
-                "Focusing on \u{201c}{}\u{201d} for {} min.",
-                task.title,
-                planned / 60
-            ));
+            self.message = Some(match kind {
+                FocusKind::Timer => format!("Timing \u{201c}{}\u{201d}.", task.title),
+                FocusKind::Pomodoro => format!(
+                    "Pomodoro on \u{201c}{}\u{201d} for {} min.",
+                    task.title,
+                    planned / 60
+                ),
+            });
         }
     }
 
@@ -122,9 +196,11 @@ impl App {
         };
         if self
             .write(|store| {
+                // Behind a timer, the next task is timed too.
+                let planned = is_timer(&session).then_some(OPEN_ENDED_SECONDS);
                 store
                     .core
-                    .add_to_focus_queue(session.id, task.id.clone(), None, now_ms())
+                    .add_to_focus_queue(session.id, task.id.clone(), planned, now_ms())
             })
             .is_some()
         {
@@ -211,12 +287,16 @@ impl App {
         let elapsed = elapsed_seconds(session, now);
         let planned = session.work_duration_seconds.max(1);
         let paused = session.paused_at_ms.is_some();
+        let title = if paused {
+            format!("{title} (paused)")
+        } else {
+            title
+        };
+        if is_timer(session) {
+            return Some((title, clock(elapsed), false));
+        }
         Some((
-            if paused {
-                format!("{title} (paused)")
-            } else {
-                title
-            },
+            title,
             format!("{} / {}", clock(elapsed), clock(planned)),
             elapsed > planned,
         ))
@@ -224,12 +304,12 @@ impl App {
 
     /// Return confirms a pending "start anyway"; any other key drops it.
     pub fn confirm_pending_focus(&mut self, key: &str) -> bool {
-        let Some(id) = self.pending_focus.take() else {
+        let Some((id, kind)) = self.pending_focus.take() else {
             return false;
         };
         if key == "enter" {
             self.selected_task = Some(id);
-            self.start_focus_on_selected(true);
+            self.start_focus(kind, true);
         } else {
             self.message = None;
         }

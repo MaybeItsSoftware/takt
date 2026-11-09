@@ -146,7 +146,21 @@ impl App {
 
             // Focus
             "goFocus" => self.wants_panel = Some(true),
-            "taskStartFocus" => self.start_focus_on_selected(false),
+            // Behind a running block, either one queues the task.
+            "taskStartFocus" => {
+                if self.focus_running() {
+                    self.add_selected_to_focus_queue();
+                } else {
+                    self.start_focus_on_selected(false);
+                }
+            }
+            crate::keys::START_POMODORO => {
+                if self.focus_running() {
+                    self.add_selected_to_focus_queue();
+                } else {
+                    self.start_pomodoro_on_selected(false);
+                }
+            }
             "focusFinish" => self.request_focus_completion(true),
             "focusStop" => self.stop_focus(),
 
@@ -998,6 +1012,7 @@ pub const PORTED: &[&str] = &[
     "taskPromoteList",
     "taskShowProgress",
     "taskStartFocus",
+    "taskStartPomodoro",
     "taskWaiting",
     "windowToggleDoneRail",
     "filterListEdit",
@@ -1077,7 +1092,7 @@ mod tests {
             .collect();
         for id in PORTED {
             assert!(
-                catalogue.iter().any(|known| known == id),
+                catalogue.iter().any(|known| known == id) || *id == crate::keys::START_POMODORO,
                 "{id} is not a catalogue id"
             );
         }
