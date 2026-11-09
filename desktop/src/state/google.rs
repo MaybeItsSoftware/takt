@@ -87,12 +87,25 @@ impl App {
         }
     }
 
+    /// The person's own client when they set one, else Takt's built in.
     pub fn google_client_id(&self) -> String {
         self.prefs
             .google_client_id
             .clone()
+            .or_else(|| google::BUILT_IN_CLIENT_ID.map(str::to_string))
             .or_else(google::swift_client_id)
+            .filter(|id| !id.trim().is_empty())
             .unwrap_or_default()
+    }
+
+    /// The secret that goes with `google_client_id`.
+    pub fn google_client_secret(&self) -> String {
+        match &self.prefs.google_client_id {
+            Some(_) => self.prefs.google_client_secret.clone().unwrap_or_default(),
+            None => google::BUILT_IN_CLIENT_SECRET
+                .unwrap_or_default()
+                .to_string(),
+        }
     }
 
     /// Starts the worker. Not in a smoke run, which must not reach Google.
@@ -166,6 +179,9 @@ impl App {
             "OAuth client ID",
             if client.is_empty() {
                 "Not set".into()
+            } else if self.prefs.google_client_id.is_none() && google::BUILT_IN_CLIENT_ID.is_some()
+            {
+                "Takt's".into()
             } else {
                 format!("{}…", client.chars().take(16).collect::<String>())
             },
@@ -176,6 +192,9 @@ impl App {
             "OAuth client secret",
             if self.prefs.google_client_secret.is_some() {
                 "Set"
+            } else if self.prefs.google_client_id.is_none() && google::BUILT_IN_CLIENT_ID.is_some()
+            {
+                "Takt's"
             } else {
                 "Not set"
             }
@@ -309,13 +328,14 @@ impl App {
         let text = text.trim();
         self.prefs.google_client_secret = (!text.is_empty()).then(|| text.to_string());
         self.prefs.save();
-        google::set_client_secret(text);
+        google::set_client_secret(&self.google_client_secret());
     }
 
     pub fn set_google_client_id(&mut self, text: &str) {
         let text = text.trim();
         self.prefs.google_client_id = (!text.is_empty()).then(|| text.to_string());
         self.prefs.save();
+        google::set_client_secret(&self.google_client_secret());
         *lock(&self.google.config) = self.google_config();
     }
 

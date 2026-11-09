@@ -78,6 +78,11 @@ static REFRESHING: Mutex<()> = Mutex::new(());
 /// real sense: it ships inside every installed copy.
 static CLIENT_SECRET: Mutex<String> = Mutex::new(String::new());
 
+/// Takt's own Desktop client, compiled in by the install script, which
+/// lets anyone connect without a Google Cloud project of their own.
+pub const BUILT_IN_CLIENT_ID: Option<&str> = option_env!("TAKT_GOOGLE_CLIENT_ID");
+pub const BUILT_IN_CLIENT_SECRET: Option<&str> = option_env!("TAKT_GOOGLE_CLIENT_SECRET");
+
 pub fn set_client_secret(secret: &str) {
     *CLIENT_SECRET.lock().unwrap_or_else(|p| p.into_inner()) = secret.trim().to_string();
 }

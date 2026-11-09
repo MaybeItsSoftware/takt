@@ -36,6 +36,15 @@ VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT_DIR/desktop/Cargo.toml" | 
 BUILD_NUMBER="$(git -C "$ROOT_DIR" rev-list --count HEAD 2>/dev/null || echo 1)"
 
 echo "==> Building takt-desktop and the takt CLI (release)…"
+# Takt's own Google Desktop OAuth client, so people connect Google without
+# a Cloud project of their own. Kept out of git (the repo is public):
+# TAKT_GOOGLE_CLIENT_ID and TAKT_GOOGLE_CLIENT_SECRET, compiled in.
+if [[ -f "$HOME/.config/takt/google-desktop.env" ]]; then
+  set -a; source "$HOME/.config/takt/google-desktop.env"; set +a
+fi
+if [[ -z "${TAKT_GOOGLE_CLIENT_ID:-}" ]]; then
+  echo "note: no TAKT_GOOGLE_CLIENT_ID; Google needs a client ID entered in Settings" >&2
+fi
 cargo build --release --manifest-path "$ROOT_DIR/desktop/Cargo.toml"
 cargo build --release --manifest-path "$ROOT_DIR/cli/Cargo.toml"
 

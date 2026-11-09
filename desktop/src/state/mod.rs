@@ -325,7 +325,6 @@ impl App {
     pub fn open() -> Result<Self, String> {
         let store = Store::open()?;
         let prefs = Prefs::load();
-        crate::google::set_client_secret(prefs.google_client_secret.as_deref().unwrap_or_default());
         let seen_version = store.core.data_version().unwrap_or_default();
         let sync = crate::sync::Sync::new(store.core.clone());
         let mut app = App {
@@ -405,6 +404,7 @@ impl App {
             seen_version,
             prefs,
         };
+        crate::google::set_client_secret(&app.google_client_secret());
         app.reload_sidebar();
         app.reload_details();
         app.reload_themes();
