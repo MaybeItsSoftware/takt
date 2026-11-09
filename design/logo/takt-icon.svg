@@ -1,14 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Full bleed, for the platforms that cut their own shape (iOS, watchOS, Play). -->
-  <rect width="1024" height="1024" fill="#faf8f4"/>
-  <path fill-rule="evenodd" fill="#444054" d="M404 224 H620 L752 816 H272 Z M436 288 H588 L676 704 H348 Z"/>
-  <g fill="#b6b3bf">
-    <rect x="440" y="360" width="32" height="12"/>
-    <rect x="428" y="432" width="32" height="12"/>
-    <rect x="416" y="504" width="32" height="12"/>
-    <rect x="404" y="576" width="32" height="12"/>
+  <!-- Full bleed, for the platforms that cut their own shape (iOS, watchOS,
+       Play). Written by draw_mark.py. -->
+  <rect width="1024" height="1024" fill="#1c1a23"/>
+  <g transform="translate(512 512) scale(0.84) translate(-512 -515)">
+    <rect x="193" y="213" width="638" height="34" rx="8" fill="#f5f4f7"/>
+    <rect x="193" y="213" width="34" height="347" rx="8" fill="#f5f4f7"/>
+    <rect x="797" y="213" width="34" height="347" rx="8" fill="#f5f4f7"/>
+    <rect x="269" y="289" width="200" height="34" rx="8" fill="#b6b3bf"/>
+    <rect x="269" y="289" width="34" height="511" rx="8" fill="#b6b3bf"/>
+    <rect x="555" y="289" width="200" height="34" rx="8" fill="#b6b3bf"/>
+    <rect x="721" y="289" width="34" height="511" rx="8" fill="#b6b3bf"/>
+    <rect x="345" y="365" width="124" height="34" rx="8" fill="#8a8698"/>
+    <rect x="345" y="365" width="34" height="435" rx="8" fill="#8a8698"/>
+    <rect x="555" y="365" width="124" height="34" rx="8" fill="#8a8698"/>
+    <rect x="645" y="365" width="34" height="435" rx="8" fill="#8a8698"/>
+    <rect x="421" y="441" width="48" height="34" rx="8" fill="#6e6b7c"/>
+    <rect x="421" y="441" width="34" height="359" rx="8" fill="#6e6b7c"/>
+    <rect x="555" y="441" width="48" height="34" rx="8" fill="#6e6b7c"/>
+    <rect x="569" y="441" width="34" height="359" rx="8" fill="#6e6b7c"/>
+    <rect x="495" y="213" width="34" height="601" rx="8" fill="#f5f4f7"/>
   </g>
-  <path fill="#007fff" d="M490.27 668.57 L533.73 675.43 L587.73 333.43 L544.27 326.57 Z"/>
-  <rect x="496" y="442" width="96" height="56" fill="#007fff" transform="rotate(9 544 470)"/>
-  <rect x="476" y="656" width="72" height="48" fill="#444054"/>
 </svg>

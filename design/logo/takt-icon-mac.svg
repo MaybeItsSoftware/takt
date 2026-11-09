@@ -1,21 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- The Mac's icon, after Zed's: a dark tile, the metronome drawn as one
-       even monoline, its azure pendulum breaking through the frame. macOS draws
-       the tile itself (the 824 grid square), so a hairline stands in for a shadow. -->
+  <!-- The Mac's: its own tile on Apple's 824 grid, a hairline for an edge.
+       Written by draw_mark.py. -->
   <rect x="100" y="100" width="824" height="824" rx="185" fill="#1c1a23" stroke="#34313f" stroke-width="6"/>
-  <g transform="translate(512 512) scale(0.8) translate(-512 -512)">
-  <mask id="pendulum-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
-    <rect width="1024" height="1024" fill="#fff"/>
-    <line x1="512" y1="668" x2="605.8" y2="136.2" stroke="#000" stroke-width="92"/>
-    <circle cx="512" cy="668" r="46.0" fill="#000"/>
-    <rect x="489.0" y="362.7" width="136" height="100" fill="#000" transform="rotate(10 557.0 412.7)"/>
-  </mask>
-  <g mask="url(#pendulum-gap)">
-    <path d="M384 228 H640 L764 796 H260 Z" fill="none" stroke="#f5f4f7" stroke-width="56"/>
-    <rect x="415.8" y="337" width="52" height="22" fill="#f5f4f7" opacity="0.45"/><rect x="398.3" y="417" width="52" height="22" fill="#f5f4f7" opacity="0.45"/><rect x="380.9" y="497" width="52" height="22" fill="#f5f4f7" opacity="0.45"/>
-  </g>
-  <line x1="512" y1="668" x2="605.8" y2="136.2" stroke="#007fff" stroke-width="44"/>
-  <rect x="490.0" y="646.0" width="44" height="44" fill="#007fff" transform="rotate(10 512 668)"/>
-  <rect x="513.0" y="386.7" width="88" height="52" fill="#007fff" transform="rotate(10 557.0 412.7)"/>
+  <g transform="translate(512 512) scale(0.78) translate(-512 -515)">
+    <rect x="193" y="213" width="638" height="34" rx="8" fill="#f5f4f7"/>
+    <rect x="193" y="213" width="34" height="347" rx="8" fill="#f5f4f7"/>
+    <rect x="797" y="213" width="34" height="347" rx="8" fill="#f5f4f7"/>
+    <rect x="269" y="289" width="200" height="34" rx="8" fill="#b6b3bf"/>
+    <rect x="269" y="289" width="34" height="511" rx="8" fill="#b6b3bf"/>
+    <rect x="555" y="289" width="200" height="34" rx="8" fill="#b6b3bf"/>
+    <rect x="721" y="289" width="34" height="511" rx="8" fill="#b6b3bf"/>
+    <rect x="345" y="365" width="124" height="34" rx="8" fill="#8a8698"/>
+    <rect x="345" y="365" width="34" height="435" rx="8" fill="#8a8698"/>
+    <rect x="555" y="365" width="124" height="34" rx="8" fill="#8a8698"/>
+    <rect x="645" y="365" width="34" height="435" rx="8" fill="#8a8698"/>
+    <rect x="421" y="441" width="48" height="34" rx="8" fill="#6e6b7c"/>
+    <rect x="421" y="441" width="34" height="359" rx="8" fill="#6e6b7c"/>
+    <rect x="555" y="441" width="48" height="34" rx="8" fill="#6e6b7c"/>
+    <rect x="569" y="441" width="34" height="359" rx="8" fill="#6e6b7c"/>
+    <rect x="495" y="213" width="34" height="601" rx="8" fill="#f5f4f7"/>
   </g>
 </svg>

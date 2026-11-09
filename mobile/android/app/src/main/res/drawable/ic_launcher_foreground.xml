@@ -1,16 +1,16 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- design/logo/takt-mark.svg, its 1024 units scaled into the 66dp safe
-         circle. The window is a hole, so the themed monochrome icon reads too. -->
-    <group android:scaleX="0.085" android:scaleY="0.085" android:translateX="10.48" android:translateY="9.8">
-        <path android:fillColor="#FF444054" android:fillType="evenOdd"
-            android:pathData="M404,224H620L752,816H272Z M436,288H588L676,704H348Z" />
+    <!-- Written by design/logo/draw_mark.py: Takt's mark, its 1024 units
+         scaled into the 66dp safe circle. One colour per step, so the themed
+         monochrome icon reads as the same shape. -->
+    <group android:scaleX="0.068" android:scaleY="0.068" android:translateX="19.184" android:translateY="18.980">
+        <path android:fillColor="#FFF5F4F7"
+            android:pathData="M201,213h622a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-622a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M201,213h18a8,8 0 0 1 8,8v331a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-331a8,8 0 0 1 8,-8z M805,213h18a8,8 0 0 1 8,8v331a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-331a8,8 0 0 1 8,-8z M503,213h18a8,8 0 0 1 8,8v585a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-585a8,8 0 0 1 8,-8z" />
         <path android:fillColor="#FFB6B3BF"
-            android:pathData="M440,360h32v12h-32z M428,432h32v12h-32z M416,504h32v12h-32z M404,576h32v12h-32z" />
-        <path android:fillColor="#FF007FFF" android:pathData="M490.27,668.57L533.73,675.43L587.73,333.43L544.27,326.57Z" />
-        <group android:rotation="9" android:pivotX="544" android:pivotY="470">
-            <path android:fillColor="#FF007FFF" android:pathData="M496,442h96v56h-96z" />
-        </group>
-        <path android:fillColor="#FF444054" android:pathData="M476,656h72v48h-72z" />
+            android:pathData="M277,289h184a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-184a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M277,289h18a8,8 0 0 1 8,8v495a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-495a8,8 0 0 1 8,-8z M563,289h184a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-184a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M729,289h18a8,8 0 0 1 8,8v495a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-495a8,8 0 0 1 8,-8z" />
+        <path android:fillColor="#FF8A8698"
+            android:pathData="M353,365h108a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-108a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M353,365h18a8,8 0 0 1 8,8v419a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-419a8,8 0 0 1 8,-8z M563,365h108a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-108a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M653,365h18a8,8 0 0 1 8,8v419a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-419a8,8 0 0 1 8,-8z" />
+        <path android:fillColor="#FF6E6B7C"
+            android:pathData="M429,441h32a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-32a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M429,441h18a8,8 0 0 1 8,8v343a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-343a8,8 0 0 1 8,-8z M563,441h32a8,8 0 0 1 8,8v18a8,8 0 0 1 -8,8h-32a8,8 0 0 1 -8,-8v-18a8,8 0 0 1 8,-8z M577,441h18a8,8 0 0 1 8,8v343a8,8 0 0 1 -8,8h-18a8,8 0 0 1 -8,-8v-343a8,8 0 0 1 8,-8z" />
     </group>
 </vector>

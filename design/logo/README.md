@@ -1,19 +1,30 @@
 # Takt's logo
 
-A metronome: *Takt* is the beat. A solid grape body with its face cut open,
-the azure pendulum caught mid-swing against a dim scale. Ink `#444054`,
-accent `#007fff`, scale `#b6b3bf`, paper `#faf8f4` — the house palette.
+A T standing in a run of open arches, after Zed's nested-line mark: the bar
+of the T is the outer arch's top, and its stem cuts the inner arches in two,
+each a step dimmer as it goes in. Drawn 2026-11-09, in place of the
+metronome. Every stroke is a rectangle with slightly rounded corners (8 of
+1024 units). On the dark grape tile (`#1c1a23`) the outer arch and stem are
+ink `#f5f4f7`, stepping down through `#b6b3bf`, `#8a8698` and `#6e6b7c`; on
+paper the steps run the other way, from `#444054`.
 
 | File | Use |
 | --- | --- |
-| `takt-mark.svg` | The mark alone, on nothing. Store art, the web, anything that brings its own ground |
-| `takt-icon.svg` | Full bleed on chalk, for the platforms that cut their own shape: iPhone, watch, Play's 512 |
-| `takt-icon-mac.svg` | The Mac's, which draws its own tile — the 824 grid square, a hairline instead of a shadow. Since 2026-11-09 it is drawn after Zed, as the desktop app is: a dark grape tile (`#1c1a23`), the body as one even white monoline, and the azure pendulum breaking through its top edge, the frame cut back around it. The phones keep the solid mark for now |
+| `draw_mark.py` | **The source.** Holds the rectangles and writes every file below, the SVGs and Android's and Wear OS's launcher drawables |
+| `takt-mark.svg` | The mark alone, dark, for a light ground: store art, the web |
+| `takt-icon.svg` | Full bleed on the grape tile, for the platforms that cut their own shape: iPhone, watch, Play's 512 |
+| `takt-icon-mac.svg` | The Mac's, which draws its own tile — the 824 grid square, a hairline instead of a shadow — with the mark at 78% so it sits inside it |
 
-`scripts/build_icons.sh` writes every PNG app icon from these. Android's and
-Wear OS's launchers are vector drawables (`res/drawable/ic_launcher_*.xml`)
-holding the same shapes, scaled into the adaptive icon's safe circle; change
-them alongside the SVGs. The window is a hole in the body rather than a chalk
-fill, so Android's themed monochrome icon still shows the pendulum.
+To change it, edit `draw_mark.py`, then:
+
+```bash
+python3 design/logo/draw_mark.py && scripts/build_icons.sh
+```
+
+`build_icons.sh` writes every PNG app icon from the SVGs. Android's launchers
+are vector drawables (`res/drawable/ic_launcher_*.xml`) the script writes
+directly, the mark scaled into the adaptive icon's 66dp safe circle; the
+themed monochrome icon uses the same foreground. `scripts/build_store_assets.sh`
+redraws the Play feature graphic from `takt-mark.svg`.
 
 `concepts/` and `refine/` are the directions that were drawn on the way.
