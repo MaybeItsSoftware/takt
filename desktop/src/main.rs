@@ -543,9 +543,17 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             let started = Instant::now();
             app.run("taskNew", None);
             let opened = started.elapsed().as_secs_f64() * 1000.0;
+            let drafted = app
+                .draft_inspector_stops("smoke draft")
+                .is_some_and(|stops| stops[0].value == "smoke draft");
             let started = Instant::now();
             app.create_task(&format!("smoke new task {n}"));
             let created = started.elapsed().as_secs_f64() * 1000.0;
+            // Return closes the draft and leaves the new task selected.
+            let closed = app.editing.is_none()
+                && app
+                    .selected()
+                    .is_some_and(|task| task.title == format!("smoke new task {n}"));
             let started = Instant::now();
             let today = state::today::compute(
                 app.store.core.clone(),
@@ -554,7 +562,7 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             )
             .is_ok();
             said.push(format!(
-                "open {opened:.1} create {created:.1} today {:.1} ms ({today})",
+                "open {opened:.1} create {created:.1} today {:.1} ms ({today}, drafted {drafted}, closed {closed})",
                 started.elapsed().as_secs_f64() * 1000.0
             ));
         }

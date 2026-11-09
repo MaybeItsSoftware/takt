@@ -112,7 +112,7 @@ impl Stop {
             "list-context" => "sparkles",
             "priority" => "flag",
             "tags" => "tag",
-            "move" => "list",
+            "move" | "draft-list" => "list",
             "blockers" => "ban",
             "waiting" => "user",
             "repeat" => "repeat",
@@ -508,6 +508,25 @@ impl App {
         Some(snapshot)
     }
 
+    /// While a new task or card is being typed, the inspector shows that
+    /// task rather than the selection it was opened from: its title as
+    /// typed so far and the list it will land in. None when no draft is
+    /// open.
+    pub fn draft_inspector_stops(&self, title: &str) -> Option<Vec<Stop>> {
+        let list_id = match &self.editing {
+            Some(Editing::NewTask { list_id, .. } | Editing::NewCard { list_id, .. }) => list_id,
+            _ => return None,
+        };
+        let list = self.list(list_id).map(|list| list.name.clone());
+        Some(vec![
+            Stop::new("title", "", StopKind::Text { multiline: false })
+                .value(Some(title.trim().to_string()), "New task"),
+            Stop::new("draft-list", "List", StopKind::Action)
+                .value(list, "")
+                .grouped(),
+        ])
+    }
+
     /// The inspector's stops for the selection.
     pub fn inspector_stops(&mut self) -> Vec<Stop> {
         if let Some(subject) = self.inspected_container() {
@@ -652,6 +671,13 @@ impl App {
     /// Return on a stop: a field opens, a switch flips, a choice steps, an
     /// action runs.
     pub fn activate_inspector(&mut self) {
+        // A draft's inspector is a preview: the task has no row to edit yet.
+        if matches!(
+            self.editing,
+            Some(Editing::NewTask { .. } | Editing::NewCard { .. })
+        ) {
+            return;
+        }
         let Some(stop) = self.inspector_stop() else {
             return;
         };

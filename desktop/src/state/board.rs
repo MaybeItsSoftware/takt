@@ -407,9 +407,9 @@ impl App {
         self.editing = Some(super::Editing::NewCard { list_id, place });
     }
 
-    /// Adds the drafted card, files it where it was drafted and selects it,
-    /// leaving the draft open for the next. False when the text was kept
-    /// back, its problem in the status bar.
+    /// Adds the drafted card, files it where it was drafted, closes the
+    /// draft and selects it. False when the text was kept back, its problem
+    /// in the status bar.
     pub fn create_card(&mut self, title: &str) -> bool {
         let Some(super::Editing::NewCard { list_id, place }) = self.editing.clone() else {
             return true;
@@ -460,7 +460,7 @@ impl App {
         self.layout_board();
         self.selected_task = Some(id);
         self.reload_today();
-        self.editing = Some(super::Editing::NewCard { list_id, place });
+        self.editing = None;
         true
     }
 }

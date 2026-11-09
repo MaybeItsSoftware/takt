@@ -277,7 +277,10 @@ the ones the task has. Escape puts the title back; clicking away saves.
 In the row that opens for a new task (`Return`, `Shift+Return`), `Tab` makes it a
 subtask of the task above and `Shift+Tab` takes it back out, before you type or
 after. `↑` and `↓` close the row, dropping what was typed as `Escape` does, and
-carry on to the task above or below where it sat.
+carry on to the task above or below where it sat. `Return` files the task and
+closes the row, leaving you in normal mode with the new task selected; press
+`Return` again for the next one. While the row is open the inspector shows the
+task being typed, not the one you started from.
 
 **Quick Add's slots.** To the right of Quick Add's field sit three slots: the
 due day, the conditions the task needs, and its time to complete. `→` at the

@@ -469,8 +469,8 @@ impl App {
         }
     }
 
-    /// Adds a task from the draft row and selects it, leaving the draft open
-    /// below it for the next.
+    /// Adds a task from the draft row, closes the row and selects the new
+    /// task, so the keys are back in normal mode on it.
     /// False when the text was kept back, its problem in the status bar.
     pub fn create_task(&mut self, title: &str) -> bool {
         let Some(Editing::NewTask {
@@ -502,12 +502,8 @@ impl App {
         if let Some(id) = created {
             self.lingering.clear();
             self.reload_rows();
-            self.selected_task = Some(id.clone());
-            self.editing = Some(Editing::NewTask {
-                list_id,
-                parent_id,
-                after: Some(id),
-            });
+            self.selected_task = Some(id);
+            self.editing = None;
         }
         true
     }

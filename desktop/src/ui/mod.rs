@@ -1352,7 +1352,11 @@ impl Render for Takt {
             self.settings_window.is_none() || !self.settings_active
         };
         let inspector = if self.app.prefs.right_dock_visible && !settings {
-            Some(self.app.inspector_stops())
+            Some(
+                self.app
+                    .draft_inspector_stops(&self.field.text)
+                    .unwrap_or_else(|| self.app.inspector_stops()),
+            )
         } else {
             None
         };
