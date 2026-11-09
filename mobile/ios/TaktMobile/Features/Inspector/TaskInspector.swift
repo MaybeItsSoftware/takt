@@ -200,14 +200,16 @@ struct TaskInspector: View {
 
   private func when(_ values: TaskEditorValues) -> some View {
     InspectorSection("When") {
-      Toggle("Start later", isOn: Binding(
+      // The slot set aside for doing it: when it starts and, below, how
+      // long it takes, which is also its Google Calendar event's length.
+      Toggle("Schedule a time", isOn: Binding(
         get: { inspector.values?.startAt != nil },
         set: { on in inspector.edit(model, immediate: true) { $0.startAt = on ? ($0.startAt ?? defaultStart) : nil } }))
         .toggleStyle(ThemedToggleStyle())
         .accessibilityIdentifier("inspector.start")
       if values.startAt != nil {
         DatePicker(
-          "Starts",
+          "Scheduled",
           selection: Binding(
             get: { inspector.values?.startAt ?? .now },
             set: { date in inspector.edit(model, immediate: true) { $0.startAt = date } }),
@@ -215,6 +217,33 @@ struct TaskInspector: View {
         )
         .font(theme.type.body)
         .foregroundStyle(theme.muted)
+      }
+      InspectorRow("Takes") {
+        HStack(spacing: theme.space.sm) {
+          TextField("Minutes", text: binding(\.estimateMinutes))
+            .keyboardType(.decimalPad)
+            .font(theme.type.numeralBody)
+            .focused($focused, equals: .estimate)
+            .controlFrame()
+            .accessibilityIdentifier("inspector.estimate")
+          Text("min").font(theme.type.caption).foregroundStyle(theme.muted)
+        }
+      }
+      Toggle("Must finish in one sitting", isOn: Binding(
+        get: { inspector.values?.requiresSingleSitting == true },
+        set: { on in inspector.edit(model, immediate: true) { $0.requiresSingleSitting = on ? true : nil } }))
+        .toggleStyle(ThemedToggleStyle())
+      InspectorRow("Min block") {
+        HStack(spacing: theme.space.sm) {
+          TextField("Minutes", text: Binding(
+            get: { inspector.values?.minimumBlockMinutes ?? "" },
+            set: { raw in inspector.edit(model) { $0.minimumBlockMinutes = raw.isEmpty ? nil : raw } }))
+            .keyboardType(.decimalPad)
+            .font(theme.type.numeralBody)
+            .focused($focused, equals: .minimumBlock)
+            .controlFrame()
+          Text("min").font(theme.type.caption).foregroundStyle(theme.muted)
+        }
       }
       InspectorRow("Due") {
         ChoiceChips(
@@ -244,7 +273,7 @@ struct TaskInspector: View {
         .font(theme.type.body)
         .foregroundStyle(theme.muted)
       case .none:
-        quickDueButtons
+        EmptyView()
       }
       InspectorRow("Repeat") {
         TextField("Every Monday", text: binding(\.recurrenceRule))
@@ -272,18 +301,6 @@ struct TaskInspector: View {
     return Calendar.current.date(byAdding: .hour, value: 9, to: tomorrow) ?? tomorrow
   }
 
-  private var quickDueButtons: some View {
-    HStack(spacing: theme.space.xs) {
-      ForEach([(0, "Today"), (1, "Tomorrow"), (7, "Next week")], id: \.0) { offset, title in
-        Button(title) {
-          let day = Calendar.current.date(byAdding: .day, value: offset, to: .now) ?? .now
-          inspector.edit(model, immediate: true) { $0.dueDate = TaskCalendarDate.string(day); $0.dueAt = nil }
-        }
-        .buttonStyle(ThemedButtonStyle(kind: .quiet, compact: true))
-      }
-    }
-  }
-
   // MARK: - Plan
 
   private func plan(_ task: WorkspaceTask, _ values: TaskEditorValues) -> some View {
@@ -304,17 +321,6 @@ struct TaskInspector: View {
         selection: priority,
         tint: theme.muted,
         identifier: "inspector.priorityLater")
-      InspectorRow("Estimate") {
-        HStack(spacing: theme.space.sm) {
-          TextField("Minutes", text: binding(\.estimateMinutes))
-            .keyboardType(.decimalPad)
-            .font(theme.type.numeralBody)
-            .focused($focused, equals: .estimate)
-            .controlFrame()
-            .accessibilityIdentifier("inspector.estimate")
-          Text("min").font(theme.type.caption).foregroundStyle(theme.muted)
-        }
-      }
       if inspector.progress.subtasks > 0 {
         ProgressLine(done: inspector.progress.subtasksDone, total: inspector.progress.subtasks)
       }
@@ -324,22 +330,6 @@ struct TaskInspector: View {
           .foregroundStyle(theme.muted)
       }
       conditions(values)
-      Toggle("Must finish in one sitting", isOn: Binding(
-        get: { inspector.values?.requiresSingleSitting == true },
-        set: { on in inspector.edit(model, immediate: true) { $0.requiresSingleSitting = on ? true : nil } }))
-        .toggleStyle(ThemedToggleStyle())
-      InspectorRow("Min block") {
-        HStack(spacing: theme.space.sm) {
-          TextField("Minutes", text: Binding(
-            get: { inspector.values?.minimumBlockMinutes ?? "" },
-            set: { raw in inspector.edit(model) { $0.minimumBlockMinutes = raw.isEmpty ? nil : raw } }))
-            .keyboardType(.decimalPad)
-            .font(theme.type.numeralBody)
-            .focused($focused, equals: .minimumBlock)
-            .controlFrame()
-          Text("min").font(theme.type.caption).foregroundStyle(theme.muted)
-        }
-      }
       Button("Apply conditions and start to subtasks") { inspector.applyPlanningToDescendants(model: model) }
         .buttonStyle(ThemedButtonStyle(kind: .quiet, compact: true))
     }
