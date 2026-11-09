@@ -223,9 +223,6 @@ impl Takt {
                                 })
                                 .when(ringed, |d| d.bg(t.hover))
                                 .hover(|d| d.bg(t.hover))
-                                .when_some(stop.tip().filter(|_| !open), |d, text| {
-                                    d.tooltip(super::widgets::tip(text, t))
-                                })
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     this.app.enter_inspector_region();
                                     this.app.inspector_cursor = ix;
@@ -241,6 +238,9 @@ impl Takt {
                                     d.child(
                                         div()
                                             .id(("inspector-icon", ix))
+                                            .when_some(stop.tip(), |d, text| {
+                                                d.tooltip(super::widgets::tip(text, t))
+                                            })
                                             .w(px(16.))
                                             .h(px(18.))
                                             .flex_none()
