@@ -174,32 +174,32 @@ impl Takt {
                             t.text
                         };
                         if stop.id == "title" {
-                            return self.title_with_links(stop, tone, t, cx);
+                            // Inside the row like any other stop: handed to
+                            // the column itself, its flex_1 took the height.
+                            self.title_with_links(stop, tone, t, cx)
+                        } else {
+                            let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .px_1()
+                                .text_color(tone)
+                                .when(!multiline, |d| d.truncate())
+                                .when(multiline && !stop.empty, |d| {
+                                    d.flex().flex_col().children(
+                                        stop.value
+                                            .lines()
+                                            .map(|line| {
+                                                div()
+                                                    .min_h(px(18.))
+                                                    .child(SharedString::from(line.to_string()))
+                                            })
+                                            .collect::<Vec<_>>(),
+                                    )
+                                })
+                                .when(!multiline || stop.empty, |d| d.child(stop.value.clone()))
+                                .into_any_element()
                         }
-                        let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .px_1()
-                            .text_color(tone)
-                            .when(stop.id == "title", |d| {
-                                d.text_size(px(16.)).font_weight(FontWeight::MEDIUM)
-                            })
-                            .when(!multiline, |d| d.truncate())
-                            .when(multiline && !stop.empty, |d| {
-                                d.flex().flex_col().children(
-                                    stop.value
-                                        .lines()
-                                        .map(|line| {
-                                            div()
-                                                .min_h(px(18.))
-                                                .child(SharedString::from(line.to_string()))
-                                        })
-                                        .collect::<Vec<_>>(),
-                                )
-                            })
-                            .when(!multiline || stop.empty, |d| d.child(stop.value.clone()))
-                            .into_any_element()
                     };
                     div()
                         .id(("inspector-stop", ix))
