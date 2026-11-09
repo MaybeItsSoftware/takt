@@ -6,7 +6,7 @@
 //! `SettingsView.swift`'s panes, and `DiagnosticsView.swift`.
 
 use super::Editing;
-use super::pickers::Picker;
+use super::pickers::{Choice, Picker};
 use super::plugins::{self, Plugin};
 use super::{App, Overlay};
 use crate::platform::hotkeys::{self, Hotkey};
@@ -19,14 +19,59 @@ pub struct SettingRow {
     pub value: String,
 }
 
-/// Where the settings page is: the category shown and the setting under
+/// Where the settings page is: the category shown, the setting under
 /// the keyboard, counted in what is shown (a category, or what the search
-/// found).
+/// found), and the dropdown open on a setting, if one is.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SettingsPage {
     pub category: Option<&'static str>,
     pub cursor: usize,
+    pub menu: Option<SettingsMenu>,
 }
+
+/// A setting's dropdown: which setting, and the option under the keyboard,
+/// counted in what its filter leaves.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SettingsMenu {
+    pub row: String,
+    pub cursor: usize,
+}
+
+/// One option of a dropdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectOption {
+    /// What choosing it sets (`choose_setting_option`'s `value`).
+    pub value: String,
+    pub label: String,
+    /// A word on the right ("Zed theme", "Primary").
+    pub detail: String,
+    /// The value in force, which the dropdown ticks.
+    pub current: bool,
+}
+
+fn option(value: impl Into<String>, label: impl Into<String>, current: bool) -> SelectOption {
+    SelectOption {
+        value: value.into(),
+        label: label.into(),
+        detail: String::new(),
+        current,
+    }
+}
+
+/// The settings whose control is a dropdown of options.
+const SELECTS: [&str; 7] = [
+    "theme",
+    "appearance",
+    "quick-capture-list",
+    "celebration",
+    "google-calendar-choose",
+    "remind-due-today-at",
+    "remind-dailies-at",
+];
+
+/// Past this many options a dropdown shows its filter field; it filters
+/// as you type either way.
+pub const MENU_FILTER_FROM: usize = 7;
 
 /// The categories, in the order the page lists them; a group no entry here
 /// names goes at the end.
@@ -43,27 +88,26 @@ pub const CATEGORIES: [(&str, &str); 8] = [
 
 /// The groups too small for a category of their own: each is a headed
 /// section of the category it sits under, in this order after the
-/// category's own settings. Under Plugins, the category's own settings are
-/// the plugins' switches, and each section one plugin's settings.
-const SECTIONS: [(&str, &str); 10] = [
-    ("Reminders", "General"),
-    ("Shared lists", "Sync"),
-    (plugins::GOOGLE_ACCOUNT, "Plugins"),
-    ("Google Calendar", "Plugins"),
-    ("Google Tasks", "Plugins"),
-    ("Google Drive", "Plugins"),
-    ("Checkvist", "Plugins"),
-    ("Obsidian", "Plugins"),
-    ("MCP", "Plugins"),
-    ("Celebration", "Plugins"),
-];
+/// category's own settings. A plugin's settings need no entry: they go
+/// under Plugins by the registry (`Plugin::ALL`), beneath the plugin's
+/// own switch.
+const SECTIONS: &[(&str, &str)] = &[("Reminders", "General"), ("Shared lists", "Sync")];
 
 /// The category a row's group is shown under.
 pub fn category_of(group: &'static str) -> &'static str {
+    if group == plugins::GOOGLE_ACCOUNT || Plugin::ALL.iter().any(|p| p.name() == group) {
+        return "Plugins";
+    }
     SECTIONS
         .iter()
         .find(|(section, _)| *section == group)
         .map_or(group, |(_, category)| category)
+}
+
+/// A plugin's own setting, drawn beneath the plugin's switch rather than
+/// as a row of the page.
+pub fn is_plugin_setting(group: &'static str) -> bool {
+    group != "Plugins" && category_of(group) == "Plugins"
 }
 
 /// Where a group sorts within its category: the category's own settings
@@ -75,6 +119,73 @@ fn section_rank(group: &str) -> usize {
         .map_or(0, |at| at + 1)
 }
 
+/// The Plugins category in order: each plugin's switch, and beneath it, if
+/// it is on, its settings. The Google sign-in, which every Google plugin
+/// needs, goes beneath the first Google plugin that is on.
+fn plugins_in_order(rows: Vec<SettingRow>) -> Vec<SettingRow> {
+    let mut rest: Vec<Option<SettingRow>> = rows.into_iter().map(Some).collect();
+    let mut take = |keep: &dyn Fn(&SettingRow) -> bool| -> Vec<SettingRow> {
+        rest.iter_mut()
+            .filter(|slot| slot.as_ref().is_some_and(keep))
+            .filter_map(Option::take)
+            .collect()
+    };
+    let switches = take(&|row| row.id.starts_with("plugin:"));
+    let mut ordered = Vec::new();
+    for switch in switches {
+        let plugin = Plugin::from_id(&switch.id["plugin:".len()..]);
+        ordered.push(switch);
+        let Some(plugin) = plugin else { continue };
+        if plugin.is_google() {
+            ordered.extend(take(&|row| row.group == plugins::GOOGLE_ACCOUNT));
+        }
+        ordered.extend(take(&|row| row.group == plugin.name()));
+    }
+    ordered.extend(rest.into_iter().flatten());
+    ordered
+}
+
+/// `options` narrowed to those with every word of `query` in their label
+/// or detail, those whose label starts with it first; an empty query keeps
+/// them all, in order.
+pub fn filter_options(options: Vec<SelectOption>, query: &str) -> Vec<SelectOption> {
+    let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        return options;
+    }
+    let words: Vec<&str> = query.split_whitespace().collect();
+    let mut found: Vec<(bool, SelectOption)> = options
+        .into_iter()
+        .filter_map(|option| {
+            let label = option.label.to_lowercase();
+            let all = format!("{label} {}", option.detail.to_lowercase());
+            words
+                .iter()
+                .all(|w| all.contains(w))
+                .then(|| (label.starts_with(&query), option))
+        })
+        .collect();
+    found.sort_by_key(|(starts, _)| !*starts);
+    found.into_iter().map(|(_, option)| option).collect()
+}
+
+/// A day's times, every half hour, with `current` (minutes after midnight)
+/// ticked, and among them if it falls between.
+fn time_options(current: i32) -> Vec<SelectOption> {
+    let mut minutes: Vec<i32> = (0..48).map(|half| half * 30).collect();
+    if !minutes.contains(&current) {
+        minutes.push(current);
+        minutes.sort_unstable();
+    }
+    minutes
+        .into_iter()
+        .map(|m| {
+            let clock = super::reminders::clock(m);
+            option(clock.clone(), clock, m == current)
+        })
+        .collect()
+}
+
 /// How a setting is changed on the page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Control {
@@ -82,8 +193,12 @@ pub enum Control {
     Switch { on: bool, note: String },
     /// Something done, and what it last said.
     Button { label: &'static str, note: String },
-    /// One of several, or a text: the value, opening its picker or field.
-    Choice(String),
+    /// One of several: the value, opening a dropdown of the others.
+    Select(String),
+    /// A text: the value, opening a field to type it.
+    Text(String),
+    /// A global shortcut: the keys, recorded from the next press.
+    Shortcut(String),
 }
 
 const SWITCHES: [&str; 17] = [
@@ -155,7 +270,15 @@ impl SettingRow {
             };
             return Control::Button { label, note };
         }
-        Control::Choice(self.value.clone())
+        let value = self.value.clone();
+        if SELECTS.contains(&self.id.as_str()) {
+            Control::Select(value)
+        } else if self.id.starts_with("hotkey-") {
+            Control::Shortcut(value)
+        } else {
+            // The server address, the Google client ID.
+            Control::Text(value)
+        }
     }
 
     /// The line under the title.
@@ -427,6 +550,9 @@ impl App {
                 .into_iter()
                 .filter(|r| category_of(r.group) == category)
                 .collect();
+            if category == "Plugins" {
+                return plugins_in_order(shown);
+            }
             // Stable, so each section keeps its own order.
             shown.sort_by_key(|r| section_rank(r.group));
             return shown;
@@ -493,6 +619,193 @@ impl App {
         }
     }
 
+    // MARK: Dropdowns
+
+    /// A dropdown's options, before any filter; none for a setting that
+    /// isn't one.
+    pub fn setting_options(&self, id: &str) -> Option<Vec<SelectOption>> {
+        let p = &self.prefs;
+        Some(match id {
+            "theme" => {
+                let current = self.theme().id();
+                self.library
+                    .themes
+                    .iter()
+                    .map(|theme| SelectOption {
+                        detail: if theme
+                            .id()
+                            .starts_with(takt_core::theme::zed::IDENTIFIER_PREFIX)
+                        {
+                            "Zed theme".into()
+                        } else {
+                            String::new()
+                        },
+                        current: theme.id() == current,
+                        value: theme.id(),
+                        label: theme.name(),
+                    })
+                    .collect()
+            }
+            "appearance" => [
+                ("system", "As the system is"),
+                ("light", "Light"),
+                ("dark", "Dark"),
+            ]
+            .into_iter()
+            .map(|(mode, label)| {
+                let current = p.appearance == mode
+                    || (mode == "system" && !matches!(p.appearance.as_str(), "light" | "dark"));
+                option(mode, label, current)
+            })
+            .collect(),
+            "quick-capture-list" => {
+                let current = p.quick_capture_list.clone().unwrap_or_default();
+                std::iter::once(option("", "Inbox", current.is_empty()))
+                    .chain(self.lists_in_sidebar_order().into_iter().map(|id| {
+                        let name = self.list(&id).map(|l| l.name.clone()).unwrap_or_default();
+                        let here = id == current;
+                        option(id, name, here)
+                    }))
+                    .collect()
+            }
+            "celebration" => {
+                let current = self.celebration_style();
+                super::celebration::Style::ALL
+                    .into_iter()
+                    .map(|style| option(style.id(), style.name(), style == current))
+                    .collect()
+            }
+            "google-calendar-choose" => {
+                let current = (self.store.core.google_calendar_settings().ok())
+                    .and_then(|s| s.calendar_id)
+                    .unwrap_or_default();
+                std::iter::once(option("", "None", current.is_empty()))
+                    .chain(
+                        self.google_calendar_choices()
+                            .into_iter()
+                            .map(|(id, name, detail)| SelectOption {
+                                current: id == current,
+                                value: id,
+                                label: name,
+                                detail,
+                            }),
+                    )
+                    .collect()
+            }
+            "remind-due-today-at" => time_options(p.remind_due_today_minute),
+            "remind-dailies-at" => time_options(p.remind_dailies_left_minute),
+            _ => return None,
+        })
+    }
+
+    /// The open dropdown's options with `query` typed into its filter. A
+    /// time typed ("7:45", "9pm") is offered first, as itself.
+    pub fn setting_menu_options(&self, query: &str) -> Vec<SelectOption> {
+        let Some(menu) = self.settings_page.as_ref().and_then(|p| p.menu.as_ref()) else {
+            return Vec::new();
+        };
+        let options = self.setting_options(&menu.row).unwrap_or_default();
+        let mut shown = filter_options(options, query);
+        if menu.row.ends_with("-at")
+            && let Some((hour, minute)) = takt_core::capture::time_of_day(query.trim())
+        {
+            let clock = super::reminders::clock((hour * 60 + minute) as i32);
+            if shown.first().is_none_or(|first| first.value != clock) {
+                shown.insert(
+                    0,
+                    SelectOption {
+                        detail: "Typed".into(),
+                        ..option(clock.clone(), clock, false)
+                    },
+                );
+            }
+        }
+        shown
+    }
+
+    pub fn setting_menu(&self) -> Option<&SettingsMenu> {
+        self.settings_page.as_ref().and_then(|p| p.menu.as_ref())
+    }
+
+    /// Opens `id`'s dropdown with the value in force under the keyboard;
+    /// false when it has none.
+    pub fn open_setting_menu(&mut self, id: &str) -> bool {
+        let Some(options) = self.setting_options(id) else {
+            return false;
+        };
+        if id == "google-calendar-choose" {
+            // Fetches the calendars; the dropdown shows them as they come.
+            self.change_google_setting(id);
+        }
+        let cursor = options.iter().position(|o| o.current).unwrap_or(0);
+        let page = self.settings_page.get_or_insert_with(Default::default);
+        page.menu = Some(SettingsMenu {
+            row: id.into(),
+            cursor,
+        });
+        true
+    }
+
+    pub fn close_setting_menu(&mut self) {
+        if let Some(page) = self.settings_page.as_mut() {
+            page.menu = None;
+        }
+    }
+
+    /// ↑ and ↓ in the open dropdown, wrapping as a menu does.
+    pub fn step_setting_menu(&mut self, by: isize, query: &str) {
+        let len = self.setting_menu_options(query).len() as isize;
+        if let Some(menu) = self.settings_page.as_mut().and_then(|p| p.menu.as_mut())
+            && len > 0
+        {
+            menu.cursor = (menu.cursor as isize + by).rem_euclid(len) as usize;
+        }
+    }
+
+    /// The filter changed: its first option is the one under the keyboard.
+    pub fn setting_menu_filtered(&mut self) {
+        if let Some(menu) = self.settings_page.as_mut().and_then(|p| p.menu.as_mut()) {
+            menu.cursor = 0;
+        }
+    }
+
+    /// Return in the open dropdown: the option under the keyboard.
+    pub fn choose_setting_menu(&mut self, query: &str) {
+        let Some(menu) = self.setting_menu().cloned() else {
+            return;
+        };
+        let options = self.setting_menu_options(query);
+        match options.get(menu.cursor.min(options.len().saturating_sub(1))) {
+            Some(option) => {
+                let value = option.value.clone();
+                self.choose_setting_option(&menu.row, &value);
+            }
+            None => self.close_setting_menu(),
+        }
+    }
+
+    /// Sets `id` to one of its options, and closes its dropdown.
+    pub fn choose_setting_option(&mut self, id: &str, value: &str) {
+        self.close_setting_menu();
+        let some = || (!value.is_empty()).then(|| value.to_string());
+        match id {
+            "theme" => self.apply_choice(Picker::Theme, Choice::Theme(value.into())),
+            "appearance" => self.apply_choice(Picker::Appearance, Choice::Appearance(value.into())),
+            "quick-capture-list" => {
+                self.apply_choice(Picker::CaptureList, Choice::CaptureList(some()))
+            }
+            "google-calendar-choose" => self.choose_google_calendar(some()),
+            "celebration" => {
+                self.prefs.celebration = Some(value.into());
+                self.prefs.save();
+            }
+            "remind-due-today-at" => self.set_reminder_time(false, value),
+            "remind-dailies-at" => self.set_reminder_time(true, value),
+            _ => {}
+        }
+        self.open_overlay(Overlay::Settings);
+    }
+
     /// Rows the integrations add: sync, then each plugin's switch and,
     /// for those switched on, their own settings under their name. Each is
     /// the platform module's to describe; the page only files them.
@@ -553,6 +866,11 @@ impl App {
 
     /// Return on a settings row.
     pub fn change_setting(&mut self, id: &str) {
+        // On the page a choice opens its dropdown; from the palette, the
+        // picker or field it always has.
+        if self.settings_page.is_some() && self.open_setting_menu(id) {
+            return;
+        }
         let p = &mut self.prefs;
         match id {
             "theme" => return self.open_picker(Picker::Theme),
@@ -711,5 +1029,126 @@ impl App {
             rows.push(("Theme problem".into(), issue.clone()));
         }
         rows
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(id: &str, group: &'static str) -> SettingRow {
+        SettingRow {
+            id: id.into(),
+            group,
+            title: id.into(),
+            value: String::new(),
+        }
+    }
+
+    #[test]
+    fn every_plugin_files_under_plugins_by_the_registry() {
+        for plugin in Plugin::ALL {
+            assert_eq!(category_of(plugin.name()), "Plugins", "{plugin:?}");
+            assert!(is_plugin_setting(plugin.name()));
+        }
+        assert_eq!(category_of(plugins::GOOGLE_ACCOUNT), "Plugins");
+        assert!(!is_plugin_setting("Plugins"));
+        assert_eq!(category_of("Reminders"), "General");
+        assert_eq!(category_of("Sync"), "Sync");
+    }
+
+    #[test]
+    fn each_plugins_settings_sit_beneath_its_switch() {
+        let rows = vec![
+            row("checkvist-import", "Checkvist"),
+            row("google-connect", plugins::GOOGLE_ACCOUNT),
+            row("links-drive", "Google Drive"),
+            row("plugin:google-calendar", "Plugins"),
+            row("plugin:google-drive", "Plugins"),
+            row("plugin:checkvist", "Plugins"),
+            row("plugin:celebration", "Plugins"),
+            row("celebration", "Celebration"),
+        ];
+        let ids: Vec<String> = plugins_in_order(rows).into_iter().map(|r| r.id).collect();
+        assert_eq!(
+            ids,
+            [
+                "plugin:google-calendar",
+                "google-connect",
+                "plugin:google-drive",
+                "links-drive",
+                "plugin:checkvist",
+                "checkvist-import",
+                "plugin:celebration",
+                "celebration",
+            ]
+        );
+    }
+
+    #[test]
+    fn controls_follow_what_the_setting_is() {
+        assert!(matches!(
+            row("plugin:obsidian", "Plugins").control(),
+            Control::Switch { .. }
+        ));
+        assert!(matches!(
+            row("theme", "Appearance").control(),
+            Control::Select(_)
+        ));
+        assert!(matches!(
+            row("celebration", "Celebration").control(),
+            Control::Select(_)
+        ));
+        assert!(matches!(
+            row("hotkey-capture", "Keyboard").control(),
+            Control::Shortcut(_)
+        ));
+        assert!(matches!(
+            row("sync-server", "Sync").control(),
+            Control::Text(_)
+        ));
+        assert!(matches!(
+            row("sync-now", "Sync").control(),
+            Control::Button { .. }
+        ));
+    }
+
+    #[test]
+    fn a_filter_keeps_what_has_every_word_starts_first() {
+        let options = vec![
+            option("a", "One Dark", false),
+            option("b", "Ayu Dark", false),
+            option("c", "Dark Matter", true),
+            option("d", "Solarized Light", false),
+        ];
+        let labels = |q: &str| -> Vec<String> {
+            filter_options(options.clone(), q)
+                .into_iter()
+                .map(|o| o.label)
+                .collect()
+        };
+        assert_eq!(labels("dark"), ["Dark Matter", "One Dark", "Ayu Dark"]);
+        assert_eq!(labels("ayu dark"), ["Ayu Dark"]);
+        assert_eq!(
+            labels("  "),
+            ["One Dark", "Ayu Dark", "Dark Matter", "Solarized Light"]
+        );
+        assert!(labels("zzz").is_empty());
+    }
+
+    #[test]
+    fn a_time_between_the_half_hours_is_among_them_and_ticked() {
+        let times = time_options(7 * 60 + 45);
+        assert_eq!(times.len(), 49);
+        let ticked: Vec<&str> = times
+            .iter()
+            .filter(|o| o.current)
+            .map(|o| o.label.as_str())
+            .collect();
+        assert_eq!(ticked, ["07:45"]);
+        let at = times.iter().position(|o| o.current).unwrap();
+        assert_eq!(times[at - 1].label, "07:30");
+        assert_eq!(times[at + 1].label, "08:00");
+        assert_eq!(time_options(9 * 60).len(), 48);
     }
 }

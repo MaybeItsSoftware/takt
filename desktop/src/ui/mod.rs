@@ -15,6 +15,7 @@ pub mod icons;
 pub mod panel;
 mod repeat;
 mod settings;
+mod notes_editor;
 mod views;
 mod widgets;
 
@@ -57,11 +58,15 @@ pub struct Takt {
     /// The settings page's search, and where its list is scrolled.
     settings_field: TextField,
     settings_scroll: gpui::ScrollHandle,
+    /// The open dropdown's filter and scroll on the settings page.
+    settings_menu: settings::MenuView,
     /// The board's columns side to side, and each column's cards.
     board_scroll: gpui::ScrollHandle,
     card_scrolls: std::cell::RefCell<Vec<gpui::ScrollHandle>>,
     sidebar_scroll: UniformListScrollHandle,
     main_scroll: UniformListScrollHandle,
+    /// The Markdown editor's two sides' scrolling.
+    notes_view: notes_editor::NotesView,
     last_key_ms: Option<f64>,
     /// The floating focus panel, while it is open.
     panel: Option<gpui::WindowHandle<panel::FocusPanel>>,
@@ -164,10 +169,12 @@ impl Takt {
             overlay: OverlayState::default(),
             settings_field: TextField::default(),
             settings_scroll: gpui::ScrollHandle::new(),
+            settings_menu: Default::default(),
             board_scroll: gpui::ScrollHandle::new(),
             card_scrolls: Default::default(),
             sidebar_scroll: UniformListScrollHandle::new(),
             main_scroll: UniformListScrollHandle::new(),
+            notes_view: Default::default(),
             last_key_ms: None,
             panel: None,
             main: None,
@@ -201,6 +208,9 @@ impl Takt {
                         this.app.expire_lingering();
                     }
                     this.app.tick_reminders();
+                    if this.poll_notes_editor() {
+                        cx.notify();
+                    }
                     if this.app.check_external_writes() {
                         this.app.reload_today();
                         this.rank_today(cx);
@@ -327,6 +337,13 @@ impl Takt {
                 }
                 "quit" => cx.quit(),
                 crate::state::links::DRIVE_PICKED => self.app.take_drive_picks(),
+                // The calendars fetched: the settings dropdown open on them
+                // redraws with them; otherwise their picker opens.
+                "pick-google-calendar"
+                    if self
+                        .app
+                        .setting_menu()
+                        .is_some_and(|m| m.row == "google-calendar-choose") => {}
                 "pick-google-calendar" => {
                     self.app
                         .open_picker(crate::state::pickers::Picker::GoogleCalendar);
@@ -802,6 +819,27 @@ impl Takt {
     }
 
     fn editing_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        if matches!(self.app.editing, Some(Editing::NotesEditor)) {
+            return self.notes_editor_key(keystroke, cx);
+        }
+        // From the inspector's notes field, the Markdown editor's chord
+        // keeps what was typed and maximises it.
+        if let Some(Editing::InspectorField { stop: "notes", .. }) = self.app.editing
+            && (keystroke.modifiers.platform || keystroke.modifiers.control)
+            && let Some(key) = spell(&Press::from_keystroke(keystroke))
+            && self
+                .app
+                .bindings
+                .command(&key, self.app.surface())
+                .is_some_and(|c| c.id == "taskMaximiseNotes")
+            && self.app.notes_editor_on()
+        {
+            let text = self.field.text.clone();
+            self.app.editing = None;
+            self.app.commit_inspector_field("notes", &text);
+            self.app.open_notes_editor();
+            return true;
+        }
         // The inspector's calendar takes its keys whole: nothing is typed.
         if matches!(self.app.editing, Some(Editing::Date(_))) {
             if let Some(key) = spell(&Press::from_keystroke(keystroke)) {
@@ -1083,6 +1121,14 @@ impl Takt {
             Some(Editing::AgentMessage) => {
                 TextField::multiline(&self.app.agent_draft.take().unwrap_or_default())
             }
+            Some(Editing::NotesEditor) => TextField::multiline(
+                &self
+                    .app
+                    .notes_editor
+                    .as_ref()
+                    .map(|e| e.saved.clone())
+                    .unwrap_or_default(),
+            ),
             Some(Editing::InspectorField { stop, .. }) => {
                 let stop = *stop;
                 let text = self.app.inspector_field_text(stop);
@@ -1380,6 +1426,10 @@ impl Render for Takt {
                 !settings && matches!(self.app.editing, Some(Editing::Rules(_))),
                 |d| d.child(self.rules_sheet(t)),
             )
+            .when(
+                !settings && matches!(self.app.editing, Some(Editing::NotesEditor)),
+                |d| d.child(self.notes_editor_view(t, cx)),
+            )
             .when(!settings && self.app.focus_prompt.is_some(), |d| {
                 d.child(self.focus_prompt_sheet(t))
             })
@@ -1411,6 +1461,8 @@ impl Takt {
             )
         {
             Some(&mut self.field)
+        } else if self.app.setting_menu().is_some() {
+            Some(&mut self.settings_menu.field)
         } else if self.app.settings_page.is_some() {
             Some(&mut self.settings_field)
         } else {
@@ -1423,6 +1475,8 @@ impl Takt {
         if self.app.overlay.is_some() {
             self.overlay.index = 0;
             self.overlay.refresh(&self.app);
+        } else if self.app.editing.is_none() && self.app.setting_menu().is_some() {
+            self.settings_menu_filtered();
         } else if self.app.editing.is_none() && self.app.settings_page.is_some() {
             self.settings_searched();
         }
@@ -1469,6 +1523,8 @@ impl EntityInputHandler for Takt {
             &self.overlay.field
         } else if self.app.editing.is_some() {
             &self.field
+        } else if self.app.setting_menu().is_some() {
+            &self.settings_menu.field
         } else if self.app.settings_page.is_some() {
             &self.settings_field
         } else {

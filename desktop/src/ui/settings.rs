@@ -11,12 +11,32 @@
 use super::icons::icon;
 use super::widgets::field_text;
 use super::{MONO_FONT, Takt, Tokens};
-use crate::state::settings::{Control, SettingRow};
+use crate::platform::hotkeys::Hotkey;
+use crate::state::Editing;
+use crate::state::settings::{self as page, Control, SettingRow, SettingsMenu};
 use crate::text_field::{FieldKey, TextField};
 use gpui::{
-    AnyElement, ClickEvent, Context, FontWeight, IntoElement, ParentElement, SharedString, Styled,
-    div, prelude::*, px,
+    AnyElement, ClickEvent, Context, Corner, FontWeight, IntoElement, ParentElement, SharedString,
+    Styled, anchored, deferred, div, point, prelude::*, px,
 };
+use std::time::{Duration, Instant};
+
+/// The width every dropdown and text control on the page is drawn at, so
+/// their values line up down the page.
+const CONTROL_WIDTH: f32 = 220.;
+/// A control's height: buttons, dropdowns, fields and shortcuts alike.
+const CONTROL_HEIGHT: f32 = 26.;
+const MENU_ROW: f32 = 26.;
+
+/// The open dropdown's side of the view: its filter, where its options
+/// are scrolled, and which one a click outside just closed (so the click
+/// that lands on its own control doesn't open it again).
+#[derive(Default)]
+pub(super) struct MenuView {
+    pub(super) field: TextField,
+    scroll: gpui::ScrollHandle,
+    dismissed: Option<(String, Instant)>,
+}
 
 impl Takt {
     /// ⌘,: the page, its search empty, where it was left. The window
@@ -70,6 +90,9 @@ impl Takt {
         keystroke: &gpui::Keystroke,
         cx: &mut Context<Self>,
     ) -> bool {
+        if self.app.setting_menu().is_some() {
+            return self.settings_menu_key(keystroke, cx);
+        }
         let query = self.settings_field.text.clone();
         if keystroke.modifiers.control {
             match keystroke.key.as_str() {
@@ -95,7 +118,9 @@ impl Takt {
             FieldKey::Text(_) => return false,
             FieldKey::Copy | FieldKey::Cut | FieldKey::Paste => {}
             FieldKey::Commit => {
+                let before = self.app.setting_menu().cloned();
                 self.app.change_settings_cursor(&query);
+                self.settings_menu_opened(before);
                 if self.app.overlay.is_some() {
                     self.open_overlay_field();
                 }
@@ -129,6 +154,78 @@ impl Takt {
             FieldKey::Ignored => {}
         }
         true
+    }
+
+    /// A key while a setting's dropdown is open: ↑↓ (and ⌃N ⌃P) move,
+    /// Return chooses, Esc clears the filter and then closes, and what is
+    /// typed filters. False for a printable key, which the input method
+    /// types into the filter.
+    fn settings_menu_key(&mut self, keystroke: &gpui::Keystroke, cx: &mut Context<Self>) -> bool {
+        let query = self.settings_menu.field.text.clone();
+        if keystroke.modifiers.control {
+            let by = match keystroke.key.as_str() {
+                "n" | "j" => Some(1),
+                "p" | "k" => Some(-1),
+                _ => None,
+            };
+            if let Some(by) = by {
+                self.step_settings_menu(by);
+                return true;
+            }
+        }
+        let outcome = self.settings_menu.field.handle(keystroke);
+        if Self::clipboard_key(&mut self.settings_menu.field, &outcome, cx) {
+            self.settings_menu_filtered();
+            return true;
+        }
+        match outcome {
+            FieldKey::Text(_) => return false,
+            FieldKey::Copy | FieldKey::Cut | FieldKey::Paste | FieldKey::Ignored => {}
+            FieldKey::Tab { .. } => {}
+            FieldKey::Commit => {
+                self.app.choose_setting_menu(&query);
+                self.settings_menu.field = TextField::default();
+            }
+            FieldKey::Cancel => {
+                if query.is_empty() {
+                    self.app.close_setting_menu();
+                } else {
+                    self.settings_menu.field = TextField::default();
+                    self.settings_menu_filtered();
+                }
+            }
+            FieldKey::Down => self.step_settings_menu(1),
+            FieldKey::Up => self.step_settings_menu(-1),
+            FieldKey::Edited => self.settings_menu_filtered(),
+        }
+        true
+    }
+
+    fn step_settings_menu(&mut self, by: isize) {
+        let query = self.settings_menu.field.text.clone();
+        self.app.step_setting_menu(by, &query);
+        if let Some(menu) = self.app.setting_menu() {
+            self.settings_menu.scroll.scroll_to_item(menu.cursor);
+        }
+    }
+
+    /// The dropdown's filter changed: what it leaves, from the top.
+    pub(super) fn settings_menu_filtered(&mut self) {
+        self.app.setting_menu_filtered();
+        self.settings_menu.scroll.set_offset(Default::default());
+    }
+
+    /// After a row was changed: a dropdown it opened starts unfiltered,
+    /// scrolled to the value in force.
+    fn settings_menu_opened(&mut self, before: Option<SettingsMenu>) {
+        let now = self.app.setting_menu().cloned();
+        if let Some(menu) = now
+            && before.as_ref().map(|m| &m.row) != Some(&menu.row)
+        {
+            self.settings_menu.field = TextField::default();
+            self.settings_menu.scroll.set_offset(Default::default());
+            self.settings_menu.scroll.scroll_to_item(menu.cursor);
+        }
     }
 
     /// `TAKT_DESKTOP_SMOKE_SETTINGS`: ⌘, through the window's own key
@@ -193,6 +290,47 @@ impl Takt {
                 self.app.settings_page.is_some()
             ));
         }
+        // The dropdowns: Return opens one on the value in force, typing
+        // filters it, Esc clears the filter and then closes it unchanged.
+        self.settings_field = TextField::default();
+        self.settings_searched();
+        self.app.choose_settings_category("Appearance");
+        for (id, typed) in [("appearance", ""), ("theme", "one")] {
+            let Some(ix) = self.app.settings_shown("").iter().position(|r| r.id == id) else {
+                continue;
+            };
+            let before = (
+                self.app.prefs.appearance.clone(),
+                self.app.prefs.theme.clone(),
+            );
+            if let Some(page) = self.app.settings_page.as_mut() {
+                page.cursor = ix;
+            }
+            press(self, "enter", window, cx);
+            let open = self.app.setting_menu().is_some_and(|m| m.row == id);
+            let every = self.app.setting_menu_options("").len();
+            self.settings_menu.field = TextField::new(typed);
+            self.settings_menu_filtered();
+            let filtered = self.app.setting_menu_options(typed).len();
+            press(self, "down", window, cx);
+            if !typed.is_empty() {
+                press(self, "escape", window, cx);
+            }
+            press(self, "escape", window, cx);
+            said.push(format!(
+                "{id} dropdown open {open}, {every} options, {filtered} for {typed:?}, esc closes {}, unchanged {}",
+                self.app.setting_menu().is_none() && self.app.settings_page.is_some(),
+                (self.app.prefs.appearance.clone(), self.app.prefs.theme.clone()) == before
+            ));
+        }
+        self.app.choose_settings_category("Plugins");
+        let plugins: Vec<String> = self
+            .app
+            .settings_shown("")
+            .iter()
+            .map(|row| row.id.clone())
+            .collect();
+        said.push(format!("plugins: {}", plugins.join(" ")));
         said
     }
 
@@ -240,8 +378,19 @@ impl Takt {
         if let Some(page) = self.app.settings_page.as_mut() {
             page.cursor = ix;
         }
+        // The click on a dropdown's own control, which its mouse-down
+        // outside has just closed: it stays closed.
+        if let Some((row, at)) = self.settings_menu.dismissed.take()
+            && row == id
+            && at.elapsed() < Duration::from_millis(600)
+        {
+            cx.notify();
+            return;
+        }
         let editing = self.app.editing.clone();
+        let menu = self.app.setting_menu().cloned();
         self.app.change_setting(id);
+        self.settings_menu_opened(menu);
         if self.app.overlay.is_some() {
             self.open_overlay_field();
         }
@@ -400,7 +549,10 @@ impl Takt {
         let mut body: Vec<AnyElement> = Vec::new();
         let mut section: Option<&'static str> = None;
         for (ix, row) in rows.iter().enumerate() {
-            if !searching && row.group != category && section != Some(row.group) {
+            // A plugin's settings sit beneath its switch, not under a
+            // heading of their own.
+            let nested = !searching && page::is_plugin_setting(row.group);
+            if !searching && !nested && row.group != category && section != Some(row.group) {
                 body.push(
                     div()
                         .px_2()
@@ -414,7 +566,7 @@ impl Takt {
                 );
             }
             section = Some(row.group);
-            body.push(self.setting_row(ix, ix == cursor, row, searching, t, cx));
+            body.push(self.setting_row(ix, ix == cursor, row, searching, nested, t, cx));
         }
         div()
             .flex_1()
@@ -478,21 +630,26 @@ impl Takt {
             )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn setting_row(
         &self,
         ix: usize,
         here: bool,
         row: &SettingRow,
         searching: bool,
+        nested: bool,
         t: Tokens,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = row.id.clone();
         let description = row.description();
+        let plugin = !searching && row.id.starts_with("plugin:");
         div()
             .id(SharedString::from(format!("setting-{}", row.id)))
-            .px_2()
-            .py_3()
+            .pr_2()
+            .pl(px(if nested { 28. } else { 8. }))
+            .py(px(if nested { 10. } else { 12. }))
+            .min_h(px(44.))
             .flex()
             .items_center()
             .justify_between()
@@ -500,6 +657,18 @@ impl Takt {
             .border_b_1()
             .border_color(t.border_variant)
             .relative()
+            // A plugin's settings hang off a rule down from its switch.
+            .when(nested, |d| {
+                d.child(
+                    div()
+                        .absolute()
+                        .left(px(14.))
+                        .top_0()
+                        .bottom_0()
+                        .w(px(1.))
+                        .bg(t.border),
+                )
+            })
             .when(here, |d| {
                 d.bg(t.hover).child(
                     div()
@@ -532,7 +701,8 @@ impl Takt {
                     })
                     .child(
                         div()
-                            .text_size(px(14.))
+                            .text_size(px(if nested { 13. } else { 14. }))
+                            .when(plugin, |d| d.font_weight(FontWeight::MEDIUM))
                             .text_color(t.text)
                             .child(row.title.clone()),
                     )
@@ -540,13 +710,179 @@ impl Takt {
                         d.child(div().text_color(t.muted).child(description))
                     }),
             )
-            .child(control(row.control(), t))
+            .child(self.setting_control(row, t, cx))
+            .into_any_element()
+    }
+
+    /// A setting's control, drawn, and its dropdown when that is open; the
+    /// row takes the click.
+    fn setting_control(&self, row: &SettingRow, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        let open = self.app.setting_menu().is_some_and(|m| m.row == row.id);
+        let hotkey = match row.id.as_str() {
+            "hotkey-capture" => Some(Hotkey::QuickCapture),
+            "hotkey-panel" => Some(Hotkey::FocusPanel),
+            "hotkey-window" => Some(Hotkey::ShowWindow),
+            _ => None,
+        };
+        let recording = matches!(&self.app.editing, Some(Editing::Hotkey(h)) if Some(*h) == hotkey);
+        let drawn = control(row.control(), open, recording, t);
+        if !open {
+            return drawn;
+        }
+        div()
+            .relative()
+            .flex_none()
+            .child(drawn)
+            .child(
+                // Its top right corner under the control's bottom right,
+                // kept inside the window.
+                div().absolute().right_0().bottom_0().child(
+                    deferred(
+                        anchored()
+                            .anchor(Corner::TopRight)
+                            .offset(point(px(0.), px(4.)))
+                            .snap_to_window_with_margin(px(8.))
+                            .child(self.settings_menu_view(t, cx)),
+                    )
+                    .with_priority(1),
+                ),
+            )
+            .into_any_element()
+    }
+
+    /// The open dropdown: a filter once the list is long, and the options,
+    /// the one in force ticked and the one under the keyboard lit.
+    fn settings_menu_view(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        let Some(menu) = self.app.setting_menu().cloned() else {
+            return div().into_any_element();
+        };
+        let query = self.settings_menu.field.text.clone();
+        let options = self.app.setting_menu_options(&query);
+        let every = self
+            .app
+            .setting_options(&menu.row)
+            .map_or(0, |all| all.len());
+        let filtering = every >= page::MENU_FILTER_FROM || !query.is_empty();
+        let cursor = menu.cursor.min(options.len().saturating_sub(1));
+        let row_id = menu.row.clone();
+        let items: Vec<AnyElement> = options
+            .into_iter()
+            .enumerate()
+            .map(|(ix, option)| {
+                let here = ix == cursor;
+                let row = menu.row.clone();
+                let value = option.value.clone();
+                div()
+                    .id(("settings-option", ix))
+                    .h(px(MENU_ROW))
+                    .flex_none()
+                    .px_2()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .rounded(px(4.))
+                    .when(here, |d| d.bg(t.selected))
+                    .when(!here, |d| d.hover(|d| d.bg(t.hover)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.app.choose_setting_option(&row, &value);
+                        this.settings_menu.field = TextField::default();
+                        this.after_change(cx);
+                        cx.notify();
+                    }))
+                    .child(div().w(px(14.)).flex_none().when(option.current, |d| {
+                        d.child(icon("check", 14.).text_color(t.accent))
+                    }))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_color(t.text)
+                            .child(option.label),
+                    )
+                    .when(!option.detail.is_empty(), |d| {
+                        d.child(
+                            div()
+                                .flex_none()
+                                .text_size(px(12.))
+                                .text_color(t.placeholder)
+                                .child(option.detail),
+                        )
+                    })
+                    .into_any_element()
+            })
+            .collect();
+        let empty = items.is_empty();
+        div()
+            .id("settings-menu")
+            .occlude()
+            .w(px(CONTROL_WIDTH + 40.))
+            .flex()
+            .flex_col()
+            .rounded(px(6.))
+            .bg(t.surface)
+            .border_1()
+            .border_color(t.border)
+            .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_down_out(cx.listener(move |this, _: &gpui::MouseDownEvent, _, cx| {
+                this.app.close_setting_menu();
+                this.settings_menu.dismissed = Some((row_id.clone(), Instant::now()));
+                cx.notify();
+            }))
+            .when(filtering, |d| {
+                d.child(
+                    div()
+                        .h(px(30.))
+                        .px_2()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .border_b_1()
+                        .border_color(t.border_variant)
+                        .child(icon("search", 12.).text_color(t.muted))
+                        .child(div().flex_1().min_w_0().overflow_hidden().child(field_text(
+                            &self.settings_menu.field,
+                            "Filter…",
+                            t,
+                            self.input_hook(),
+                        ))),
+                )
+            })
+            .child(
+                div()
+                    .id("settings-menu-options")
+                    .max_h(px(MENU_ROW * 11. + 8.))
+                    .overflow_y_scroll()
+                    .track_scroll(&self.settings_menu.scroll)
+                    .p_1()
+                    .flex()
+                    .flex_col()
+                    .when(empty, |d| {
+                        d.child(
+                            div()
+                                .h(px(MENU_ROW))
+                                .px_2()
+                                .flex()
+                                .items_center()
+                                .text_color(t.placeholder)
+                                .child(if query.trim().is_empty() {
+                                    "Nothing to choose yet"
+                                } else {
+                                    "Nothing matches"
+                                }),
+                        )
+                    })
+                    .children(items),
+            )
             .into_any_element()
     }
 }
 
-/// A setting's control, drawn; the row takes the click.
-fn control(control: Control, t: Tokens) -> AnyElement {
+/// A setting's control, drawn: a switch, a button, a dropdown showing its
+/// value, a field showing its text, or a shortcut's keys. Every boxed
+/// control is the same height, and dropdowns and fields the same width.
+fn control(control: Control, open: bool, recording: bool, t: Tokens) -> AnyElement {
     let note = |text: String| {
         div()
             .max_w(px(260.))
@@ -554,18 +890,15 @@ fn control(control: Control, t: Tokens) -> AnyElement {
             .text_color(t.muted)
             .child(text)
     };
-    let button = || {
+    let boxed = |lit: bool| {
         div()
-            .h(px(26.))
-            .px_3()
+            .h(px(CONTROL_HEIGHT))
             .flex()
             .items_center()
             .gap_2()
             .rounded(px(6.))
             .border_1()
-            .border_color(t.border)
-            .bg(t.surface)
-            .hover(|d| d.bg(t.hover))
+            .border_color(if lit { t.accent } else { t.border })
     };
     let side = div().flex_none().flex().items_center().gap_3();
     match control {
@@ -592,20 +925,87 @@ fn control(control: Control, t: Tokens) -> AnyElement {
             .into_any_element(),
         Control::Button { label, note: said } => side
             .when(!said.is_empty(), |d| d.child(note(said)))
-            .child(button().child(label))
-            .into_any_element(),
-        Control::Choice(value) => side
             .child(
-                button()
-                    .max_w(px(320.))
-                    .child(div().truncate().child(if value.is_empty() {
-                        "Choose…".to_string()
-                    } else {
-                        value
-                    }))
+                boxed(false)
+                    .px_3()
+                    .bg(t.surface)
+                    .hover(|d| d.bg(t.hover))
+                    .child(label),
+            )
+            .into_any_element(),
+        Control::Select(value) => side
+            .child(
+                boxed(open)
+                    .w(px(CONTROL_WIDTH))
+                    .pl_2()
+                    .pr(px(6.))
+                    .justify_between()
+                    .bg(if open { t.hover } else { t.surface })
+                    .hover(|d| d.bg(t.hover))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_color(if value.is_empty() {
+                                t.placeholder
+                            } else {
+                                t.text
+                            })
+                            .child(if value.is_empty() {
+                                "Choose…".to_string()
+                            } else {
+                                value
+                            }),
+                    )
                     .child(icon("chevrons-up-down", 12.).text_color(t.muted)),
             )
             .into_any_element(),
+        Control::Text(value) => side
+            .child(
+                boxed(false)
+                    .w(px(CONTROL_WIDTH))
+                    .px_2()
+                    .bg(t.background)
+                    .hover(|d| d.border_color(t.muted))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_color(if value.is_empty() {
+                                t.placeholder
+                            } else {
+                                t.text
+                            })
+                            .child(if value.is_empty() {
+                                "Not set".to_string()
+                            } else {
+                                value
+                            }),
+                    ),
+            )
+            .into_any_element(),
+        Control::Shortcut(keys) => {
+            let off = keys == "Off";
+            side.child(
+                boxed(recording)
+                    .px_2()
+                    .min_w(px(96.))
+                    .justify_center()
+                    .bg(t.surface)
+                    .hover(|d| d.bg(t.hover))
+                    .font_family(MONO_FONT)
+                    .text_size(px(12.))
+                    .text_color(if recording || off { t.muted } else { t.text })
+                    .child(if recording {
+                        "Press keys…".to_string()
+                    } else {
+                        keys
+                    }),
+            )
+            .into_any_element()
+        }
     }
 }
 
