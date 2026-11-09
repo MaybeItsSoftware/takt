@@ -1149,6 +1149,47 @@ impl App {
 mod tests {
     use super::*;
 
+    #[test]
+    // The title shows no key: `ei` begins with the inspector's own `e`.
+    fn every_key_the_inspector_shows_runs_its_row_from_there() {
+        let bindings = crate::keys::Bindings::shipped();
+        let ids = [
+            "focus",
+            "notes",
+            "notes-editor",
+            "estimate",
+            "tags",
+            "conditions",
+            "move",
+            "blockers",
+            "waiting",
+            "commit",
+            "links",
+            "complete",
+            "convert",
+            "pin",
+            "assignee",
+        ];
+        let mut wrong = Vec::new();
+        for id in ids {
+            let command = Stop::new(id, "", StopKind::Action).command().unwrap();
+            let Some(key) = bindings
+                .entry(command)
+                .and_then(|e| e.keys.first())
+                .cloned()
+            else {
+                continue;
+            };
+            let ran = bindings
+                .command(&key, takt_core::keymap::CommandSurface::Inspector)
+                .map(|c| c.id.clone());
+            if ran.as_deref() != Some(command) {
+                wrong.push(format!("{id}: {key} runs {ran:?}, not {command}"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
     fn snapshot() -> EditorSnapshot {
         EditorSnapshot {
             workspace_id: "w".into(),

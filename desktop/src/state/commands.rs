@@ -96,6 +96,14 @@ impl App {
         let Some(command) = self.bindings.command(key, surface).map(|c| c.id.clone()) else {
             return false;
         };
+        // A list or folder in the inspector: the task keys it inherits would
+        // reach whichever task was selected before, so they wait.
+        if self.region == Region::Inspector
+            && self.inspecting_container
+            && command.starts_with("task")
+        {
+            return false;
+        }
         self.run(&command, Some(key));
         true
     }

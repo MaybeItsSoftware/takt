@@ -194,7 +194,11 @@ the row under the notes (or `nm`, or `Cmd+Ctrl+M` from inside them) opens them
 full size, and says whether they are the task's linked Obsidian note.
 `Tab` / `Shift+Tab` keep the field
 and go on to the next / previous row, editing it if it is a field. The mouse
-works as before.
+works as before. The task's own keys work from the inspector too — the ones
+shown beside its rows (`nn` the notes, `tt` the tags, `pl` a link, `⌥T` the
+estimate, `Space` to complete) and every `Cmd` chord — except where the
+inspector has the key itself (`i`, `e`, `x`, `j`, `k`, `h`, `gg`); on a list or
+folder they wait, so they never reach a task you can't see.
 
 On the Mac the inspector also takes a **list or a folder**. While the
 keyboard is in the sidebar on one, the inspector shows it rather than the

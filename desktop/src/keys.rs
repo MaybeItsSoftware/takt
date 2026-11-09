@@ -214,7 +214,16 @@ fn inherits(command: &CommandEntry, key: &str, surface: CommandSurface) -> bool 
         Sidebar | Done | Conditions => {
             is_chord(key) || is_letter_sequence(key) || REGION_BARE_KEYS.contains(&key)
         }
-        Inspector => is_chord(key) || REGION_BARE_KEYS.contains(&key),
+        // The inspector's rows show the task's keys (`nn` notes, `pl` a
+        // link, ⌥T the estimate, space to complete), so they reach the task
+        // from there too. Nothing is typed until a field is opened.
+        Inspector => {
+            is_chord(key)
+                || is_letter_sequence(key)
+                || REGION_BARE_KEYS.contains(&key)
+                || key.starts_with("option+")
+                || matches!(key, "space" | "shift+space")
+        }
     }
 }
 
