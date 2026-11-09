@@ -18,6 +18,7 @@ pub mod columns;
 pub mod commands;
 pub mod conditions;
 pub mod context_menu;
+pub mod date_edit;
 pub mod details;
 pub mod docks;
 pub mod drag;
@@ -181,7 +182,7 @@ pub enum Editing {
     },
     /// A calendar open under the inspector's start or due row: the day the
     /// keyboard is on and the time it would be set at.
-    Date(inspector::DateEdit),
+    Date(date_edit::DateEdit),
     /// The repeat selector open under the inspector's repeat row.
     Repeat(repeat::RepeatEdit),
 }

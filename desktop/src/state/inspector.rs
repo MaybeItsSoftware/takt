@@ -97,7 +97,7 @@ impl Stop {
         Some(match self.id {
             "focus" => "play",
             "log" => "clock",
-            "start" => "sunrise",
+            "start" => "calendar-clock",
             "due" => "calendar",
             "due.exact" => "clock",
             "conditions" => "sliders",
@@ -157,6 +157,89 @@ pub fn priority_name(level: i64) -> &'static str {
         -2 => "−2 · Second to last",
         -1 => "−1 · Last",
         _ => "None",
+    }
+}
+
+/// The rows of the inspector's When group, in order.
+fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning) -> Vec<Stop> {
+    use StopKind::*;
+    let estimate = snapshot.estimate_seconds.filter(|s| *s > 0);
+    let minutes = |s: i64| format!("{} min", editor_minutes_text(s, true));
+    let mut stops = vec![
+        Stop::new("start", "Scheduled", Text { multiline: false })
+            .value(
+                planning
+                    .start_at_ms
+                    .map(|ms| format!("Scheduled {}", format_slot(ms, estimate))),
+                "Schedule a time",
+            )
+            .grouped(),
+        Stop::new("estimate", "Takes", Text { multiline: false }).value(
+            estimate.map(|s| format!("Takes {}", minutes(s))),
+            "Add estimate",
+        ),
+    ];
+    // How the estimate may be split only means something once there is one.
+    if estimate.is_some() || planning.minimum_block_seconds.is_some() {
+        stops.push(
+            Stop::new("minimum-block", "Min. block", Text { multiline: false }).value(
+                planning
+                    .minimum_block_seconds
+                    .map(|s| format!("In blocks of {} or more", minutes(s))),
+                "Add a minimum block",
+            ),
+        );
+    }
+    let single = planning.requires_single_sitting == Some(true);
+    if estimate.is_some() || single {
+        stops.push(Stop {
+            value: if single {
+                "Must finish in one go".into()
+            } else {
+                "Can be split".into()
+            },
+            empty: !single,
+            ..Stop::new("single-sitting", "One sitting", Toggle)
+        });
+    }
+    let due = snapshot
+        .due_at_ms
+        .map(format_when)
+        .or_else(|| planning.due_date.as_deref().map(format_day_string));
+    stops.push(
+        Stop::new("due", "Due", Text { multiline: false })
+            .value(due.map(|d| format!("Due {d}")), "Add due date"),
+    );
+    stops.push(
+        Stop::new("repeat", "Repeat", Text { multiline: false }).value(
+            snapshot
+                .metadata
+                .recurrence_rule
+                .clone()
+                .map(|rule| format!("Repeats {rule}")),
+            "Add repeat",
+        ),
+    );
+    stops
+}
+
+/// "Mon 3 Nov, 14:00": a day and its time, as the When rows write them.
+pub fn format_when(ms: i64) -> String {
+    use chrono::{Local, TimeZone};
+    Local
+        .timestamp_millis_opt(ms)
+        .single()
+        .map(|time| time.format("%a %-d %b, %H:%M").to_string())
+        .unwrap_or_default()
+}
+
+/// "Mon 3 Nov, 14:00–14:45": a start and, with a length, its end.
+pub fn format_slot(start_ms: i64, length_seconds: Option<i64>) -> String {
+    use chrono::{Local, TimeZone};
+    let from = format_when(start_ms);
+    match length_seconds.and_then(|s| Local.timestamp_millis_opt(start_ms + s * 1000).single()) {
+        Some(end) => format!("{from}\u{2013}{}", end.format("%H:%M")),
+        None => from,
     }
 }
 
@@ -222,38 +305,6 @@ pub fn stops(
             ..Stop::new("log", "", Text { multiline: false })
         });
     }
-    let estimated = snapshot.estimate_seconds.is_some();
-    stops.push(
-        Stop::new("estimate", "Estimate", Text { multiline: false }).value(
-            snapshot
-                .estimate_seconds
-                .map(|s| format!("{} min", editor_minutes_text(s, true))),
-            "Add estimate",
-        ),
-    );
-    // How the estimate may be split only means something once there is one.
-    if estimated || planning.minimum_block_seconds.is_some() {
-        stops.push(
-            Stop::new("minimum-block", "Min. block", Text { multiline: false }).value(
-                planning
-                    .minimum_block_seconds
-                    .map(|s| format!("{} min", editor_minutes_text(s, true))),
-                "Add minimum",
-            ),
-        );
-    }
-    let single = planning.requires_single_sitting == Some(true);
-    if estimated || single {
-        stops.push(Stop {
-            value: if single {
-                "Must finish in one go".into()
-            } else {
-                "Can be split".into()
-            },
-            empty: !single,
-            ..Stop::new("single-sitting", "One sitting", Toggle)
-        });
-    }
     if snapshot.daily_progress {
         stops.push(Stop {
             value: "Make daily progress".into(),
@@ -268,30 +319,13 @@ pub fn stops(
         });
     }
 
-    // When: the dates and how it comes round. The calendar sets a due
-    // time or none, so the time needs no row of its own.
-    stops.push(
-        Stop::new("start", "Start", Text { multiline: false })
-            .value(
-                planning
-                    .start_at_ms
-                    .map(|ms| format!("Starts {}", format_moment(ms))),
-                "Add start date",
-            )
-            .grouped(),
-    );
-    let due = snapshot
-        .due_at_ms
-        .map(format_moment)
-        .or_else(|| planning.due_date.as_deref().map(format_day_string));
-    stops.push(
-        Stop::new("due", "Due", Text { multiline: false })
-            .value(due.map(|d| format!("Due {d}")), "Add due date"),
-    );
-    stops.push(
-        Stop::new("repeat", "Repeat", Text { multiline: false })
-            .value(snapshot.metadata.recurrence_rule.clone(), "Add repeat"),
-    );
+    // When, and for how long: one group, each row a short sentence that
+    // starts with what it is. Scheduled is the slot it is to be done in
+    // (its start, buried until then, and the event Google Calendar shows),
+    // as long as it takes; the splitting rows say how that time may be cut;
+    // then the deadline, and how it comes round. Each calendar row opens the
+    // calendar, whose time is typed beside its days.
+    stops.extend(when_stops(snapshot, &planning));
 
     // What it is about.
     stops.push(
@@ -350,7 +384,7 @@ pub fn stops(
         .as_ref()
         .is_some_and(|groups| !groups.is_empty())
         || planning.minimum_block_seconds.is_some()
-        || single;
+        || planning.requires_single_sitting == Some(true);
     let mut actions = Vec::new();
     // Only a task with subtasks has anyone to copy its requirements to.
     if work.subtasks > 0 && has_requirements {
@@ -397,7 +431,7 @@ pub fn stops(
 }
 
 /// "1h 20m", "45m", "2h".
-fn span(seconds: i64) -> String {
+pub(crate) fn span(seconds: i64) -> String {
     let minutes = (seconds + 30) / 60;
     match (minutes / 60, minutes % 60) {
         (0, m) => format!("{m}m"),
@@ -1001,197 +1035,6 @@ impl App {
     }
 }
 
-/// The calendar under the start or due row.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DateEdit {
-    pub task_id: String,
-    /// `start` or `due`.
-    pub stop: &'static str,
-    /// The day the keyboard is on.
-    pub day: chrono::NaiveDate,
-    /// Minutes after midnight; None is the day with no time (due only).
-    pub time: Option<u32>,
-}
-
-/// The times offered under the calendar, in minutes after midnight.
-pub const DATE_TIMES: [u32; 6] = [9 * 60, 12 * 60, 14 * 60, 17 * 60, 19 * 60, 21 * 60];
-
-fn local_parts(ms: i64) -> Option<(chrono::NaiveDate, u32)> {
-    use chrono::{Local, TimeZone, Timelike};
-    let time = Local.timestamp_millis_opt(ms).single()?;
-    Some((time.date_naive(), time.hour() * 60 + time.minute()))
-}
-
-fn local_ms(day: chrono::NaiveDate, minutes: u32) -> Option<i64> {
-    use chrono::{Local, TimeZone};
-    let at = day.and_hms_opt(minutes / 60, minutes % 60, 0)?;
-    Local
-        .from_local_datetime(&at)
-        .earliest()
-        .map(|time| time.timestamp_millis())
-}
-
-pub fn today() -> chrono::NaiveDate {
-    chrono::Local::now().date_naive()
-}
-
-impl App {
-    /// Return on the start or due row: the calendar opens on its day.
-    pub fn open_date_edit(&mut self, stop: &'static str) {
-        let Some(task_id) = self.selected_task.clone() else {
-            return;
-        };
-        let Some(snapshot) = self.inspected() else {
-            return;
-        };
-        let planning = snapshot.planning.clone().unwrap_or_default();
-        let (day, time) = match stop {
-            "start" => planning
-                .start_at_ms
-                .and_then(local_parts)
-                .map(|(d, t)| (d, Some(t)))
-                .unwrap_or((today(), Some(9 * 60))),
-            _ => snapshot
-                .due_at_ms
-                .and_then(local_parts)
-                .map(|(d, t)| (d, Some(t)))
-                .or_else(|| {
-                    planning
-                        .due_date
-                        .as_deref()
-                        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
-                        .map(|d| (d, None))
-                })
-                .unwrap_or((today(), None)),
-        };
-        self.region = Region::Inspector;
-        self.editing = Some(Editing::Date(DateEdit {
-            task_id,
-            stop,
-            day,
-            time,
-        }));
-    }
-
-    fn date_edit(&mut self) -> Option<&mut DateEdit> {
-        match self.editing.as_mut() {
-            Some(Editing::Date(edit)) => Some(edit),
-            _ => None,
-        }
-    }
-
-    /// A key while the calendar is open: arrows and hjkl move the day, [ ]
-    /// and page keys the month, t today, Return sets it, Delete clears it,
-    /// Esc leaves it as it was.
-    pub fn date_key(&mut self, key: &str) {
-        use chrono::{Duration, Months};
-        let Some(edit) = self.date_edit() else {
-            return;
-        };
-        let day = edit.day;
-        let moved = match key {
-            "left" | "h" => day.checked_sub_signed(Duration::days(1)),
-            "right" | "l" => day.checked_add_signed(Duration::days(1)),
-            "up" | "k" => day.checked_sub_signed(Duration::days(7)),
-            "down" | "j" => day.checked_add_signed(Duration::days(7)),
-            "[" | "pageup" => day.checked_sub_months(Months::new(1)),
-            "]" | "pagedown" => day.checked_add_months(Months::new(1)),
-            "t" => Some(today()),
-            _ => None,
-        };
-        if let Some(day) = moved {
-            edit.day = day;
-            return;
-        }
-        match key {
-            "-" => edit.time = Some(edit.time.unwrap_or(9 * 60).saturating_sub(15)),
-            "=" | "+" => edit.time = Some((edit.time.unwrap_or(9 * 60) + 15).min(23 * 60 + 45)),
-            "enter" | "space" => self.commit_date(),
-            "backspace" | "delete" => self.clear_date(),
-            "escape" => self.editing = None,
-            _ => {}
-        }
-    }
-
-    /// A day clicked: it is set at once.
-    pub fn pick_date_day(&mut self, day: chrono::NaiveDate) {
-        if let Some(edit) = self.date_edit() {
-            edit.day = day;
-        }
-        self.commit_date();
-    }
-
-    /// A time chosen under the calendar; None is no time (due only).
-    pub fn pick_date_time(&mut self, time: Option<u32>) {
-        if let Some(edit) = self.date_edit() {
-            edit.time = if edit.stop == "start" {
-                time.or(Some(9 * 60))
-            } else {
-                time
-            };
-        }
-    }
-
-    /// The month shown moved by `by`.
-    pub fn step_date_month(&mut self, by: i32) {
-        use chrono::Months;
-        if let Some(edit) = self.date_edit() {
-            let months = Months::new(by.unsigned_abs());
-            let moved = if by < 0 {
-                edit.day.checked_sub_months(months)
-            } else {
-                edit.day.checked_add_months(months)
-            };
-            if let Some(day) = moved {
-                edit.day = day;
-            }
-        }
-    }
-
-    pub fn commit_date(&mut self) {
-        let Some(Editing::Date(edit)) = self.editing.take() else {
-            return;
-        };
-        if self.selected_task.as_deref() != Some(edit.task_id.as_str()) {
-            return;
-        }
-        match edit.stop {
-            "start" => {
-                let at = local_ms(edit.day, edit.time.unwrap_or(9 * 60));
-                self.schedule_selected(at);
-            }
-            _ => {
-                let day = edit.day.format("%Y-%m-%d").to_string();
-                let at = edit.time.and_then(|t| local_ms(edit.day, t));
-                self.edit_selected(|snapshot| {
-                    let mut planning = snapshot.planning.clone().unwrap_or_default();
-                    match at {
-                        Some(ms) => {
-                            snapshot.due_at_ms = Some(ms);
-                            planning.due_date = None;
-                        }
-                        None => {
-                            snapshot.due_at_ms = None;
-                            planning.due_date = Some(day);
-                        }
-                    }
-                    snapshot.planning = planning.normalized();
-                });
-            }
-        }
-    }
-
-    pub fn clear_date(&mut self) {
-        let Some(Editing::Date(edit)) = self.editing.take() else {
-            return;
-        };
-        match edit.stop {
-            "start" => self.schedule_selected(None),
-            _ => self.apply_typed("clear due"),
-        }
-    }
-}
-
 /// `yyyy-MM-dd` of a moment, locally.
 fn day_of(ms: i64) -> String {
     use chrono::{Local, TimeZone};
@@ -1308,7 +1151,7 @@ mod tests {
         let stops = stops(&snapshot(), &task(None), "Inbox", false, Default::default());
         assert_eq!(stops[0].id, "title");
         let estimate = stops.iter().find(|s| s.id == "estimate").unwrap();
-        assert_eq!(estimate.value, "30 min");
+        assert_eq!(estimate.value, "Takes 30 min");
         let due = stops.iter().find(|s| s.id == "due").unwrap();
         assert!(due.empty);
         assert!(!stops.iter().any(|s| s.id == "due.exact"));
@@ -1378,6 +1221,44 @@ mod tests {
             stops.iter().find(|s| s.id == "focus").unwrap().value,
             "Start focus"
         );
+    }
+
+    #[test]
+    fn the_when_rows_are_one_group_of_sentences() {
+        use chrono::{Local, TimeZone};
+        let start = Local
+            .with_ymd_and_hms(2026, 11, 9, 14, 0, 0)
+            .unwrap()
+            .timestamp_millis();
+        let mut scheduled = snapshot();
+        scheduled.planning = Some(takt_core::editor::Planning {
+            start_at_ms: Some(start),
+            due_date: Some("2026-11-13".into()),
+            ..Default::default()
+        });
+        scheduled.metadata.recurrence_rule = Some("weekly".into());
+        let stops = stops(&scheduled, &task(None), "Inbox", false, Default::default());
+        let ids: Vec<&str> = stops.iter().map(|s| s.id).collect();
+        let from = ids.iter().position(|id| *id == "start").unwrap();
+        assert_eq!(
+            &ids[from..from + 6],
+            [
+                "start",
+                "estimate",
+                "minimum-block",
+                "single-sitting",
+                "due",
+                "repeat"
+            ]
+        );
+        // One hairline, above the first of them.
+        assert!(stops[from].group);
+        assert!(stops[from + 1..from + 6].iter().all(|s| !s.group));
+        let value = |id: &str| stops.iter().find(|s| s.id == id).unwrap().value.clone();
+        assert_eq!(value("start"), "Scheduled Mon 9 Nov, 14:00\u{2013}14:30");
+        assert_eq!(value("due"), "Due Fri 13 Nov");
+        assert_eq!(value("repeat"), "Repeats weekly");
+        assert_eq!(format_slot(start, None), "Mon 9 Nov, 14:00");
     }
 
     #[test]

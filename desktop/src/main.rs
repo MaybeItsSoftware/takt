@@ -370,6 +370,30 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             app.open_date_edit("due");
             app.date_key("backspace");
             let cleared = value(app, "due");
+            // Due at a typed time, then a slot scheduled with its length:
+            // Tab from the days to the time, and on to how long.
+            app.open_date_edit("due");
+            for key in ["t", "tab", "1", "7", "enter"] {
+                app.date_key(key);
+            }
+            let due_timed = value(app, "due");
+            app.date_key("escape");
+            app.open_date_edit("due");
+            app.date_key("backspace");
+            let estimate_before = app.inspected().and_then(|s| s.estimate_seconds);
+            let scheduled_before = value(app, "start");
+            app.open_date_edit("start");
+            for key in ["t", "right", "tab", "1", "4", "tab", "4", "5", "enter"] {
+                app.date_key(key);
+            }
+            let scheduled = value(app, "start");
+            app.open_date_edit("start");
+            app.date_key("backspace");
+            // The estimate the slot's length wrote is put back.
+            let estimate_text = estimate_before
+                .map(|seconds| (seconds / 60).to_string())
+                .unwrap_or_default();
+            app.commit_inspector_field("estimate", &estimate_text);
             // The task's own agent context, apart from its notes.
             let notes_before = app.inspector_field_text("notes");
             app.commit_inspector_field("agent-context", "Smoke: warm up first.");
@@ -398,8 +422,9 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             app.open_repeat_edit();
             app.repeat_key("backspace");
             report.push(format!(
-                "inspector dates {:.2} ms: calendar {opened}, due {due_before:?} -> {set:?} -> {cleared:?}; repeat selector {selector}, set {repeating:?}, now {:?}",
+                "inspector dates {:.2} ms: calendar {opened}, due {due_before:?} -> {set:?} -> {cleared:?}, timed {due_timed:?}; scheduled {scheduled_before:?} -> {scheduled:?} -> {:?}; repeat selector {selector}, set {repeating:?}, now {:?}",
                 started.elapsed().as_secs_f64() * 1000.0,
+                value(app, "start"),
                 value(app, "repeat"),
             ));
         }

@@ -156,15 +156,25 @@ the title; working on it (Start focus, which says how far it has got — time
 logged against the estimate and subtasks done — and Log time worked, where on
 the Mac you type `25`, `25m` or `1h 20m` to record work done without the
 timer and without finishing the task, which counts toward a daily due today
-as a timed block would; then the estimate, how it may
-be split once it has one, daily progress and the commitment); when (start,
-due, repeat); the notes; where it is filed (List, Priority, Tags); what it
+as a timed block would; then daily progress and the commitment); when
+(Scheduled, the estimate as how long it takes, how it may be split once it
+has one, Due, Repeat); the notes; where it is filed (List, Priority, Tags); what it
 waits on (Conditions, Blocked by, Waiting on); Links; and the actions —
 and `gg` / `Shift+G` (or `Home` / `End`) go to the first and last. Landing on
 a text row only highlights it, so the notes no longer keep the keyboard.
 `Return`, `i` or `e` edits the row: it puts the caret in a field, presses a
 button, flips a switch, opens a menu, the date picker, the repeat selector or,
-on Conditions, the `cc` finder. On the Mac the repeat selector reads "Every
+on Conditions, the `cc` finder. On the Mac the date picker under Scheduled
+and Due is a month of days with the time typed beside it, not picked: the
+arrows (or `hjkl`) move a day or a week, `[` / `]` a month, `t` goes to today,
+and `Tab` moves to the time field, where `9`, `9:30`, `14:00` and `2pm` all
+read (a digit typed on the days starts it, `↑` / `↓` nudge it by 15 minutes).
+Under Scheduled — the slot set aside for doing the task, which is what Google
+Calendar shows as its event — the time also takes a range, `9-10:30`, and a
+second `Tab` reaches **For**, its length (`45`, `45m`, `1h 30m`), which is the
+task's estimate. `Shift+Tab` goes back, `Return` sets it, `⌫` on the days
+clears it and `Esc` leaves it as it was. A Due with no time is due that day,
+all day; a Scheduled with no time starts at 9:00. On the Mac the repeat selector reads "Every
 ‹3› ‹days›": `↑` / `↓` change the part in focus, `←` / `→` move between the
 count and the unit (day, week, weekday, or a named day), digits type the
 count, `d` and `w` pick days and weeks, `Return` sets it, `⌫` stops it
@@ -699,7 +709,7 @@ the field the arrows only choose, so you can keep refining a search.
 | `Tab` / `gf` | Start, or queue behind the running block; on a nested list's row, go into it |
 | `ee` / `F2` | Edit the title |
 | `dd` / `Cmd+D` | Edit the due date |
-| `ds` / `Alt+T` | Edit the start date / the time estimate |
+| `ds` / `Alt+T` | Schedule it (the start: a day, a time and how long) / edit the time estimate |
 | `nn`, `tt`, `dr` | Edit the notes, the tags, how it repeats |
 | `td` / `tm` / `cd` | Due today / tomorrow / clear the due date |
 | `cs` | Clear the start date, so a buried task is back among its siblings at once. `⌫` in the `ds` editor does the same |
