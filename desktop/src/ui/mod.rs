@@ -462,8 +462,12 @@ impl Takt {
                 .as_ref()
                 .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
             if open {
+                // Closed once this update ends: closing a window runs
+                // `window_closed`, which reads this entity, leased now.
                 if let Some(handle) = self.capture.take() {
-                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    cx.defer(move |cx| {
+                        let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    });
                 }
             } else {
                 let takt = cx.entity();
@@ -480,7 +484,9 @@ impl Takt {
                 .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
             if open && !wanted {
                 if let Some(handle) = self.panel.take() {
-                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    cx.defer(move |cx| {
+                        let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    });
                 }
             } else if !open && wanted {
                 // Opened once this update ends: the panel's first draw reads
@@ -574,7 +580,10 @@ impl Takt {
             return;
         }
         if keystroke.modifiers.platform && keystroke.key == "w" {
-            window.remove_window();
+            let handle = window.window_handle();
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, _| window.remove_window());
+            });
             return;
         }
         if matches!(self.app.editing, Some(Editing::Hotkey(_))) {
