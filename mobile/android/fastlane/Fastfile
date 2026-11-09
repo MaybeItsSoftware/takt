@@ -15,7 +15,9 @@ platform :android do
 
     upload_to_play_store(
       package_name:            APP_ID,
-      track:                   "internal",
+      # A Wear OS bundle goes to the watch's own track, `wear:internal`; on
+      # the phone's it would stand in for the phone's build.
+      track:                   options[:track].to_s.empty? ? "internal" : options[:track],
       aab:                     aab,
       release_status:          "completed",
       **play_credentials,

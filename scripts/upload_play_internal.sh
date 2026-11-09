@@ -38,4 +38,7 @@ fi
 
 cd "$android"
 bundle check >/dev/null 2>&1 || bundle install
-exec bundle exec fastlane android internal aab:"$aab"
+# A Wear OS bundle (scripts/build_wear_bundle.sh) goes to the watch's track.
+track=internal
+[[ "$(basename "$aab")" == takt-wear-* ]] && track=wear:internal
+exec bundle exec fastlane android internal aab:"$aab" track:"$track"
