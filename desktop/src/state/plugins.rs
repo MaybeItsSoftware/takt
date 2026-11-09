@@ -1,5 +1,6 @@
 //! The built-in plugins: each integration as something switched on or off
-//! in Settings → Plugins. A plugin is an id, a name, a line on what it does
+//! in Settings, each a page under the sidebar's Plugins heading (MCP sits
+//! in AI and the celebration in Appearance). A plugin is an id, a name, a line on what it does
 //! and its settings rows; switched off, its rows leave the page and what it
 //! does in the background or offers in the link picker stops.
 //!
@@ -82,6 +83,17 @@ impl Plugin {
             }
             Plugin::Mcp => "Add Takt's MCP server to the assistants on this Mac.",
             Plugin::Celebration => "A row's flourish and a quiet sound as a task is finished.",
+        }
+    }
+
+    /// The settings category a plugin lives in when it isn't a page of its
+    /// own under the sidebar's Plugins heading: MCP with the rest of AI,
+    /// the celebration with how the app looks.
+    pub fn home(self) -> Option<&'static str> {
+        match self {
+            Plugin::Mcp => Some("AI"),
+            Plugin::Celebration => Some("Appearance"),
+            _ => None,
         }
     }
 

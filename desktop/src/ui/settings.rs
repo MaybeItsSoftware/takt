@@ -13,6 +13,7 @@ use super::widgets::field_text;
 use super::{MONO_FONT, Takt, Tokens};
 use crate::platform::hotkeys::Hotkey;
 use crate::state::Editing;
+use crate::state::plugins::Plugin;
 use crate::state::settings::{self as page, Control, SettingRow, SettingsMenu};
 use crate::text_field::{FieldKey, TextField};
 use gpui::{
@@ -323,14 +324,16 @@ impl Takt {
                 (self.app.prefs.appearance.clone(), self.app.prefs.theme.clone()) == before
             ));
         }
-        self.app.choose_settings_category("Plugins");
-        let plugins: Vec<String> = self
+        let pages: Vec<String> = self
             .app
-            .settings_shown("")
-            .iter()
-            .map(|row| row.id.clone())
+            .settings_plugin_pages()
+            .into_iter()
+            .map(|plugin| {
+                self.app.choose_settings_category(plugin.name());
+                format!("{}:{}", plugin.id(), self.app.settings_shown("").len())
+            })
             .collect();
-        said.push(format!("plugins: {}", plugins.join(" ")));
+        said.push(format!("plugin pages: {}", pages.join(" ")));
         said
     }
 
@@ -417,6 +420,7 @@ impl Takt {
         let searching = !self.settings_field.text.trim().is_empty();
         let current = self.app.settings_category();
         let categories = self.app.settings_categories();
+        let mut plugins_headed = false;
         let hint = |key: &'static str, what: &'static str| {
             div()
                 .flex()
@@ -482,8 +486,11 @@ impl Takt {
                     .flex_col()
                     .gap(px(1.))
                     .children(categories.into_iter().map(|(name, glyph)| {
+                        let plugin = page::plugin_named(name).filter(|p| p.home().is_none());
+                        let first_plugin = plugin.is_some() && !plugins_headed;
+                        plugins_headed |= plugin.is_some();
                         let chosen = !searching && name == current;
-                        div()
+                        let entry = div()
                             .id(SharedString::from(format!("settings-category-{name}")))
                             .h(px(28.))
                             .px_2()
@@ -493,22 +500,46 @@ impl Takt {
                             .rounded(px(4.))
                             .when(chosen, |d| d.bg(t.selected))
                             .when(!chosen, |d| d.hover(|d| d.bg(t.hover)))
-                            .child(icon(glyph, 14.).text_color(if chosen {
-                                t.text
-                            } else {
-                                t.muted
-                            }))
+                            .when(plugin.is_none(), |d| {
+                                d.child(icon(glyph, 14.).text_color(if chosen {
+                                    t.text
+                                } else {
+                                    t.muted
+                                }))
+                            })
                             .child(
                                 div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
                                     .text_color(if chosen { t.text } else { t.muted })
                                     .child(name),
                             )
+                            .when_some(plugin, |d, plugin| {
+                                d.child(self.sidebar_switch(plugin, t, cx))
+                            })
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.settings_field = TextField::default();
                                 this.app.choose_settings_category(name);
                                 this.settings_scroll.set_offset(Default::default());
                                 cx.notify();
-                            }))
+                            }));
+                        div()
+                            .flex()
+                            .flex_col()
+                            .when(first_plugin, |d| {
+                                d.child(
+                                    div()
+                                        .px_2()
+                                        .pt_4()
+                                        .pb_1()
+                                        .text_size(px(10.))
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(t.placeholder)
+                                        .child("PLUGINS"),
+                                )
+                            })
+                            .child(entry)
                     })),
             )
             .child(
@@ -522,6 +553,40 @@ impl Takt {
                     .child(hint("tab", "Next category"))
                     .child(hint("esc", "Close settings")),
             )
+    }
+
+    /// A plugin's switch in the sidebar: a click flips it without leaving
+    /// the page shown.
+    fn sidebar_switch(&self, plugin: Plugin, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        let on = self.app.plugin_on(plugin);
+        div()
+            .id(SharedString::from(format!(
+                "settings-plugin-switch-{}",
+                plugin.id()
+            )))
+            .flex_none()
+            .w(px(26.))
+            .h(px(16.))
+            .p(px(2.))
+            .flex()
+            .items_center()
+            .when(on, |d| d.justify_end())
+            .rounded_full()
+            .border_1()
+            .border_color(if on { t.accent } else { t.border })
+            .bg(if on { t.accent } else { t.hover })
+            .child(
+                div()
+                    .size(px(10.))
+                    .rounded_full()
+                    .bg(if on { t.background } else { t.muted }),
+            )
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                cx.stop_propagation();
+                this.app.toggle_plugin(plugin);
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     fn settings_content(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
@@ -549,10 +614,7 @@ impl Takt {
         let mut body: Vec<AnyElement> = Vec::new();
         let mut section: Option<&'static str> = None;
         for (ix, row) in rows.iter().enumerate() {
-            // A plugin's settings sit beneath its switch, not under a
-            // heading of their own.
-            let nested = !searching && page::is_plugin_setting(row.group);
-            if !searching && !nested && row.group != category && section != Some(row.group) {
+            if !searching && row.group != category && section != Some(row.group) {
                 body.push(
                     div()
                         .px_2()
@@ -566,7 +628,7 @@ impl Takt {
                 );
             }
             section = Some(row.group);
-            body.push(self.setting_row(ix, ix == cursor, row, searching, nested, t, cx));
+            body.push(self.setting_row(ix, ix == cursor, row, searching, t, cx));
         }
         div()
             .flex_1()
@@ -637,7 +699,6 @@ impl Takt {
         here: bool,
         row: &SettingRow,
         searching: bool,
-        nested: bool,
         t: Tokens,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -647,8 +708,8 @@ impl Takt {
         div()
             .id(SharedString::from(format!("setting-{}", row.id)))
             .pr_2()
-            .pl(px(if nested { 28. } else { 8. }))
-            .py(px(if nested { 10. } else { 12. }))
+            .pl(px(8.))
+            .py(px(12.))
             .min_h(px(44.))
             .flex()
             .items_center()
@@ -657,18 +718,6 @@ impl Takt {
             .border_b_1()
             .border_color(t.border_variant)
             .relative()
-            // A plugin's settings hang off a rule down from its switch.
-            .when(nested, |d| {
-                d.child(
-                    div()
-                        .absolute()
-                        .left(px(14.))
-                        .top_0()
-                        .bottom_0()
-                        .w(px(1.))
-                        .bg(t.border),
-                )
-            })
             .when(here, |d| {
                 d.bg(t.hover).child(
                     div()
@@ -701,7 +750,7 @@ impl Takt {
                     })
                     .child(
                         div()
-                            .text_size(px(if nested { 13. } else { 14. }))
+                            .text_size(px(14.))
                             .when(plugin, |d| d.font_weight(FontWeight::MEDIUM))
                             .text_color(t.text)
                             .child(row.title.clone()),

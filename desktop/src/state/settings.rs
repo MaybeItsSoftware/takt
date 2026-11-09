@@ -74,29 +74,35 @@ const SELECTS: [&str; 7] = [
 pub const MENU_FILTER_FROM: usize = 7;
 
 /// The categories, in the order the page lists them; a group no entry here
-/// names goes at the end.
-pub const CATEGORIES: [(&str, &str); 8] = [
+/// names goes at the end. The plugins follow, each a page of its own under
+/// the sidebar's Plugins heading.
+pub const CATEGORIES: [(&str, &str); 7] = [
     ("General", "settings"),
     ("Appearance", "palette"),
     ("Keyboard", "keyboard"),
     ("Focus", "timer"),
     ("Sync", "refresh"),
-    ("Plugins", "plug"),
     ("AI", "sparkles"),
     ("Advanced", "wrench"),
 ];
 
 /// The groups too small for a category of their own: each is a headed
 /// section of the category it sits under, in this order after the
-/// category's own settings. A plugin's settings need no entry: they go
-/// under Plugins by the registry (`Plugin::ALL`), beneath the plugin's
-/// own switch.
+/// category's own settings. A plugin with a home (`Plugin::home`) is a
+/// section of it the same way, after these.
 const SECTIONS: &[(&str, &str)] = &[("Reminders", "General"), ("Shared lists", "Sync")];
 
-/// The category a row's group is shown under.
+/// The plugin a page or section is, by its name.
+pub fn plugin_named(name: &str) -> Option<Plugin> {
+    Plugin::ALL.into_iter().find(|p| p.name() == name)
+}
+
+/// The category a row's group is shown under: a plugin's own page, or for
+/// MCP and the celebration, the category they sit in. The Google sign-in
+/// is on each Google plugin's page, which `settings_shown` sees to.
 pub fn category_of(group: &'static str) -> &'static str {
-    if group == plugins::GOOGLE_ACCOUNT || Plugin::ALL.iter().any(|p| p.name() == group) {
-        return "Plugins";
+    if let Some(plugin) = plugin_named(group) {
+        return plugin.home().unwrap_or(plugin.name());
     }
     SECTIONS
         .iter()
@@ -104,45 +110,43 @@ pub fn category_of(group: &'static str) -> &'static str {
         .map_or(group, |(_, category)| category)
 }
 
-/// A plugin's own setting, drawn beneath the plugin's switch rather than
-/// as a row of the page.
-pub fn is_plugin_setting(group: &'static str) -> bool {
-    group != "Plugins" && category_of(group) == "Plugins"
-}
-
-/// Where a group sorts within its category: the category's own settings
-/// first, then its sections in [`SECTIONS`] order.
-fn section_rank(group: &str) -> usize {
-    SECTIONS
+/// Where a row sorts within its category: the category's own settings
+/// first, then its sections in [`SECTIONS`] order, then the plugins homed
+/// there; within each, a plugin's switch first.
+fn section_rank(row: &SettingRow) -> (usize, bool) {
+    let section = SECTIONS
         .iter()
-        .position(|(section, _)| *section == group)
-        .map_or(0, |at| at + 1)
+        .position(|(section, _)| *section == row.group)
+        .map(|at| at + 1)
+        .or_else(|| {
+            plugin_named(row.group)
+                .filter(|p| p.home().is_some())
+                .map(|p| SECTIONS.len() + 1 + p as usize)
+        })
+        .unwrap_or(0);
+    (section, !row.id.starts_with("plugin:"))
 }
 
-/// The Plugins category in order: each plugin's switch, and beneath it, if
-/// it is on, its settings. The Google sign-in, which every Google plugin
-/// needs, goes beneath the first Google plugin that is on.
-fn plugins_in_order(rows: Vec<SettingRow>) -> Vec<SettingRow> {
-    let mut rest: Vec<Option<SettingRow>> = rows.into_iter().map(Some).collect();
-    let mut take = |keep: &dyn Fn(&SettingRow) -> bool| -> Vec<SettingRow> {
-        rest.iter_mut()
-            .filter(|slot| slot.as_ref().is_some_and(keep))
-            .filter_map(Option::take)
-            .collect()
-    };
-    let switches = take(&|row| row.id.starts_with("plugin:"));
-    let mut ordered = Vec::new();
-    for switch in switches {
-        let plugin = Plugin::from_id(&switch.id["plugin:".len()..]);
-        ordered.push(switch);
-        let Some(plugin) = plugin else { continue };
-        if plugin.is_google() {
-            ordered.extend(take(&|row| row.group == plugins::GOOGLE_ACCOUNT));
+/// A plugin's page in order: its switch, the Google sign-in if it is a
+/// Google plugin, then its own settings.
+fn plugin_page(plugin: Plugin, rows: Vec<SettingRow>) -> Vec<SettingRow> {
+    let mut shown: Vec<SettingRow> = rows
+        .into_iter()
+        .filter(|row| {
+            category_of(row.group) == plugin.name()
+                || (plugin.is_google() && row.group == plugins::GOOGLE_ACCOUNT)
+        })
+        .collect();
+    shown.sort_by_key(|row| {
+        if row.id.starts_with("plugin:") {
+            0
+        } else if row.group == plugins::GOOGLE_ACCOUNT {
+            1
+        } else {
+            2
         }
-        ordered.extend(take(&|row| row.group == plugin.name()));
-    }
-    ordered.extend(rest.into_iter().flatten());
-    ordered
+    });
+    shown
 }
 
 /// `options` narrowed to those with every word of `query` in their label
@@ -513,20 +517,35 @@ impl App {
     }
 
     /// The categories that have settings, in the page's order, with their
-    /// icons.
+    /// icons, then each plugin's page.
     pub fn settings_categories(&self) -> Vec<(&'static str, &'static str)> {
         let rows = self.settings_rows();
+        let pages = self.settings_plugin_pages();
         let mut shown: Vec<(&'static str, &'static str)> = CATEGORIES
             .into_iter()
             .filter(|(name, _)| rows.iter().any(|row| category_of(row.group) == *name))
             .collect();
         for row in &rows {
             let category = category_of(row.group);
-            if !shown.iter().any(|(name, _)| *name == category) {
+            let page = pages.iter().any(|p| p.name() == category);
+            if !page
+                && row.group != plugins::GOOGLE_ACCOUNT
+                && !shown.iter().any(|(name, _)| *name == category)
+            {
                 shown.push((category, "settings"));
             }
         }
+        shown.extend(pages.into_iter().map(|p| (p.name(), "plug")));
         shown
+    }
+
+    /// The plugins with a page of their own, under the sidebar's Plugins
+    /// heading, on or off.
+    pub fn settings_plugin_pages(&self) -> Vec<Plugin> {
+        self.plugins_shown()
+            .into_iter()
+            .filter(|p| p.home().is_none())
+            .collect()
     }
 
     /// The category the page shows: the one chosen, or the first.
@@ -546,15 +565,15 @@ impl App {
         let rows = self.settings_rows();
         if query.trim().is_empty() {
             let category = self.settings_category();
+            if let Some(plugin) = plugin_named(category).filter(|p| p.home().is_none()) {
+                return plugin_page(plugin, rows);
+            }
             let mut shown: Vec<SettingRow> = rows
                 .into_iter()
                 .filter(|r| category_of(r.group) == category)
                 .collect();
-            if category == "Plugins" {
-                return plugins_in_order(shown);
-            }
             // Stable, so each section keeps its own order.
-            shown.sort_by_key(|r| section_rank(r.group));
+            shown.sort_by_key(section_rank);
             return shown;
         }
         // Every word somewhere in the setting; those whose title has them
@@ -813,7 +832,7 @@ impl App {
         let google = self.any_google_plugin_on();
         let plugin_rows = self.plugins_shown().into_iter().map(|plugin| SettingRow {
             id: format!("plugin:{}", plugin.id()),
-            group: "Plugins",
+            group: plugin.name(),
             title: plugin.name().into(),
             value: on(self.plugin_on(plugin)),
         });
@@ -1046,41 +1065,65 @@ mod tests {
     }
 
     #[test]
-    fn every_plugin_files_under_plugins_by_the_registry() {
+    fn each_plugin_is_a_page_but_mcp_and_the_celebration_have_homes() {
         for plugin in Plugin::ALL {
-            assert_eq!(category_of(plugin.name()), "Plugins", "{plugin:?}");
-            assert!(is_plugin_setting(plugin.name()));
+            let expected = match plugin {
+                Plugin::Mcp => "AI",
+                Plugin::Celebration => "Appearance",
+                _ => plugin.name(),
+            };
+            assert_eq!(category_of(plugin.name()), expected, "{plugin:?}");
         }
-        assert_eq!(category_of(plugins::GOOGLE_ACCOUNT), "Plugins");
-        assert!(!is_plugin_setting("Plugins"));
         assert_eq!(category_of("Reminders"), "General");
         assert_eq!(category_of("Sync"), "Sync");
     }
 
     #[test]
-    fn each_plugins_settings_sit_beneath_its_switch() {
-        let rows = vec![
-            row("checkvist-import", "Checkvist"),
+    fn a_google_plugins_page_is_its_switch_the_sign_in_then_its_settings() {
+        let rows = [
+            row("google-calendar-choose", "Google Calendar"),
             row("google-connect", plugins::GOOGLE_ACCOUNT),
             row("links-drive", "Google Drive"),
-            row("plugin:google-calendar", "Plugins"),
-            row("plugin:google-drive", "Plugins"),
-            row("plugin:checkvist", "Plugins"),
-            row("plugin:celebration", "Plugins"),
-            row("celebration", "Celebration"),
+            row("plugin:google-calendar", "Google Calendar"),
+            row("plugin:google-drive", "Google Drive"),
+            row("checkvist-import", "Checkvist"),
         ];
-        let ids: Vec<String> = plugins_in_order(rows).into_iter().map(|r| r.id).collect();
+        let ids = |plugin| -> Vec<String> {
+            plugin_page(plugin, rows.iter().map(|r| row(&r.id, r.group)).collect())
+                .into_iter()
+                .map(|r| r.id)
+                .collect()
+        };
         assert_eq!(
-            ids,
+            ids(Plugin::GoogleCalendar),
             [
                 "plugin:google-calendar",
                 "google-connect",
-                "plugin:google-drive",
-                "links-drive",
-                "plugin:checkvist",
-                "checkvist-import",
+                "google-calendar-choose"
+            ]
+        );
+        assert_eq!(ids(Plugin::Checkvist), ["checkvist-import"]);
+    }
+
+    #[test]
+    fn a_homed_plugin_is_a_section_after_its_categorys_own_settings() {
+        let mut rows = vec![
+            row("celebration", "Celebration"),
+            row("plugin:celebration", "Celebration"),
+            row("theme", "Appearance"),
+            row("celebration-sound", "Celebration"),
+            row("appearance", "Appearance"),
+        ];
+        rows.sort_by_key(section_rank);
+        let ids: Vec<String> = rows.into_iter().map(|r| r.id).collect();
+        assert_eq!(
+            ids,
+            [
+                "theme",
+                "appearance",
                 "plugin:celebration",
                 "celebration",
+                "celebration-sound"
             ]
         );
     }
@@ -1088,7 +1131,7 @@ mod tests {
     #[test]
     fn controls_follow_what_the_setting_is() {
         assert!(matches!(
-            row("plugin:obsidian", "Plugins").control(),
+            row("plugin:obsidian", "Obsidian").control(),
             Control::Switch { .. }
         ));
         assert!(matches!(

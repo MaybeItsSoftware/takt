@@ -54,9 +54,10 @@ to filter them, walk them with `↑`/`↓`, or jump with `⌘1`–`⌘9`:
 | --- | --- |
 | General | Launch at login, confirming deletes, and reminders |
 | Focus | Where a started block runs, and whether each block is scored |
-| Appearance | The theme gallery, light/dark/system, the interface, heading and numeral fonts, and the text size |
+| Appearance | The theme gallery, light/dark/system, the interface, heading and numeral fonts, the text size, and the completion celebration (its switch, its style and its sound) |
 | Keyboard | The three global hotkeys (show the window, focus panel `⌃⌥⇧⌘F`, Quick Add `⌃⌥⇧⌘D`, which opens one of the window's overlays over whatever app you are in, in the theme you have chosen: the field, the chips that say what `30m`, `@fri`, `#work` and `!1` will set as the window's add row does, and under it every list in the list finder's rows — `↑`/`↓` pick the list, `→` at the end of the text (or `Tab`) walks into its date, conditions and time slots — see *Quick Add's slots* below — `Return` files it, `Esc` or a click away drops it), the list Quick Add captures into, and `keymap.json` |
-| Plugins | Every built-in plugin with a switch — Google Calendar, Google Tasks, Google Drive, Checkvist, Obsidian, the Markdown editor, MCP, the completion celebration — and each one switched on with its own settings beneath. Off, a plugin's settings, link-picker rows and background work go |
+| AI | Switching off all AI, and MCP: adding Takt's server to the assistants on this Mac |
+| Plugins | A heading in the sidebar with a page under it for each built-in plugin — Google Calendar, Google Tasks, Google Drive, Checkvist, Obsidian, the Markdown editor — each with its switch beside its name. A plugin's page holds its switch and, while it is on, its settings (a Google plugin's also holds the Google sign-in). Off, a plugin's settings, link-picker rows and background work go |
 | Sync | The account that keeps the Mac and phones on one workspace, on Takt's server or [your own](docs/self-hosting.md) |
 | Advanced | Export the workspace as Markdown or JSON, diagnostics, and the app's data folder |
 
@@ -1401,7 +1402,7 @@ Takt exposes **45 MCP tools** so an AI assistant can work with your lists direct
 
 All but one are reads or Checkvist writes. `task_matrix_set` places tasks on the Eisenhower matrix in bulk (`takt matrix <id>:<urgency>:<importance> …` from a terminal), and refuses while Takt is running — the app holds those coordinates in memory and would overwrite them. Quit Takt, let the assistant do a first pass over the whole list, then reopen and correct it by dragging.
 
-Set it up from `Settings → Plugins → MCP`. It detects Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and Zed, and adds Takt to the one you pick in a single click, preserving any servers already in that client's config.
+Set it up from `Settings → AI → MCP`. It detects Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and Zed, and adds Takt to the one you pick in a single click, preserving any servers already in that client's config.
 
 There is one implementation — the Rust CLI — and the app ships it at `Contents/Helpers/takt`, so it works whether or not you installed the CLI separately. `Takt --mcp-server` hands the process over to it, which keeps configurations written for older versions working; one written before the rename names `Priority.app`, and setting that client up again replaces its `priority` entry with a `takt` one. There were three implementations once; `scripts/mcp_smoke_check.py` is what remains of holding them together, and it now only checks that handover.
 
