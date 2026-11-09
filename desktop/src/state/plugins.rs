@@ -129,7 +129,11 @@ impl Plugin {
 pub fn is_google_account_row(id: &str) -> bool {
     matches!(
         id,
-        "google-client" | "google-connect" | "google-disconnect" | "google-sync-now"
+        "google-client"
+            | "google-secret"
+            | "google-connect"
+            | "google-disconnect"
+            | "google-sync-now"
     )
 }
 

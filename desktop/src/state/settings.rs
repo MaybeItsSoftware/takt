@@ -340,6 +340,7 @@ impl SettingRow {
             "checkvist-import" => "Copy in the Checkvist lists the workspace lacks.",
             "checkvist-disconnect" => "Forget the Checkvist account; imported lists stay.",
             "google-client" => "The OAuth client Takt signs in to Google with.",
+            "google-secret" => "The Desktop client's secret, beside its ID in Google Cloud.",
             "google-connect" => "Sign in to Google for Calendar, Tasks and Drive.",
             "google-disconnect" => "Sign out of Google on this Mac.",
             "google-calendar" => "Tasks with a time appear in your calendar.",

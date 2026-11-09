@@ -55,6 +55,8 @@ pub struct Prefs {
     pub agent_client: String,
     /// The person's own Google OAuth client ID; else the Swift app's.
     pub google_client_id: Option<String>,
+    /// The Desktop client's secret, which Google wants on token calls.
+    pub google_client_secret: Option<String>,
     pub google_calendar: bool,
     pub google_tasks: bool,
     /// Which reminders this Mac shows, and when (minutes after midnight).
@@ -138,6 +140,7 @@ impl Default for Prefs {
             left_dock_tab: "lists".into(),
             agent_client: "claude".into(),
             google_client_id: None,
+            google_client_secret: None,
             google_calendar: false,
             google_tasks: false,
             remind_due_time: true,

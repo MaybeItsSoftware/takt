@@ -73,6 +73,31 @@ impl GoogleError {
 /// One refresh at a time, however many passes find the token spent.
 static REFRESHING: Mutex<()> = Mutex::new(());
 
+/// The Desktop client's secret. Google asks for it on every token call
+/// from a Desktop app client, PKCE or not, though it is not secret in any
+/// real sense: it ships inside every installed copy.
+static CLIENT_SECRET: Mutex<String> = Mutex::new(String::new());
+
+pub fn set_client_secret(secret: &str) {
+    *CLIENT_SECRET.lock().unwrap_or_else(|p| p.into_inner()) = secret.trim().to_string();
+}
+
+/// `fields` with the client secret added when one is set.
+fn with_secret<'a>(fields: &[(&'a str, &'a str)], secret: &'a str) -> Vec<(&'a str, &'a str)> {
+    let mut all = fields.to_vec();
+    if !secret.is_empty() {
+        all.push(("client_secret", secret));
+    }
+    all
+}
+
+fn client_secret() -> String {
+    CLIENT_SECRET
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone()
+}
+
 fn now_s() -> i64 {
     chrono::Utc::now().timestamp()
 }
@@ -172,13 +197,17 @@ fn access_token_in(
     if token.expires_at - 60 > now_s() {
         return Ok(token.access_token);
     }
+    let secret = client_secret();
     let reply = http::form(
         TOKEN,
-        &[
-            ("client_id", client_id.trim()),
-            ("refresh_token", &token.refresh_token),
-            ("grant_type", "refresh_token"),
-        ],
+        &with_secret(
+            &[
+                ("client_id", client_id.trim()),
+                ("refresh_token", &token.refresh_token),
+                ("grant_type", "refresh_token"),
+            ],
+            &secret,
+        ),
         Duration::from_secs(30),
     )
     .map_err(GoogleError::Other)?;
@@ -362,15 +391,19 @@ fn authorize(
         return Err("That sign-in wasn't the one asked for. Try again.".into());
     }
     let code = http::parameter(&full, "code").ok_or("Google sent no code back.")?;
+    let secret = client_secret();
     let reply = http::form(
         TOKEN,
-        &[
-            ("client_id", client_id),
-            ("code", &code),
-            ("code_verifier", &verifier),
-            ("redirect_uri", &redirect),
-            ("grant_type", "authorization_code"),
-        ],
+        &with_secret(
+            &[
+                ("client_id", client_id),
+                ("code", &code),
+                ("code_verifier", &verifier),
+                ("redirect_uri", &redirect),
+                ("grant_type", "authorization_code"),
+            ],
+            &secret,
+        ),
         Duration::from_secs(30),
     )?;
     let value: serde_json::Value = serde_json::from_str(&reply.body).unwrap_or_default();

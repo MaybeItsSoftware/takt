@@ -170,6 +170,17 @@ impl App {
                 format!("{}…", client.chars().take(16).collect::<String>())
             },
         )];
+        rows.push((
+            "google-secret",
+            "Google",
+            "OAuth client secret",
+            if self.prefs.google_client_secret.is_some() {
+                "Set"
+            } else {
+                "Not set"
+            }
+            .into(),
+        ));
         if google::connected() {
             rows.push((
                 "google-disconnect",
@@ -227,6 +238,7 @@ impl App {
     pub fn change_google_setting(&mut self, id: &str) -> bool {
         match id {
             "google-client" => self.ask(super::ask::Ask::GoogleClientId),
+            "google-secret" => self.ask(super::ask::Ask::GoogleClientSecret),
             "google-connect" => {
                 let client = self.google_client_id();
                 // Drive linking signs in on its own, in the Picker, since
@@ -291,6 +303,13 @@ impl App {
         }
         self.open_overlay(Overlay::Settings);
         true
+    }
+
+    pub fn set_google_client_secret(&mut self, text: &str) {
+        let text = text.trim();
+        self.prefs.google_client_secret = (!text.is_empty()).then(|| text.to_string());
+        self.prefs.save();
+        google::set_client_secret(text);
     }
 
     pub fn set_google_client_id(&mut self, text: &str) {

@@ -29,6 +29,8 @@ pub enum Ask {
     Agent,
     /// The Google OAuth client the integrations sign in through.
     GoogleClientId,
+    /// The Desktop client's secret, from the same page as its ID.
+    GoogleClientSecret,
     /// A folder to search as an Obsidian vault in the link picker.
     ObsidianVault,
     /// The morning or evening reminder's time.
@@ -54,6 +56,7 @@ impl Ask {
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
             Ask::Agent => "Ask the agent",
             Ask::GoogleClientId => "Google OAuth client ID",
+            Ask::GoogleClientSecret => "Google OAuth client secret",
             Ask::ObsidianVault => "Add an Obsidian vault",
             Ask::ReminderTime { dailies: false } => "Morning reminder at",
             Ask::ReminderTime { dailies: true } => "Evening reminder at",
@@ -70,6 +73,7 @@ impl Ask {
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
             Ask::Agent => "Make it due Friday, split it up, explain it…",
             Ask::GoogleClientId => "….apps.googleusercontent.com",
+            Ask::GoogleClientSecret => "GOCSPX-…",
             Ask::ObsidianVault => "~/Documents/Notes",
             Ask::ReminderTime { .. } => "09:00",
             Ask::JoinList => "The invite link or code",
@@ -87,6 +91,9 @@ impl Ask {
                 "A self-hosted server must trust the same Supabase project.".into()
             }
             Ask::CheckvistKey { email } => format!("For {email}. Kept in the keychain."),
+            Ask::GoogleClientSecret => {
+                "From the Desktop app client in Google Cloud → Clients. Google asks for it on every sign-in.".into()
+            }
             Ask::JoinList => {
                 "Someone who shares a list with you sends an invite. Its tasks are everyone's to edit; where it sits in your sidebar and your board columns stay yours.".into()
             }
@@ -188,6 +195,10 @@ impl App {
             }
             Ask::GoogleClientId => {
                 self.set_google_client_id(text);
+                self.open_overlay(Overlay::Settings);
+            }
+            Ask::GoogleClientSecret => {
+                self.set_google_client_secret(text);
                 self.open_overlay(Overlay::Settings);
             }
             Ask::ObsidianVault => {
