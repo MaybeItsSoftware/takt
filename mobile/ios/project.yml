@@ -154,7 +154,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: uk.co.maybeitssoftware.takt
         # The iOS OAuth client from Google Cloud project takt-511416, of the
         # form `<number>-<id>.apps.googleusercontent.com`.
-        GOOGLE_IOS_CLIENT_ID: ""
+        GOOGLE_IOS_CLIENT_ID: 974752893800-5d0ilpnpij8cinlsavjf15i4nm6tnbro.apps.googleusercontent.com
         # RevenueCat project → Apps → the App Store app → Public API key.
         # Pass it to xcodebuild (`REVENUECAT_IOS_KEY=appl_…`) or set it here.
         REVENUECAT_IOS_KEY: ""
