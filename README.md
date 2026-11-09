@@ -48,7 +48,9 @@ Or build it yourself — see [Build from source](#build-from-source).
 ## First run
 
 Open Settings with `Cmd+,`. It is one window with a sidebar of pages — type
-to filter them, walk them with `↑`/`↓`, or jump with `⌘1`–`⌘9`:
+to filter them, walk them with `Tab`, or jump with a key, shown beside each
+entry: `⌘1`–`⌘7` the categories, `⌥⌘1`–`⌥⌘6` the plugins' pages, and
+`⇧⌥⌘1`–`⇧⌥⌘6` a plugin's switch, on or off:
 
 | Page | What |
 | --- | --- |

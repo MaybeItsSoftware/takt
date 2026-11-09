@@ -95,6 +95,29 @@ impl Takt {
             return self.settings_menu_key(keystroke, cx);
         }
         let query = self.settings_field.text.clone();
+        // ⌘1–⌘9 a category, ⌥⌘1–⌥⌘9 a plugin's page, ⇧⌥⌘1–⇧⌥⌘9 its
+        // switch.
+        let m = &keystroke.modifiers;
+        if m.platform
+            && m.alt
+            && m.shift
+            && !m.control
+            && let Some(digit) = digit_key(keystroke)
+            && self.app.toggle_plugin_by_key(digit)
+        {
+            return true;
+        }
+        if m.platform
+            && !m.control
+            && !m.shift
+            && let Some(digit) = digit_key(keystroke)
+            && self.app.choose_settings_by_key(digit, m.alt)
+        {
+            self.settings_field = TextField::default();
+            self.settings_searched();
+            self.settings_scroll.set_offset(Default::default());
+            return true;
+        }
         if keystroke.modifiers.control {
             match keystroke.key.as_str() {
                 "n" | "j" => {
@@ -246,7 +269,7 @@ impl Takt {
                 // ⌘, through the window's own handler; the rest as the
                 // settings window's handler takes them, which is not open
                 // until this update ends.
-                if key.starts_with("cmd-") {
+                if key == "cmd-," {
                     this.key_down(&event, window, cx);
                 } else {
                     this.settings_key(&event.keystroke, cx);
@@ -334,6 +357,20 @@ impl Takt {
             })
             .collect();
         said.push(format!("plugin pages: {}", pages.join(" ")));
+        // The sidebar's chords, as the window's handler takes them.
+        press(self, "cmd-3", window, cx);
+        let third = self.app.settings_category();
+        press(self, "alt-cmd-2", window, cx);
+        let second_plugin = self.app.settings_category();
+        let plugin = self.app.settings_plugin_pages().first().copied();
+        let before = plugin.map(|p| self.app.plugin_on(p));
+        press(self, "shift-alt-cmd-1", window, cx);
+        let flipped = plugin.map(|p| self.app.plugin_on(p)) != before;
+        press(self, "shift-alt-cmd-1", window, cx);
+        let back = plugin.map(|p| self.app.plugin_on(p)) == before;
+        said.push(format!(
+            "keys: cmd-3 {third}, alt-cmd-2 {second_plugin}, switch flipped {flipped} and back {back}"
+        ));
         said
     }
 
@@ -421,6 +458,8 @@ impl Takt {
         let current = self.app.settings_category();
         let categories = self.app.settings_categories();
         let mut plugins_headed = false;
+        let keys = self.app.settings_category_keys();
+        let show_keys = !self.app.prefs.hide_key_hints;
         let hint = |key: &'static str, what: &'static str| {
             div()
                 .flex()
@@ -486,6 +525,11 @@ impl Takt {
                     .flex_col()
                     .gap(px(1.))
                     .children(categories.into_iter().map(|(name, glyph)| {
+                        let chord = keys
+                            .iter()
+                            .find(|(entry, _)| *entry == name)
+                            .map(|(_, chord)| chord.clone())
+                            .filter(|_| show_keys);
                         let plugin = page::plugin_named(name).filter(|p| p.home().is_none());
                         let first_plugin = plugin.is_some() && !plugins_headed;
                         plugins_headed |= plugin.is_some();
@@ -515,6 +559,9 @@ impl Takt {
                                     .text_color(if chosen { t.text } else { t.muted })
                                     .child(name),
                             )
+                            .when_some(chord, |d, chord| {
+                                d.child(super::widgets::key_hint(chord, t))
+                            })
                             .when_some(plugin, |d, plugin| {
                                 d.child(self.sidebar_switch(plugin, t, cx))
                             })
@@ -550,6 +597,9 @@ impl Takt {
                     .flex()
                     .flex_col()
                     .gap_1()
+                    .child(hint("⌘1–9", "A category"))
+                    .child(hint("⌥⌘1–9", "A plugin"))
+                    .child(hint("⇧⌥⌘1–9", "Switch it on or off"))
                     .child(hint("tab", "Next category"))
                     .child(hint("esc", "Close settings")),
             )
@@ -1092,4 +1142,11 @@ fn open_window(takt: &gpui::Entity<Takt>, cx: &mut gpui::App) {
     });
     cx.activate(true);
     takt.update(cx, |_, cx| cx.notify());
+}
+
+/// The digit 1–9 a chord is on, whatever the modifiers made of it.
+fn digit_key(keystroke: &gpui::Keystroke) -> Option<u32> {
+    let mut chars = keystroke.key.chars();
+    let digit = chars.next()?.to_digit(10)?;
+    (chars.next().is_none() && digit > 0).then_some(digit)
 }

@@ -539,6 +539,64 @@ impl App {
         shown
     }
 
+    /// The sidebar's entries with their chords: ⌘1–⌘9 down the
+    /// categories, ⌥⌘1–⌥⌘9 down the plugins.
+    pub fn settings_category_keys(&self) -> Vec<(&'static str, String)> {
+        let pages = self.settings_plugin_pages();
+        let (mut categories, mut plugins) = (0, 0);
+        self.settings_categories()
+            .into_iter()
+            .filter_map(|(name, _)| {
+                let plugin = pages.iter().any(|p| p.name() == name);
+                let n = if plugin {
+                    &mut plugins
+                } else {
+                    &mut categories
+                };
+                *n += 1;
+                (*n <= 9).then(|| {
+                    let chord = if plugin { "⌥⌘" } else { "⌘" };
+                    (name, format!("{chord}{n}"))
+                })
+            })
+            .collect()
+    }
+
+    /// `⌘digit` (a category) or `⌥⌘digit` (a plugin): shows it. False when
+    /// no entry has that chord.
+    pub fn choose_settings_by_key(&mut self, digit: u32, plugin: bool) -> bool {
+        let chord = format!("{}{digit}", if plugin { "⌥⌘" } else { "⌘" });
+        let Some(name) = self
+            .settings_category_keys()
+            .into_iter()
+            .find(|(_, keys)| *keys == chord)
+            .map(|(name, _)| name)
+        else {
+            return false;
+        };
+        self.choose_settings_category(name);
+        true
+    }
+
+    /// `⇧⌥⌘digit`: switches that plugin on or off, as its switch in the
+    /// sidebar does. False when no plugin has that digit.
+    pub fn toggle_plugin_by_key(&mut self, digit: u32) -> bool {
+        let Some(plugin) = self
+            .settings_plugin_pages()
+            .get((digit as usize).wrapping_sub(1))
+            .copied()
+        else {
+            return false;
+        };
+        self.toggle_plugin(plugin);
+        self.message = Some(format!(
+            "{} is {}.",
+            plugin.name(),
+            if self.plugin_on(plugin) { "on" } else { "off" }
+        ));
+        true
+    }
+
     /// The plugins with a page of their own, under the sidebar's Plugins
     /// heading, on or off.
     pub fn settings_plugin_pages(&self) -> Vec<Plugin> {
