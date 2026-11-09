@@ -30,9 +30,11 @@ pub mod inspector;
 pub mod integrations;
 pub mod library;
 pub mod links;
+pub mod markdown;
 pub mod mcp_clients;
 pub mod menubar;
 pub mod navigation;
+pub mod notes_editor;
 pub mod outline;
 pub mod pickers;
 pub mod plugins;
@@ -185,6 +187,9 @@ pub enum Editing {
     Date(date_edit::DateEdit),
     /// The repeat selector open under the inspector's repeat row.
     Repeat(repeat::RepeatEdit),
+    /// The Markdown editor, over the window: `App::notes_editor` says what
+    /// it edits.
+    NotesEditor,
 }
 
 pub struct App {
@@ -234,6 +239,8 @@ pub struct App {
     pub google: google::Google,
     /// What the link picker searches (`links.rs`).
     pub links: links::Links,
+    /// The Markdown editor, while it is open (`notes_editor.rs`).
+    pub notes_editor: Option<notes_editor::NotesEditor>,
     /// When reminders were last read.
     pub reminders_looked_ms: i64,
     /// Text the agent's message box opens with.
@@ -347,6 +354,7 @@ impl App {
             quick_task: None,
             google: Default::default(),
             links: Default::default(),
+            notes_editor: None,
             reminders_looked_ms: 0,
             agent_draft: None,
             done_cursor: None,

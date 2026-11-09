@@ -81,6 +81,14 @@ holding the daily log's notes folder (the nearest ancestor with an
 is a walk of each vault's Markdown files and folders, skipping dot-folders,
 refreshed when the picker opens.
 
+### An Obsidian note as the notes
+
+With the Markdown editor plugin on, a task's notes open full size (`nm`), and
+a task that links an Obsidian note chooses, per task, whether its notes are
+additional to the note (the default: Takt's own, the note drawn beside them)
+or the same as it (the editor edits the `.md` file in the vault). See
+[markdown-editor.md](markdown-editor.md).
+
 ### Google Drive
 
 Pasting a Drive, Docs or Sheets address needs no Google access at all, and is

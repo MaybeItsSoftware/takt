@@ -18,6 +18,7 @@ pub enum Plugin {
     GoogleDrive,
     Checkvist,
     Obsidian,
+    MarkdownEditor,
     Mcp,
     Celebration,
 }
@@ -28,12 +29,13 @@ pub const GOOGLE_ACCOUNT: &str = "Google account";
 
 impl Plugin {
     /// In the order the page lists them.
-    pub const ALL: [Plugin; 7] = [
+    pub const ALL: [Plugin; 8] = [
         Plugin::GoogleCalendar,
         Plugin::GoogleTasks,
         Plugin::GoogleDrive,
         Plugin::Checkvist,
         Plugin::Obsidian,
+        Plugin::MarkdownEditor,
         Plugin::Mcp,
         Plugin::Celebration,
     ];
@@ -46,6 +48,7 @@ impl Plugin {
             Plugin::GoogleDrive => "google-drive",
             Plugin::Checkvist => "checkvist",
             Plugin::Obsidian => "obsidian",
+            Plugin::MarkdownEditor => "markdown-editor",
             Plugin::Mcp => "mcp",
             Plugin::Celebration => "celebration",
         }
@@ -59,6 +62,7 @@ impl Plugin {
             Plugin::GoogleDrive => "Google Drive",
             Plugin::Checkvist => "Checkvist",
             Plugin::Obsidian => "Obsidian",
+            Plugin::MarkdownEditor => "Markdown editor",
             Plugin::Mcp => "MCP",
             Plugin::Celebration => "Celebration",
         }
@@ -73,6 +77,9 @@ impl Plugin {
             Plugin::GoogleDrive => "Link Drive files you choose in Google's file picker.",
             Plugin::Checkvist => "Import your Checkvist lists into the workspace.",
             Plugin::Obsidian => "Notes and folders in your Obsidian vaults, offered as links.",
+            Plugin::MarkdownEditor => {
+                "A task's notes maximised (nm), drawn as Markdown; or its linked Obsidian note, edited in place."
+            }
             Plugin::Mcp => "Add Takt's MCP server to the assistants on this Mac.",
             Plugin::Celebration => "A row's flourish and a quiet sound as a task is finished.",
         }
@@ -170,6 +177,8 @@ impl App {
             }
             // Its setup rows were on the page for everyone with AI on, and
             // an assistant already added may be one this Mac can't see.
+            // Nothing to set up, and nothing changes until it is asked for.
+            Plugin::MarkdownEditor => true,
             Plugin::Mcp => !p.ai_off,
             Plugin::Celebration => self.celebration_style() != super::celebration::Style::None,
         }
@@ -186,6 +195,12 @@ impl App {
             Plugin::Obsidian if !on => {
                 self.links.vaults.clear();
                 self.links.entries.clear();
+            }
+            Plugin::MarkdownEditor if !on => {
+                if matches!(self.editing, Some(super::Editing::NotesEditor)) {
+                    self.editing = None;
+                }
+                self.notes_editor = None;
             }
             Plugin::Celebration if !on => {
                 self.celebrating.clear();

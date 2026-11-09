@@ -323,6 +323,7 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             snapshot.as_ref().and_then(|s| s.estimate_seconds),
             snapshot.as_ref().map_or(0, |s| s.notes.lines().count()),
         ));
+        smoke_notes_editor(app, &mut report);
         // A linked task's links reach the inspector with their kinds, for
         // the icons drawn beside them.
         let linked = app
@@ -646,4 +647,74 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             None => cx.quit(),
         }
     });
+}
+
+/// The Markdown editor on the selected task: a note in a scratch vault
+/// linked, its file made the notes, typed into and saved, then changed on
+/// disk mid-edit, which the editor must not write over. Everything is put
+/// back: the link undone, the settings as they were, the vault removed.
+fn smoke_notes_editor(app: &mut state::App, report: &mut Vec<String>) {
+    let Some(task_id) = app.selected_task.clone() else {
+        return;
+    };
+    let started = Instant::now();
+    let root = std::env::temp_dir().join(format!("takt-smoke-vault-{}", std::process::id()));
+    let vault = root.join("Smoke");
+    let note = vault.join("Plan.md");
+    if std::fs::create_dir_all(&vault).is_err() || std::fs::write(&note, "# Plan\n").is_err() {
+        return;
+    }
+    let kept_vaults = app.prefs.links_obsidian_vaults.clone();
+    let kept_plugins = app.prefs.plugins.clone();
+    app.prefs
+        .links_obsidian_vaults
+        .push(vault.to_string_lossy().into_owned());
+    app.prefs.plugins.insert("markdown-editor".into(), true);
+    app.prefs.plugins.insert("obsidian".into(), true);
+    let url = takt_core::links::obsidian_link_url("Smoke".into(), "Plan.md".into(), false);
+    let now = state::store::now_ms();
+    let linked = app
+        .write(|s| s.core.add_task_link(task_id.clone(), url, None, None, now))
+        .is_some();
+    app.open_notes_editor();
+    let additional = app
+        .notes_editor
+        .as_ref()
+        .is_some_and(|e| !e.same && e.note.is_some() && e.note_text.is_some());
+    let own = app
+        .notes_editor
+        .as_ref()
+        .map(|e| e.saved.clone())
+        .unwrap_or_default();
+    let switched = app.switch_notes_source(&own).as_deref() == Some("# Plan\n");
+    let typed = "# Plan\n- [ ] step\n";
+    let saved = app.save_notes_editor(typed, false)
+        && std::fs::read_to_string(&note).ok().as_deref() == Some(typed);
+    // Obsidian writes while something else is typed here.
+    let _ = std::fs::write(&note, "# Plan\nfrom Obsidian, longer\n");
+    let mine = "# Plan\n- [ ] step\nmine\n";
+    app.poll_notes_editor(mine);
+    let refused = !app.save_notes_editor(mine, false)
+        && std::fs::read_to_string(&note)
+            .ok()
+            .is_some_and(|t| t.contains("from Obsidian"));
+    let theirs = app.take_their_notes().unwrap_or_default();
+    let closed = app.close_notes_editor(&theirs).is_none();
+    let notes_kept = app
+        .store
+        .core
+        .editor_snapshot(task_id.clone())
+        .is_ok_and(|s| s.notes == own);
+    app.prefs.notes_same_as_obsidian.remove(&task_id);
+    if linked {
+        app.undo(false);
+    }
+    app.prefs.links_obsidian_vaults = kept_vaults;
+    app.prefs.plugins = kept_plugins;
+    app.prefs.save();
+    let _ = std::fs::remove_dir_all(&root);
+    report.push(format!(
+        "notes editor {:.1} ms (additional first: {additional}, file became the notes: {switched}, saved to it: {saved}, a change on disk not written over: {refused}, closed: {closed}, Takt's notes kept: {notes_kept})",
+        started.elapsed().as_secs_f64() * 1000.0
+    ));
 }

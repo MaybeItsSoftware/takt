@@ -217,6 +217,13 @@ fn search_drive(client_id: &str, text: &str) -> Result<Vec<Candidate>, String> {
 impl App {
     /// The vaults and their entries, read afresh: on opening the picker.
     pub fn index_obsidian(&mut self) {
+        let vaults = self.obsidian_vaults();
+        self.links.entries = vaults.iter().flat_map(|vault| entries(vault)).collect();
+        self.links.vaults = vaults;
+    }
+
+    /// Obsidian's vaults and those added in Settings, that are there.
+    pub fn obsidian_vaults(&self) -> Vec<PathBuf> {
         let mut vaults = configured_vaults(&obsidian_config());
         for extra in &self.prefs.links_obsidian_vaults {
             let path = PathBuf::from(extra);
@@ -225,8 +232,7 @@ impl App {
             }
         }
         vaults.retain(|vault| vault.is_dir());
-        self.links.entries = vaults.iter().flat_map(|vault| entries(vault)).collect();
-        self.links.vaults = vaults;
+        vaults
     }
 
     pub fn drive_search_ready(&self) -> bool {

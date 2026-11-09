@@ -84,6 +84,7 @@ Last checked against `main` on 6 October 2026.
 | Checkvist import and sync | Missing | It works on the Mac, and what it imports reaches the phone through sync. A phone client would need its own Checkvist credentials |
 | Google Calendar, Google Tasks | Missing | Same as Checkvist: the integration runs on the Mac |
 | Obsidian daily notes | Not on a phone | Writes into a local vault folder |
+| Markdown editor plugin (notes full size; a linked Obsidian note as the notes) | Missing | The notes are edited in the inspector as before. "Same as the Obsidian file" needs the vault on disk, so it stays a Mac choice; a Markdown preview of the notes would not. See `docs/markdown-editor.md` |
 | Daily log files | Missing | Per-device files on the Mac. Nothing records them on Android |
 | Workspace export (Markdown, JSON) | Done | Settings → Your data, through the system save dialog. `WorkspaceExport` in `:core` writes the same bytes as the Mac (fixtures from Foundation's `JSONEncoder`). Neither app imports it |
 | MCP server and `takt` CLI | Not on a phone | Desktop processes |

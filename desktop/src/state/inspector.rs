@@ -44,6 +44,7 @@ impl Stop {
             "title" => "taskRenameInsert",
             "focus" => "taskStartFocus",
             "notes" => "taskEditNotes",
+            "notes-editor" => "taskMaximiseNotes",
             "estimate" => "taskEditEstimate",
             "tags" => "taskEditTags",
             "conditions" => "taskConditions",
@@ -105,6 +106,7 @@ impl Stop {
             "minimum-block" => "timer",
             "single-sitting" => "armchair",
             "notes" => "text",
+            "notes-editor" => "file-text",
             "agent-context" => "sparkles",
             "list-context" => "sparkles",
             "priority" => "flag",
@@ -573,6 +575,7 @@ impl App {
                 .value(Some(of_list), &format!("Add agent context for {list}")),
             );
         }
+        self.add_notes_editor_stop(&mut stops, &task.id);
         if let Some(stop) = stops.iter_mut().find(|s| s.id == "links")
             && !stop.empty
         {
@@ -762,6 +765,7 @@ impl App {
                 }
             }
             "conditions" => self.run("taskConditions", None),
+            "notes-editor" => self.open_notes_editor(),
             "move" => self.run("taskMove", None),
             "blockers" => self.run("taskAddBlocker", None),
             "waiting" => self.run("taskWaiting", None),

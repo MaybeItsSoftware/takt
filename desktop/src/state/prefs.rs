@@ -94,6 +94,11 @@ pub struct Prefs {
     /// Which built-in plugins are on, by `plugins::Plugin::id`; one not
     /// named is seeded at launch from whether it is in use.
     pub plugins: HashMap<String, bool>,
+    /// The tasks whose notes are their Obsidian note's file, by the
+    /// note's address (`notes_editor`); a task not named keeps its own.
+    pub notes_same_as_obsidian: HashMap<String, String>,
+    /// The Markdown editor's split: `split`, `edit` or `preview`.
+    pub notes_editor_layout: String,
 }
 
 impl Default for Prefs {
@@ -152,6 +157,8 @@ impl Default for Prefs {
             ai_off: false,
             hide_key_hints: false,
             plugins: HashMap::new(),
+            notes_same_as_obsidian: HashMap::new(),
+            notes_editor_layout: "split".into(),
         }
     }
 }

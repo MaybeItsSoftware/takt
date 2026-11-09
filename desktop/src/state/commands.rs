@@ -274,6 +274,7 @@ impl App {
             "motionInspectorClear" => self.clear_inspector_stop(),
             "motionInspectorLeave" => self.inspector_left(key == "left"),
             "taskEditNotes" => self.edit_in_inspector("notes"),
+            "taskMaximiseNotes" => self.open_notes_editor(),
             "taskBury" => self.bury_selected(),
             "planHideLater" => self.toggle_hide_later(),
             "planGrowTask" => self.grow_selected(),
@@ -788,6 +789,9 @@ impl App {
         if self.prefs.ai_off && AI_COMMANDS.contains(&id) {
             return false;
         }
+        if id == "taskMaximiseNotes" && !self.notes_editor_on() {
+            return false;
+        }
         self.bindings
             .entry(id)
             .is_some_and(|entry| !entry.motion && entry.surface != CommandSurface::Timeline)
@@ -972,6 +976,7 @@ pub const PORTED: &[&str] = &[
     "taskEditDue",
     "taskEditEstimate",
     "taskEditNotes",
+    "taskMaximiseNotes",
     "taskEditRecurrence",
     "taskEditStart",
     "taskEditTags",

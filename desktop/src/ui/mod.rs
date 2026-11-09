@@ -12,10 +12,10 @@ mod celebrate;
 mod chrome;
 mod dock;
 pub mod icons;
+mod notes_editor;
 pub mod panel;
 mod repeat;
 mod settings;
-mod notes_editor;
 mod views;
 mod widgets;
 

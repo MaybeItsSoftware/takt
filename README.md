@@ -56,7 +56,7 @@ to filter them, walk them with `↑`/`↓`, or jump with `⌘1`–`⌘9`:
 | Focus | Where a started block runs, and whether each block is scored |
 | Appearance | The theme gallery, light/dark/system, the interface, heading and numeral fonts, and the text size |
 | Keyboard | The three global hotkeys (show the window, focus panel `⌃⌥⇧⌘F`, Quick Add `⌃⌥⇧⌘D`, which opens one of the window's overlays over whatever app you are in, in the theme you have chosen: the field, the chips that say what `30m`, `@fri`, `#work` and `!1` will set as the window's add row does, and under it every list in the list finder's rows — `↑`/`↓` pick the list, `→` at the end of the text (or `Tab`) walks into its date, conditions and time slots — see *Quick Add's slots* below — `Return` files it, `Esc` or a click away drops it), the list Quick Add captures into, and `keymap.json` |
-| Plugins | Every built-in plugin with a switch — Google Calendar, Google Tasks, Google Drive, Checkvist, Obsidian, MCP, the completion celebration — and each one switched on with its own settings beneath. Off, a plugin's settings, link-picker rows and background work go |
+| Plugins | Every built-in plugin with a switch — Google Calendar, Google Tasks, Google Drive, Checkvist, Obsidian, the Markdown editor, MCP, the completion celebration — and each one switched on with its own settings beneath. Off, a plugin's settings, link-picker rows and background work go |
 | Sync | The account that keeps the Mac and phones on one workspace, on Takt's server or [your own](docs/self-hosting.md) |
 | Advanced | Export the workspace as Markdown or JSON, diagnostics, and the app's data folder |
 
@@ -117,6 +117,7 @@ So none of it is reachable only by something you already have to know.
 | `f` / `Shift+F` then a letter, `;` | Vim's find: the next / previous task (in the sidebar, list) whose title starts with that letter; `;` repeats it |
 | `gg` / `Shift+G`, `Ctrl+D` / `Ctrl+U` | First / last task, eight down / up (vim) |
 | `gx` / `Cmd+O` | Open the task's first link (vim's open-the-URL-under-the-cursor) |
+| `nm` / `Cmd+Ctrl+M` | Open the notes in the **Markdown editor** (the Markdown editor plugin): the notes the size of the window, the text on the left and the Markdown drawn on the right (`Cmd+E` cycles split / text / preview). On a task linked to an Obsidian note, `Cmd+Shift+O` chooses whether the notes are *additional* to the note (the default: Takt's own notes, the note drawn read-only beside them, `Ctrl+Tab`) or *the same as* it (the editor edits the `.md` file in the vault). `Cmd+S` saves, `Esc` or `Cmd+Return` saves and returns, and `Cmd+Ctrl+M` from inside the inspector's notes field carries what you typed in. A change made on disk while you type is never written over unasked. See [the Markdown editor](docs/markdown-editor.md) |
 | `pl` / `Cmd+Ctrl+L` | Link…: find a note or folder in your Obsidian vaults or a Drive file linked before, choose "Pick from Google Drive…" to pick files in Google's own picker in the browser (only the files you pick are shared with Takt), or paste any address — `↑` `↓` choose, `Return` links, `Tab` narrows to Obsidian or Drive. Rows with links show a small link mark; see [Links](docs/links.md) |
 | `]` / `[` | Open the task's subtasks / leave them |
 | `→` / `←` | In the outline, show a task's subtasks and step into them / hide them and step out — without opening the task. Elsewhere, open and leave it. At the top level of a list, `←` goes back to the list in the sidebar |
@@ -185,7 +186,10 @@ Priority, `h` (and `←` elsewhere) hands the keyboard back to the tasks, and so
 does `Esc`. In a one-line field `Return` keeps what you typed and `Esc` puts
 it back, and either returns you to the row; `↑` / `↓` keep it and move on. In
 the notes and the links the arrows and `Return` are the text's: `Esc` or
-`Cmd+Return` keeps the text and comes out. `Tab` / `Shift+Tab` keep the field
+`Cmd+Return` keeps the text and comes out; with the Markdown editor plugin on,
+the row under the notes (or `nm`, or `Cmd+Ctrl+M` from inside them) opens them
+full size, and says whether they are the task's linked Obsidian note.
+`Tab` / `Shift+Tab` keep the field
 and go on to the next / previous row, editing it if it is a field. The mouse
 works as before.
 
