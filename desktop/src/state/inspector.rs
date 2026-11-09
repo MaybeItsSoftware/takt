@@ -94,6 +94,42 @@ impl Stop {
         }
     }
 
+    /// The heading over the group this row starts, when it starts one.
+    pub fn section(&self) -> Option<&'static str> {
+        if !self.group {
+            return None;
+        }
+        Some(match self.id {
+            "focus" => "Work",
+            "start" => "When",
+            "notes" => "Notes",
+            "move" => "Filed",
+            "conditions" => "Needs",
+            _ => "Actions",
+        })
+    }
+
+    /// A field, drawn as its label beside its value, so the When rows read
+    /// as a form: Start, Estimate, Due and Repeat each where it is looked
+    /// for. Actions and free text keep their icon.
+    pub fn labelled(&self) -> bool {
+        matches!(
+            self.id,
+            "start"
+                | "estimate"
+                | "minimum-block"
+                | "single-sitting"
+                | "due"
+                | "repeat"
+                | "move"
+                | "priority"
+                | "tags"
+                | "conditions"
+                | "blockers"
+                | "waiting"
+        )
+    }
+
     /// The icon drawn in place of the label: what the row is, at a glance.
     pub fn icon(&self) -> Option<&'static str> {
         Some(match self.id {
@@ -169,18 +205,14 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
     let estimate = snapshot.estimate_seconds.filter(|s| *s > 0);
     let minutes = |s: i64| format!("{} min", editor_minutes_text(s, true));
     let mut stops = vec![
-        Stop::new("start", "Scheduled", Text { multiline: false })
+        Stop::new("start", "Start", Text { multiline: false })
             .value(
-                planning
-                    .start_at_ms
-                    .map(|ms| format!("Scheduled {}", format_slot(ms, estimate))),
-                "Schedule a time",
+                planning.start_at_ms.map(|ms| format_slot(ms, estimate)),
+                "Not set",
             )
             .grouped(),
-        Stop::new("estimate", "Takes", Text { multiline: false }).value(
-            estimate.map(|s| format!("Takes {}", minutes(s))),
-            "Add estimate",
-        ),
+        Stop::new("estimate", "Estimate", Text { multiline: false })
+            .value(estimate.map(minutes), "Not set"),
     ];
     // How the estimate may be split only means something once there is one.
     if estimate.is_some() || planning.minimum_block_seconds.is_some() {
@@ -188,8 +220,8 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
             Stop::new("minimum-block", "Min. block", Text { multiline: false }).value(
                 planning
                     .minimum_block_seconds
-                    .map(|s| format!("In blocks of {} or more", minutes(s))),
-                "Add a minimum block",
+                    .map(|s| format!("{} or more", minutes(s))),
+                "Not set",
             ),
         );
     }
@@ -209,18 +241,15 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
         .due_at_ms
         .map(format_when)
         .or_else(|| planning.due_date.as_deref().map(format_day_string));
-    stops.push(
-        Stop::new("due", "Due", Text { multiline: false })
-            .value(due.map(|d| format!("Due {d}")), "Add due date"),
-    );
+    stops.push(Stop::new("due", "Due", Text { multiline: false }).value(due, "Not set"));
     stops.push(
         Stop::new("repeat", "Repeat", Text { multiline: false }).value(
             snapshot
                 .metadata
                 .recurrence_rule
                 .clone()
-                .map(|rule| format!("Repeats {rule}")),
-            "Add repeat",
+                .map(|rule| capitalise(&rule)),
+            "Never",
         ),
     );
     stops
@@ -299,6 +328,7 @@ pub fn stops(
                 Some(progress) => format!("{action} \u{b7} {progress}"),
                 None => action.into(),
             },
+            group: true,
             ..Stop::new("focus", "", Action)
         });
         // Work done away from the timer counts as much as work timed.
@@ -346,7 +376,7 @@ pub fn stops(
     let priority = snapshot.metadata.priority.unwrap_or(0);
     stops.push(Stop {
         value: if priority == 0 {
-            "Add priority".into()
+            "None".into()
         } else {
             priority_name(priority).into()
         },
@@ -355,7 +385,7 @@ pub fn stops(
     });
     stops.push(
         Stop::new("tags", "Tags", Text { multiline: false })
-            .value(Some(snapshot.metadata.tags.join(", ")), "Add tags"),
+            .value(Some(snapshot.metadata.tags.join(", ")), "None"),
     );
 
     // What it waits on.
@@ -365,13 +395,13 @@ pub fn stops(
                 planning.requirement_groups.as_ref().and_then(|groups| {
                     (!groups.is_empty()).then(|| format!("{} condition groups", groups.len()))
                 }),
-                "Add conditions",
+                "None",
             )
             .grouped(),
     );
     if !list {
-        stops.push(Stop::new("blockers", "Blocked by", Action).value(None, "Add blocker"));
-        stops.push(Stop::new("waiting", "Waiting on", Action).value(None, "Add waiting"));
+        stops.push(Stop::new("blockers", "Blocked by", Action).value(None, "Nothing"));
+        stops.push(Stop::new("waiting", "Waiting on", Action).value(None, "Nobody"));
     }
 
     let has_requirements = planning
@@ -1248,7 +1278,7 @@ mod tests {
         let stops = stops(&snapshot(), &task(None), "Inbox", false, Default::default());
         assert_eq!(stops[0].id, "title");
         let estimate = stops.iter().find(|s| s.id == "estimate").unwrap();
-        assert_eq!(estimate.value, "Takes 30 min");
+        assert_eq!(estimate.value, "30 min");
         let due = stops.iter().find(|s| s.id == "due").unwrap();
         assert!(due.empty);
         assert!(!stops.iter().any(|s| s.id == "due.exact"));
@@ -1352,9 +1382,11 @@ mod tests {
         assert!(stops[from].group);
         assert!(stops[from + 1..from + 6].iter().all(|s| !s.group));
         let value = |id: &str| stops.iter().find(|s| s.id == id).unwrap().value.clone();
-        assert_eq!(value("start"), "Scheduled Mon 9 Nov, 14:00\u{2013}14:30");
-        assert_eq!(value("due"), "Due Fri 13 Nov");
-        assert_eq!(value("repeat"), "Repeats weekly");
+        assert_eq!(value("start"), "Mon 9 Nov, 14:00\u{2013}14:30");
+        assert_eq!(value("due"), "Fri 13 Nov");
+        assert_eq!(value("repeat"), "Weekly");
+        assert_eq!(stops[from].section(), Some("When"));
+        assert!(stops[from..from + 6].iter().all(Stop::labelled));
         assert_eq!(format_slot(start, None), "Mon 9 Nov, 14:00");
     }
 

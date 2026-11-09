@@ -155,13 +155,15 @@ rename, `h` / `l` / `-` collapse, expand and go up, `gg` / `Shift+G` the ends,
 opens the same panel's menu, each item with its sidebar key beside it.
 
 The **inspector** is modal, as vim is. With the keyboard in it, `j` / `k` (or
-`↓` / `↑`) move a row cursor down every row, grouped by what you do with a task:
+`↓` / `↑`) move a row cursor down every row, in sections headed by what you do
+with a task, and within When, Filed and Needs each row is its label beside its
+value, so Start sits plainly above Estimate, Due and Repeat:
 the title; working on it (Start focus, which says how far it has got — time
 logged against the estimate and subtasks done — and Log time worked, where on
 the Mac you type `25`, `25m` or `1h 20m` to record work done without the
 timer and without finishing the task, which counts toward a daily due today
 as a timed block would; then daily progress and the commitment); when
-(Scheduled, the estimate as how long it takes, how it may be split once it
+(Start, the slot it is scheduled into and hidden until; Estimate, how long it takes; how it may be split once it
 has one, Due, Repeat); the notes; where it is filed (List, Priority, Tags); what it
 waits on (Conditions, Blocked by, Waiting on); and the actions —
 and `gg` / `Shift+G` (or `Home` / `End`) go to the first and last. Landing on

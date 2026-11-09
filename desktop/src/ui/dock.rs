@@ -206,6 +206,18 @@ impl Takt {
                         .when(stop.group && ix > 0, |d| {
                             d.mt_1().pt_1().border_t_1().border_color(t.border_variant)
                         })
+                        .when_some(stop.section().filter(|_| ix > 0), |d, heading| {
+                            d.child(
+                                div()
+                                    .px_2()
+                                    .pt_1()
+                                    .pb(px(2.))
+                                    .text_size(px(10.))
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(t.muted)
+                                    .child(heading.to_uppercase()),
+                            )
+                        })
                         .child(
                             div()
                                 .id(("inspector-row", ix))
@@ -234,7 +246,20 @@ impl Takt {
                                     this.after_change(cx);
                                     cx.notify();
                                 }))
-                                .when_some(stop.icon(), |d, glyph| {
+                                .when(stop.labelled(), |d| {
+                                    d.child(
+                                        div()
+                                            .w(px(72.))
+                                            .h(px(18.))
+                                            .flex_none()
+                                            .flex()
+                                            .items_center()
+                                            .text_size(px(12.))
+                                            .text_color(if ringed { t.accent } else { t.muted })
+                                            .child(stop.label),
+                                    )
+                                })
+                                .when_some(stop.icon().filter(|_| !stop.labelled()), |d, glyph| {
                                     d.child(
                                         div()
                                             .id(("inspector-icon", ix))
