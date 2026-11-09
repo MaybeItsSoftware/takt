@@ -131,7 +131,7 @@ impl App {
             }
             Ask::SyncServer if self.sync_hosted() => String::new(),
             Ask::SyncServer => self.sync.status().server,
-            Ask::GoogleClientId => self.google_client_id(),
+            Ask::GoogleClientId => self.prefs.google_client_id.clone().unwrap_or_default(),
             Ask::JoinList => clipboard_invite().unwrap_or_default(),
             Ask::ReminderTime { dailies } => super::reminders::clock(if *dailies {
                 self.prefs.remind_dailies_left_minute

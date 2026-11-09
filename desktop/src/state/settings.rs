@@ -218,8 +218,9 @@ pub enum Control {
     Shortcut(String),
 }
 
-const SWITCHES: [&str; 18] = [
+const SWITCHES: [&str; 19] = [
     "sync-self-hosted",
+    "google-own-client",
     "ai-off",
     "key-hints",
     "confirm-delete",
@@ -356,8 +357,11 @@ impl SettingRow {
             "checkvist-connect" => "Copy your Checkvist lists into the workspace.",
             "checkvist-import" => "Copy in the Checkvist lists the workspace lacks.",
             "checkvist-disconnect" => "Forget the Checkvist account; imported lists stay.",
-            "google-client" => "Takt's own unless you set one from a Cloud project of yours.",
-            "google-secret" => "Only with a client of your own: its secret, beside its ID.",
+            "google-own-client" => {
+                "Off, Google signs in through Takt's own client. On, a client from a Google Cloud project of yours, asked for by ID. Turning it off forgets that client and signs Google out."
+            }
+            "google-client" => "The OAuth client ID from your Google Cloud project.",
+            "google-secret" => "The secret Google gave with that client ID.",
             "google-connect" => "Sign in to Google for Calendar, Tasks and Drive.",
             "google-disconnect" => "Sign out of Google on this Mac.",
             "google-calendar" => "Tasks with a time appear in your calendar.",

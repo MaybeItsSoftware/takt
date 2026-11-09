@@ -170,36 +170,21 @@ impl App {
             })
     }
 
+    /// Whether Takt's built-in client is compiled in, so a client of the
+    /// person's own is a choice rather than a necessity.
+    fn google_has_built_in_client() -> bool {
+        google::BUILT_IN_CLIENT_ID.is_some_and(|id| !id.trim().is_empty())
+    }
+
+    /// Using a Google Cloud client of their own rather than Takt's. Always
+    /// so in a build without Takt's, where there is nothing else.
+    pub fn google_own_client(&self) -> bool {
+        self.prefs.google_client_id.is_some() || !Self::google_has_built_in_client()
+    }
+
     pub fn google_rows(&self) -> Vec<(&'static str, &'static str, &'static str, String)> {
         let on = |b: bool| if b { "On" } else { "Off" }.to_string();
-        let client = self.google_client_id();
-        let mut rows = vec![(
-            "google-client",
-            "Google",
-            "OAuth client ID",
-            if client.is_empty() {
-                "Not set".into()
-            } else if self.prefs.google_client_id.is_none() && google::BUILT_IN_CLIENT_ID.is_some()
-            {
-                "Takt's".into()
-            } else {
-                format!("{}…", client.chars().take(16).collect::<String>())
-            },
-        )];
-        rows.push((
-            "google-secret",
-            "Google",
-            "OAuth client secret",
-            if self.prefs.google_client_secret.is_some() {
-                "Set"
-            } else if self.prefs.google_client_id.is_none() && google::BUILT_IN_CLIENT_ID.is_some()
-            {
-                "Takt's"
-            } else {
-                "Not set"
-            }
-            .into(),
-        ));
+        let mut rows = Vec::new();
         if google::connected() {
             rows.push((
                 "google-disconnect",
@@ -209,6 +194,43 @@ impl App {
             ));
         } else {
             rows.push(("google-connect", "Google", "Connect Google", String::new()));
+        }
+        if Self::google_has_built_in_client() {
+            rows.push((
+                "google-own-client",
+                "Google",
+                "Use your own Google client",
+                if self.google_own_client() {
+                    "On"
+                } else {
+                    "Off · Takt's"
+                }
+                .into(),
+            ));
+        }
+        if self.google_own_client() {
+            let client = self.google_client_id();
+            rows.push((
+                "google-client",
+                "Google",
+                "OAuth client ID",
+                if client.is_empty() {
+                    "Not set".into()
+                } else {
+                    format!("{}…", client.chars().take(16).collect::<String>())
+                },
+            ));
+            rows.push((
+                "google-secret",
+                "Google",
+                "OAuth client secret",
+                if self.prefs.google_client_secret.is_some() {
+                    "Set"
+                } else {
+                    "Not set"
+                }
+                .into(),
+            ));
         }
         let settings = self.calendar_settings();
         let chosen = settings.calendar_id.as_ref().map(|id| {
@@ -256,6 +278,23 @@ impl App {
     /// Return on a Google row; false when it isn't one.
     pub fn change_google_setting(&mut self, id: &str) -> bool {
         match id {
+            "google-own-client" => {
+                if self.google_own_client() {
+                    // Back to Takt's: forget the person's client and its
+                    // secret. A sign-in made with their client won't
+                    // refresh under Takt's, so it goes too.
+                    self.prefs.google_client_secret = None;
+                    self.set_google_client_id("");
+                    if google::connected() {
+                        google::disconnect();
+                        self.message =
+                            Some("Back on Takt's Google client: connect Google again.".into());
+                    }
+                } else {
+                    self.ask(super::ask::Ask::GoogleClientId);
+                    return true;
+                }
+            }
             "google-client" => self.ask(super::ask::Ask::GoogleClientId),
             "google-secret" => self.ask(super::ask::Ask::GoogleClientSecret),
             "google-connect" => {

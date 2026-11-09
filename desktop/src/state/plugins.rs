@@ -133,7 +133,8 @@ impl Plugin {
 pub fn is_google_account_row(id: &str) -> bool {
     matches!(
         id,
-        "google-client"
+        "google-own-client"
+            | "google-client"
             | "google-secret"
             | "google-connect"
             | "google-disconnect"
@@ -313,6 +314,7 @@ mod tests {
         assert_eq!(Plugin::of_row("mcp:claude-code"), Some(Plugin::Mcp));
         assert_eq!(Plugin::of_row("google-connect"), None);
         assert!(is_google_account_row("google-connect"));
+        assert!(is_google_account_row("google-own-client"));
         assert_eq!(Plugin::of_row("sync-now"), None);
     }
 }
