@@ -1028,10 +1028,13 @@ clicking it drops the day down as a menu you can start any task from without
 the app ever coming to the front. Overdue work is coloured; the tick marks
 whatever is running.
 
-It also **outlives the window**. `⌘Q` closes the windows and leaves the status
-item behind, because a reminder you can dismiss with a keystroke is not a
-reminder. The only quit that actually quits is **Quit Takt** in the status
-item's own menu.
+It also **outlives the window**. Closing the windows (`⌘W`) leaves the status
+item behind, and the app with it; `⌘Q`, or **Quit Takt** in either menu, quits.
+
+The Mac's own menu bar along the top of the screen has **Takt** (About,
+Settings… `⌘,`, Hide `⌘H`, Quit `⌘Q`), **File** (Quick Add…) and **Window**
+(Main Window, Focus Panel), so everything the keys reach first also has
+somewhere to click.
 
 ## The window
 

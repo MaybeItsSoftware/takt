@@ -12,6 +12,7 @@ mod celebrate;
 mod chrome;
 mod dock;
 pub mod icons;
+pub mod menus;
 mod notes_editor;
 pub mod panel;
 mod repeat;

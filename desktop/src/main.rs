@@ -71,6 +71,7 @@ fn main() {
     });
     application.run(move |cx: &mut App| {
         load_fonts(cx);
+        ui::menus::install(cx);
         let takt = cx.new(|cx| ui::Takt::new(app, cx));
         cx.set_global(ui::Shell(takt.clone()));
         let Some(window) = ui::open_main(&takt, cx) else {
