@@ -18,7 +18,7 @@
 <body>
 <main>
 <h1>Privacy policy</h1>
-<p class="muted">Takt for Mac, iPhone and Android · last updated 8 November 2026</p>
+<p class="muted">Takt for Mac, iPhone and Android · last updated 9 November 2026</p>
 
 <p>Takt is a task manager. Your tasks live on your devices. If you sign in to sync, a copy goes to our server so your other devices can fetch it. That's all we collect it for: we don't sell your data, show ads or track you, and the apps contain no analytics or advertising SDKs.</p>
 
@@ -31,10 +31,21 @@
   <li><strong>Your workspace:</strong> your tasks, lists, folders, notes, dailies, focus sessions, settings that sync, and the themes you add. It is stored so that your devices can merge their changes.</li>
   <li><strong>Your devices:</strong> each device's name (for example "Adam's iPhone"), its platform and when it last synced, so that you can see which devices are signed in.</li>
 </ul>
-<p>The data goes over HTTPS. It is stored by <a href="https://supabase.com/privacy">Supabase</a> (accounts and the database, in London, UK) and processed by <a href="https://railway.com/legal/privacy">Railway</a> (the sync server). Sign-in and password-reset emails are sent through <a href="https://resend.com/legal/privacy-policy">Resend</a>. They act on our behalf and don't use your data for anything else.</p>
+<p>The data goes over HTTPS. It is stored by <a href="https://supabase.com/privacy">Supabase</a> (accounts and the database, in London, UK) and processed by <a href="https://cloud.google.com/terms/cloud-privacy-notice">Google Cloud</a> (the sync server, in Belgium). Sign-in and password-reset emails are sent through <a href="https://resend.com/legal/privacy-policy">Resend</a>. They act on our behalf and don't use your data for anything else.</p>
 
 <h2>Shared lists</h2>
 <p>If you share a list, everyone you invite can see and change that list's tasks, and sees the email address you signed in with. They don't see your other lists, habits, focus sessions or settings. If you join someone else's list, its other members see your email address and what you change in it. When you leave a list, or its owner stops sharing it, it is removed from your devices.</p>
+
+<h2>Google Calendar, Google Tasks and Google Drive</h2>
+<p>These are optional. If you connect your Google account in Takt's settings, Takt asks Google for access to:</p>
+<ul>
+  <li><strong>Google Calendar</strong> (<code>calendar.events</code>, <code>calendar.readonly</code>): to see your calendars so you can choose one, to put tasks that have a time into it, and, if you turn it on, to bring events added there back into Takt as tasks.</li>
+  <li><strong>Google Tasks</strong> (<code>tasks</code>): to keep a copy of your lists in Google Tasks and bring changes made there back.</li>
+  <li><strong>Google Drive</strong> (<code>drive.file</code>): to open only the files you pick in Google's file picker and link them to a task. Takt can't see anything else in your Drive.</li>
+</ul>
+<p>The app talks to Google directly from your device. The sign-in is kept in your device's keychain or secure storage and never reaches our server. What Google sends back is used only for the features above: an event brought back from your calendar, or a task changed in Google Tasks, becomes an ordinary task in your workspace, and syncs to your other devices like any task if you sign in to sync. We don't use Google data for advertising, don't sell it, don't use it to train AI models, and don't let people read it.</p>
+<p>Takt's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+<p>To stop it, choose <strong>Disconnect Google</strong> in Takt's settings, or remove Takt at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>. Tasks already brought into Takt stay until you delete them.</p>
 
 <h2>Deleting your data</h2>
 <p>In any of the apps, go to <strong>Settings → Sync → Delete account</strong>. This deletes your account, everything synced to the server and your list of devices, straight away. A list you shared stays with the people in it, passing to whoever has been in it longest; your changes to it stay part of it. Each device keeps its own local copy until you delete the app or its data. Signing out stops syncing but keeps your account.</p>
