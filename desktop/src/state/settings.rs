@@ -218,10 +218,10 @@ pub enum Control {
     Shortcut(String),
 }
 
-const SWITCHES: [&str; 19] = [
+const SWITCHES: [&str; 16] = [
     "sync-self-hosted",
     "google-own-client",
-    "ai-off",
+    "ai-on",
     "key-hints",
     "confirm-delete",
     "launch-at-login",
@@ -233,11 +233,8 @@ const SWITCHES: [&str; 19] = [
     "remind-due-time",
     "remind-due-today",
     "remind-dailies",
-    "links-drive",
     "celebration-sound",
-    "google-calendar",
     "google-import-events",
-    "google-tasks",
 ];
 
 fn button_label(id: &str) -> Option<&'static str> {
@@ -326,8 +323,8 @@ impl SettingRow {
             "keymap-open" => "Your own bindings, laid over the built-in ones.",
             "keymap-reload" => "Read keymap.json again without relaunching.",
             "diagnostics" => "What the app is reading, and anything that went wrong.",
-            "ai-off" => {
-                "Hide the agent panel, quick ask, the agent's context on tasks and the MCP setup. Nothing is sent to an AI while it is on."
+            "ai-on" => {
+                "The agent panel, quick ask, the agent's context on tasks and the MCP setup. Off, they are hidden and nothing is sent to an AI."
             }
             "key-hints" => "A small marking with the key beside buttons and rows that have one.",
             "remind-due-time" => "A notification when a task's due time comes.",
@@ -362,16 +359,19 @@ impl SettingRow {
             }
             "google-client" => "The OAuth client ID from your Google Cloud project.",
             "google-secret" => "The secret Google gave with that client ID.",
-            "google-connect" => "Sign in to Google for Calendar, Tasks and Drive.",
-            "google-disconnect" => "Sign out of Google on this Mac.",
-            "google-calendar" => "Tasks with a time appear in your calendar.",
-            "google-calendar-choose" => "The calendar that changes come back from.",
+            "google-connect" => {
+                "Lets Calendar, Tasks and Drive reach your Google account. Not your Takt account: that is the Sign in on the Sync page."
+            }
+            "google-disconnect" => {
+                "Stop Calendar, Tasks and Drive reaching your Google account. Your Takt account stays signed in."
+            }
+            "google-calendar-choose" => {
+                "The Google calendar timed tasks go to, and that changes come back from."
+            }
             "google-import-events" => "Events added in the calendar become tasks.",
-            "google-tasks" => "Each list mirrored as a Google Tasks list.",
             "google-sync-now" => "Pass the calendar and tasks mirrors now.",
             "links-vault-add" => "Notes in Obsidian vaults are offered when you link a task.",
             "links-vault-forget" => "Drop the vault folders added by hand; Obsidian's own stay.",
-            "links-drive" => "Offer Google Drive files when you link a task.",
             mcp if mcp.starts_with("mcp:") => "Let this assistant read and change your tasks.",
             "share-join" => "Open an invite someone sent you.",
             share if share.starts_with("share:") => {
@@ -435,19 +435,19 @@ impl App {
             ),
             row(
                 "themes-folder",
-                "Appearance",
+                "Advanced",
                 "Open the themes folder",
                 String::new(),
             ),
             row(
                 "themes-reload",
-                "Appearance",
+                "Advanced",
                 "Reload themes",
                 format!("{}", self.library.themes.len()),
             ),
             row(
                 "theme-export",
-                "Appearance",
+                "Advanced",
                 "Export the theme as JSON",
                 String::new(),
             ),
@@ -517,10 +517,10 @@ impl App {
                 "The main window from any app",
                 shortcut(&p.hotkey_show_window),
             ),
-            row("keymap-open", "Keyboard", "Open keymap.json", String::new()),
+            row("keymap-open", "Advanced", "Open keymap.json", String::new()),
             row(
                 "keymap-reload",
-                "Keyboard",
+                "Advanced",
                 "Reload the keymap",
                 if self.library.keymap_issues.is_empty() {
                     String::new()
@@ -529,7 +529,7 @@ impl App {
                 },
             ),
             row("diagnostics", "Advanced", "Diagnostics", String::new()),
-            row("ai-off", "AI", "Switch off all AI", on(p.ai_off)),
+            row("ai-on", "AI", "AI features", on(!p.ai_off)),
             row(
                 "key-hints",
                 "Keyboard",
@@ -538,6 +538,16 @@ impl App {
             ),
         ];
         rows.extend(self.integration_settings());
+        // A row that only means something while a switch above it is on
+        // waits for that switch.
+        let p = &self.prefs;
+        rows.retain(|row| match row.id.as_str() {
+            "hotkey-capture" | "hotkey-panel" | "hotkey-window" => p.hotkeys_enabled,
+            "focus-sound" => p.focus_notifications,
+            "remind-due-today-at" => p.remind_due_today,
+            "remind-dailies-at" => p.remind_dailies_left,
+            _ => true,
+        });
         rows
     }
 
@@ -1007,7 +1017,7 @@ impl App {
             }
             "confirm-delete" => p.confirm_delete = !p.confirm_delete,
             "key-hints" => p.hide_key_hints = !p.hide_key_hints,
-            "ai-off" => {
+            "ai-on" => {
                 let off = !p.ai_off;
                 self.set_ai_off(off);
             }
@@ -1181,7 +1191,6 @@ mod tests {
         let rows = [
             row("google-calendar-choose", "Google Calendar"),
             row("google-connect", plugins::GOOGLE_ACCOUNT),
-            row("links-drive", "Google Drive"),
             row("plugin:google-calendar", "Google Calendar"),
             row("plugin:google-drive", "Google Drive"),
             row("checkvist-import", "Checkvist"),

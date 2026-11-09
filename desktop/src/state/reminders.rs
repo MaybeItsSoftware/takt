@@ -84,11 +84,7 @@ impl App {
                 "remind-due-today",
                 "Reminders",
                 "What's due today, each morning",
-                if p.remind_due_today {
-                    format!("At {}", clock(p.remind_due_today_minute))
-                } else {
-                    on(false)
-                },
+                on(p.remind_due_today),
             ),
             (
                 "remind-due-today-at",
@@ -100,11 +96,7 @@ impl App {
                 "remind-dailies",
                 "Reminders",
                 "Dailies left, each evening",
-                if p.remind_dailies_left {
-                    format!("At {}", clock(p.remind_dailies_left_minute))
-                } else {
-                    on(false)
-                },
+                on(p.remind_dailies_left),
             ),
             (
                 "remind-dailies-at",

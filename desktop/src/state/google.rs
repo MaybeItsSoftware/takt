@@ -82,8 +82,8 @@ impl App {
     fn google_config(&self) -> Config {
         Config {
             client_id: self.google_client_id(),
-            calendar: self.prefs.google_calendar && self.plugin_on(Plugin::GoogleCalendar),
-            tasks: self.prefs.google_tasks && self.plugin_on(Plugin::GoogleTasks),
+            calendar: self.plugin_on(Plugin::GoogleCalendar),
+            tasks: self.plugin_on(Plugin::GoogleTasks),
         }
     }
 
@@ -189,11 +189,16 @@ impl App {
             rows.push((
                 "google-disconnect",
                 "Google",
-                "Disconnect Google",
+                "Disconnect Google Calendar, Tasks & Drive",
                 "Connected".into(),
             ));
         } else {
-            rows.push(("google-connect", "Google", "Connect Google", String::new()));
+            rows.push((
+                "google-connect",
+                "Google",
+                "Connect Google Calendar, Tasks & Drive",
+                String::new(),
+            ));
         }
         if Self::google_has_built_in_client() {
             rows.push((
@@ -242,15 +247,9 @@ impl App {
         });
         rows.extend([
             (
-                "google-calendar",
-                "Google",
-                "Mirror timed tasks to Google Calendar",
-                on(self.prefs.google_calendar),
-            ),
-            (
                 "google-calendar-choose",
                 "Google",
-                "Two-way calendar",
+                "Calendar to sync with",
                 chosen.unwrap_or_else(|| "None".into()),
             ),
             (
@@ -258,12 +257,6 @@ impl App {
                 "Google",
                 "Import the calendar's events as tasks",
                 on(settings.import_events),
-            ),
-            (
-                "google-tasks",
-                "Google",
-                "Mirror lists to Google Tasks",
-                on(self.prefs.google_tasks),
             ),
             (
                 "google-sync-now",
@@ -315,16 +308,6 @@ impl App {
             "google-disconnect" => {
                 google::disconnect();
                 self.message = Some("Google disconnected.".into());
-            }
-            "google-calendar" => {
-                self.prefs.google_calendar = !self.prefs.google_calendar;
-                self.prefs.save();
-                self.google_now();
-            }
-            "google-tasks" => {
-                self.prefs.google_tasks = !self.prefs.google_tasks;
-                self.prefs.save();
-                self.google_now();
             }
             "google-import-events" => {
                 let mut settings = self.calendar_settings();

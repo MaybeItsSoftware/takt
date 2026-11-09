@@ -115,11 +115,7 @@ impl Plugin {
     /// The plugin a settings row belongs to, by the row's id.
     pub fn of_row(id: &str) -> Option<Plugin> {
         Some(match id {
-            "google-calendar" | "google-calendar-choose" | "google-import-events" => {
-                Plugin::GoogleCalendar
-            }
-            "google-tasks" => Plugin::GoogleTasks,
-            "links-drive" => Plugin::GoogleDrive,
+            "google-calendar-choose" | "google-import-events" => Plugin::GoogleCalendar,
             "links-vault-add" | "links-vault-forget" => Plugin::Obsidian,
             "celebration" | "celebration-sound" => Plugin::Celebration,
             checkvist if checkvist.starts_with("checkvist-") => Plugin::Checkvist,
@@ -209,6 +205,29 @@ impl App {
             let on = self.plugin_in_use(plugin);
             self.prefs.plugins.insert(plugin.id().into(), on);
         }
+        self.prefs.save();
+    }
+
+    /// Once: Calendar, Tasks and Drive used to need a switch of their own
+    /// inside the plugin as well as the plugin's. The plugin's is now the
+    /// only one, so a plugin left on with its inner switch off goes off,
+    /// rather than starting to write to Google on upgrade.
+    pub fn fold_google_switches(&mut self) {
+        if self.prefs.google_switches_folded {
+            return;
+        }
+        let p = &self.prefs;
+        let inner = [
+            (Plugin::GoogleCalendar, p.google_calendar),
+            (Plugin::GoogleTasks, p.google_tasks),
+            (Plugin::GoogleDrive, p.links_drive_search),
+        ];
+        for (plugin, on) in inner {
+            if !on {
+                self.prefs.plugins.insert(plugin.id().into(), false);
+            }
+        }
+        self.prefs.google_switches_folded = true;
         self.prefs.save();
     }
 
@@ -309,7 +328,10 @@ mod tests {
             Plugin::of_row("google-import-events"),
             Some(Plugin::GoogleCalendar)
         );
-        assert_eq!(Plugin::of_row("links-drive"), Some(Plugin::GoogleDrive));
+        assert_eq!(
+            Plugin::of_row("google-import-events"),
+            Some(Plugin::GoogleCalendar)
+        );
         assert_eq!(Plugin::of_row("checkvist-import"), Some(Plugin::Checkvist));
         assert_eq!(Plugin::of_row("mcp:claude-code"), Some(Plugin::Mcp));
         assert_eq!(Plugin::of_row("google-connect"), None);

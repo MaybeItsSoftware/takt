@@ -241,7 +241,7 @@ impl App {
 
     /// Drive linking is switched on in Settings → Links.
     pub fn drive_linking_on(&self) -> bool {
-        self.prefs.links_drive_search && self.plugin_on(super::plugins::Plugin::GoogleDrive)
+        self.plugin_on(super::plugins::Plugin::GoogleDrive)
     }
 
     /// Once, when the sign-in still holds the restricted Drive scope from
@@ -430,15 +430,6 @@ impl App {
                 self.links.entries.len()
             )
         };
-        let drive = if !self.prefs.links_drive_search {
-            "Off".to_string()
-        } else if self.google_client_id().is_empty() {
-            "On · set a Google client ID".to_string()
-        } else if google::holds_legacy_drive() {
-            "On · connect Google again to drop the old Drive access".to_string()
-        } else {
-            "On".to_string()
-        };
         vec![
             (
                 "links-vault-add",
@@ -451,12 +442,6 @@ impl App {
                 "Links",
                 "Forget the vault folders added here",
                 self.prefs.links_obsidian_vaults.len().to_string(),
-            ),
-            (
-                "links-drive",
-                "Links",
-                "Link Google Drive files you pick",
-                drive,
             ),
         ]
     }
@@ -471,14 +456,6 @@ impl App {
             "links-vault-forget" => {
                 self.prefs.links_obsidian_vaults.clear();
                 self.prefs.save();
-            }
-            "links-drive" => {
-                self.prefs.links_drive_search = !self.prefs.links_drive_search;
-                self.prefs.save();
-                if self.prefs.links_drive_search && self.google_client_id().is_empty() {
-                    self.message =
-                        Some("Set the Google OAuth client ID to finish setting up Drive.".into());
-                }
             }
             _ => return false,
         }

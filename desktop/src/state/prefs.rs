@@ -59,6 +59,8 @@ pub struct Prefs {
     pub google_client_secret: Option<String>,
     pub google_calendar: bool,
     pub google_tasks: bool,
+    /// `fold_google_switches` has run: the inner switches above only seed.
+    pub google_switches_folded: bool,
     /// Which reminders this Mac shows, and when (minutes after midnight).
     pub remind_due_time: bool,
     pub remind_due_today: bool,
@@ -143,6 +145,7 @@ impl Default for Prefs {
             google_client_secret: None,
             google_calendar: false,
             google_tasks: false,
+            google_switches_folded: false,
             remind_due_time: true,
             remind_due_today: false,
             remind_due_today_minute: 9 * 60,

@@ -422,6 +422,7 @@ impl App {
         app.adopt_shared_theme();
         app.adopt_finished_tasks_leave();
         app.seed_plugins();
+        app.fold_google_switches();
         app.start_google();
         Ok(app)
     }

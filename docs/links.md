@@ -66,7 +66,7 @@ task's links.
 The Rust app (`desktop/`, installed as `Takt.app`) does the same in
 `desktop/src/state/links.rs`: the picker searches the vaults' notes and
 folders as you type, and offers Drive when Settings → Plugins → Google
-Drive → "Link Google Drive files you pick" is on. The vaults are the
+→ Google Drive is switched on. The vaults are the
 Obsidian plugin and Drive the Google Drive plugin; either switched off
 leaves the picker. Its vault folders added by hand and the
 Drive switch are its own settings (`desktop.json`). The Swift app's version is

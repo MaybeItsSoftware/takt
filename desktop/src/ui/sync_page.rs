@@ -264,6 +264,9 @@ impl Takt {
                     .children(wide("Continue with Google", None, "sync-google", cx))
                     .children(wide("Continue with email", Some("mail"), "sync-email", cx)),
             )
+            .child(div().text_size(px(12.)).text_color(t.muted).child(
+                "This is your Takt account. Google Calendar, Tasks and Drive connect separately, under Plugins → Google.",
+            ))
             .child(
                 div()
                     .pt_1()
