@@ -238,6 +238,7 @@ impl App {
             .inspected()
             .and_then(|snapshot| snapshot.metadata.recurrence_rule);
         self.region = Region::Inspector;
+        self.inspecting_container = false;
         self.editing = Some(Editing::Repeat(RepeatEdit::new(task_id, rule.as_deref())));
     }
 

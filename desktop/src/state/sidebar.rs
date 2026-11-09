@@ -115,7 +115,7 @@ impl App {
         self.sidebar_rows = self.sidebar_rows_expanding(false);
     }
 
-    fn sidebar_rows_expanding(&self, every_folder: bool) -> Vec<SidebarRow> {
+    pub(super) fn sidebar_rows_expanding(&self, every_folder: bool) -> Vec<SidebarRow> {
         let lists = self.sidebar_lists();
         let folders = self.sidebar_folders();
         let nested: Vec<SidebarNestedList> = self

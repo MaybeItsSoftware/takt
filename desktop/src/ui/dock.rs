@@ -224,7 +224,7 @@ impl Takt {
                                 .when(ringed, |d| d.bg(t.hover))
                                 .hover(|d| d.bg(t.hover))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    this.app.region = Region::Inspector;
+                                    this.app.enter_inspector_region();
                                     this.app.inspector_cursor = ix;
                                     let before = this.app.editing.clone();
                                     this.app.activate_inspector();

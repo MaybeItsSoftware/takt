@@ -194,6 +194,18 @@ full size, and says whether they are the task's linked Obsidian note.
 and go on to the next / previous row, editing it if it is a field. The mouse
 works as before.
 
+On the Mac the inspector also takes a **list or a folder**. While the
+keyboard is in the sidebar on one, the inspector shows it rather than the
+selected task, and `Ctrl+3` (or `Ctrl+Tab`) takes the keyboard into it there;
+it shows one too when no task is selected. A list's rows are its name, what it
+is (how many tasks, whether it is completed, archived or shared), its
+**Folder** (`←` / `→` step through the folders, `x` puts it at the top
+level), its icon, the agent's context for it, sharing, completing or
+reopening it, archiving or restoring it, and **More settings**, the `oo`
+sheet with its root task and colour. A folder's are its name, what it holds,
+the folder it sits **Inside** and its icon. `Esc` or `h` hands the keyboard
+back to the sidebar.
+
 The palette, search, the list finder, the move picker, quick edits (`t`, `dd`,
 `ee`…), the reference and the new list / folder / column prompts all open in
 one **overlay** at the top of the window rather than as sheets. One is up at a

@@ -324,6 +324,7 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             snapshot.as_ref().map_or(0, |s| s.notes.lines().count()),
         ));
         smoke_notes_editor(app, &mut report);
+        smoke_container_inspector(app, &mut report);
         // A linked task's links reach the inspector with their kinds, for
         // the icons drawn beside them.
         let linked = app
@@ -653,6 +654,67 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
 /// linked, its file made the notes, typed into and saved, then changed on
 /// disk mid-edit, which the editor must not write over. Everything is put
 /// back: the link undone, the settings as they were, the vault removed.
+/// The inspector on a list from the sidebar: its rows, a rename and a move
+/// to a folder through them, each undone.
+fn smoke_container_inspector(app: &mut state::App, report: &mut Vec<String>) {
+    use state::inspector_container::Subject;
+    let Some(list) = app
+        .lists
+        .iter()
+        .find(|l| l.system_role.is_none() && !l.is_archived)
+        .cloned()
+    else {
+        return;
+    };
+    let (scope, region, selected, container) = (
+        app.scope.clone(),
+        app.region,
+        app.selected_task.clone(),
+        app.inspecting_container,
+    );
+    app.select_list(&list.id);
+    app.region = state::Region::Sidebar;
+    let on_list = app.inspector_subject() == Some(Subject::List(list.id.clone()));
+    let ids: Vec<&str> = app.inspector_stops().iter().map(|s| s.id).collect();
+    let ids = ids.join(" ");
+    app.focus_region(state::Region::Inspector);
+    let stays = app.inspector_subject() == Some(Subject::List(list.id.clone()));
+    app.commit_inspector_field("title", &format!("{} smoke", list.name));
+    let renamed = app
+        .list(&list.id)
+        .is_some_and(|l| l.name == format!("{} smoke", list.name));
+    app.undo(false);
+    let mut moved = None;
+    if !app.folders.is_empty()
+        && let Some(ix) = app
+            .inspector_stops()
+            .iter()
+            .position(|s| s.id == "container-folder")
+    {
+        app.inspector_cursor = ix;
+        app.activate_inspector();
+        moved =
+            Some(app.list(&list.id).map(|l| l.folder_id.clone()) != Some(list.folder_id.clone()));
+        app.undo(false);
+    }
+    let restored = app
+        .list(&list.id)
+        .is_some_and(|l| l.name == list.name && l.folder_id == list.folder_id);
+    app.focus_region(state::Region::Tasks);
+    let task_again = !matches!(
+        app.inspector_subject(),
+        Some(Subject::List(_)) if app.selected_task.is_some()
+    );
+    app.scope = scope;
+    app.region = region;
+    app.inspecting_container = container;
+    app.selected_task = selected;
+    app.reload_rows();
+    report.push(format!(
+        "list inspector (from {region:?}): on the list {on_list}, stays {stays}, rows [{ids}], renamed {renamed}, moved {moved:?}, undone {restored}, task again {task_again}"
+    ));
+}
+
 fn smoke_notes_editor(app: &mut state::App, report: &mut Vec<String>) {
     let Some(task_id) = app.selected_task.clone() else {
         return;

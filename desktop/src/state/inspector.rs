@@ -6,6 +6,7 @@
 //! notes Esc or ⌘Return), a switch flips, a choice steps, and an action
 //! runs. `x` clears what can be cleared.
 
+use super::inspector_container::Subject;
 use super::store::now_ms;
 use super::{App, Editing, Region};
 use takt_core::editor::EditorSnapshot;
@@ -81,7 +82,7 @@ impl Stop {
         })
     }
 
-    fn new(id: &'static str, label: &'static str, kind: StopKind) -> Self {
+    pub(super) fn new(id: &'static str, label: &'static str, kind: StopKind) -> Self {
         Stop {
             id,
             label,
@@ -129,7 +130,7 @@ impl Stop {
         })
     }
 
-    fn value(mut self, value: Option<String>, add: &str) -> Self {
+    pub(super) fn value(mut self, value: Option<String>, add: &str) -> Self {
         match value.filter(|value| !value.trim().is_empty()) {
             Some(value) => self.value = value,
             None => {
@@ -140,7 +141,7 @@ impl Stop {
         self
     }
 
-    fn grouped(mut self) -> Self {
+    pub(super) fn grouped(mut self) -> Self {
         self.group = true;
         self
     }
@@ -517,6 +518,9 @@ impl App {
 
     /// The inspector's stops for the selection.
     pub fn inspector_stops(&mut self) -> Vec<Stop> {
+        if let Some(subject) = self.inspected_container() {
+            return self.container_stops(&subject);
+        }
         let Some(snapshot) = self.inspected() else {
             return Vec::new();
         };
@@ -660,6 +664,23 @@ impl App {
         let Some(stop) = self.inspector_stop() else {
             return;
         };
+        if let Some(subject) = self.inspected_container() {
+            let (Subject::List(id) | Subject::Folder(id)) = &subject else {
+                return;
+            };
+            match stop.kind {
+                StopKind::Text { .. } => {
+                    self.editing = Some(Editing::InspectorField {
+                        task_id: id.clone(),
+                        stop: stop.id,
+                    });
+                }
+                StopKind::Choice => self.step_container_folder(&subject, 1),
+                StopKind::Action => self.press_container_action(&subject, stop.id),
+                StopKind::Toggle => {}
+            }
+            return;
+        }
         let Some(task_id) = self.selected_task.clone() else {
             return;
         };
@@ -691,6 +712,7 @@ impl App {
         self.prefs.right_dock_tab = "inspector".into();
         self.prefs.save();
         self.region = Region::Inspector;
+        self.inspecting_container = false;
         if let Some(ix) = self.inspector_stops().iter().position(|s| s.id == stop) {
             self.inspector_cursor = ix;
         }
@@ -703,11 +725,15 @@ impl App {
             Some(stop) if stop.kind == StopKind::Choice && by_arrow => {
                 self.step_inspector_choice(-1)
             }
+            _ if self.inspecting_container => self.region = Region::Sidebar,
             _ => self.region = Region::Tasks,
         }
     }
 
     fn step_inspector_choice(&mut self, by: i64) {
+        if let Some(subject) = self.inspected_container() {
+            return self.step_container_folder(&subject, by);
+        }
         if self
             .inspector_stop()
             .is_some_and(|stop| stop.id == "assignee")
@@ -824,6 +850,9 @@ impl App {
         let Some(stop) = self.inspector_stop() else {
             return;
         };
+        if let Some(subject) = self.inspected_container() {
+            return self.clear_container_stop(&subject, stop.id);
+        }
         match stop.id {
             "start" => self.schedule_selected(None),
             "due" => self.apply_typed("clear due"),
@@ -870,6 +899,9 @@ impl App {
     /// What a text stop's field opens with: the value as typed, not as
     /// shown.
     pub fn inspector_field_text(&mut self, stop: &str) -> String {
+        if let Some(subject) = self.inspected_container() {
+            return self.container_field_text(&subject, stop);
+        }
         let Some(snapshot) = self.inspected() else {
             return String::new();
         };
@@ -963,6 +995,9 @@ impl App {
 
     /// The field closed with Return: save what was typed.
     pub fn commit_inspector_field(&mut self, stop: &str, text: &str) {
+        if let Some(subject) = self.inspected_container() {
+            return self.commit_container_field(&subject, stop, text);
+        }
         let trimmed = text.trim();
         match stop {
             "title" => {

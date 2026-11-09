@@ -1305,7 +1305,7 @@ impl Takt {
             Pane::Left => Some(Region::Sidebar),
             Pane::Centre => Some(Region::Tasks),
             Pane::Right => crate::state::docks::tab_region(&p.right_dock_tab)
-                .filter(|r| *r != Region::Inspector || self.app.selected().is_some()),
+                .filter(|r| *r != Region::Inspector || self.app.can_inspect()),
             Pane::Bottom => crate::state::docks::tab_region(&p.bottom_dock_tab),
         };
         let Some(region) = region else { return };
@@ -1317,7 +1317,11 @@ impl Takt {
         {
             self.app.editing = None;
         }
-        self.app.region = region;
+        if region == Region::Inspector {
+            self.app.enter_inspector_region();
+        } else {
+            self.app.region = region;
+        }
         if region == Region::Agent && self.app.editing.is_none() {
             self.app.editing = Some(Editing::AgentMessage);
             self.begin_editing();

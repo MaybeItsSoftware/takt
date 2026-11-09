@@ -263,13 +263,15 @@ impl App {
             self.return_to_sidebar();
             return;
         }
-        if region == Region::Inspector && self.selected().is_none() {
+        if region == Region::Inspector && !self.can_inspect() {
             return;
         }
         if region == Region::Inspector {
             self.prefs.right_dock_visible = true;
             self.prefs.right_dock_tab = "inspector".into();
             self.prefs.save();
+            self.enter_inspector_region();
+            return;
         }
         self.region = region;
     }
@@ -281,7 +283,7 @@ impl App {
             order.push(Region::Sidebar);
         }
         order.push(Region::Tasks);
-        if self.prefs.right_dock_visible && self.selected().is_some() {
+        if self.prefs.right_dock_visible && self.can_inspect() {
             order.push(Region::Inspector);
         }
         let current = order.iter().position(|r| *r == self.region).unwrap_or(0) as i64;

@@ -27,6 +27,7 @@ pub mod focus_prompt;
 pub mod forms;
 pub mod google;
 pub mod inspector;
+pub mod inspector_container;
 pub mod integrations;
 pub mod library;
 pub mod links;
@@ -304,6 +305,9 @@ pub struct App {
     /// The inspector's row cursor, and its read of the selection keyed by
     /// the task and the write generation.
     pub inspector_cursor: usize,
+    /// The keyboard came into the inspector from the sidebar, so it is on
+    /// the list or folder there rather than the selected task.
+    pub inspecting_container: bool,
     pub inspected: Option<((String, u64), takt_core::editor::EditorSnapshot)>,
     /// Bumped by every write and reload, so caches of what was read know
     /// to read again. Our own writes do not move `data_version`.
@@ -391,6 +395,7 @@ impl App {
             last_find: None,
             edit_cursor: commands::EditCursor::default(),
             inspector_cursor: 0,
+            inspecting_container: false,
             inspected: None,
             generation: 0,
             undo_label: None,

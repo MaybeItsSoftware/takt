@@ -56,9 +56,13 @@ impl App {
         }
         if focus
             && let Some(region) = tab_region(tab)
-            && (region != Region::Inspector || self.selected().is_some())
+            && (region != Region::Inspector || self.can_inspect())
         {
-            self.region = region;
+            if region == Region::Inspector {
+                self.enter_inspector_region();
+            } else {
+                self.region = region;
+            }
         }
     }
 

@@ -455,7 +455,11 @@ impl App {
         } else if self.editing.is_some() {
             self.editing = None;
         } else if self.region == Region::Inspector {
-            self.region = Region::Tasks;
+            self.region = if self.inspecting_container {
+                Region::Sidebar
+            } else {
+                Region::Tasks
+            };
         } else if self.region == Region::Tasks && self.leave_card_rows() {
             // Out of a card's subtask rows, onto the card.
         } else if matches!(

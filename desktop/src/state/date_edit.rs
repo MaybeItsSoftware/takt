@@ -299,6 +299,7 @@ impl App {
             String::new()
         };
         self.region = Region::Inspector;
+        self.inspecting_container = false;
         self.editing = Some(Editing::Date(DateEdit {
             task_id,
             stop,
