@@ -242,12 +242,23 @@ impl App {
     /// The task's first link to an Obsidian note (not a folder or canvas),
     /// or the one its "same" choice names when it still links it.
     pub fn linked_note(&self, task_id: &str) -> Option<LinkedNote> {
-        let links = self.store.core.task_links(task_id.into()).ok()?;
+        let links: Vec<_> = self
+            .store
+            .core
+            .task_links(task_id.into())
+            .ok()?
+            .into_iter()
+            .filter(|l| l.kind == takt_core::links::LinkKind::Obsidian && !l.is_folder)
+            .collect();
+        // The vaults are read only for a task that links into one: the
+        // inspector asks on every draw.
+        if links.is_empty() {
+            return None;
+        }
         let vaults = self.note_vaults();
         let chosen = self.prefs.notes_same_as_obsidian.get(task_id);
         let notes: Vec<LinkedNote> = links
             .iter()
-            .filter(|l| l.kind == takt_core::links::LinkKind::Obsidian && !l.is_folder)
             .filter_map(|l| resolve(&l.url, &vaults))
             .collect();
         chosen
