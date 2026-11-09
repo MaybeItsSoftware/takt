@@ -17,6 +17,7 @@ mod notes_editor;
 pub mod panel;
 mod repeat;
 mod settings;
+mod sync_page;
 mod views;
 mod widgets;
 

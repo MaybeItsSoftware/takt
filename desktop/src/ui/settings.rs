@@ -372,6 +372,17 @@ impl Takt {
         said.push(format!(
             "keys: cmd-3 {third}, alt-cmd-2 {second_plugin}, switch flipped {flipped} and back {back}"
         ));
+        // The window draws Sync's account screen before it closes.
+        self.app.choose_settings_category("Sync");
+        said.push(format!(
+            "sync page: {}",
+            self.app
+                .settings_shown("")
+                .iter()
+                .map(|r| r.id.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        ));
         said
     }
 
@@ -424,7 +435,7 @@ impl Takt {
     }
 
     /// A setting clicked: it is the one under the keyboard, and it changes.
-    fn settings_clicked(&mut self, ix: usize, id: &str, cx: &mut Context<Self>) {
+    pub(super) fn settings_clicked(&mut self, ix: usize, id: &str, cx: &mut Context<Self>) {
         if let Some(page) = self.app.settings_page.as_mut() {
             page.cursor = ix;
         }
@@ -725,7 +736,20 @@ impl Takt {
         let category = self.app.settings_category();
         let mut body: Vec<AnyElement> = Vec::new();
         let mut section: Option<&'static str> = None;
+        // Sync's own rows are an account screen rather than a list.
+        let sync_page = !searching && category == super::sync_page::SYNC;
+        if sync_page {
+            let own: Vec<(usize, &SettingRow)> = rows
+                .iter()
+                .enumerate()
+                .filter(|(_, row)| row.group == super::sync_page::SYNC)
+                .collect();
+            body.push(self.sync_panel(&own, cursor, t, cx));
+        }
         for (ix, row) in rows.iter().enumerate() {
+            if sync_page && row.group == super::sync_page::SYNC {
+                continue;
+            }
             if !searching && row.group != category && section != Some(row.group) {
                 body.push(
                     div()

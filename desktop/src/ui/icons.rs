@@ -35,6 +35,9 @@ const NAMES: &[&str] = &[
     "chevron-left",
     "chevron-right",
     "chevron-down",
+    "cloud",
+    "server",
+    "mail",
     "panel-left",
     "sparkles",
     "search",
@@ -246,6 +249,13 @@ fn body(name: &str) -> Option<&'static str> {
         "chevron-left" => r#"<path d="m15 18-6-6 6-6"/>"#,
         "chevron-right" => r#"<path d="m9 18 6-6-6-6"/>"#,
         "chevron-down" => r#"<path d="m6 9 6 6 6-6"/>"#,
+        "cloud" => r#"<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>"#,
+        "server" => {
+            r#"<rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/>"#
+        }
+        "mail" => {
+            r#"<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>"#
+        }
         _ => return None,
     })
 }
