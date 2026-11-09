@@ -118,7 +118,7 @@ impl App {
             self.item("taskConditions", "Conditions…"),
             self.item("taskWaiting", "Waiting on…"),
             self.item("taskAddBlocker", "Blocked by…"),
-            self.item("taskToggleDaily", "Commit periodically…"),
+            self.item("taskToggleDaily", "Work on it regularly…"),
             MenuEntry::Divider,
             self.item(
                 "taskConvertToList",

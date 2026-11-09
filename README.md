@@ -1293,7 +1293,7 @@ task is completed from `takt` or an assistant.
 
 ### Committing to a task periodically
 
-`Cmd+Shift+D`, or **Commit periodically…** under the inspector's Repeat
+`Cmd+Shift+D`, or **Work on it regularly…** under the inspector's Repeat
 row, commits you to working on the selected task on a rhythm. It opens a
 small form rather than flipping a switch:
 

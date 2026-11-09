@@ -29,7 +29,7 @@ pub struct Stop {
     /// the actions).
     pub label: &'static str,
     pub value: String,
-    /// The value is a stand-in ("Add estimate"), drawn dim.
+    /// The value is a stand-in ("Estimate how long it takes"), drawn dim.
     pub empty: bool,
     pub kind: StopKind,
     /// A hairline goes above this row: the start of a group.
@@ -65,6 +65,22 @@ impl Stop {
     /// What its icon says on hover: its label, or what the row is when it
     /// has none.
     pub fn tip(&self) -> Option<&'static str> {
+        // The rows easily taken for one another say what sets them apart.
+        let told = match self.id {
+            "log" => Some("Record time you spent on it away from the timer."),
+            "commit" => Some(
+                "Work on it regularly: adds a subtask that comes round in Dailies, every day or on the days you choose, until you stop it.",
+            ),
+            "start" => Some("When you'll do it: a slot in your day. Not a deadline."),
+            "estimate" => Some("How long it will take. Scheduling and focus use it."),
+            "minimum-block" => Some("The shortest piece of time it is worth working on it in."),
+            "due" => Some("The deadline: when it has to be done by."),
+            "repeat" => Some("The task itself comes back on a schedule once it is done."),
+            _ => None,
+        };
+        if told.is_some() {
+            return told;
+        }
         if !self.label.is_empty() {
             return Some(self.label);
         }
@@ -174,12 +190,12 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
                 planning
                     .start_at_ms
                     .map(|ms| format!("Scheduled {}", format_slot(ms, estimate))),
-                "Schedule a time",
+                "Block out time to do it",
             )
             .grouped(),
         Stop::new("estimate", "Takes", Text { multiline: false }).value(
             estimate.map(|s| format!("Takes {}", minutes(s))),
-            "Add estimate",
+            "Estimate how long it takes",
         ),
     ];
     // How the estimate may be split only means something once there is one.
@@ -189,7 +205,7 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
                 planning
                     .minimum_block_seconds
                     .map(|s| format!("In blocks of {} or more", minutes(s))),
-                "Add a minimum block",
+                "Set the shortest block to work in",
             ),
         );
     }
@@ -211,7 +227,7 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
         .or_else(|| planning.due_date.as_deref().map(format_day_string));
     stops.push(
         Stop::new("due", "Due", Text { multiline: false })
-            .value(due.map(|d| format!("Due {d}")), "Add due date"),
+            .value(due.map(|d| format!("Due {d}")), "Set a deadline"),
     );
     stops.push(
         Stop::new("repeat", "Repeat", Text { multiline: false }).value(
@@ -220,7 +236,7 @@ fn when_stops(snapshot: &EditorSnapshot, planning: &takt_core::editor::Planning)
                 .recurrence_rule
                 .clone()
                 .map(|rule| format!("Repeats {rule}")),
-            "Add repeat",
+            "Repeat the task on a schedule",
         ),
     );
     stops
@@ -303,7 +319,7 @@ pub fn stops(
         });
         // Work done away from the timer counts as much as work timed.
         stops.push(Stop {
-            value: "Log time worked".into(),
+            value: "Log time already spent".into(),
             empty: true,
             ..Stop::new("log", "", Text { multiline: false })
         });
@@ -316,7 +332,7 @@ pub fn stops(
     }
     if !list {
         stops.push(Stop {
-            value: "Commit periodically…".into(),
+            value: "Work on it regularly…".into(),
             empty: true,
             ..Stop::new("commit", "", Action)
         });
