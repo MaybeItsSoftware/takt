@@ -677,6 +677,14 @@ impl Takt {
         .collect::<Vec<_>>()
         .join("   ");
         let focus = self.app.focus_status();
+        // What is syncing now, if anything, beside a spinner.
+        let takt_syncing = matches!(self.app.sync.status().phase, crate::sync::Phase::Syncing);
+        let syncing = match (takt_syncing, self.app.google.busy()) {
+            (true, true) => Some("Syncing Takt and Google"),
+            (true, false) => Some("Syncing"),
+            (false, true) => Some("Syncing Google"),
+            (false, false) => None,
+        };
         let left_icons = self.status_icons(true, t, cx);
         let right_icons = self.status_icons(false, t, cx);
         div()
@@ -721,6 +729,16 @@ impl Takt {
                                 .text_color(if over { t.warning } else { t.text })
                                 .child(clock),
                         ),
+                )
+            })
+            .when_some(syncing, |d, said| {
+                d.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .child(spinner("status-sync-spinner", 12., t.accent))
+                        .child(said),
                 )
             })
             .child(div().font_family(MONO_FONT).child(right))

@@ -9,7 +9,7 @@
 //! address, a shortcut being recorded) come up over it while it is in front.
 
 use super::icons::icon;
-use super::widgets::field_text;
+use super::widgets::{field_text, spinner};
 use super::{MONO_FONT, Takt, Tokens};
 use crate::platform::hotkeys::Hotkey;
 use crate::state::Editing;
@@ -1109,6 +1109,9 @@ fn control(control: Control, open: bool, recording: bool, t: Tokens) -> AnyEleme
             )
             .into_any_element(),
         Control::Button { label, note: said } => side
+            .when(said == crate::state::google::SYNCING, |d| {
+                d.child(spinner("setting-spinner", 13., t.muted))
+            })
             .when(!said.is_empty(), |d| d.child(note(said)))
             .child(
                 boxed(false)

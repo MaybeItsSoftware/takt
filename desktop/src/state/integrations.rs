@@ -44,7 +44,7 @@ impl App {
             Phase::Unpaired => "Off".to_string(),
             Phase::NeedsSignIn => "Signed out: sign in again".to_string(),
             Phase::Working(what) => what.clone(),
-            Phase::Syncing => "Syncing…".to_string(),
+            Phase::Syncing => super::google::SYNCING.to_string(),
             Phase::Idle(Some(at)) => format!("Synced {}", ago(*at)),
             Phase::Idle(None) => "On".to_string(),
             Phase::Failed(why) => why.clone(),

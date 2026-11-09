@@ -358,3 +358,22 @@ pub(super) fn key_hint(keys: String, t: Tokens) -> AnyElement {
         .child(keys)
         .into_any_element()
 }
+
+/// A spinning loader: something is under way. With reduced motion it
+/// stands still, and the words beside it carry the meaning.
+pub(super) fn spinner(id: &'static str, size: f32, colour: Hsla) -> AnyElement {
+    let glyph = super::icons::icon("loader", size).text_color(colour);
+    if crate::platform::reduce_motion() {
+        return glyph.into_any_element();
+    }
+    use gpui::AnimationExt;
+    glyph
+        .with_animation(
+            id,
+            gpui::Animation::new(std::time::Duration::from_millis(900)).repeat(),
+            |svg, delta| {
+                svg.with_transformation(gpui::Transformation::rotate(gpui::percentage(delta)))
+            },
+        )
+        .into_any_element()
+}

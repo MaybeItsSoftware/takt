@@ -6,6 +6,7 @@
 use super::plugins::Plugin;
 use super::{App, Overlay};
 use crate::google::{self, CALENDAR_SCOPES, TASKS_SCOPES};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -14,6 +15,9 @@ use takt_core::workspace::CoreWorkspace;
 
 const EVERY: Duration = Duration::from_secs(300);
 const QUIET: Duration = Duration::from_secs(4);
+
+/// What a row says while a pass runs; the settings page spins beside it.
+pub const SYNCING: &str = "Syncing…";
 
 #[derive(Debug, Clone, Default)]
 struct Config {
@@ -27,6 +31,8 @@ pub struct Google {
     config: Arc<Mutex<Config>>,
     /// What the last pass came to, for the settings row.
     status: Arc<Mutex<String>>,
+    /// A pass is under way, for the spinner.
+    busy: Arc<AtomicBool>,
     wake: Option<Sender<bool>>,
     seen_generation: u64,
     /// The account's calendars, once fetched for the picker.
@@ -39,7 +45,14 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 impl Google {
     pub fn status(&self) -> String {
+        if self.busy() {
+            return SYNCING.into();
+        }
         lock(&self.status).clone()
+    }
+
+    pub fn busy(&self) -> bool {
+        self.busy.load(Ordering::Relaxed)
     }
 }
 
@@ -122,6 +135,7 @@ impl App {
         let zone = self.store.zone.clone();
         let config = self.google.config.clone();
         let status = self.google.status.clone();
+        let busy = self.google.busy.clone();
         std::thread::spawn(move || {
             let _ = sender.send(true);
             loop {
@@ -135,8 +149,11 @@ impl App {
                 if !(config.calendar || config.tasks) || !google::connected() {
                     continue;
                 }
+                busy.store(true, Ordering::Relaxed);
+                crate::platform::push(crate::platform::Event::Sync { workspace: false });
                 let (said, wrote) = pass(&core, &workspace_id, &zone, &config);
                 *lock(&status) = said;
+                busy.store(false, Ordering::Relaxed);
                 crate::platform::push(crate::platform::Event::Sync { workspace: wrote });
             }
         });
@@ -338,7 +355,6 @@ impl App {
             }
             "google-sync-now" => {
                 self.google_now();
-                self.message = Some("Syncing Google…".into());
             }
             _ => return false,
         }

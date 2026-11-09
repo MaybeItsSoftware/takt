@@ -280,8 +280,11 @@ pub fn connect(client_id: &str, scopes: &[&str]) -> Result<(), String> {
     let (mut token, _) = authorize(
         client_id,
         &scope,
-        "&include_granted_scopes=true",
-        "Signed in. You can close this tab and go back to Takt.",
+        "&include_granted_scopes=true&prompt=consent",
+        Done {
+            title: "Google is connected",
+            body: "Calendar and Tasks can reach your Google account. Switch each one on in Takt's settings under Plugins → Google.",
+        },
     )?;
     if token.refresh_token.is_empty() {
         token.refresh_token = previous
@@ -301,11 +304,24 @@ pub fn pick_drive_files(client_id: &str) -> Result<Vec<String>, String> {
     if client_id.is_empty() {
         return Err("Set the Google OAuth client ID first.".into());
     }
+    // Consent is asked for once: forcing it on every pick showed Google's
+    // permission screen before the picker each time. Without a kept
+    // refresh token it is forced, so one comes back.
+    let granted =
+        drive_token().is_some_and(|t| t.client_id == client_id && !t.refresh_token.is_empty());
+    let extra = if granted {
+        "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true"
+    } else {
+        "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true&prompt=consent"
+    };
     let (mut token, callback) = authorize(
         client_id,
         DRIVE_FILE_SCOPE,
-        "&trigger_onepick=true&allow_multiple=true&allow_folder_selection=true",
-        "Linked in Takt. You can close this tab.",
+        extra,
+        Done {
+            title: "Linked in Takt",
+            body: "The files you picked are linked to your task.",
+        },
     )?;
     if token.refresh_token.is_empty()
         && let Some(previous) = drive_token().filter(|t| t.client_id == client_id)
@@ -333,11 +349,62 @@ fn picked_ids(callback: &str) -> Vec<String> {
 /// parameters, back to a listener on the loopback, and the code exchanged.
 /// Answers the token (its refresh token empty when Google sent none) and
 /// the address the browser came back to.
+/// The page the browser lands on once Google sends it back.
+struct Done {
+    title: &'static str,
+    body: &'static str,
+}
+
+/// The page the browser shows on its way back: Takt's mark, what happened,
+/// and that the tab can go. Light and dark follow the system.
+fn done_page(done: &Done, failed: Option<&str>) -> String {
+    let (title, body, mark, tint) = match failed {
+        None => (done.title, done.body.to_string(), "&#10003;", "#4cc38e"),
+        Some(error) => (
+            "That didn't work",
+            format!(
+                "Google said: {}. Go back to Takt and try again.",
+                escape_html(error)
+            ),
+            "!",
+            "#d62246",
+        ),
+    };
+    format!(
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · Takt</title>
+<style>
+:root{{--paper:#faf8f4;--raised:#fff;--ink:#444054;--muted:#6e6b7c;--border:#e6e4ea}}
+@media (prefers-color-scheme:dark){{:root{{--paper:#1c1a23;--raised:#25232f;--ink:#f5f4f7;--muted:#b6b3bf;--border:#34313f}}}}
+*{{box-sizing:border-box}}
+body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--paper);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}}
+main{{width:100%;max-width:420px;background:var(--raised);border:1px solid var(--border);border-radius:8px;padding:32px}}
+.eyebrow{{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0 0 20px}}
+.mark{{width:40px;height:40px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:{tint};border:1px solid {tint};background:color-mix(in srgb,{tint} 10%,transparent);margin-bottom:16px}}
+h1{{font-size:20px;font-weight:600;margin:0 0 8px}}
+p{{margin:0;color:var(--muted);font-size:14px}}
+.foot{{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:13px}}
+</style></head><body><main>
+<p class="eyebrow">Takt</p>
+<div class="mark">{mark}</div>
+<h1>{title}</h1>
+<p>{body}</p>
+<p class="foot">You can close this tab and go back to Takt.</p>
+</main></body></html>"#
+    )
+}
+
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 fn authorize(
     client_id: &str,
     scope: &str,
     extra: &str,
-    done: &str,
+    done: Done,
 ) -> Result<(Token, String), String> {
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
@@ -345,7 +412,7 @@ fn authorize(
     let (verifier, challenge) = crate::sync::auth::pkce();
     let state = uuid::Uuid::new_v4().simple().to_string();
     let url = format!(
-        "{AUTHORIZE}?client_id={}&redirect_uri={}&response_type=code&scope={}&code_challenge={challenge}&code_challenge_method=S256&state={state}&access_type=offline&prompt=consent{extra}",
+        "{AUTHORIZE}?client_id={}&redirect_uri={}&response_type=code&scope={}&code_challenge={challenge}&code_challenge_method=S256&state={state}&access_type=offline{extra}",
         http::escape(client_id),
         http::escape(&redirect),
         http::escape(scope),
@@ -378,9 +445,8 @@ fn authorize(
             let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
             continue;
         }
-        let page = format!(
-            "<html><body style=\"font-family:-apple-system;padding:40px\">{done}</body></html>"
-        );
+        let error = http::parameter(&format!("http://127.0.0.1{path}"), "error");
+        let page = done_page(&done, error.as_deref());
         let _ = write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
@@ -482,6 +548,20 @@ mod tests {
         };
         assert!(token.has(&CALENDAR_SCOPES));
         assert!(!token.has(&TASKS_SCOPES));
+    }
+
+    #[test]
+    fn the_return_page_says_what_happened_and_escapes_googles_words() {
+        let done = Done {
+            title: "Google is connected",
+            body: "Calendar and Tasks can reach it.",
+        };
+        let ok = done_page(&done, None);
+        assert!(ok.contains("<h1>Google is connected</h1>"));
+        let failed = done_page(&done, Some("<access_denied>"));
+        assert!(failed.contains("That didn't work"));
+        assert!(failed.contains("&lt;access_denied&gt;"));
+        assert!(!failed.contains("<access_denied>"));
     }
 
     #[test]

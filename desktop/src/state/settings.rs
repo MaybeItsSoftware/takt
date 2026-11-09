@@ -141,24 +141,34 @@ fn plugin_page(plugin: Plugin, rows: Vec<SettingRow>) -> Vec<SettingRow> {
 /// The section the Google page lists its plugins' switches under.
 const GOOGLE_SERVICES: &str = "Services";
 
-/// The Google page: the sign-in, then a switch for each Google plugin.
+/// The Google page: the sign-in, then a switch for each Google plugin,
+/// each followed by that plugin's own settings while it is on, so a
+/// calendar can be chosen without going a level down.
 fn google_page(rows: Vec<SettingRow>) -> Vec<SettingRow> {
-    let (mut account, services): (Vec<SettingRow>, Vec<SettingRow>) = rows
-        .into_iter()
-        .filter_map(|mut row| {
-            if row.group == plugins::GOOGLE_ACCOUNT {
-                return Some(row);
-            }
-            let plugin = row.id.strip_prefix("plugin:").and_then(Plugin::from_id)?;
-            plugin.is_google().then(|| {
+    let mut account = Vec::new();
+    let mut switches = Vec::new();
+    let mut settings: Vec<(Plugin, SettingRow)> = Vec::new();
+    for mut row in rows {
+        if row.group == plugins::GOOGLE_ACCOUNT {
+            account.push(row);
+        } else if let Some(plugin) = row.id.strip_prefix("plugin:").and_then(Plugin::from_id) {
+            if plugin.is_google() {
                 row.group = GOOGLE_SERVICES;
-                row
-            })
-        })
-        .partition(|row| row.group == plugins::GOOGLE_ACCOUNT);
+                switches.push((plugin, row));
+            }
+        } else if let Some(plugin) = plugin_named(row.group).filter(|p| p.is_google()) {
+            row.group = GOOGLE_SERVICES;
+            settings.push((plugin, row));
+        }
+    }
     // Google's own switch heads the page.
     account.sort_by_key(|row| !row.id.starts_with("plugin:"));
-    account.extend(services);
+    for (plugin, switch) in switches {
+        account.push(switch);
+        let (mine, rest): (Vec<_>, Vec<_>) = settings.into_iter().partition(|(p, _)| *p == plugin);
+        account.extend(mine.into_iter().map(|(_, row)| row));
+        settings = rest;
+    }
     account
 }
 
@@ -1216,6 +1226,7 @@ mod tests {
             [
                 ("google-connect".to_string(), plugins::GOOGLE_ACCOUNT),
                 ("plugin:google-calendar".to_string(), GOOGLE_SERVICES),
+                ("google-calendar-choose".to_string(), GOOGLE_SERVICES),
                 ("plugin:google-drive".to_string(), GOOGLE_SERVICES),
             ]
         );
