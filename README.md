@@ -163,7 +163,7 @@ timer and without finishing the task, which counts toward a daily due today
 as a timed block would; then daily progress and the commitment); when
 (Scheduled, the estimate as how long it takes, how it may be split once it
 has one, Due, Repeat); the notes; where it is filed (List, Priority, Tags); what it
-waits on (Conditions, Blocked by, Waiting on); Links; and the actions —
+waits on (Conditions, Blocked by, Waiting on); and the actions —
 and `gg` / `Shift+G` (or `Home` / `End`) go to the first and last. Landing on
 a text row only highlights it, so the notes no longer keep the keyboard.
 `Return`, `i` or `e` edits the row: it puts the caret in a field, presses a
@@ -194,7 +194,10 @@ the row under the notes (or `nm`, or `Cmd+Ctrl+M` from inside them) opens them
 full size, and says whether they are the task's linked Obsidian note.
 `Tab` / `Shift+Tab` keep the field
 and go on to the next / previous row, editing it if it is a field. The mouse
-works as before. The task's own keys work from the inspector too — the ones
+works as before. A task's links sit beside its name, each as its kind's icon
+(a click opens it), followed by a link button with its key, `pl`: it opens the
+finder, where you type to search Obsidian and Drive or paste an address, and
+where a link already there can be opened or removed. The task's own keys work from the inspector too — the ones
 shown beside its rows (`nn` the notes, `tt` the tags, `pl` a link, `⌥T` the
 estimate, `Space` to complete) and every `Cmd` chord — except where the
 inspector has the key itself (`i`, `e`, `x`, `j`, `k`, `h`, `gg`); on a list or

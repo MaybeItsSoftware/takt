@@ -374,14 +374,6 @@ pub fn stops(
         stops.push(Stop::new("waiting", "Waiting on", Action).value(None, "Add waiting"));
     }
 
-    stops.push(
-        Stop::new("links", "Links", Text { multiline: true })
-            .value(
-                Some(snapshot.metadata.external_links.join("\n")),
-                "Add link",
-            )
-            .grouped(),
-    );
     let has_requirements = planning
         .requirement_groups
         .as_ref()
@@ -580,9 +572,8 @@ impl App {
             );
         }
         self.add_notes_editor_stop(&mut stops, &task.id);
-        if let Some(stop) = stops.iter_mut().find(|s| s.id == "links")
-            && !stop.empty
-        {
+        // The links sit beside the name, with the button that adds one.
+        if let Some(stop) = stops.iter_mut().find(|s| s.id == "title") {
             stop.links = self
                 .store
                 .core

@@ -173,8 +173,8 @@ impl Takt {
                         } else {
                             t.text
                         };
-                        if !stop.links.is_empty() {
-                            return link_rows(ix, &stop.links, t, cx);
+                        if stop.id == "title" {
+                            return self.title_with_links(stop, tone, t, cx);
                         }
                         let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
                         div()
@@ -676,6 +676,83 @@ impl Takt {
     }
 }
 
+impl Takt {
+    /// The name, then each link as its kind's icon (a click opens it), then
+    /// the button that opens the link finder, with its key.
+    fn title_with_links(
+        &self,
+        stop: &Stop,
+        tone: gpui::Hsla,
+        t: Tokens,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let hint = self.app.key_hint("taskAddLink");
+        div()
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .px_1()
+                    .truncate()
+                    .text_color(tone)
+                    .text_size(px(16.))
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(stop.value.clone()),
+            )
+            .children(stop.links.iter().enumerate().map(|(ix, link)| {
+                let (glyph, colour) = link_glyph(&link.icon, t);
+                let url = link.url.clone();
+                let tip = if link.subtitle.is_empty() {
+                    link.title.clone()
+                } else {
+                    format!("{} · {}", link.title, link.subtitle)
+                };
+                div()
+                    .id(("title-link", ix))
+                    .flex_none()
+                    .size(px(20.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(4.))
+                    .hover(|d| d.bg(t.hover))
+                    .tooltip(super::widgets::tip(tip, t))
+                    .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        crate::state::pickers::open_address(&url);
+                    }))
+                    .child(icon(glyph, 13.).text_color(colour))
+            }))
+            .child(
+                div()
+                    .id("title-add-link")
+                    .flex_none()
+                    .h(px(20.))
+                    .px(px(3.))
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .rounded(px(4.))
+                    .hover(|d| d.bg(t.hover))
+                    .tooltip(super::widgets::tip("Link a note, a file or a page", t))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.app.begin_add_link();
+                        this.after_change(cx);
+                        cx.notify();
+                    }))
+                    .child(icon("link", 13.).text_color(t.muted))
+                    .when_some(hint, |d, keys| d.child(super::widgets::key_hint(keys, t))),
+            )
+            .into_any_element()
+    }
+}
+
 /// The icon for a link's kind (`TaskLink::icon`), and its colour.
 fn link_glyph(kind: &str, t: Tokens) -> (&'static str, gpui::Hsla) {
     match kind {
@@ -690,54 +767,4 @@ fn link_glyph(kind: &str, t: Tokens) -> (&'static str, gpui::Hsla) {
         "file" => ("file", t.muted),
         _ => ("globe", t.muted),
     }
-}
-
-/// The links row: each link its kind's icon, its name and where it is. A
-/// click on one opens it; anywhere else on the row edits the addresses.
-fn link_rows(
-    stop: usize,
-    links: &[takt_core::links::TaskLink],
-    t: Tokens,
-    cx: &mut Context<Takt>,
-) -> AnyElement {
-    div()
-        .flex_1()
-        .min_w_0()
-        .flex()
-        .flex_col()
-        .gap(px(2.))
-        .children(links.iter().enumerate().map(|(ix, link)| {
-            let (glyph, colour) = link_glyph(&link.icon, t);
-            let url = link.url.clone();
-            div()
-                .id(("inspector-link", stop * 1000 + ix))
-                .px_1()
-                .flex()
-                .items_center()
-                .gap_2()
-                .rounded(px(4.))
-                .hover(|d| d.bg(t.hover))
-                .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
-                    cx.stop_propagation();
-                    crate::state::pickers::open_address(&url);
-                }))
-                .child(icon(glyph, 14.).text_color(colour))
-                .child(
-                    div()
-                        .flex_none()
-                        .max_w(px(180.))
-                        .truncate()
-                        .child(link.title.clone()),
-                )
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .truncate()
-                        .text_size(px(11.))
-                        .text_color(t.placeholder)
-                        .child(link.subtitle.clone()),
-                )
-        }))
-        .into_any_element()
 }

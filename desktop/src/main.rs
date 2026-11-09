@@ -341,7 +341,7 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             let kinds: Vec<String> = app
                 .inspector_stops()
                 .into_iter()
-                .find(|s| s.id == "links")
+                .find(|s| s.id == "title")
                 .map(|s| s.links.into_iter().map(|l| l.icon).collect())
                 .unwrap_or_default();
             report.push(format!("inspector links: {}", kinds.join(" ")));
