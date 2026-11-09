@@ -56,7 +56,7 @@ task's links.
   picker. The raw address list is still editable under "Edit addresses".
 - **Picker** (`pl`, or `Cmd+Ctrl+L`, palette "Link…"): one field. As you
   type it fuzzy-matches notes and folders in your Obsidian vaults and the
-  Drive files already linked or picked before; "Pick from Google Drive…"
+  Drive files already linked or picked before; "Choose files from Google Drive…"
   opens Google's own file picker in the browser for anything else. A
   pasted address is offered as the first row. `↑`/`↓` choose, `Return`
   links, `Tab` cycles the source (all, Obsidian, Drive), `Esc` closes.

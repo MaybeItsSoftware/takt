@@ -751,6 +751,9 @@ impl Takt {
             Some(Overlay::ListNavigator) => "Go to a list…",
             Some(Overlay::Search) => "Search tasks…",
             Some(Overlay::KeyboardReference) => "Filter keys…",
+            Some(Overlay::Picker(crate::state::pickers::Picker::Link { .. })) => {
+                self.app.link_prompt()
+            }
             Some(Overlay::Picker(ref picker)) => App::picker_prompt(picker),
             Some(Overlay::Settings) => "Settings…",
             Some(Overlay::Diagnostics) => "Diagnostics…",
@@ -758,6 +761,13 @@ impl Takt {
         };
         let items = self.overlay.items.clone();
         let selected = self.overlay.index;
+        // As tall as its rows, up to ten; no rows, no list.
+        let list_height = items.len().min(10) as f32 * (ROW_HEIGHT + 2.) + 8.;
+        let help = matches!(
+            self.app.overlay,
+            Some(Overlay::Picker(crate::state::pickers::Picker::Link { .. }))
+        )
+        .then(|| self.app.link_help());
         div()
             .absolute()
             .top(px(TITLE_BAR_HEIGHT + 8.))
@@ -770,7 +780,6 @@ impl Takt {
                     .id("overlay")
                     .occlude()
                     .w(px(560.))
-                    .max_h(px(440.))
                     .flex()
                     .flex_col()
                     .rounded(px(8.))
@@ -791,51 +800,66 @@ impl Takt {
                                 self.input_hook(),
                             )),
                     )
-                    .child(
-                        uniform_list(
-                            "overlay-items",
-                            items.len(),
-                            cx.processor(move |_, range: std::ops::Range<usize>, _, _| {
-                                range
-                                    .map(|ix| {
-                                        let item = &items[ix];
-                                        div()
-                                            .id(("overlay-item", ix))
-                                            .h(px(ROW_HEIGHT + 2.))
-                                            .mx_1()
-                                            .px_2()
-                                            .flex()
-                                            .items_center()
-                                            .gap_2()
-                                            .rounded(px(4.))
-                                            .when(ix == selected, |d| d.bg(t.selected))
-                                            .child(
-                                                div()
-                                                    .flex_1()
-                                                    .min_w_0()
-                                                    .truncate()
-                                                    .child(item.title.clone()),
-                                            )
-                                            .child(
-                                                div()
-                                                    .text_size(px(11.))
-                                                    .text_color(t.placeholder)
-                                                    .child(item.detail.clone()),
-                                            )
-                                            .child(
-                                                div()
-                                                    .font_family(MONO_FONT)
-                                                    .text_size(px(11.))
-                                                    .text_color(t.muted)
-                                                    .child(item.keys.clone()),
-                                            )
-                                    })
-                                    .collect::<Vec<_>>()
-                            }),
+                    .when(!items.is_empty(), |d| {
+                        d.child(
+                            uniform_list(
+                                "overlay-items",
+                                items.len(),
+                                cx.processor(move |_, range: std::ops::Range<usize>, _, _| {
+                                    range
+                                        .map(|ix| {
+                                            let item = &items[ix];
+                                            div()
+                                                .id(("overlay-item", ix))
+                                                .w_full()
+                                                .h(px(ROW_HEIGHT + 2.))
+                                                .px_2()
+                                                .flex()
+                                                .items_center()
+                                                .gap_2()
+                                                .rounded(px(4.))
+                                                .when(ix == selected, |d| d.bg(t.selected))
+                                                .child(
+                                                    div()
+                                                        .flex_1()
+                                                        .min_w_0()
+                                                        .truncate()
+                                                        .child(item.title.clone()),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_size(px(11.))
+                                                        .text_color(t.placeholder)
+                                                        .child(item.detail.clone()),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .font_family(MONO_FONT)
+                                                        .text_size(px(11.))
+                                                        .text_color(t.muted)
+                                                        .child(item.keys.clone()),
+                                                )
+                                        })
+                                        .collect::<Vec<_>>()
+                                }),
+                            )
+                            .h(px(list_height))
+                            .px_1()
+                            .py_1(),
                         )
-                        .h(px(380.))
-                        .py_1(),
-                    ),
+                    })
+                    .when_some(help, |d, help| {
+                        d.child(
+                            div()
+                                .px_3()
+                                .py_2()
+                                .border_t_1()
+                                .border_color(t.border_variant)
+                                .text_size(px(11.))
+                                .text_color(t.muted)
+                                .child(help),
+                        )
+                    }),
             )
     }
 

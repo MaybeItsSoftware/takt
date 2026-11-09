@@ -191,12 +191,47 @@ impl App {
         self.open_overlay(Overlay::Picker(picker));
     }
 
+    /// The link picker's placeholder, naming only the sources that are on.
+    pub fn link_prompt(&self) -> &'static str {
+        if self.plugin_on(super::plugins::Plugin::Obsidian) {
+            "Search your Obsidian notes, or paste an address…"
+        } else {
+            "Paste a web address or a file path…"
+        }
+    }
+
+    /// The line under the link picker saying what it can do, and what is
+    /// switched off.
+    pub fn link_help(&self) -> String {
+        use super::plugins::Plugin;
+        let mut said = vec!["Paste a web address or a file path to link it"];
+        if self.plugin_on(Plugin::Obsidian) {
+            said.push("type to search Obsidian notes");
+        }
+        let mut line = said.join(", ") + ".";
+        let off: Vec<&str> = [
+            (Plugin::Obsidian, "Obsidian"),
+            (Plugin::GoogleDrive, "Google Drive"),
+        ]
+        .into_iter()
+        .filter(|(p, _)| !self.plugin_on(*p))
+        .map(|(_, name)| name)
+        .collect();
+        if !off.is_empty() {
+            line.push_str(&format!(
+                " {} can be switched on in Settings → Plugins.",
+                off.join(" and ")
+            ));
+        }
+        line
+    }
+
     /// The placeholder the picker's field shows.
     pub fn picker_prompt(picker: &Picker) -> &'static str {
         match picker {
             Picker::MoveTask { .. } | Picker::MoveList { .. } => "Move to…",
             Picker::Blocker { .. } => "Wait on a task, or type a new one…",
-            Picker::Link { .. } => "Search Obsidian and Drive, or paste an address…",
+            Picker::Link { .. } => "Paste a web address or a file path…",
             Picker::Waiting { .. } => "Who, when to follow up, every n days…",
             Picker::Icon { .. } => "An icon, or type an emoji…",
             Picker::Place => "Where are you?",
@@ -584,8 +619,8 @@ impl App {
         let offered = !rows.is_empty();
         if self.drive_linking_on() {
             rows.push(row(
-                "Pick from Google Drive\u{2026}",
-                "Google's file picker, in the browser",
+                "Choose files from Google Drive\u{2026}",
+                "Opens in your browser",
                 Choice::PickDrive,
             ));
         }
