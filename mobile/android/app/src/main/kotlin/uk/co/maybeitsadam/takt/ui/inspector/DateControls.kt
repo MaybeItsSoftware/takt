@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,8 +62,8 @@ private fun monthAt(index: Int): YearMonth = YearMonth.of(Math.floorDiv(index, 1
 
 /**
  * The themed date (and optionally time) field: a field-shaped button showing
- * the value in the mono face, which opens an inline panel beneath it with quick chips,
- * a month grid and an hour:minute stepper. Never the stock Material dialog.
+ * the value in the mono face, which opens an inline panel beneath it with a month grid,
+ * an hour:minute stepper and Clear. Never the stock Material dialog.
  *
  * [time] non-null shows the time stepper; [onDate] with null clears.
  */
@@ -119,19 +118,6 @@ fun ChalkDateField(
                 tint = colors.mutedText, modifier = Modifier.size(18.dp),
             )
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Metrics.xs)) {
-            for (chip in QuickDay.entries) {
-                if (chip == QuickDay.CLEAR && (!clearable || date == null)) continue
-                val target = DateFieldMath.quickDate(chip, today)
-                Tag(
-                    chip.title,
-                    color = if (chip == QuickDay.CLEAR) colors.danger else colors.mutedText,
-                    selected = target != null && target == date,
-                    onClick = { onDate(target) },
-                    modifier = Modifier.semantics { contentDescription = "$label ${chip.title.lowercase()}" },
-                )
-            }
-        }
         if (expanded) {
             Column(
                 Modifier
@@ -146,6 +132,14 @@ fun ChalkDateField(
                 if (time != null && date != null) {
                     Box(Modifier.fillMaxWidth().heightIn(min = Metrics.hairline).background(colors.border))
                     TimeStepper(time = time, onChange = onTime, label = label)
+                }
+                if (clearable && date != null) {
+                    Tag(
+                        "Clear",
+                        color = colors.danger,
+                        onClick = { onDate(null) },
+                        modifier = Modifier.semantics { contentDescription = "Clear ${label.lowercase()}" },
+                    )
                 }
             }
         }

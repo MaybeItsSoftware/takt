@@ -25,14 +25,6 @@ import uk.co.maybeitsadam.takt.data.workspace.TaskSearchResult
 // repeat presets, requirement-group reducers and pre-save validation. Kept
 // free of Compose so they are tested on the JVM.
 
-/** The quick chips under a date field. */
-enum class QuickDay(val title: String) {
-    TODAY("Today"),
-    TOMORROW("Tomorrow"),
-    NEXT_WEEK("Next week"),
-    CLEAR("Clear"),
-}
-
 object DateFieldMath {
     /**
      * The month as rows of seven, [firstDayOfWeek] first, with nulls padding
@@ -53,14 +45,6 @@ object DateFieldMath {
         (0 until 7).map { firstDayOfWeek.plus(it.toLong()) }.map {
             it.name.take(2).lowercase().replaceFirstChar(Char::uppercase)
         }
-
-    /** The day a quick chip means; null for Clear. "Next week" is a week today, as on iOS. */
-    fun quickDate(chip: QuickDay, today: LocalDate): LocalDate? = when (chip) {
-        QuickDay.TODAY -> today
-        QuickDay.TOMORROW -> today.plusDays(1)
-        QuickDay.NEXT_WEEK -> today.plusDays(7)
-        QuickDay.CLEAR -> null
-    }
 
     /** Hours wrap round the day without touching the date. */
     fun stepHour(time: LocalTime, by: Int): LocalTime = time.withSecond(0).withNano(0).plusHours(by.toLong())

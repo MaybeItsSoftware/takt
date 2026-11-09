@@ -63,15 +63,6 @@ class DateFieldMathTest {
     }
 
     @Test
-    fun quickChipsAreRelativeToToday() {
-        val today = LocalDate.of(2026, 12, 31)
-        assertEquals(today, DateFieldMath.quickDate(QuickDay.TODAY, today))
-        assertEquals(LocalDate.of(2027, 1, 1), DateFieldMath.quickDate(QuickDay.TOMORROW, today))
-        assertEquals(LocalDate.of(2027, 1, 7), DateFieldMath.quickDate(QuickDay.NEXT_WEEK, today))
-        assertNull(DateFieldMath.quickDate(QuickDay.CLEAR, today))
-    }
-
-    @Test
     fun hoursWrapRoundTheDay() {
         assertEquals(LocalTime.of(0, 30), DateFieldMath.stepHour(LocalTime.of(23, 30), 1))
         assertEquals(LocalTime.of(23, 0), DateFieldMath.stepHour(LocalTime.of(0, 0), -1))

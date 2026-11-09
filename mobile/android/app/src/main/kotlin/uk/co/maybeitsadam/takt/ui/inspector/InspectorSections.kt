@@ -246,13 +246,15 @@ private fun WhenSection(
 ) {
     val mode = DueEditing.mode(values)
     InspectorSection("When") {
-        FieldLabel("Start")
+        // The slot set aside for doing it; the estimate is how long, and the
+        // two are what Google Calendar shows as its event.
+        FieldLabel("Scheduled")
         ChalkDateField(
-            label = "Start",
+            label = "Scheduled",
             date = values.startAt?.let { DateFieldMath.date(it, zone) },
             time = values.startAt?.let { DateFieldMath.time(it, zone) },
             today = today,
-            placeholder = "Any time",
+            placeholder = "Not scheduled",
             onDate = { date ->
                 edit { v ->
                     v.copy(
