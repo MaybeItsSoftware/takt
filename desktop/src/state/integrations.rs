@@ -22,13 +22,13 @@ impl App {
         let status = self.sync.status();
         let mut rows = Vec::new();
         rows.push((
-            "sync-host",
+            "sync-self-hosted",
             "Sync",
-            "Server",
+            "Use your own server",
             if self.sync_hosted() {
-                "Takt Sync"
+                "Off · Takt Sync"
             } else {
-                "Self-hosted"
+                "On"
             }
             .to_string(),
         ));
@@ -153,19 +153,13 @@ impl App {
         self.sync.status().server == crate::sync::HOSTED_SERVER
     }
 
-    /// The Server dropdown: back to Takt Sync at once, or a self-hosted
-    /// server's address asked for.
-    pub fn choose_sync_host(&mut self, own: bool) {
-        if !own {
-            if !self.sync_hosted()
-                && let Err(problem) = self.sync.use_server("")
-            {
-                self.message = Some(problem);
-            }
-            return;
-        }
+    /// The switch: on asks for the server's address, off goes back to
+    /// Takt Sync at once.
+    fn toggle_self_hosted(&mut self) {
         if self.sync_hosted() {
             self.ask(Ask::SyncServer);
+        } else if let Err(problem) = self.sync.use_server("") {
+            self.message = Some(problem);
         }
     }
 
@@ -199,6 +193,7 @@ impl App {
             "sync-create" => self.ask(Ask::SyncEmail { create: true }),
             "sync-reset" => self.ask(Ask::SyncResetEmail),
             "sync-server" => self.ask(Ask::SyncServer),
+            "sync-self-hosted" => self.toggle_self_hosted(),
             "checkvist-connect" => self.ask(Ask::CheckvistEmail),
             "checkvist-import" => self.import_checkvist(),
             "checkvist-disconnect" => self.disconnect_checkvist(),

@@ -28,6 +28,10 @@ pub enum Plugin {
 /// plugins themselves, which sit under it in the sidebar.
 pub const GOOGLE_ACCOUNT: &str = "Google";
 
+/// Google's own switch in `Prefs::plugins`, beside the plugins' ids, and
+/// its row's id is `plugin:` and this.
+pub const GOOGLE_SWITCH: &str = "google";
+
 impl Plugin {
     /// In the order the page lists them.
     pub const ALL: [Plugin; 8] = [
@@ -138,8 +142,41 @@ pub fn is_google_account_row(id: &str) -> bool {
 }
 
 impl App {
+    /// On by its own switch and, for a Google plugin, Google's too.
     pub fn plugin_on(&self, plugin: Plugin) -> bool {
+        self.plugin_switched_on(plugin) && (!plugin.is_google() || self.google_on())
+    }
+
+    /// Its own switch, whatever Google's says.
+    fn plugin_switched_on(&self, plugin: Plugin) -> bool {
         self.prefs.plugins.get(plugin.id()).copied().unwrap_or(true)
+    }
+
+    /// Google's switch, over its plugins: off, they all stop and their own
+    /// switches are kept for when it is on again.
+    pub fn google_on(&self) -> bool {
+        self.prefs
+            .plugins
+            .get(GOOGLE_SWITCH)
+            .copied()
+            .unwrap_or(true)
+    }
+
+    pub fn toggle_google(&mut self) {
+        let on = !self.google_on();
+        self.prefs.plugins.insert(GOOGLE_SWITCH.into(), on);
+        // On with nothing under it would do nothing: all of them, then.
+        if on
+            && !Plugin::ALL
+                .into_iter()
+                .any(|p| p.is_google() && self.plugin_switched_on(p))
+        {
+            for plugin in Plugin::ALL.into_iter().filter(|p| p.is_google()) {
+                self.prefs.plugins.insert(plugin.id().into(), true);
+            }
+        }
+        self.prefs.save();
+        self.google_now();
     }
 
     pub fn any_google_plugin_on(&self) -> bool {
@@ -153,6 +190,7 @@ impl App {
         Plugin::ALL
             .into_iter()
             .filter(|p| *p != Plugin::Mcp || !self.prefs.ai_off)
+            .filter(|p| !p.is_google() || self.google_on())
             .collect()
     }
 
@@ -202,7 +240,7 @@ impl App {
 
     /// Return on a plugin's switch.
     pub fn toggle_plugin(&mut self, plugin: Plugin) {
-        let on = !self.plugin_on(plugin);
+        let on = !self.plugin_switched_on(plugin);
         self.prefs.plugins.insert(plugin.id().into(), on);
         self.prefs.save();
         match plugin {
@@ -257,9 +295,11 @@ mod tests {
             assert!(!plugin.description().is_empty());
         }
         let mut ids: Vec<_> = Plugin::ALL.iter().map(|p| p.id()).collect();
+        ids.push(GOOGLE_SWITCH);
         ids.sort();
         ids.dedup();
-        assert_eq!(ids.len(), Plugin::ALL.len());
+        // Google's switch shares the prefs map, so no plugin may take its id.
+        assert_eq!(ids.len(), Plugin::ALL.len() + 1);
     }
 
     #[test]

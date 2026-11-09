@@ -59,9 +59,8 @@ fn option(value: impl Into<String>, label: impl Into<String>, current: bool) -> 
 }
 
 /// The settings whose control is a dropdown of options.
-const SELECTS: [&str; 8] = [
+const SELECTS: [&str; 7] = [
     "theme",
-    "sync-host",
     "appearance",
     "quick-capture-list",
     "celebration",
@@ -157,6 +156,8 @@ fn google_page(rows: Vec<SettingRow>) -> Vec<SettingRow> {
             })
         })
         .partition(|row| row.group == plugins::GOOGLE_ACCOUNT);
+    // Google's own switch heads the page.
+    account.sort_by_key(|row| !row.id.starts_with("plugin:"));
     account.extend(services);
     account
 }
@@ -217,7 +218,8 @@ pub enum Control {
     Shortcut(String),
 }
 
-const SWITCHES: [&str; 17] = [
+const SWITCHES: [&str; 18] = [
+    "sync-self-hosted",
     "ai-off",
     "key-hints",
     "confirm-delete",
@@ -347,8 +349,8 @@ impl SettingRow {
             "sync-email" => "Sign in to an account made with an email address.",
             "sync-create" => "Make an account with an email address.",
             "sync-reset" => "Send a link to choose a new password.",
-            "sync-host" => {
-                "Takt's own server, or one you run yourself from sync-server/. Changing it signs you out."
+            "sync-self-hosted" => {
+                "Off, sync uses Takt Sync, Takt's own server. On, a server you run from sync-server/, asked for by address. Changing it signs you out."
             }
             "sync-server" => "The address of the server you run.",
             "checkvist-connect" => "Copy your Checkvist lists into the workspace.",
@@ -378,6 +380,9 @@ impl SettingRow {
                 "Shared with you. Leaving takes it off your devices; the others keep it."
             }
             member if member.starts_with("member:") => "Take them out of the list.",
+            plugin if plugin == format!("plugin:{}", plugins::GOOGLE_SWITCH) => {
+                "Calendar, Tasks and Drive. Off, they all stop; each keeps its own switch for when it is on again."
+            }
             plugin if plugin.starts_with("plugin:") => {
                 Plugin::from_id(&plugin["plugin:".len()..]).map_or("", Plugin::description)
             }
@@ -551,13 +556,9 @@ impl App {
                 shown.push((category, "settings"));
             }
         }
-        // Google heads its plugins, which the sidebar folds under it.
-        for plugin in pages {
-            if plugin.is_google() && !shown.iter().any(|(n, _)| *n == plugins::GOOGLE_ACCOUNT) {
-                shown.push((plugins::GOOGLE_ACCOUNT, "plug"));
-            }
-            shown.push((plugin.name(), "plug"));
-        }
+        // Google heads the plugins, its own folded under it.
+        shown.push((plugins::GOOGLE_ACCOUNT, "plug"));
+        shown.extend(pages.into_iter().map(|p| (p.name(), "plug")));
         shown
     }
 
@@ -795,19 +796,6 @@ impl App {
                     )
                     .collect()
             }
-            "sync-host" => {
-                let hosted = self.sync_hosted();
-                vec![
-                    SelectOption {
-                        detail: "Ours, £1 a year".into(),
-                        ..option("takt", "Takt Sync", hosted)
-                    },
-                    SelectOption {
-                        detail: "A server you run".into(),
-                        ..option("self", "Self-hosted", !hosted)
-                    },
-                ]
-            }
             "remind-due-today-at" => time_options(p.remind_due_today_minute),
             "remind-dailies-at" => time_options(p.remind_dailies_left_minute),
             _ => return None,
@@ -911,7 +899,6 @@ impl App {
                 self.apply_choice(Picker::CaptureList, Choice::CaptureList(some()))
             }
             "google-calendar-choose" => self.choose_google_calendar(some()),
-            "sync-host" => self.choose_sync_host(value == "self"),
             "celebration" => {
                 self.prefs.celebration = Some(value.into());
                 self.prefs.save();
@@ -943,6 +930,12 @@ impl App {
                 value,
             })
             .chain(plugin_rows)
+            .chain(std::iter::once(SettingRow {
+                id: format!("plugin:{}", plugins::GOOGLE_SWITCH),
+                group: plugins::GOOGLE_ACCOUNT,
+                title: "Google".into(),
+                value: on(self.google_on()),
+            }))
             .chain(
                 self.shared_list_rows()
                     .into_iter()
@@ -1000,7 +993,10 @@ impl App {
             "diagnostics" => return self.open_overlay(Overlay::Diagnostics),
             "quick-capture-list" => return self.open_picker(Picker::CaptureList),
             plugin if plugin.starts_with("plugin:") => {
-                if let Some(plugin) = Plugin::from_id(&plugin["plugin:".len()..]) {
+                let id = &plugin["plugin:".len()..];
+                if id == plugins::GOOGLE_SWITCH {
+                    self.toggle_google();
+                } else if let Some(plugin) = Plugin::from_id(id) {
                     self.toggle_plugin(plugin);
                 }
                 return self.open_overlay(Overlay::Settings);

@@ -13,7 +13,7 @@ use super::widgets::field_text;
 use super::{MONO_FONT, Takt, Tokens};
 use crate::platform::hotkeys::Hotkey;
 use crate::state::Editing;
-use crate::state::plugins::{GOOGLE_ACCOUNT, Plugin};
+use crate::state::plugins::{GOOGLE_ACCOUNT, GOOGLE_SWITCH, Plugin};
 use crate::state::settings::{self as page, Control, SettingRow, SettingsMenu};
 use crate::text_field::{FieldKey, TextField};
 use gpui::{
@@ -609,6 +609,7 @@ impl Takt {
                             .when_some(plugin, |d, plugin| {
                                 d.child(self.sidebar_switch(plugin, t, cx))
                             })
+                            .when(google, |d| d.child(self.google_switch(t, cx)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.settings_field = TextField::default();
                                 this.app.choose_settings_category(name);
@@ -658,11 +659,29 @@ impl Takt {
     /// the page shown.
     fn sidebar_switch(&self, plugin: Plugin, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let on = self.app.plugin_on(plugin);
+        Self::switch(plugin.id(), on, t)
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                cx.stop_propagation();
+                this.app.toggle_plugin(plugin);
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    /// Google's switch beside it in the sidebar, over all its plugins.
+    fn google_switch(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
+        Self::switch(GOOGLE_SWITCH, self.app.google_on(), t)
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                cx.stop_propagation();
+                this.app.toggle_google();
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    fn switch(id: &str, on: bool, t: Tokens) -> gpui::Stateful<gpui::Div> {
         div()
-            .id(SharedString::from(format!(
-                "settings-plugin-switch-{}",
-                plugin.id()
-            )))
+            .id(SharedString::from(format!("settings-plugin-switch-{id}")))
             .flex_none()
             .w(px(26.))
             .h(px(16.))
@@ -680,12 +699,6 @@ impl Takt {
                     .rounded_full()
                     .bg(if on { t.background } else { t.muted }),
             )
-            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                cx.stop_propagation();
-                this.app.toggle_plugin(plugin);
-                cx.notify();
-            }))
-            .into_any_element()
     }
 
     fn settings_content(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
