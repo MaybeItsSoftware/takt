@@ -297,7 +297,7 @@ final class WorkspaceCommandDispatchTests: XCTestCase {
     XCTAssertEqual(
       WorkspaceCommandCatalog.sequences(on: .outline),
       [
-        "ee", "ea", "ei", "dd", "ds", "nn", "tt", "mm", "gl", "uu", "td", "tm", "bu", "cd", "cs", "cn", "ct", "go",
+        "ee", "ea", "ei", "dd", "ds", "nn", "nm", "tt", "mm", "gl", "uu", "td", "tm", "bu", "cd", "cs", "cn", "ct", "go",
         "dr", "tc", "tl", "gb", "ww", "bb", "cc", "aa", "gh", "sd", "oo", "pc", "pl", "ex", "gg", "za", "gf", "gx", "ga", "gw",
         "-1", "-2", "-3", "-4",
       ])

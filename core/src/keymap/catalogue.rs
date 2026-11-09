@@ -144,6 +144,9 @@ fn task() -> Vec<Spec> {
             .note("Like vim's i: the cursor lands before the first character"),
         c("taskEditDue", "Edit the due date", "Task", &["dd", "cmd+d"]),
         c("taskEditNotes", "Edit the notes", "Task", &["nn", "cmd+ctrl+n"]),
+        // The Markdown editor plugin, on the Mac. `n` started only `nn`.
+        c("taskMaximiseNotes", "Open the notes in the Markdown editor", "Task", &["nm", "cmd+ctrl+m"])
+            .note("The notes full size, with a preview; or the linked Obsidian note itself. Esc returns. From inside the notes field too"),
         c("taskEditTags", "Edit the tags", "Task", &["tt", "cmd+ctrl+t"]),
         c("taskEditRecurrence", "Edit how it repeats", "Task", &["dr", "cmd+ctrl+r"]),
         c("taskEditStart", "Edit the start date", "Task", &["ds", "option+s"]),

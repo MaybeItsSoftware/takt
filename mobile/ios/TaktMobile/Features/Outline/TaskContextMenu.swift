@@ -58,6 +58,9 @@ struct TaskContextMenu: View {
       return !context.isList && context.status == .open
     case .taskToggleInspector:
       return false
+    case .taskMaximiseNotes:
+      // The Mac's Markdown editor plugin; the iPhone edits notes in the inspector.
+      return false
     case .taskGoToList:
       // Only where the row is away from its list: Today, Find, a combined scope.
       return !context.allowsStructure
