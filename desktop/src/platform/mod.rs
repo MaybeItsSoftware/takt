@@ -9,6 +9,7 @@
 pub mod hotkeys;
 pub mod notifications;
 pub mod status_item;
+pub mod window_move;
 
 use std::sync::Mutex;
 
@@ -19,7 +20,7 @@ pub enum Event {
     ShowWindow,
     /// Toggle the quick capture window.
     QuickCapture,
-    /// Toggle the floating focus panel.
+    /// Bring the floating focus panel up, or forward.
     FocusPanel,
     /// A status item menu entry, by its action.
     Menu(String),

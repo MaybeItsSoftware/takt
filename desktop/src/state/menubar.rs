@@ -35,7 +35,7 @@ fn indented(title: impl Into<String>, action: &str, tooltip: Option<&str>) -> En
 
 impl App {
     /// The running block's task, wherever it is.
-    fn running_title(&self) -> Option<String> {
+    pub fn running_title(&self) -> Option<String> {
         let id = self.focus_session.as_ref()?.active_task_id.clone()?;
         self.task(&id).map(|task| task.title.clone()).or_else(|| {
             self.store

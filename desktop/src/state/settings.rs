@@ -500,7 +500,7 @@ impl App {
             row(
                 "focus-panel",
                 "Focus",
-                "Show the floating focus panel",
+                "Show the focus pill while a block runs",
                 on(p.focus_panel),
             ),
             row(

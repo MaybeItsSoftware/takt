@@ -42,7 +42,7 @@ pub struct Prefs {
     pub scores_each_block: bool,
     pub focus_notifications: bool,
     pub focus_sound: bool,
-    /// The floating panel while a block runs.
+    /// The focus pill while a block runs (the key predates the pill).
     pub focus_panel: bool,
     pub hotkeys_enabled: bool,
     /// The global shortcuts, spelled as the keymap spells keys; none is off.

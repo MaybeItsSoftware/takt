@@ -15,6 +15,7 @@ pub mod icons;
 pub mod menus;
 mod notes_editor;
 pub mod panel;
+pub mod pill;
 mod repeat;
 mod settings;
 mod sync_page;
@@ -74,6 +75,9 @@ pub struct Takt {
     last_key_ms: Option<f64>,
     /// The floating focus panel, while it is open.
     panel: Option<gpui::WindowHandle<panel::FocusPanel>>,
+    /// The focus pill, while a block runs, and whether one is on its way.
+    pill: Option<gpui::WindowHandle<pill::FocusPill>>,
+    pill_opening: bool,
     /// The main window, while it is open: closing it leaves the app in the
     /// menu bar, and this entity lives on for the next one.
     main: Option<gpui::WindowHandle<Takt>>,
@@ -182,6 +186,8 @@ impl Takt {
             notes_view: Default::default(),
             last_key_ms: None,
             panel: None,
+            pill: None,
+            pill_opening: false,
             main: None,
             capture: None,
             settings_window: None,
@@ -213,6 +219,9 @@ impl Takt {
                         this.app.expire_lingering();
                     }
                     this.app.tick_reminders();
+                    // A session ended or begun anywhere (a click, the CLI,
+                    // another device) shows or puts away the pill.
+                    this.sync_pill(cx);
                     if this.poll_notes_editor() {
                         cx.notify();
                     }
@@ -302,10 +311,7 @@ impl Takt {
         match event {
             Event::ShowWindow => self.show_main_window(cx),
             Event::QuickCapture => self.app.wants_capture = true,
-            Event::FocusPanel => {
-                let open = self.panel_open(cx);
-                self.app.wants_panel = Some(!open);
-            }
+            Event::FocusPanel => self.app.wants_panel = Some(true),
             Event::Sync { workspace } => {
                 if workspace {
                     self.app.reload_all();
@@ -500,6 +506,82 @@ impl Takt {
                 let _ = handle.update(cx, |_, window, _| window.activate_window());
             }
         }
+        self.sync_pill(cx);
+    }
+
+    /// The pill up while a block runs (unless turned off), and away once
+    /// the session ends. Both deferred: opening draws it, which reads this
+    /// entity, and closing runs `window_closed`, which does too.
+    pub fn sync_pill(&mut self, cx: &mut Context<Self>) {
+        let wanted = self.app.focus_session.is_some() && self.app.prefs.focus_panel;
+        let open = self.pill.is_some_and(|handle| {
+            cx.windows()
+                .iter()
+                .any(|w| w.window_id() == handle.window_id())
+        });
+        if !open {
+            self.pill = None;
+        }
+        if wanted && !open && !self.pill_opening {
+            self.pill_opening = true;
+            let takt = cx.entity();
+            cx.defer(move |cx| {
+                let handle = pill::open(takt.clone(), cx);
+                takt.update(cx, |this, _| {
+                    this.pill = handle;
+                    this.pill_opening = false;
+                });
+            });
+        } else if !wanted && let Some(handle) = self.pill.take() {
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, _| window.remove_window());
+            });
+        }
+    }
+
+    fn pill_open(&self, cx: &mut Context<Self>) -> bool {
+        self.pill.is_some_and(|handle| {
+            cx.windows()
+                .iter()
+                .any(|w| w.window_id() == handle.window_id())
+        })
+    }
+
+    /// `TAKT_DESKTOP_SMOKE_WRITE`: a timer started on the selection brings
+    /// the pill up, and stopping it puts the pill away, each through the
+    /// deferred open and close a real start and stop take.
+    pub fn smoke_pill(&mut self, cx: &mut Context<Self>) {
+        if self.app.selected().is_none() || self.app.focus_running() {
+            println!("smoke pill: skipped (nothing selected, or a block already running)");
+            return;
+        }
+        let pref = self.app.prefs.focus_panel;
+        self.app.prefs.focus_panel = true;
+        self.app.start_focus_on_selected(true);
+        let timer = self
+            .app
+            .focus_session
+            .as_ref()
+            .is_some_and(crate::state::focus::is_timer);
+        self.open_requested_windows(cx);
+        let takt = cx.entity();
+        cx.defer(move |cx| {
+            let opened = takt.update(cx, |this, cx| this.pill_open(cx));
+            takt.update(cx, |this, cx| {
+                this.app.stop_focus();
+                this.open_requested_windows(cx);
+            });
+            let takt = takt.clone();
+            cx.defer(move |cx| {
+                let (closed, stopped) = takt.update(cx, |this, cx| {
+                    this.app.prefs.focus_panel = pref;
+                    (!this.pill_open(cx), !this.app.focus_running())
+                });
+                println!(
+                    "smoke pill: timer {timer}, pill opened {opened}, stopped {stopped}, pill closed {closed}"
+                );
+            });
+        });
     }
 
     /// While the agent works, its output is read ten times a second.

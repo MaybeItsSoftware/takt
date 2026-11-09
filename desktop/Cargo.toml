@@ -19,6 +19,8 @@ serde_json = "1"
 # AppKit and Carbon for what GPUI doesn't do: the status item, global
 # hotkeys, the activation policy, login items. The same `objc` GPUI uses.
 objc = "0.2"
+# The pill's `NSWindow`, to move it by hand (src/platform/window_move.rs).
+raw-window-handle = "0.6"
 # Zed's UI framework. Its Metal shaders are compiled at build time, so a
 # build needs the Metal toolchain (`xcodebuild -downloadComponent
 # MetalToolchain`); the `runtime_shaders` feature compiles them at launch

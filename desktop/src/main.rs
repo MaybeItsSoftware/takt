@@ -111,6 +111,9 @@ fn main() {
                             );
                         });
                     }
+                    if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() {
+                        view.smoke_pill(cx);
+                    }
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_PANEL").is_some() {
                         view.app.wants_panel = Some(true);
                         view.open_requested_windows(cx);
