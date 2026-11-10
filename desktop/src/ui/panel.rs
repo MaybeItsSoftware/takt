@@ -390,6 +390,16 @@ impl FocusPanel {
         self.cursor = 0;
     }
 
+    /// Puts the panel away, handing the keyboard back to the app it was
+    /// summoned over rather than letting the main window take it.
+    fn put_away(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let back = self.takt.update(cx, |takt, _| takt.panel_return_to.take());
+        if let Some(pid) = back {
+            crate::platform::activate_app(pid);
+        }
+        window.remove_window();
+    }
+
     /// Settles the main window once this window's update is over: `Takt`
     /// can't see this window while it updates.
     fn settle(&self, cx: &mut Context<Self>) {
@@ -432,7 +442,7 @@ impl FocusPanel {
             _ => None,
         };
         match key.as_str() {
-            "escape" | "cmd+w" => return window.remove_window(),
+            "escape" | "cmd+w" => return self.put_away(window, cx),
             "n" | "/" => {
                 self.mode = Mode::typing();
                 self.cursor = 0;
@@ -514,12 +524,12 @@ impl FocusPanel {
                 };
                 let hide = event.keystroke.modifiers.platform;
                 if self.commit(kind, hide, cx) {
-                    return window.remove_window();
+                    return self.put_away(window, cx);
                 }
             }
             FieldKey::Cancel => {
                 if self.cancel(cx) {
-                    return window.remove_window();
+                    return self.put_away(window, cx);
                 }
             }
             FieldKey::Tab { .. } => self.open_picker(cx),

@@ -111,6 +111,33 @@ pub fn set_launch_at_login(enabled: bool) -> Result<(), String> {
     }
 }
 
+/// The app in front when it isn't Takt itself: where the keyboard goes
+/// back to once the focus panel is put away.
+pub fn frontmost_other_app() -> Option<i32> {
+    unsafe {
+        let workspace: *mut objc::runtime::Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let app: *mut objc::runtime::Object = msg_send![workspace, frontmostApplication];
+        if app.is_null() {
+            return None;
+        }
+        let pid: i32 = msg_send![app, processIdentifier];
+        (pid as u32 != std::process::id()).then_some(pid)
+    }
+}
+
+/// Brings the app with process id `pid` forward, if it is still running.
+pub fn activate_app(pid: i32) {
+    unsafe {
+        let app: *mut objc::runtime::Object = msg_send![
+            class!(NSRunningApplication),
+            runningApplicationWithProcessIdentifier: pid
+        ];
+        if !app.is_null() {
+            let _: bool = msg_send![app, activateWithOptions: 0usize];
+        }
+    }
+}
+
 /// Whether the person asked for less motion (Accessibility → Display).
 pub fn reduce_motion() -> bool {
     unsafe {

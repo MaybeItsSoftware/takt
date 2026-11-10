@@ -76,6 +76,10 @@ pub struct Takt {
     last_key_ms: Option<f64>,
     /// The floating focus panel, while it is open.
     panel: Option<gpui::WindowHandle<panel::FocusPanel>>,
+    /// The app that was in front when the panel was summoned over it: put
+    /// away, the panel hands the keyboard back there rather than to the
+    /// main window.
+    panel_return_to: Option<i32>,
     /// The focus pill, while a block runs, and whether one is on its way.
     pill: Option<gpui::WindowHandle<pill::FocusPill>>,
     pill_opening: bool,
@@ -186,6 +190,7 @@ impl Takt {
             notes_view: Default::default(),
             last_key_ms: None,
             panel: None,
+            panel_return_to: None,
             pill: None,
             pill_opening: false,
             main: None,
@@ -473,11 +478,16 @@ impl Takt {
                 .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
             if open && !wanted {
                 if let Some(handle) = self.panel.take() {
+                    let back = self.panel_return_to.take();
                     cx.defer(move |cx| {
+                        if let Some(pid) = back {
+                            crate::platform::activate_app(pid);
+                        }
                         let _ = handle.update(cx, |_, window, _| window.remove_window());
                     });
                 }
             } else if !open && wanted {
+                self.panel_return_to = crate::platform::frontmost_other_app();
                 // Opened once this update ends: the panel's first draw reads
                 // this entity, which is leased while it updates.
                 let takt = cx.entity();
