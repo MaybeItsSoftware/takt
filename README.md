@@ -641,10 +641,16 @@ Quick Add has no hotkey of its own any more. The status item's menu, `Cmd+8`
 and the app menu's Quick Add open it too. Rebind or disable the hotkey in
 Settings → Keyboard.
 
-At the top are the running task and its clock.
+The panel is the focus pill grown larger: it opens over the pill's place
+(the top centre of the screen until you drag the pill elsewhere), the pill
+hides while it is up, and putting the panel away shrinks it back to the
+pill.
 
-**With nothing running it opens typing.** Until you type, it lists the day to
-start from. Type and it finds every open task and list that matches, with a
+At the top are the running task and its clock. It opens on its rows: the
+day to start from, or while a block runs the queue behind it. Every action
+is a letter (see below); `/` or `n` start typing.
+
+**Typing** lists the day until you type. Type and it finds every open task and list that matches, with a
 last row, **Add "…"**, that files what you typed as a new task (`45m`,
 `#tag`, `@fri` and `!1` read as in Quick Add, and their chips show on the
 row):
@@ -655,21 +661,23 @@ row):
 | `Return` | On a task, start a timer on it. On a list, narrow to that list's tasks, and Add then files there. On Add, file the task: it heads the day, highlighted, and `Return` again starts it (opened from the app menu's Quick Add, the panel goes instead) |
 | `Cmd+Return` | On Add, file the task and put the panel away |
 | `Option+Return` | Start a pomodoro on the highlighted task |
+| `Cmd+O` | Open the highlighted task, or list, in the main window |
 | `Tab` | Choose the list Add files into: a picker of every list, with its folder, that you type to filter; `↑` / `↓` (or `Tab`) move, `Return` chooses and `Esc` goes back to your typing. Clicking **Adds to …** under the field opens it too. It starts at Quick Add's list, and narrowing to a list chooses that list |
-| `Esc` | Clear what you typed, then leave a narrowed list, then hide the panel |
+| `Esc` | Clear what you typed, then leave a narrowed list, then back to the rows |
 
-**While a block runs, every action is a letter**, and a footer of key hints
-spells them out:
+**On the rows, every action is a letter**, and a footer of key hints spells
+them out:
 
 | Key | Action |
 | --- | --- |
 | `j` / `k`, `↓` / `↑` | Move through the queue |
-| `Return` / `p` | Queue the highlighted task behind the running block, as a timer / a pomodoro |
+| `Return` / `p` | Start a timer / a pomodoro on the highlighted task, or while a block runs queue it as one |
+| `o` | Open the highlighted task (or with none, the running one) in the main window, which takes the keyboard |
 | `Space` | Pause or resume the running block (on a break, back to work) |
 | `d` | Finish the block, completing its task, and ask how it went |
 | `s` | Stop: the time so far is logged and the task stays open |
-| `/` or `n` | Back to typing, to find or add a task; `Return` on one queues it |
-| `Esc` | Hide the panel (from typing, back to the letters first) |
+| `/` or `n` | Type, to find or add a task |
+| `Esc` | Hide the panel: back to the pill while a block runs |
 
 While the block's "how did it go?" question is up, the keys answer it instead.
 

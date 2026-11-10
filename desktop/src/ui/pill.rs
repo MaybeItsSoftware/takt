@@ -2,7 +2,9 @@
 //! runs, with the task's title and its clock (counting up for a timer, down
 //! for a pomodoro or a break). It never takes the keyboard: it opens without
 //! focus, as a non-activating panel, so the app in front stays in front.
-//! A click brings up the focus panel; a drag moves it.
+//! A click grows it into the focus panel, which shrinks back into it when
+//! put away: the panel opens over the pill's place and the pill hides while
+//! it is up. A drag moves it.
 //!
 //! Like the panel it holds nothing but its drag: it reads the main window's
 //! `App` through the `Takt` entity and redraws when that does. `Takt`
@@ -15,8 +17,8 @@ use crate::state::focus::reading;
 use crate::theme::Tokens;
 use gpui::{
     App as GpuiApp, Bounds, Context, DispatchPhase, Entity, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, WeakEntity, Window, WindowBounds, WindowKind, WindowOptions,
-    canvas, div, point, prelude::*, px, size,
+    MouseMoveEvent, MouseUpEvent, Pixels, WeakEntity, Window, WindowBounds, WindowKind,
+    WindowOptions, canvas, div, point, prelude::*, px, size,
 };
 
 pub const WIDTH: f32 = 240.;
@@ -42,8 +44,9 @@ struct Drag {
     moved: bool,
 }
 
-/// Opens the pill at the top centre of the main display, below the menu bar.
-pub fn open(takt: Entity<Takt>, cx: &mut GpuiApp) -> Option<gpui::WindowHandle<FocusPill>> {
+/// Where the pill sits until it is dragged: the top centre of the main
+/// display, below the menu bar.
+pub fn default_bounds(cx: &GpuiApp) -> Bounds<Pixels> {
     let width = px(WIDTH);
     let origin = cx
         .primary_display()
@@ -55,11 +58,24 @@ pub fn open(takt: Entity<Takt>, cx: &mut GpuiApp) -> Option<gpui::WindowHandle<F
             )
         })
         .unwrap_or(point(px(600.), px(44.)));
+    Bounds {
+        origin,
+        size: size(width, px(HEIGHT)),
+    }
+}
+
+/// Opens the pill where it last was (`at`), else at its default place.
+pub fn open(
+    takt: Entity<Takt>,
+    at: Option<Bounds<Pixels>>,
+    cx: &mut GpuiApp,
+) -> Option<gpui::WindowHandle<FocusPill>> {
+    let bounds = Bounds {
+        size: size(px(WIDTH), px(HEIGHT)),
+        ..at.unwrap_or_else(|| default_bounds(cx))
+    };
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds {
-            origin,
-            size: size(width, px(HEIGHT)),
-        })),
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: None,
         kind: WindowKind::PopUp,
         is_movable: true,

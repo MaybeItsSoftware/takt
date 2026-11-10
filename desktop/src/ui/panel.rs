@@ -94,6 +94,12 @@ impl Mode {
     }
 }
 
+/// What `o` opens in the main window.
+enum Target {
+    Task(String),
+    List(String),
+}
+
 /// A row of the panel.
 #[derive(Clone, Debug, PartialEq)]
 enum Entry {
@@ -123,25 +129,46 @@ impl Focusable for FocusPanel {
     }
 }
 
-/// Opens the panel at the top right of the main display, in front of
-/// whatever app is, typing when nothing runs or when `capturing`.
+pub const WIDTH: f32 = 340.;
+pub const HEIGHT: f32 = 420.;
+
+/// Where the panel goes when it grows out of the pill at `pill`: the same
+/// top edge, centred on it, kept on its display. With no pill, where the
+/// pill would be, at the top centre of the main display.
+fn bounds_from(pill: Option<Bounds<Pixels>>, cx: &GpuiApp) -> Bounds<Pixels> {
+    let panel = size(px(WIDTH), px(HEIGHT));
+    let pill = pill.unwrap_or_else(|| super::pill::default_bounds(cx));
+    let centre = pill.origin.x + pill.size.width / 2.;
+    let display = cx
+        .displays()
+        .into_iter()
+        .map(|d| d.bounds())
+        .find(|b| b.contains(&pill.origin))
+        .or_else(|| cx.primary_display().map(|d| d.bounds()));
+    let mut origin = point(centre - panel.width / 2., pill.origin.y);
+    if let Some(d) = display {
+        let right = d.origin.x + d.size.width - panel.width;
+        let bottom = d.origin.y + d.size.height - panel.height;
+        origin.x = origin.x.max(d.origin.x).min(right);
+        origin.y = origin.y.max(d.origin.y).min(bottom);
+    }
+    Bounds {
+        origin,
+        size: panel,
+    }
+}
+
+/// Opens the panel grown out of the pill at `pill` (or where the pill
+/// would be), in front of whatever app is: on its rows, or typing when
+/// `capturing`.
 pub fn open(
     takt: Entity<Takt>,
     capturing: bool,
+    pill: Option<Bounds<Pixels>>,
     cx: &mut GpuiApp,
 ) -> Option<gpui::WindowHandle<FocusPanel>> {
-    let display = cx.primary_display();
-    let origin = display
-        .map(|d| {
-            let b = d.bounds();
-            point(b.origin.x + b.size.width - px(380.), b.origin.y + px(40.))
-        })
-        .unwrap_or(point(px(900.), px(40.)));
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds {
-            origin,
-            size: size(px(340.), px(420.)),
-        })),
+        window_bounds: Some(WindowBounds::Windowed(bounds_from(pill, cx))),
         titlebar: None,
         kind: WindowKind::PopUp,
         is_movable: true,
@@ -156,7 +183,6 @@ pub fn open(
             if let Some(ns_window) = window_move::ns_window(window) {
                 window_move::no_animation(ns_window);
             }
-            let running = takt.read(cx).app.focus_session.is_some();
             let panel = cx.new(|cx| {
                 cx.observe(&takt, |_, _, cx| cx.notify()).detach();
                 FocusPanel {
@@ -167,10 +193,10 @@ pub fn open(
                     picked: None,
                     capturing,
                     destination: None,
-                    mode: if running && !capturing {
-                        Mode::Rows
-                    } else {
+                    mode: if capturing {
                         Mode::typing()
+                    } else {
+                        Mode::Rows
                     },
                 }
             });
@@ -390,6 +416,34 @@ impl FocusPanel {
         self.cursor = 0;
     }
 
+    /// `o` (`⌘O` while typing): the task, or list, in the main window,
+    /// which takes the keyboard; the panel goes back to the pill.
+    fn open_in_main(&mut self, target: Target, window: &mut Window, cx: &mut Context<Self>) {
+        let takt = self.takt.clone();
+        takt.update(cx, |takt, _| takt.panel_return_to = None);
+        window.remove_window();
+        cx.defer(move |cx| {
+            takt.update(cx, |takt, cx| {
+                let app = &mut takt.app;
+                match target {
+                    Target::Task(id) => {
+                        let list = app
+                            .task(&id)
+                            .cloned()
+                            .or_else(|| app.store.core.task(id.clone()).ok().flatten())
+                            .map(|t| t.list_id);
+                        if let Some(list) = list {
+                            app.reveal_task(&id, &list);
+                        }
+                    }
+                    Target::List(id) => app.select_list(&id),
+                }
+                takt.show_main_window(cx);
+                takt.settle(cx);
+            })
+        });
+    }
+
     /// Puts the panel away, handing the keyboard back to the app it was
     /// summoned over rather than letting the main window take it.
     fn put_away(&self, window: &mut Window, cx: &mut Context<Self>) {
@@ -447,6 +501,18 @@ impl FocusPanel {
                 self.mode = Mode::typing();
                 self.cursor = 0;
             }
+            "o" => {
+                let running = self
+                    .takt
+                    .read(cx)
+                    .app
+                    .focus_session
+                    .as_ref()
+                    .and_then(|s| s.active_task_id.clone());
+                if let Some(id) = highlighted.clone().or(running) {
+                    return self.open_in_main(Target::Task(id), window, cx);
+                }
+            }
             "enter" | "p" => {
                 if let Some(id) = highlighted {
                     let kind = if key == "p" {
@@ -484,6 +550,23 @@ impl FocusPanel {
 
     /// A key while typing.
     fn field_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let m = &event.keystroke.modifiers;
+        if m.platform
+            && !m.shift
+            && event.keystroke.key == "o"
+            && matches!(self.mode, Mode::Type { .. })
+        {
+            let entries = self.entries(&self.takt.read(cx).app);
+            let target = match entries.get(self.cursor) {
+                Some(Entry::Task { id, .. }) => Some(Target::Task(id.clone())),
+                Some(Entry::List { id, .. }) => Some(Target::List(id.clone())),
+                _ => None,
+            };
+            if let Some(target) = target {
+                cx.stop_propagation();
+                return self.open_in_main(target, window, cx);
+            }
+        }
         let Some(field) = self.mode.field() else {
             return;
         };
@@ -579,10 +662,14 @@ impl FocusPanel {
                         return true;
                     }
                     Ok((id, _)) => {
-                        // Back to the ladder with it first, to start.
-                        self.mode = Mode::typing();
-                        self.picked = Some(id);
-                        self.cursor = 0;
+                        // Back to the rows with it highlighted, to start.
+                        self.mode = Mode::Rows;
+                        self.picked = Some(id.clone());
+                        self.cursor = self
+                            .entries(&self.takt.read(cx).app)
+                            .iter()
+                            .position(|e| matches!(e, Entry::Task { id: t, .. } if *t == id))
+                            .unwrap_or(0);
                         self.settle(cx);
                     }
                     Err(why) => {
@@ -600,7 +687,6 @@ impl FocusPanel {
     /// Esc: clears what was typed, then leaves a chosen list, then goes back
     /// to the running block's keys. True when the panel should go.
     fn cancel(&mut self, cx: &GpuiApp) -> bool {
-        let running = self.takt.read(cx).app.focus_session.is_some();
         if let Mode::Type { field, list, .. } = &mut self.mode {
             if !field.text.is_empty() {
                 *field = TextField::default();
@@ -609,7 +695,7 @@ impl FocusPanel {
                 if self.destination.as_ref() == Some(&left) {
                     self.destination = None;
                 }
-            } else if running && !self.capturing {
+            } else if !self.capturing {
                 self.mode = Mode::Rows;
             } else {
                 return true;
@@ -758,6 +844,7 @@ impl Render for FocusPanel {
                         ("\u{21a9}", "queue"),
                         ("p", "queue pomodoro"),
                         ("j k", "move"),
+                        ("o", "open in Takt"),
                         ("/", "find or add"),
                         ("esc", "hide"),
                     ]
@@ -766,6 +853,7 @@ impl Render for FocusPanel {
                         ("\u{21a9}", "timer"),
                         ("p", "pomodoro"),
                         ("j k", "move"),
+                        ("o", "open in Takt"),
                         ("/", "find or add"),
                         ("esc", "hide"),
                     ]
@@ -876,13 +964,14 @@ impl Render for FocusPanel {
                         ("\u{2191}\u{2193}", "move"),
                         ("\u{2318}\u{21a9}", "add & hide"),
                         ("\u{21e5}", "choose list"),
+                        ("\u{2318}O", "open in Takt"),
                         (
                             "esc",
                             if !typed.is_empty() {
                                 "clear"
                             } else if list.is_some() {
                                 "all lists"
-                            } else if running && !self.capturing {
+                            } else if !self.capturing {
                                 "back"
                             } else {
                                 "hide"

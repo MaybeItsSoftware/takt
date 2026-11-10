@@ -83,6 +83,9 @@ pub struct Takt {
     /// The focus pill, while a block runs, and whether one is on its way.
     pill: Option<gpui::WindowHandle<pill::FocusPill>>,
     pill_opening: bool,
+    /// Where the pill last was, so the panel grows out of it and it comes
+    /// back there.
+    pill_at: Option<gpui::Bounds<gpui::Pixels>>,
     /// The main window, while it is open: closing it leaves the app in the
     /// menu bar, and this entity lives on for the next one.
     main: Option<gpui::WindowHandle<Takt>>,
@@ -150,6 +153,8 @@ pub fn window_closed(cx: &mut GpuiApp) {
         takt.update(cx, |this, _| this.main = None);
         crate::platform::set_regular(false);
     }
+    // The panel put away shrinks back to the pill.
+    takt.update(cx, |this, cx| this.sync_pill(cx));
     let settings = takt.read(cx).settings_window;
     if settings.is_some_and(|handle| {
         !cx.windows()
@@ -193,6 +198,7 @@ impl Takt {
             panel_return_to: None,
             pill: None,
             pill_opening: false,
+            pill_at: None,
             main: None,
             settings_window: None,
             settings_active: false,
@@ -490,10 +496,21 @@ impl Takt {
                 self.panel_return_to = crate::platform::frontmost_other_app();
                 // Opened once this update ends: the panel's first draw reads
                 // this entity, which is leased while it updates.
+                if let Some(at) = self
+                    .pill
+                    .and_then(|h| h.update(cx, |_, window, _| window.bounds()).ok())
+                {
+                    self.pill_at = Some(at);
+                }
+                let pill = self.pill_at;
                 let takt = cx.entity();
                 cx.defer(move |cx| {
-                    let handle = panel::open(takt.clone(), capturing, cx);
-                    takt.update(cx, |this, _| this.panel = handle);
+                    let handle = panel::open(takt.clone(), capturing, pill, cx);
+                    // The pill hides while the panel grown out of it is up.
+                    takt.update(cx, |this, cx| {
+                        this.panel = handle;
+                        this.sync_pill(cx);
+                    });
                 });
             } else if open && let Some(handle) = &self.panel {
                 let _ = handle.update(cx, |panel, window, cx| {
@@ -513,7 +530,9 @@ impl Takt {
     /// the session ends. Both deferred: opening draws it, which reads this
     /// entity, and closing runs `window_closed`, which does too.
     pub fn sync_pill(&mut self, cx: &mut Context<Self>) {
-        let wanted = self.app.focus_session.is_some() && self.app.prefs.focus_panel;
+        // The panel is the pill grown larger: one or the other, not both.
+        let wanted =
+            self.app.focus_session.is_some() && self.app.prefs.focus_panel && !self.panel_open(cx);
         let open = self.pill.is_some_and(|handle| {
             cx.windows()
                 .iter()
@@ -526,13 +545,17 @@ impl Takt {
             self.pill_opening = true;
             let takt = cx.entity();
             cx.defer(move |cx| {
-                let handle = pill::open(takt.clone(), cx);
+                let at = takt.read(cx).pill_at;
+                let handle = pill::open(takt.clone(), at, cx);
                 takt.update(cx, |this, _| {
                     this.pill = handle;
                     this.pill_opening = false;
                 });
             });
         } else if !wanted && let Some(handle) = self.pill.take() {
+            if let Ok(at) = handle.update(cx, |_, window, _| window.bounds()) {
+                self.pill_at = Some(at);
+            }
             cx.defer(move |cx| {
                 let _ = handle.update(cx, |_, window, _| window.remove_window());
             });
