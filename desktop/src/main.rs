@@ -89,6 +89,14 @@ fn main() {
                         println!("smoke enter: {}", keys.join(", "));
                         smoke_frames(window);
                     }
+                    if let Ok(page) = std::env::var("TAKT_DESKTOP_SMOKE_SETTINGS_PAGE") {
+                        let row = std::env::var("TAKT_DESKTOP_SMOKE_SETTINGS_ROW")
+                            .ok()
+                            .and_then(|r| r.parse().ok())
+                            .unwrap_or(0);
+                        let found = view.smoke_settings_page(&page, row, window, cx);
+                        println!("smoke settings page {page}: {found}");
+                    }
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_SETTINGS").is_some() {
                         let said = view.smoke_settings(window, cx);
                         println!("smoke settings: {}", said.join(" | "));

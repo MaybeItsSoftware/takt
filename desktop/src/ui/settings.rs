@@ -20,11 +20,60 @@ use gpui::{
     AnyElement, ClickEvent, Context, Corner, FontWeight, IntoElement, ParentElement, SharedString,
     Styled, anchored, deferred, div, point, prelude::*, px,
 };
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 /// The width every dropdown and text control on the page is drawn at, so
 /// their values line up down the page.
 const CONTROL_WIDTH: f32 = 220.;
+/// The smoke run's check that each description's wrapped lines fit the box
+/// layout gave it: on, every row drawn is measured, and any that would run
+/// past its box is kept in [`OVERFLOWING`].
+pub static CHECK_ROWS: AtomicBool = AtomicBool::new(false);
+pub static OVERFLOWING: Mutex<Vec<String>> = Mutex::new(Vec::new());
+thread_local! {
+    static NEEDS: std::cell::RefCell<std::collections::HashMap<String, f32>> =
+        Default::default();
+}
+pub static ROWS_CHECKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn check_row_fits(id: &str, text: &str, drawn: gpui::Bounds<gpui::Pixels>, window: &gpui::Window) {
+    let style = window.text_style();
+    let size = style.font_size.to_pixels(window.rem_size());
+    let line = style.line_height_in_pixels(window.rem_size());
+    let runs = [style.to_run(text.len())];
+    let Ok(lines) = window.text_system().shape_text(
+        SharedString::from(text.to_string()),
+        size,
+        &runs,
+        Some(drawn.size.width),
+        None,
+    ) else {
+        return;
+    };
+    let count: usize = lines.iter().map(|l| l.wrap_boundaries().len() + 1).sum();
+    let needs = line * count as f32;
+    if needs > drawn.size.height + px(1.) {
+        note_overflow(format!(
+            "{id} ({count} lines in {:.0}px)",
+            f32::from(drawn.size.height)
+        ));
+    }
+}
+
+fn note_overflow(said: String) {
+    let mut over = OVERFLOWING.lock().unwrap_or_else(|e| e.into_inner());
+    if !over.contains(&said) {
+        over.push(said);
+    }
+}
+
+/// A row's padding above and below its text.
+const ROW_PAD_Y: f32 = 9.;
+
+/// The room each row keeps for its control, beside the description.
+const CONTROL_SLOT: f32 = 240.;
 /// A control's height: buttons, dropdowns, fields and shortcuts alike.
 const CONTROL_HEIGHT: f32 = 26.;
 const MENU_ROW: f32 = 26.;
@@ -388,6 +437,65 @@ impl Takt {
 
     /// The second half, once the window is up: Esc twice through the
     /// settings window's own handler clears the search and closes it.
+    /// `TAKT_DESKTOP_SMOKE_SETTINGS_PAGE=<category>`: settings left open on
+    /// that page with its `row`th row lit, for a picture of it.
+    pub fn smoke_settings_page(
+        &mut self,
+        category: &str,
+        row: usize,
+        window: &mut gpui::Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        CHECK_ROWS.store(true, Ordering::Relaxed);
+        // Drawn, then wider, then narrower: a row measured at one width and
+        // drawn at another shows only once the width changes.
+        cx.spawn(async move |this, cx| {
+            for (wait, width, height) in [(400, 1280., 700.), (400, 900., 420.)] {
+                cx.background_executor()
+                    .timer(Duration::from_millis(wait))
+                    .await;
+                let handle = this
+                    .update(cx, |this, _| this.settings_window)
+                    .ok()
+                    .flatten();
+                if let Some(handle) = handle {
+                    let _ = handle.update(cx, |_, window, _| {
+                        window.resize(gpui::size(px(width), px(height)))
+                    });
+                }
+            }
+            cx.background_executor()
+                .timer(Duration::from_millis(400))
+                .await;
+            let over = OVERFLOWING.lock().unwrap_or_else(|e| e.into_inner());
+            println!(
+                "smoke settings rows overflowing ({} drawn): {} {}",
+                ROWS_CHECKED.load(Ordering::Relaxed),
+                over.len(),
+                over.join(", ")
+            );
+        })
+        .detach();
+        self.app.overlay = None;
+        self.app.editing = None;
+        let open = gpui::KeyDownEvent {
+            keystroke: gpui::Keystroke::parse("cmd-,").expect("a key"),
+            is_held: false,
+        };
+        self.key_down(&open, window, cx);
+        let tab = gpui::Keystroke::parse("tab").expect("a key");
+        for _ in 0..self.app.settings_categories().len() {
+            if self.app.settings_category().eq_ignore_ascii_case(category) {
+                if let Some(page) = self.app.settings_page.as_mut() {
+                    page.cursor = row;
+                }
+                return true;
+            }
+            self.settings_key(&tab, cx);
+        }
+        false
+    }
+
     pub fn smoke_settings_close(
         &mut self,
         window: &mut gpui::Window,
@@ -736,6 +844,8 @@ impl Takt {
         let category = self.app.settings_category();
         let mut body: Vec<AnyElement> = Vec::new();
         let mut section: Option<&'static str> = None;
+        // Which of `body` is which row, for the smoke run's check.
+        let mut row_ids: Vec<Option<String>> = Vec::new();
         // Sync's own rows are an account screen rather than a list.
         let sync_page = !searching && category == super::sync_page::SYNC;
         if sync_page {
@@ -764,6 +874,10 @@ impl Takt {
                 );
             }
             section = Some(row.group);
+            while row_ids.len() < body.len() {
+                row_ids.push(None);
+            }
+            row_ids.push(Some(row.id.clone()));
             body.push(self.setting_row(ix, ix == cursor, row, searching, t, cx));
         }
         div()
@@ -815,6 +929,25 @@ impl Takt {
             )
             .child(
                 div()
+                    // Each row as the page laid it out, against what its
+                    // box needs: a row squeezed by the page runs its text
+                    // across its hairlines.
+                    .when(CHECK_ROWS.load(Ordering::Relaxed), |d| {
+                        d.on_children_prepainted(move |bounds, _, _| {
+                            for (drawn, id) in bounds.iter().zip(&row_ids) {
+                                let Some(id) = id else { continue };
+                                let needs = NEEDS.with(|n| n.borrow().get(id).copied());
+                                if let Some(needs) = needs
+                                    && f32::from(drawn.size.height) + 0.5 < needs
+                                {
+                                    note_overflow(format!(
+                                        "{id} (laid out {:.0}px for {needs:.0}px)",
+                                        f32::from(drawn.size.height)
+                                    ));
+                                }
+                            }
+                        })
+                    })
                     .id("settings-rows")
                     .flex_1()
                     .min_h_0()
@@ -841,37 +974,41 @@ impl Takt {
         let id = row.id.clone();
         let description = row.description();
         let plugin = !searching && row.id.starts_with("plugin:");
-        div()
-            .id(SharedString::from(format!("setting-{}", row.id)))
-            .pr_2()
-            .pl(px(8.))
-            .py(px(12.))
-            .min_h(px(44.))
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_6()
-            .border_b_1()
-            .border_color(t.border_variant)
-            .relative()
-            .when(here, |d| {
-                d.bg(t.hover).child(
-                    div()
-                        .absolute()
-                        .left_0()
-                        .top_0()
-                        .bottom_0()
-                        .w(px(2.))
-                        .bg(t.accent),
-                )
+        // The hairline spans the page; the row under the keyboard is a
+        // rounded box inset between two of them, so lighting it moves
+        // nothing.
+        let checking = CHECK_ROWS.load(Ordering::Relaxed);
+        let content = std::rc::Rc::new(std::cell::Cell::new(0f32));
+        let inner = div()
+            .when(checking, |d| {
+                let content = content.clone();
+                d.on_children_prepainted(move |bounds, _, _| {
+                    if let Some(column) = bounds.first() {
+                        content.set(f32::from(column.size.height));
+                    }
+                })
             })
+            .id(SharedString::from(format!("setting-{}", row.id)))
+            .my(px(3.))
+            .px(px(10.))
+            .py(px(ROW_PAD_Y))
+            .min_h(px(38.))
+            .relative()
+            .flex()
+            .flex_col()
+            .justify_center()
+            .rounded(px(6.))
+            .when(here, |d| d.bg(t.hover))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.settings_clicked(ix, &id, cx);
             }))
             .child(
+                // A block as wide as the row, the control's room kept on
+                // its right: laid out beside the control in a flex row, a
+                // wrapped description was measured at the row's whole width
+                // and so ran past the row it was drawn in.
                 div()
-                    .flex_1()
-                    .min_w_0()
+                    .pr(px(CONTROL_SLOT + 24.))
                     .flex()
                     .flex_col()
                     .gap(px(2.))
@@ -892,10 +1029,55 @@ impl Takt {
                             .child(row.title.clone()),
                     )
                     .when(!description.is_empty(), |d| {
-                        d.child(div().text_color(t.muted).child(description))
+                        let checked = description.to_string();
+                        let row_id = row.id.clone();
+                        d.child(div().text_color(t.muted).child(description)).when(
+                            CHECK_ROWS.load(Ordering::Relaxed),
+                            |d| {
+                                d.on_children_prepainted(move |bounds, window, _| {
+                                    if let Some(drawn) = bounds.last() {
+                                        check_row_fits(&row_id, &checked, *drawn, window);
+                                    }
+                                })
+                            },
+                        )
                     }),
             )
-            .child(self.setting_control(row, t, cx))
+            .child(
+                // One width for every control, whatever it shows, so a
+                // description wraps the same with a setting on or off.
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .right(px(10.))
+                    .w(px(CONTROL_SLOT))
+                    .flex()
+                    .items_center()
+                    .justify_end()
+                    .child(self.setting_control(row, t, cx)),
+            );
+        let row_id = row.id.clone();
+        div()
+            .border_b_1()
+            .border_color(t.border_variant)
+            .child(inner)
+            .when(checking, |d| {
+                d.on_children_prepainted(move |bounds, _, _| {
+                    let Some(drawn) = bounds.first() else { return };
+                    // Its box, its margins and its hairline.
+                    let whole = f32::from(drawn.size.height) + 6. + 1.;
+                    NEEDS.with(|n| n.borrow_mut().insert(row_id.clone(), whole));
+                    ROWS_CHECKED.fetch_add(1, Ordering::Relaxed);
+                    let needs = content.get() + 2. * ROW_PAD_Y;
+                    if f32::from(drawn.size.height) + 1. < needs {
+                        note_overflow(format!(
+                            "{row_id} (row {:.0}px for {needs:.0}px)",
+                            f32::from(drawn.size.height)
+                        ));
+                    }
+                })
+            })
             .into_any_element()
     }
 
@@ -1069,13 +1251,15 @@ impl Takt {
 fn control(control: Control, open: bool, recording: bool, t: Tokens) -> AnyElement {
     let note = |text: String| {
         div()
-            .max_w(px(260.))
+            .min_w_0()
+            .flex_shrink()
             .truncate()
             .text_color(t.muted)
             .child(text)
     };
     let boxed = |lit: bool| {
         div()
+            .flex_none()
             .h(px(CONTROL_HEIGHT))
             .flex()
             .items_center()
@@ -1084,12 +1268,19 @@ fn control(control: Control, open: bool, recording: bool, t: Tokens) -> AnyEleme
             .border_1()
             .border_color(if lit { t.accent } else { t.border })
     };
-    let side = div().flex_none().flex().items_center().gap_3();
+    let side = div()
+        .max_w_full()
+        .min_w_0()
+        .flex()
+        .justify_end()
+        .items_center()
+        .gap_3();
     match control {
         Control::Switch { on, note: said } => side
             .when(!said.is_empty(), |d| d.child(note(said)))
             .child(
                 div()
+                    .flex_none()
                     .w(px(34.))
                     .h(px(20.))
                     .p(px(2.))
