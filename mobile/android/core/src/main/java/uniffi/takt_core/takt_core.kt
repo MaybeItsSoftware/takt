@@ -1311,6 +1311,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_add_task_link(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_add_timer_to_focus_queue(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_add_to_focus_queue(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_all_commitments(
@@ -1568,6 +1570,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_method_coreworkspace_sidebar_index_with_open_counts(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_start_focus_session(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_start_focus_timer(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_stop_commitment(
     ): Int
@@ -1855,6 +1859,8 @@ internal object UniffiLib {
     ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_add_task_link(`ptr`: Long,`taskId`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,`title`: RustBuffer.ByValue,`mimeType`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
+    external fun uniffi_takt_core_fn_method_coreworkspace_add_timer_to_focus_queue(`ptr`: Long,`sessionId`: RustBuffer.ByValue,`taskId`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_add_to_focus_queue(`ptr`: Long,`sessionId`: RustBuffer.ByValue,`taskId`: RustBuffer.ByValue,`plannedSeconds`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_all_commitments(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -2112,6 +2118,8 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_method_coreworkspace_sidebar_index_with_open_counts(`ptr`: Long,`listIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_start_focus_session(`ptr`: Long,`taskId`: RustBuffer.ByValue,`plannedSeconds`: RustBuffer.ByValue,`workSeconds`: Long,`breakSeconds`: Long,`context`: RustBuffer.ByValue,`overrideAvailability`: Byte,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_start_focus_timer(`ptr`: Long,`taskId`: RustBuffer.ByValue,`breakSeconds`: Long,`context`: RustBuffer.ByValue,`overrideAvailability`: Byte,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_stop_commitment(`ptr`: Long,`commitmentTaskId`: RustBuffer.ByValue,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -3676,6 +3684,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_add_task_link() and 0xFFFF) != 4160) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_add_timer_to_focus_queue() and 0xFFFF) != 49424) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_add_to_focus_queue() and 0xFFFF) != 31877) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -4061,6 +4072,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_start_focus_session() and 0xFFFF) != 4001) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_start_focus_timer() and 0xFFFF) != 17651) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_stop_commitment() and 0xFFFF) != 16726) {
@@ -5594,6 +5608,12 @@ public interface CoreWorkspaceInterface {
     fun `addTaskLink`(`taskId`: kotlin.String, `url`: kotlin.String, `title`: kotlin.String?, `mimeType`: kotlin.String?, `nowMs`: kotlin.Long): kotlin.Boolean
     
     /**
+     * Queues a task in a focus session to be timed when it takes over:
+     * see [`Self::start_focus_timer`].
+     */
+    fun `addTimerToFocusQueue`(`sessionId`: kotlin.String, `taskId`: kotlin.String, `nowMs`: kotlin.Long)
+    
+    /**
      * Queues a task in a focus session.
      */
     fun `addToFocusQueue`(`sessionId`: kotlin.String, `taskId`: kotlin.String, `plannedSeconds`: kotlin.Long?, `nowMs`: kotlin.Long)
@@ -6288,6 +6308,15 @@ public interface CoreWorkspaceInterface {
      * Starts a focus session on a task, or returns the one running.
      */
     fun `startFocusSession`(`taskId`: kotlin.String, `plannedSeconds`: kotlin.Long?, `workSeconds`: kotlin.Long, `breakSeconds`: kotlin.Long, `context`: FocusContext?, `overrideAvailability`: kotlin.Boolean, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.String
+    
+    /**
+     * Starts a timer on a task: a focus session whose block has no length
+     * and counts up until it is finished (`SessionRow::open_ended`). With a
+     * `context` the task has to be available in it, its length aside,
+     * unless `override_availability` is set. Returns the session's id, or
+     * the one already running.
+     */
+    fun `startFocusTimer`(`taskId`: kotlin.String, `breakSeconds`: kotlin.Long, `context`: FocusContext?, `overrideAvailability`: kotlin.Boolean, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.String
     
     /**
      * Stops the commitment on `commitment_task_id` as one step.
@@ -8148,6 +8177,26 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
     }
     )
     }
+    
+
+    
+    /**
+     * Queues a task in a focus session to be timed when it takes over:
+     * see [`Self::start_focus_timer`].
+     */
+    @Throws(CoreException::class)override fun `addTimerToFocusQueue`(`sessionId`: kotlin.String, `taskId`: kotlin.String, `nowMs`: kotlin.Long)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_add_timer_to_focus_queue(
+        it,
+        
+        FfiConverterString.lower(`sessionId`),
+        FfiConverterString.lower(`taskId`),
+        FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    
     
 
     
@@ -10668,6 +10717,33 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         FfiConverterString.lower(`taskId`),
         FfiConverterOptionalLong.lower(`plannedSeconds`),
         FfiConverterLong.lower(`workSeconds`),
+        FfiConverterLong.lower(`breakSeconds`),
+        FfiConverterOptionalTypeFocusContext.lower(`context`),
+        FfiConverterBoolean.lower(`overrideAvailability`),
+        FfiConverterLong.lower(`nowMs`),
+        FfiConverterString.lower(`zone`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Starts a timer on a task: a focus session whose block has no length
+     * and counts up until it is finished (`SessionRow::open_ended`). With a
+     * `context` the task has to be available in it, its length aside,
+     * unless `override_availability` is set. Returns the session's id, or
+     * the one already running.
+     */
+    @Throws(CoreException::class)override fun `startFocusTimer`(`taskId`: kotlin.String, `breakSeconds`: kotlin.Long, `context`: FocusContext?, `overrideAvailability`: kotlin.Boolean, `nowMs`: kotlin.Long, `zone`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_start_focus_timer(
+        it,
+        
+        FfiConverterString.lower(`taskId`),
         FfiConverterLong.lower(`breakSeconds`),
         FfiConverterOptionalTypeFocusContext.lower(`context`),
         FfiConverterBoolean.lower(`overrideAvailability`),
@@ -20365,6 +20441,11 @@ data class QueueItemRow (
     var `skippedAtMs`: kotlin.Long?
     , 
     var `createdAtMs`: kotlin.Long
+    , 
+    /**
+     * Timed rather than a pomodoro when it takes over.
+     */
+    var `openEnded`: kotlin.Boolean
     
 ){
     
@@ -20390,6 +20471,7 @@ public object FfiConverterTypeQueueItemRow: FfiConverterRustBuffer<QueueItemRow>
             FfiConverterOptionalLong.read(buf),
             FfiConverterOptionalLong.read(buf),
             FfiConverterLong.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -20402,7 +20484,8 @@ public object FfiConverterTypeQueueItemRow: FfiConverterRustBuffer<QueueItemRow>
             FfiConverterOptionalLong.allocationSize(value.`plannedSeconds`) +
             FfiConverterOptionalLong.allocationSize(value.`completedAtMs`) +
             FfiConverterOptionalLong.allocationSize(value.`skippedAtMs`) +
-            FfiConverterLong.allocationSize(value.`createdAtMs`)
+            FfiConverterLong.allocationSize(value.`createdAtMs`) +
+            FfiConverterBoolean.allocationSize(value.`openEnded`)
     )
 
     override fun write(value: QueueItemRow, buf: ByteBuffer) {
@@ -20415,6 +20498,7 @@ public object FfiConverterTypeQueueItemRow: FfiConverterRustBuffer<QueueItemRow>
             FfiConverterOptionalLong.write(value.`completedAtMs`, buf)
             FfiConverterOptionalLong.write(value.`skippedAtMs`, buf)
             FfiConverterLong.write(value.`createdAtMs`, buf)
+            FfiConverterBoolean.write(value.`openEnded`, buf)
     }
 }
 
@@ -21140,6 +21224,13 @@ data class SessionRow (
     var `pausedAtMs`: kotlin.Long?
     , 
     var `checkpointAtMs`: kotlin.Long?
+    , 
+    /**
+     * A timer: the block in hand has no length and counts up, and
+     * `work_duration_seconds` is only a stand-in for clients that predate
+     * it. See [`crate::focus::OPEN_ENDED_SECONDS`].
+     */
+    var `openEnded`: kotlin.Boolean
     
 ){
     
@@ -21169,6 +21260,7 @@ public object FfiConverterTypeSessionRow: FfiConverterRustBuffer<SessionRow> {
             FfiConverterOptionalLong.read(buf),
             FfiConverterOptionalLong.read(buf),
             FfiConverterOptionalLong.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -21185,7 +21277,8 @@ public object FfiConverterTypeSessionRow: FfiConverterRustBuffer<SessionRow> {
             FfiConverterOptionalString.allocationSize(value.`activeBlockId`) +
             FfiConverterOptionalLong.allocationSize(value.`accumulatedSeconds`) +
             FfiConverterOptionalLong.allocationSize(value.`pausedAtMs`) +
-            FfiConverterOptionalLong.allocationSize(value.`checkpointAtMs`)
+            FfiConverterOptionalLong.allocationSize(value.`checkpointAtMs`) +
+            FfiConverterBoolean.allocationSize(value.`openEnded`)
     )
 
     override fun write(value: SessionRow, buf: ByteBuffer) {
@@ -21202,6 +21295,7 @@ public object FfiConverterTypeSessionRow: FfiConverterRustBuffer<SessionRow> {
             FfiConverterOptionalLong.write(value.`accumulatedSeconds`, buf)
             FfiConverterOptionalLong.write(value.`pausedAtMs`, buf)
             FfiConverterOptionalLong.write(value.`checkpointAtMs`, buf)
+            FfiConverterBoolean.write(value.`openEnded`, buf)
     }
 }
 

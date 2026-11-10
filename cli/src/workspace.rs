@@ -103,12 +103,24 @@ impl Workspace {
     /// a convenience.
     pub fn focus_status(&self, now: DateTime<Utc>) -> Result<Value> {
         let connection = self.open()?;
+        // The CLI reads without migrating: a file from before
+        // `v39_open_ended_focus` has no timers.
+        let has_timers: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('focus_sessions') WHERE name = 'openEnded')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(map_query_error)?;
+        let open_ended = if has_timers { "openEnded" } else { "0" };
         let session = connection
             .query_row(
-                "SELECT id, startedAt, phase, activeTaskId, workDurationSeconds, \
-                 activeTaskStartedAt, accumulatedSeconds, pausedAt, checkpointAt \
-                 FROM focus_sessions WHERE phase <> 'finished' \
-                 ORDER BY startedAt DESC LIMIT 1",
+                &format!(
+                    "SELECT id, startedAt, phase, activeTaskId, workDurationSeconds, \
+                     activeTaskStartedAt, accumulatedSeconds, pausedAt, checkpointAt, {open_ended} \
+                     FROM focus_sessions WHERE phase <> 'finished' \
+                     ORDER BY startedAt DESC LIMIT 1"
+                ),
                 [],
                 |row| {
                     Ok(SessionRow {
@@ -121,6 +133,7 @@ impl Workspace {
                         accumulated_seconds: row.get::<_, Option<i64>>(6)?.unwrap_or(0),
                         paused_at: row.get(7)?,
                         checkpoint_at: row.get(8)?,
+                        open_ended: row.get(9)?,
                     })
                 },
             )
@@ -143,6 +156,8 @@ impl Workspace {
                 .unwrap_or(0)
         };
         let elapsed = session.accumulated_seconds.max(0) + live;
+        // A timer has no length: its clock counts up, and nothing remains.
+        let open_ended = session.open_ended;
         let remaining = session.work_duration_seconds - elapsed;
 
         let title = session
@@ -161,10 +176,11 @@ impl Workspace {
             "task_id": session.active_task_id,
             "task": title,
             "elapsed_seconds": elapsed,
-            "planned_seconds": session.work_duration_seconds,
-            "remaining_seconds": remaining,
-            "overrun": remaining < 0,
-            "clock": clock(remaining.abs()),
+            "timer": open_ended,
+            "planned_seconds": (!open_ended).then_some(session.work_duration_seconds),
+            "remaining_seconds": (!open_ended).then_some(remaining),
+            "overrun": !open_ended && remaining < 0,
+            "clock": clock(if open_ended { elapsed } else { remaining.abs() }),
             "queue": self.queue(&connection, &session.id)?,
         }))
     }
@@ -251,6 +267,7 @@ struct SessionRow {
     accumulated_seconds: i64,
     paused_at: Option<String>,
     checkpoint_at: Option<String>,
+    open_ended: bool,
 }
 
 pub fn default_database_path() -> PathBuf {

@@ -16,11 +16,6 @@ use takt_core::workspace::CoreWorkspace;
 const WORK_SECONDS: i64 = 25 * 60;
 const BREAK_SECONDS: i64 = 5 * 60;
 
-/// A timer's planned length: a day, which nobody sets a pomodoro to. The
-/// core has no open-ended block, so a timer is a block this long; the clock
-/// counts up and the prompt at its end never comes in practice.
-pub const OPEN_ENDED_SECONDS: i64 = 24 * 60 * 60;
-
 /// How a block was started: `gf`, a plain timer counting up; `gp`, a
 /// pomodoro counting down to a break.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,7 +40,7 @@ pub enum FinderHit {
 
 /// A timer, counting up with no length, rather than a pomodoro.
 pub fn is_timer(session: &SessionRow) -> bool {
-    session.work_duration_seconds >= OPEN_ENDED_SECONDS
+    session.open_ended
 }
 
 /// The clock as the pill and the status item read it: up for a timer,
@@ -165,27 +160,29 @@ impl App {
             ));
             return;
         }
-        let planned = match kind {
-            FocusKind::Timer => OPEN_ENDED_SECONDS,
-            FocusKind::Pomodoro => candidate
-                .as_ref()
-                .map(|c| takt_core::focus::suggested_seconds(c, &context, now))
-                .unwrap_or(WORK_SECONDS),
-        };
-        // The timer's availability was settled above; the core would hold
-        // its open length against the time left.
-        let override_core = !available || kind == FocusKind::Timer;
-        let started = self.write(|store| {
-            store.core.start_focus_session(
+        let planned = candidate
+            .as_ref()
+            .map(|c| takt_core::focus::suggested_seconds(c, &context, now))
+            .unwrap_or(WORK_SECONDS);
+        let started = self.write(|store| match kind {
+            FocusKind::Timer => store.core.start_focus_timer(
+                task.id.clone(),
+                BREAK_SECONDS,
+                Some(context),
+                !available,
+                now,
+                zone,
+            ),
+            FocusKind::Pomodoro => store.core.start_focus_session(
                 task.id.clone(),
                 Some(planned),
                 WORK_SECONDS,
                 BREAK_SECONDS,
                 Some(context),
-                override_core,
+                !available,
                 now,
                 zone,
-            )
+            ),
         });
         if started.is_some() {
             self.reload_focus();
@@ -202,18 +199,22 @@ impl App {
     }
 
     /// Adds the selection to the running session's queue, to come after
-    /// the block in hand.
-    pub fn add_selected_to_focus_queue(&mut self) {
+    /// the block in hand: timed when it takes over, or as a pomodoro.
+    pub fn add_selected_to_focus_queue(&mut self, kind: FocusKind) {
         let (Some(session), Some(task)) = (self.focus_session.clone(), self.focus_target()) else {
             return;
         };
         if self
             .write(|store| {
-                // Behind a timer, the next task is timed too.
-                let planned = is_timer(&session).then_some(OPEN_ENDED_SECONDS);
-                store
-                    .core
-                    .add_to_focus_queue(session.id, task.id.clone(), planned, now_ms())
+                if kind == FocusKind::Timer {
+                    store
+                        .core
+                        .add_timer_to_focus_queue(session.id, task.id.clone(), now_ms())
+                } else {
+                    store
+                        .core
+                        .add_to_focus_queue(session.id, task.id.clone(), None, now_ms())
+                }
             })
             .is_some()
         {
@@ -236,7 +237,7 @@ impl App {
     pub fn focus_from_panel(&mut self, task_id: &str, kind: FocusKind) {
         let before = self.selected_task.replace(task_id.to_string());
         if self.focus_running() {
-            self.add_selected_to_focus_queue();
+            self.add_selected_to_focus_queue(kind);
         } else {
             self.start_focus(kind, true);
         }
@@ -454,6 +455,7 @@ mod tests {
             accumulated_seconds: accumulated,
             paused_at_ms: paused,
             checkpoint_at_ms: None,
+            open_ended: false,
         }
     }
 

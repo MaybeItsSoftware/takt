@@ -817,7 +817,7 @@ impl App {
         match id {
             "focus" => {
                 if self.focus_session.is_some() {
-                    self.add_selected_to_focus_queue();
+                    self.add_selected_to_focus_queue(super::focus::FocusKind::Timer);
                 } else {
                     self.start_focus_on_selected(false);
                 }

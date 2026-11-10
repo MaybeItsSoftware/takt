@@ -48,6 +48,7 @@ final class WorkspaceMigrationTests: XCTestCase {
     "v36_task_agent_context",
     "v37_shared_lists",
     "v38_task_authorship",
+    "v39_open_ended_focus",
   ]
 
   private var directoryURL: URL!

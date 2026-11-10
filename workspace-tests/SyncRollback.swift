@@ -43,6 +43,11 @@ extension Database {
     for column in ["createdBy", "completedBy"] {
       try execute(sql: "ALTER TABLE tasks DROP COLUMN \(column)")
     }
+    // `v39_open_ended_focus`: the timer flag on focus sessions and their
+    // queue. Only the outbox's triggers (gone above) name it.
+    for table in ["focus_sessions", "focus_queue_items"] {
+      try execute(sql: "ALTER TABLE \(table) DROP COLUMN openEnded")
+    }
     // `v24_condition_categories`: the journal's `task_conditions` triggers
     // name its new column.
     for operation in ["insert", "update", "delete"] {
@@ -65,6 +70,7 @@ extension Database {
         + "'v26_commitment_missed_stack', 'v27_condition_order_and_context', 'v28_synced_focus_context', "
         + "'v29_daily_contribution_skips', 'v30_google_calendar', 'v31_link_details', 'v32_follow_up_repeat', "
         + "'v33_recurrence_series', 'v34_condition_provides', 'v35_series_title', "
-        + "'v36_task_agent_context', 'v37_shared_lists', 'v38_task_authorship')")
+        + "'v36_task_agent_context', 'v37_shared_lists', 'v38_task_authorship', "
+        + "'v39_open_ended_focus')")
   }
 }

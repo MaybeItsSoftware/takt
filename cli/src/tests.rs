@@ -1450,7 +1450,7 @@ fn workspace_fixture(rows: &[&str]) -> crate::workspace::Workspace {
                workDurationSeconds INTEGER NOT NULL, breakDurationSeconds INTEGER,
                breakEndsAt DATETIME, activeTaskStartedAt DATETIME NOT NULL,
                activeBlockId TEXT, accumulatedSeconds INTEGER, pausedAt DATETIME,
-               checkpointAt DATETIME);
+               checkpointAt DATETIME, openEnded BOOLEAN NOT NULL DEFAULT 0);
              CREATE TABLE focus_queue_items (id TEXT PRIMARY KEY, sessionId TEXT NOT NULL,
                taskId TEXT NOT NULL, sortOrder INTEGER NOT NULL, state TEXT NOT NULL,
                completedAt DATETIME, skippedAt DATETIME, createdAt DATETIME NOT NULL,
@@ -1558,6 +1558,27 @@ fn overrun_is_reported_as_overrun_rather_than_as_negative_time() {
     assert_eq!(status["overrun"], json!(true));
     assert_eq!(status["remaining_seconds"], json!(-150));
     assert_eq!(status["clock"], json!("2:30"));
+}
+
+/// A timer has no length: its clock is the time so far, and nothing remains.
+#[test]
+fn a_timer_reads_as_time_so_far() {
+    let workspace = workspace_fixture(&[
+        "INSERT INTO tasks VALUES ('t4', 'Open ended');",
+        "INSERT INTO focus_sessions (id, startedAt, phase, activeTaskId, workDurationSeconds,
+           activeTaskStartedAt, accumulatedSeconds, openEnded)
+         VALUES ('s4', '2026-09-26 09:00:00.000', 'running', 't4', 86400,
+           '2026-09-26 09:00:00.000', 0, 1);",
+    ]);
+
+    let status = workspace
+        .focus_status(utc("2026-09-26 09:12:30"))
+        .expect("status");
+
+    assert_eq!(status["timer"], json!(true));
+    assert_eq!(status["remaining_seconds"], json!(null));
+    assert_eq!(status["overrun"], json!(false));
+    assert_eq!(status["clock"], json!("12:30"));
 }
 
 /// A finished session is not a running one, however recently it ended.

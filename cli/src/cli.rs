@@ -1560,7 +1560,9 @@ fn render_focus(payload: &Value) {
     }
     let task = payload["task"].as_str().unwrap_or("(unknown task)");
     let clock = payload["clock"].as_str().unwrap_or("");
-    let state = if payload["overrun"] == Value::Bool(true) {
+    let state = if payload["timer"] == Value::Bool(true) {
+        format!("{clock} so far")
+    } else if payload["overrun"] == Value::Bool(true) {
         format!("{clock} over")
     } else {
         format!("{clock} left")

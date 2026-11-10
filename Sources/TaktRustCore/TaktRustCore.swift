@@ -1414,6 +1414,12 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func addTaskLink(taskId: String, url: String, title: String?, mimeType: String?, nowMs: Int64) throws  -> Bool
     
     /**
+     * Queues a task in a focus session to be timed when it takes over:
+     * see [`Self::start_focus_timer`].
+     */
+    func addTimerToFocusQueue(sessionId: String, taskId: String, nowMs: Int64) throws 
+    
+    /**
      * Queues a task in a focus session.
      */
     func addToFocusQueue(sessionId: String, taskId: String, plannedSeconds: Int64?, nowMs: Int64) throws 
@@ -2108,6 +2114,15 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
      * Starts a focus session on a task, or returns the one running.
      */
     func startFocusSession(taskId: String, plannedSeconds: Int64?, workSeconds: Int64, breakSeconds: Int64, context: FocusContext?, overrideAvailability: Bool, nowMs: Int64, zone: String) throws  -> String
+    
+    /**
+     * Starts a timer on a task: a focus session whose block has no length
+     * and counts up until it is finished (`SessionRow::open_ended`). With a
+     * `context` the task has to be available in it, its length aside,
+     * unless `override_availability` is set. Returns the session's id, or
+     * the one already running.
+     */
+    func startFocusTimer(taskId: String, breakSeconds: Int64, context: FocusContext?, overrideAvailability: Bool, nowMs: Int64, zone: String) throws  -> String
     
     /**
      * Stops the commitment on `commitment_task_id` as one step.
@@ -3511,6 +3526,21 @@ open func addTaskLink(taskId: String, url: String, title: String?, mimeType: Str
         FfiConverterInt64.lower(nowMs),uniffiCallStatus
     )
 })
+}
+    
+    /**
+     * Queues a task in a focus session to be timed when it takes over:
+     * see [`Self::start_focus_timer`].
+     */
+open func addTimerToFocusQueue(sessionId: String, taskId: String, nowMs: Int64)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_add_timer_to_focus_queue(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(sessionId),
+        FfiConverterString.lower(taskId),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+}
 }
     
     /**
@@ -5388,6 +5418,28 @@ open func startFocusSession(taskId: String, plannedSeconds: Int64?, workSeconds:
         FfiConverterString.lower(taskId),
         FfiConverterOptionInt64.lower(plannedSeconds),
         FfiConverterInt64.lower(workSeconds),
+        FfiConverterInt64.lower(breakSeconds),
+        FfiConverterOptionTypeFocusContext.lower(context),
+        FfiConverterBool.lower(overrideAvailability),
+        FfiConverterInt64.lower(nowMs),
+        FfiConverterString.lower(zone),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Starts a timer on a task: a focus session whose block has no length
+     * and counts up until it is finished (`SessionRow::open_ended`). With a
+     * `context` the task has to be available in it, its length aside,
+     * unless `override_availability` is set. Returns the session's id, or
+     * the one already running.
+     */
+open func startFocusTimer(taskId: String, breakSeconds: Int64, context: FocusContext?, overrideAvailability: Bool, nowMs: Int64, zone: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_start_focus_timer(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),
         FfiConverterInt64.lower(breakSeconds),
         FfiConverterOptionTypeFocusContext.lower(context),
         FfiConverterBool.lower(overrideAvailability),
@@ -17450,10 +17502,17 @@ public struct QueueItemRow: Equatable, Hashable {
     public var completedAtMs: Int64?
     public var skippedAtMs: Int64?
     public var createdAtMs: Int64
+    /**
+     * Timed rather than a pomodoro when it takes over.
+     */
+    public var openEnded: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, sessionId: String, taskId: String, sortOrder: Int64, state: String, plannedSeconds: Int64?, completedAtMs: Int64?, skippedAtMs: Int64?, createdAtMs: Int64) {
+    public init(id: String, sessionId: String, taskId: String, sortOrder: Int64, state: String, plannedSeconds: Int64?, completedAtMs: Int64?, skippedAtMs: Int64?, createdAtMs: Int64, 
+        /**
+         * Timed rather than a pomodoro when it takes over.
+         */openEnded: Bool) {
         self.id = id
         self.sessionId = sessionId
         self.taskId = taskId
@@ -17463,6 +17522,7 @@ public struct QueueItemRow: Equatable, Hashable {
         self.completedAtMs = completedAtMs
         self.skippedAtMs = skippedAtMs
         self.createdAtMs = createdAtMs
+        self.openEnded = openEnded
     }
 
     
@@ -17489,7 +17549,8 @@ public struct FfiConverterTypeQueueItemRow: FfiConverterRustBuffer {
                 plannedSeconds: FfiConverterOptionInt64.read(from: &buf), 
                 completedAtMs: FfiConverterOptionInt64.read(from: &buf), 
                 skippedAtMs: FfiConverterOptionInt64.read(from: &buf), 
-                createdAtMs: FfiConverterInt64.read(from: &buf)
+                createdAtMs: FfiConverterInt64.read(from: &buf), 
+                openEnded: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -17503,6 +17564,7 @@ public struct FfiConverterTypeQueueItemRow: FfiConverterRustBuffer {
         FfiConverterOptionInt64.write(value.completedAtMs, into: &buf)
         FfiConverterOptionInt64.write(value.skippedAtMs, into: &buf)
         FfiConverterInt64.write(value.createdAtMs, into: &buf)
+        FfiConverterBool.write(value.openEnded, into: &buf)
     }
 }
 
@@ -18444,13 +18506,24 @@ public struct SessionRow: Equatable, Hashable {
     public var accumulatedSeconds: Int64?
     public var pausedAtMs: Int64?
     public var checkpointAtMs: Int64?
+    /**
+     * A timer: the block in hand has no length and counts up, and
+     * `work_duration_seconds` is only a stand-in for clients that predate
+     * it. See [`crate::focus::OPEN_ENDED_SECONDS`].
+     */
+    public var openEnded: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(id: String, startedAtMs: Int64, endedAtMs: Int64?, 
         /**
          * "running", "onBreak", "paused" or "finished".
-         */phase: String, activeTaskId: String?, activeTaskStartedAtMs: Int64, workDurationSeconds: Int64, breakDurationSeconds: Int64, breakEndsAtMs: Int64?, activeBlockId: String?, accumulatedSeconds: Int64?, pausedAtMs: Int64?, checkpointAtMs: Int64?) {
+         */phase: String, activeTaskId: String?, activeTaskStartedAtMs: Int64, workDurationSeconds: Int64, breakDurationSeconds: Int64, breakEndsAtMs: Int64?, activeBlockId: String?, accumulatedSeconds: Int64?, pausedAtMs: Int64?, checkpointAtMs: Int64?, 
+        /**
+         * A timer: the block in hand has no length and counts up, and
+         * `work_duration_seconds` is only a stand-in for clients that predate
+         * it. See [`crate::focus::OPEN_ENDED_SECONDS`].
+         */openEnded: Bool) {
         self.id = id
         self.startedAtMs = startedAtMs
         self.endedAtMs = endedAtMs
@@ -18464,6 +18537,7 @@ public struct SessionRow: Equatable, Hashable {
         self.accumulatedSeconds = accumulatedSeconds
         self.pausedAtMs = pausedAtMs
         self.checkpointAtMs = checkpointAtMs
+        self.openEnded = openEnded
     }
 
     
@@ -18494,7 +18568,8 @@ public struct FfiConverterTypeSessionRow: FfiConverterRustBuffer {
                 activeBlockId: FfiConverterOptionString.read(from: &buf), 
                 accumulatedSeconds: FfiConverterOptionInt64.read(from: &buf), 
                 pausedAtMs: FfiConverterOptionInt64.read(from: &buf), 
-                checkpointAtMs: FfiConverterOptionInt64.read(from: &buf)
+                checkpointAtMs: FfiConverterOptionInt64.read(from: &buf), 
+                openEnded: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -18512,6 +18587,7 @@ public struct FfiConverterTypeSessionRow: FfiConverterRustBuffer {
         FfiConverterOptionInt64.write(value.accumulatedSeconds, into: &buf)
         FfiConverterOptionInt64.write(value.pausedAtMs, into: &buf)
         FfiConverterOptionInt64.write(value.checkpointAtMs, into: &buf)
+        FfiConverterBool.write(value.openEnded, into: &buf)
     }
 }
 
@@ -33956,6 +34032,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_add_task_link() != 4160) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_add_timer_to_focus_queue() != 49424) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_add_to_focus_queue() != 31877) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -34341,6 +34420,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_start_focus_session() != 4001) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_start_focus_timer() != 17651) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_stop_commitment() != 16726) {

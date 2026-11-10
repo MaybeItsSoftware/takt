@@ -174,6 +174,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "v38_task_authorship",
         include_str!("migrations/v38_task_authorship.sql"),
     ),
+    (
+        "v39_open_ended_focus",
+        include_str!("migrations/v39_open_ended_focus.sql"),
+    ),
 ];
 
 /// Brings the database at `path` up to date, creating it if it does not

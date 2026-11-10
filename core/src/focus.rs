@@ -21,6 +21,28 @@ use crate::periodic;
 use crate::planning::Planning;
 use crate::time::{parse_stored, stored};
 
+/// What a timer's `workDurationSeconds` holds: a day. A timer has no
+/// length (its `openEnded` says so); this is for a client from before
+/// `v39_open_ended_focus`, which reads the column and would otherwise end
+/// the block on its own.
+pub const OPEN_ENDED_SECONDS: i64 = 24 * 60 * 60;
+
+/// The reasons that are about a block's length, which a timer has none of.
+fn about_length(reason: &Unavailable) -> bool {
+    matches!(
+        reason,
+        Unavailable::InsufficientTime { .. } | Unavailable::NeedsEstimate
+    )
+}
+
+/// Whether `candidate` can be worked on now, as a timer (`open_ended`) or a
+/// block of a length.
+fn available(candidate: &Candidate, context: &FocusContext, now_ms: i64, open_ended: bool) -> bool {
+    reasons(candidate, context, now_ms)
+        .iter()
+        .all(|reason| open_ended && about_length(reason))
+}
+
 /// The circumstances a sitting is planned in: which conditions hold, when the
 /// time available ends, and whether the aim is progress or finishing.
 #[derive(Debug, Clone, Default, PartialEq, Eq, uniffi::Record)]
@@ -476,8 +498,9 @@ fn require_actionable(connection: &Connection, id: &str) -> Result<(), CoreError
 
 /// Starts a focus session on a task and returns its id, or returns the one
 /// already running. With a `context`, the task has to be available in it and
-/// the block long enough for it, unless `override_availability` is set.
-/// `WorkspaceStore.startFocusSession`.
+/// the block long enough for it, unless `override_availability` is set. With
+/// `open_ended` the block is a timer: no length, so `planned_seconds` and
+/// the length checks don't apply. `WorkspaceStore.startFocusSession`.
 #[allow(clippy::too_many_arguments)]
 pub fn start_session(
     transaction: &Transaction,
@@ -487,6 +510,7 @@ pub fn start_session(
     break_seconds: i64,
     context: Option<&FocusContext>,
     override_availability: bool,
+    open_ended: bool,
     now_ms: i64,
     zone: &str,
 ) -> Result<String, CoreError> {
@@ -505,7 +529,7 @@ pub fn start_session(
         let candidate = candidates(transaction, now_ms, zone)?
             .into_iter()
             .find(|candidate| candidate.id == task_id)
-            .filter(|candidate| reasons(candidate, context, now_ms).is_empty())
+            .filter(|candidate| available(candidate, context, now_ms, open_ended))
             .ok_or(CoreError::Unavailable)?;
         let chosen = planned_seconds.unwrap_or(work_seconds);
         let fits_minimum = chosen >= candidate.minimum_block_seconds.unwrap_or(60).max(60);
@@ -514,42 +538,71 @@ pub fn start_session(
         let fits_window = context
             .ends_at_ms
             .is_none_or(|end| chosen as f64 <= (end - now_ms) as f64 / 1000.0);
-        if !(fits_minimum && fits_sitting && fits_window) {
+        let fits = fits_minimum && fits_sitting && fits_window;
+        if !(open_ended || fits) {
             return Err(CoreError::Unavailable);
         }
     }
+    insert_session(
+        transaction,
+        task_id,
+        if open_ended { None } else { planned_seconds },
+        work_seconds,
+        break_seconds,
+        open_ended,
+        now_ms,
+    )
+}
+
+fn insert_session(
+    transaction: &Transaction,
+    task_id: &str,
+    planned_seconds: Option<i64>,
+    work_seconds: i64,
+    break_seconds: i64,
+    open_ended: bool,
+    now_ms: i64,
+) -> Result<String, CoreError> {
     let id = new_id();
     let now = stored(now_ms);
+    let work = if open_ended {
+        OPEN_ENDED_SECONDS
+    } else {
+        planned_seconds.unwrap_or(work_seconds).max(60)
+    };
     transaction.execute(
         "INSERT INTO focus_sessions (id, startedAt, endedAt, phase, activeTaskId, workDurationSeconds,
                                      breakDurationSeconds, breakEndsAt, activeTaskStartedAt, activeBlockId,
-                                     accumulatedSeconds, pausedAt, checkpointAt)
-         VALUES (?1, ?2, NULL, 'running', ?3, ?4, ?5, NULL, ?2, ?6, NULL, NULL, ?2)",
+                                     accumulatedSeconds, pausedAt, checkpointAt, openEnded)
+         VALUES (?1, ?2, NULL, 'running', ?3, ?4, ?5, NULL, ?2, ?6, NULL, NULL, ?2, ?7)",
         params![
             id,
             now,
             task_id,
-            planned_seconds.unwrap_or(work_seconds).max(60),
+            work,
             break_seconds.max(60),
-            new_id()
+            new_id(),
+            open_ended
         ],
     )?;
     transaction.execute(
         "INSERT INTO focus_queue_items (id, sessionId, taskId, sortOrder, state, plannedSeconds,
-                                        completedAt, skippedAt, createdAt)
-         VALUES (?1, ?2, ?3, 0, 'queued', ?4, NULL, NULL, ?5)",
-        params![new_id(), id, task_id, planned_seconds, now],
+                                        completedAt, skippedAt, createdAt, openEnded)
+         VALUES (?1, ?2, ?3, 0, 'queued', ?4, NULL, NULL, ?5, ?6)",
+        params![new_id(), id, task_id, planned_seconds, now, open_ended],
     )?;
     Ok(id)
 }
 
 /// Queues a task in a session; queuing one already waiting does nothing.
+/// With `open_ended` it is timed when it takes over, not given a length.
 /// `WorkspaceStore.addToFocusQueue`.
 pub fn add_to_queue(
     transaction: &Transaction,
     session_id: &str,
     task_id: &str,
     planned_seconds: Option<i64>,
+    open_ended: bool,
     now_ms: i64,
 ) -> Result<(), CoreError> {
     let session_exists: bool = transaction.query_row(
@@ -578,15 +631,16 @@ pub fn add_to_queue(
     )?;
     transaction.execute(
         "INSERT INTO focus_queue_items (id, sessionId, taskId, sortOrder, state, plannedSeconds,
-                                        completedAt, skippedAt, createdAt)
-         VALUES (?1, ?2, ?3, ?4, 'queued', ?5, NULL, NULL, ?6)",
+                                        completedAt, skippedAt, createdAt, openEnded)
+         VALUES (?1, ?2, ?3, ?4, 'queued', ?5, NULL, NULL, ?6, ?7)",
         params![
             new_id(),
             session_id,
             task_id,
             count,
-            planned_seconds,
-            stored(now_ms)
+            if open_ended { None } else { planned_seconds },
+            stored(now_ms),
+            open_ended
         ],
     )?;
     Ok(())
@@ -918,32 +972,33 @@ fn hand_off(
     let all = candidates(transaction, now_ms, zone)?;
     let by_id: HashMap<&str, &Candidate> = all.iter().map(|c| (c.id.as_str(), c)).collect();
     let mut statement = transaction.prepare(
-        "SELECT taskId, plannedSeconds FROM focus_queue_items WHERE sessionId = ?1 AND state = 'queued' ORDER BY sortOrder",
+        "SELECT taskId, plannedSeconds, openEnded FROM focus_queue_items WHERE sessionId = ?1 AND state = 'queued' ORDER BY sortOrder",
     )?;
-    let pending: Vec<(String, Option<i64>)> = statement
-        .query_map([session_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+    let pending: Vec<(String, Option<i64>, bool)> = statement
+        .query_map([session_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?
         .collect::<Result<_, _>>()?;
-    let next = pending.iter().find_map(|(task_id, planned)| {
+    let next = pending.iter().find_map(|(task_id, planned, open_ended)| {
         by_id
             .get(task_id.as_str())
-            .filter(|candidate| reasons(candidate, context, now_ms).is_empty())
-            .map(|candidate| (*candidate, *planned))
+            .filter(|candidate| available(candidate, context, now_ms, *open_ended))
+            .map(|candidate| (*candidate, *planned, *open_ended))
     });
     let now = stored(now_ms);
     match next {
-        Some((candidate, planned)) => {
+        Some((candidate, planned, open_ended)) => {
+            let work = if open_ended {
+                OPEN_ENDED_SECONDS
+            } else {
+                planned_seconds(candidate, planned, context, now_ms)
+            };
             transaction.execute(
                 "UPDATE focus_sessions SET activeTaskId = ?1, activeTaskStartedAt = ?2, accumulatedSeconds = 0,
                                            pausedAt = NULL, checkpointAt = ?2, activeBlockId = ?3,
-                                           workDurationSeconds = ?4
-                 WHERE id = ?5",
-                params![
-                    candidate.id,
-                    now,
-                    new_id(),
-                    planned_seconds(candidate, planned, context, now_ms),
-                    session_id
-                ],
+                                           workDurationSeconds = ?4, openEnded = ?5
+                 WHERE id = ?6",
+                params![candidate.id, now, new_id(), work, open_ended, session_id],
             )?;
             Ok(true)
         }

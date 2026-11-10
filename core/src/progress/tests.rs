@@ -429,6 +429,7 @@ fn paused_workspace(paused_at: i64, accumulated: i64) -> (Connection, String) {
         300,
         None,
         false,
+        false,
         paused_at - accumulated * 1000,
         "UTC",
     )

@@ -126,6 +126,10 @@ pub struct SessionRow {
     pub accumulated_seconds: Option<i64>,
     pub paused_at_ms: Option<i64>,
     pub checkpoint_at_ms: Option<i64>,
+    /// A timer: the block in hand has no length and counts up, and
+    /// `work_duration_seconds` is only a stand-in for clients that predate
+    /// it. See [`crate::focus::OPEN_ENDED_SECONDS`].
+    pub open_ended: bool,
 }
 
 /// A row of `focus_queue_items`. `FocusQueueItem`.
@@ -140,6 +144,8 @@ pub struct QueueItemRow {
     pub completed_at_ms: Option<i64>,
     pub skipped_at_ms: Option<i64>,
     pub created_at_ms: i64,
+    /// Timed rather than a pomodoro when it takes over.
+    pub open_ended: bool,
 }
 
 /// A queued item with its task. `FocusQueueTask`.
@@ -309,6 +315,7 @@ impl SessionRow {
             accumulated_seconds: row.get("accumulatedSeconds")?,
             paused_at_ms: optional_ms(row, "pausedAt")?,
             checkpoint_at_ms: optional_ms(row, "checkpointAt")?,
+            open_ended: row.get("openEnded")?,
         })
     }
 }
@@ -325,6 +332,7 @@ impl QueueItemRow {
             completed_at_ms: optional_ms(row, "completedAt")?,
             skipped_at_ms: optional_ms(row, "skippedAt")?,
             created_at_ms: required_ms(row, "createdAt")?,
+            open_ended: row.get("openEnded")?,
         })
     }
 }

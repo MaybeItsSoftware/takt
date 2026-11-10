@@ -1200,6 +1200,37 @@ impl CoreWorkspace {
                 break_seconds,
                 context.as_ref(),
                 override_availability,
+                false,
+                now_ms,
+                &zone,
+            )
+        })
+    }
+
+    /// Starts a timer on a task: a focus session whose block has no length
+    /// and counts up until it is finished (`SessionRow::open_ended`). With a
+    /// `context` the task has to be available in it, its length aside,
+    /// unless `override_availability` is set. Returns the session's id, or
+    /// the one already running.
+    pub fn start_focus_timer(
+        &self,
+        task_id: String,
+        break_seconds: i64,
+        context: Option<FocusContext>,
+        override_availability: bool,
+        now_ms: i64,
+        zone: String,
+    ) -> Result<String, CoreError> {
+        self.unjournalled(|tx| {
+            focus::start_session(
+                tx,
+                &task_id,
+                None,
+                focus::OPEN_ENDED_SECONDS,
+                break_seconds,
+                context.as_ref(),
+                override_availability,
+                true,
                 now_ms,
                 &zone,
             )
@@ -1215,8 +1246,19 @@ impl CoreWorkspace {
         now_ms: i64,
     ) -> Result<(), CoreError> {
         self.unjournalled(|tx| {
-            focus::add_to_queue(tx, &session_id, &task_id, planned_seconds, now_ms)
+            focus::add_to_queue(tx, &session_id, &task_id, planned_seconds, false, now_ms)
         })
+    }
+
+    /// Queues a task in a focus session to be timed when it takes over:
+    /// see [`Self::start_focus_timer`].
+    pub fn add_timer_to_focus_queue(
+        &self,
+        session_id: String,
+        task_id: String,
+        now_ms: i64,
+    ) -> Result<(), CoreError> {
+        self.unjournalled(|tx| focus::add_to_queue(tx, &session_id, &task_id, None, true, now_ms))
     }
 
     /// Finishes the block in hand as one step: "Complete Task", or "Log Daily

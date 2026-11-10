@@ -51,7 +51,9 @@ fn start(
     context: Option<&FocusContext>,
 ) -> Result<String, CoreError> {
     let tx = connection.transaction().unwrap();
-    let id = start_session(&tx, task, None, 1_500, 300, context, false, NOW, "UTC")?;
+    let id = start_session(
+        &tx, task, None, 1_500, 300, context, false, false, NOW, "UTC",
+    )?;
     tx.commit().unwrap();
     Ok(id)
 }
@@ -83,8 +85,8 @@ fn finishing_a_block_completes_the_task_scores_it_and_hands_off() {
     let id = start(&mut connection, "write", None).unwrap();
     {
         let tx = connection.transaction().unwrap();
-        add_to_queue(&tx, &id, "read", Some(600), NOW).unwrap();
-        add_to_queue(&tx, &id, "read", Some(600), NOW).unwrap();
+        add_to_queue(&tx, &id, "read", Some(600), false, NOW).unwrap();
+        add_to_queue(&tx, &id, "read", Some(600), false, NOW).unwrap();
         tx.commit().unwrap();
     }
     let finished = journalled(&mut connection, "Complete Task", |tx| {
@@ -173,7 +175,7 @@ fn a_blocked_queue_waits_paused_and_resumes_when_the_context_allows() {
     let id = start(&mut connection, "write", None).unwrap();
     {
         let tx = connection.transaction().unwrap();
-        add_to_queue(&tx, &id, "garden", None, NOW).unwrap();
+        add_to_queue(&tx, &id, "garden", None, false, NOW).unwrap();
         tx.commit().unwrap();
     }
     journalled(&mut connection, "Complete Task", |tx| {
@@ -390,7 +392,7 @@ fn going_back_after_the_task_was_finished_on_the_break_moves_the_queue_on() {
     let id = start(&mut connection, "write", None).unwrap();
     {
         let tx = connection.transaction().unwrap();
-        add_to_queue(&tx, &id, "read", Some(600), NOW).unwrap();
+        add_to_queue(&tx, &id, "read", Some(600), false, NOW).unwrap();
         take_break(&tx, &id, 1_500, None, None, NOW, "UTC").unwrap();
         crate::tasks::set_status(&tx, "write", "completed", NOW + 60_000, "UTC").unwrap();
         end_break(&tx, &id, &FocusContext::default(), NOW + 300_000, "UTC").unwrap();
@@ -401,4 +403,99 @@ fn going_back_after_the_task_was_finished_on_the_break_moves_the_queue_on() {
         (phase.as_str(), active.as_deref(), paused),
         ("running", Some("read"), None)
     );
+}
+
+fn timing(connection: &Connection, id: &str) -> (bool, i64) {
+    connection
+        .query_row(
+            "SELECT openEnded, workDurationSeconds FROM focus_sessions WHERE id = ?1",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap()
+}
+
+#[test]
+fn a_timer_has_no_length_and_passes_on_to_a_timed_task_in_the_queue() {
+    let mut connection = workspace();
+    // Ten minutes left: too short for Write's 25 as a block, but a timer
+    // has no length to hold against it.
+    let short = FocusContext {
+        mode: "finish".into(),
+        ends_at_ms: Some(NOW + 10 * 60 * 1000),
+        ..Default::default()
+    };
+    let tx = connection.transaction().unwrap();
+    assert!(matches!(
+        start_session(
+            &tx,
+            "write",
+            None,
+            1_500,
+            300,
+            Some(&short),
+            false,
+            false,
+            NOW,
+            "UTC"
+        ),
+        Err(CoreError::Unavailable)
+    ));
+    let id = start_session(
+        &tx,
+        "write",
+        None,
+        1_500,
+        300,
+        Some(&short),
+        false,
+        true,
+        NOW,
+        "UTC",
+    )
+    .unwrap();
+    // A task it can't do (Garden needs Home) stays unavailable as a timer.
+    add_to_queue(&tx, &id, "garden", None, true, NOW).unwrap();
+    add_to_queue(&tx, &id, "read", Some(600), true, NOW).unwrap();
+    tx.commit().unwrap();
+    assert_eq!(timing(&connection, &id), (true, OPEN_ENDED_SECONDS));
+    let session_row = crate::rows::session(&connection, &id).unwrap().unwrap();
+    assert!(session_row.open_ended);
+    let queue = crate::rows::queue(&connection, &id).unwrap();
+    assert!(queue.iter().all(|entry| entry.item.open_ended));
+    assert_eq!(queue[2].item.planned_seconds, None);
+
+    journalled(&mut connection, "Complete Task", |tx| {
+        finish_block(tx, &id, 600, None, true, None, &short, NOW, "UTC")
+    })
+    .unwrap();
+    assert_eq!(session(&connection, &id).1.as_deref(), Some("read"));
+    assert_eq!(timing(&connection, &id), (true, OPEN_ENDED_SECONDS));
+}
+
+#[test]
+fn a_pomodoro_behind_a_timer_gets_its_length_back() {
+    let mut connection = workspace();
+    let tx = connection.transaction().unwrap();
+    let id = start_session(
+        &tx, "write", None, 1_500, 300, None, false, true, NOW, "UTC",
+    )
+    .unwrap();
+    add_to_queue(&tx, &id, "read", Some(600), false, NOW).unwrap();
+    tx.commit().unwrap();
+    journalled(&mut connection, "Complete Task", |tx| {
+        finish_block(
+            tx,
+            &id,
+            60,
+            None,
+            true,
+            None,
+            &FocusContext::default(),
+            NOW,
+            "UTC",
+        )
+    })
+    .unwrap();
+    assert_eq!(timing(&connection, &id), (false, 600));
 }

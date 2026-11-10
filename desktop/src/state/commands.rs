@@ -5,6 +5,7 @@
 //! status bar rather than doing nothing; `PORTED` lists those it can, and a
 //! test holds every catalogue id to being either ported or reported.
 
+use super::focus::FocusKind;
 use super::outline::NewPlacement;
 use super::store::now_ms;
 use super::{App, Editing, Overlay, Region, Scope, ViewMode};
@@ -149,14 +150,14 @@ impl App {
             // Behind a running block, either one queues the task.
             "taskStartFocus" => {
                 if self.focus_running() {
-                    self.add_selected_to_focus_queue();
+                    self.add_selected_to_focus_queue(FocusKind::Timer);
                 } else {
                     self.start_focus_on_selected(false);
                 }
             }
             crate::keys::START_POMODORO => {
                 if self.focus_running() {
-                    self.add_selected_to_focus_queue();
+                    self.add_selected_to_focus_queue(FocusKind::Pomodoro);
                 } else {
                     self.start_pomodoro_on_selected(false);
                 }
@@ -351,7 +352,9 @@ impl App {
                     (Some(running), Some(selected)) if running == selected => {
                         self.request_focus_completion(true)
                     }
-                    (_, _) if self.focus_running() => self.add_selected_to_focus_queue(),
+                    (_, _) if self.focus_running() => {
+                        self.add_selected_to_focus_queue(FocusKind::Timer)
+                    }
                     _ => self.start_focus_on_selected(true),
                 }
             }
