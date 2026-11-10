@@ -12,6 +12,7 @@ mod celebrate;
 mod chrome;
 mod dock;
 pub mod icons;
+mod log_time;
 pub mod menus;
 mod notes_editor;
 pub mod panel;
@@ -973,6 +974,13 @@ impl Takt {
             }
             return true;
         }
+        // And the log-time selector: its digits are the minutes.
+        if matches!(self.app.editing, Some(Editing::Log(_))) {
+            if let Some(key) = spell(&Press::from_keystroke(keystroke)) {
+                self.app.log_key(&key);
+            }
+            return true;
+        }
         if matches!(self.app.editing, Some(Editing::AgentMessage)) {
             let m = &keystroke.modifiers;
             match keystroke.key.as_str() {
@@ -1584,7 +1592,7 @@ impl Takt {
         } else if self.app.editing.is_some()
             && !matches!(
                 self.app.editing,
-                Some(Editing::Date(_) | Editing::Repeat(_))
+                Some(Editing::Date(_) | Editing::Repeat(_) | Editing::Log(_))
             )
         {
             Some(&mut self.field)

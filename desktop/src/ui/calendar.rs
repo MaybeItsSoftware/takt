@@ -1,4 +1,4 @@
-//! The calendar that opens under the inspector's Scheduled and Due rows: a
+//! The calendar that floats under the inspector's Start and Due rows: a
 //! month of days to click or walk, and under it the time, typed. `Tab`
 //! goes from the days to the time (and, for Scheduled, on to how long it
 //! takes); its keys are `App::date_key`'s.
@@ -253,9 +253,8 @@ impl Takt {
         });
         div()
             .id("date-panel")
-            .mt_1()
-            .mb_1()
-            .ml(px(22.))
+            .occlude()
+            .w(px(280.))
             .p_2()
             .rounded(px(6.))
             .border_1()

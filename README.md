@@ -156,12 +156,15 @@ rename, `h` / `l` / `-` collapse, expand and go up, `gg` / `Shift+G` the ends,
 opens the same panel's menu, each item with its sidebar key beside it.
 
 The **inspector** is modal, as vim is. With the keyboard in it, `j` / `k` (or
-`↓` / `↑`) move a row cursor down every row, in sections headed by what you do
-with a task, and within When, Filed and Needs each row is its label beside its
+`↓` / `↑`) move a row cursor down every row, in sections set apart by a
+gap (no headings) by what you do with a task, and within When, Filed and Needs each row is its label beside its
 value, so Start sits plainly above Estimate, Due and Repeat:
 the title; working on it (Start focus, which says how far it has got — time
 logged against the estimate and subtasks done — and Log time worked, where on
-the Mac you type `25`, `25m` or `1h 20m` to record work done without the
+the Mac a minute selector floats under the row — `↑` / `↓` step five
+minutes, `Shift+↑` / `Shift+↓` fifteen, `←` / `→` walk the presets (15, 25,
+30, 45, 60 and 90 minutes, each one click too), digits type the minutes,
+`Return` logs it and `Esc` leaves — to record work done without the
 timer and without finishing the task, which counts toward a daily due today
 as a timed block would; then daily progress and the commitment); when
 (Start, the slot it is scheduled into and hidden until; Estimate, how long it takes; how it may be split once it
@@ -171,8 +174,8 @@ and `gg` / `Shift+G` (or `Home` / `End`) go to the first and last. Landing on
 a text row only highlights it, so the notes no longer keep the keyboard.
 `Return`, `i` or `e` edits the row: it puts the caret in a field, presses a
 button, flips a switch, opens a menu, the date picker, the repeat selector or,
-on Conditions, the `cc` finder. On the Mac the date picker under Scheduled
-and Due is a month of days with the time typed beside it, not picked: the
+on Conditions, the `cc` finder. On the Mac the date picker under Start
+and Due floats over the rows below it, and is a month of days with the time typed beside it, not picked: the
 arrows (or `hjkl`) move a day or a week, `[` / `]` a month, `t` goes to today,
 and `Tab` moves to the time field, where `9`, `9:30`, `14:00` and `2pm` all
 read (a digit typed on the days starts it, `↑` / `↓` nudge it by 15 minutes).
@@ -193,7 +196,7 @@ does `Esc`. In a one-line field `Return` keeps what you typed and `Esc` puts
 it back, and either returns you to the row; `↑` / `↓` keep it and move on. In
 the notes and the links the arrows and `Return` are the text's: `Esc` or
 `Cmd+Return` keeps the text and comes out; with the Markdown editor plugin on,
-the row under the notes (or `nm`, or `Cmd+Ctrl+M` from inside them) opens them
+the maximise button on the notes' row (or `nm`, or `Cmd+Ctrl+M` from inside them) opens them
 full size, and says whether they are the task's linked Obsidian note.
 `Tab` / `Shift+Tab` keep the field
 and go on to the next / previous row, editing it if it is a field. The mouse

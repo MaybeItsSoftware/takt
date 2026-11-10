@@ -277,32 +277,19 @@ impl App {
 
     /// The inspector's row under the notes that opens the editor, saying
     /// what it will edit: none with the plugin off.
-    pub fn add_notes_editor_stop(&self, stops: &mut Vec<super::inspector::Stop>, task_id: &str) {
+    /// What the maximise button on the notes row says, while the Markdown
+    /// editor is on: the notes share their line with it.
+    pub fn notes_editor_tip(&self, task_id: &str) -> Option<String> {
         if !self.notes_editor_on() {
-            return;
+            return None;
         }
-        let Some(at) = stops.iter().position(|s| s.id == "notes") else {
-            return;
-        };
-        let value = match self.linked_note(task_id) {
+        Some(match self.linked_note(task_id) {
             Some(note) if self.notes_are_obsidian_file(task_id) => {
-                format!("Notes are {}.md · open", note.name)
+                format!("Notes are {}.md: open them", note.name)
             }
             Some(note) => format!("Open with {}.md beside", note.name),
             None => "Open in the Markdown editor".into(),
-        };
-        stops.insert(
-            at + 1,
-            super::inspector::Stop {
-                id: "notes-editor",
-                label: "",
-                value,
-                empty: false,
-                kind: super::inspector::StopKind::Action,
-                group: false,
-                links: Vec::new(),
-            },
-        );
+        })
     }
 
     /// `nm` / `⌃⌘M`: the selected task's notes, maximised.

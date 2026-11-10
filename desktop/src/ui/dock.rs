@@ -1,5 +1,24 @@
 use super::icons::icon;
 use super::*;
+use gpui::{anchored, deferred, point};
+
+/// A popover under an inspector row (the calendar, the repeat and log-time
+/// selectors): it floats over the rows below rather than pushing them down.
+fn floating(panel: AnyElement) -> AnyElement {
+    div()
+        .relative()
+        .h(px(0.))
+        .child(
+            deferred(
+                anchored()
+                    .offset(point(px(76.), px(2.)))
+                    .snap_to_window_with_margin(px(8.))
+                    .child(panel),
+            )
+            .with_priority(1),
+        )
+        .into_any_element()
+}
 
 impl Takt {
     pub(super) fn right_dock(
@@ -204,19 +223,7 @@ impl Takt {
                     div()
                         .id(("inspector-stop", ix))
                         .when(stop.group && ix > 0, |d| {
-                            d.mt_1().pt_1().border_t_1().border_color(t.border_variant)
-                        })
-                        .when_some(stop.section().filter(|_| ix > 0), |d, heading| {
-                            d.child(
-                                div()
-                                    .px_2()
-                                    .pt_1()
-                                    .pb(px(2.))
-                                    .text_size(px(10.))
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(t.muted)
-                                    .child(heading.to_uppercase()),
-                            )
+                            d.mt_2().pt_2().border_t_1().border_color(t.border_variant)
                         })
                         .child(
                             div()
@@ -312,6 +319,44 @@ impl Takt {
                                             ),
                                     )
                                 })
+                                // The notes share their line with the
+                                // Markdown editor's maximise button.
+                                .when_some(
+                                    (stop.id == "notes" && !open)
+                                        .then(|| self.app.selected_task.clone())
+                                        .flatten()
+                                        .and_then(|id| self.app.notes_editor_tip(&id)),
+                                    |d, tip| {
+                                        d.child(
+                                            div()
+                                                .id("inspector-maximise-notes")
+                                                .flex_none()
+                                                .h(px(18.))
+                                                .px(px(3.))
+                                                .flex()
+                                                .items_center()
+                                                .gap_1()
+                                                .rounded(px(4.))
+                                                .hover(|d| d.bg(t.hover))
+                                                .tooltip(super::widgets::tip(tip, t))
+                                                .on_click(cx.listener(
+                                                    |this, _: &ClickEvent, _, cx| {
+                                                        cx.stop_propagation();
+                                                        this.app.open_notes_editor();
+                                                        this.after_change(cx);
+                                                        cx.notify();
+                                                    },
+                                                ))
+                                                .child(icon("maximize-2", 13.).text_color(t.muted))
+                                                .when_some(
+                                                    self.app.key_hint("taskMaximiseNotes"),
+                                                    |d, keys| {
+                                                        d.child(super::widgets::key_hint(keys, t))
+                                                    },
+                                                ),
+                                        )
+                                    },
+                                )
                                 .when_some(
                                     stop.command()
                                         .filter(|_| !open && stop.id != "title")
@@ -324,14 +369,21 @@ impl Takt {
                                 Some(Editing::Date(edit)) if edit.stop == stop.id => Some(edit),
                                 _ => None,
                             },
-                            |d, edit| d.child(self.date_panel(edit, t, cx)),
+                            |d, edit| d.child(floating(self.date_panel(edit, t, cx))),
                         )
                         .when_some(
                             match &self.app.editing {
                                 Some(Editing::Repeat(edit)) if stop.id == "repeat" => Some(edit),
                                 _ => None,
                             },
-                            |d, edit| d.child(self.repeat_panel(edit, t, cx)),
+                            |d, edit| d.child(floating(self.repeat_panel(edit, t, cx))),
+                        )
+                        .when_some(
+                            match &self.app.editing {
+                                Some(Editing::Log(edit)) if stop.id == "log" => Some(edit),
+                                _ => None,
+                            },
+                            |d, edit| d.child(floating(self.log_panel(edit, t, cx))),
                         )
                         .into_any_element()
                 })

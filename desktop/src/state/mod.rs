@@ -31,6 +31,7 @@ pub mod inspector_container;
 pub mod integrations;
 pub mod library;
 pub mod links;
+pub mod log_edit;
 pub mod markdown;
 pub mod mcp_clients;
 pub mod menubar;
@@ -188,6 +189,8 @@ pub enum Editing {
     Date(date_edit::DateEdit),
     /// The repeat selector open under the inspector's repeat row.
     Repeat(repeat::RepeatEdit),
+    /// The minute selector open under the inspector's Log time row.
+    Log(log_edit::LogEdit),
     /// The Markdown editor, over the window: `App::notes_editor` says what
     /// it edits.
     NotesEditor,

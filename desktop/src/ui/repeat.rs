@@ -1,4 +1,4 @@
-//! The repeat selector under the inspector's repeat row: "Every ‹3›
+//! The repeat selector floating under the inspector's repeat row: "Every ‹3›
 //! ‹days›", the units to step through, and when it would next come round.
 //! Its keys are `App::repeat_key`'s; everything here can be clicked too.
 
@@ -149,15 +149,17 @@ impl Takt {
             .child(hint("esc", "cancel"));
 
         div()
-            .mt_1()
+            .id("repeat-panel")
+            .occlude()
+            .w(px(300.))
             .p_2()
             .flex()
             .flex_col()
             .gap_2()
             .rounded(px(6.))
             .border_1()
-            .border_color(t.border_variant)
-            .bg(t.surface)
+            .border_color(t.border)
+            .bg(t.background)
             .child(sentence)
             .child(units)
             .when(!next.is_empty(), |d| d.child(upcoming))

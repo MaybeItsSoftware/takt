@@ -94,21 +94,6 @@ impl Stop {
         }
     }
 
-    /// The heading over the group this row starts, when it starts one.
-    pub fn section(&self) -> Option<&'static str> {
-        if !self.group {
-            return None;
-        }
-        Some(match self.id {
-            "focus" => "Work",
-            "start" => "When",
-            "notes" => "Notes",
-            "move" => "Filed",
-            "conditions" => "Needs",
-            _ => "Actions",
-        })
-    }
-
     /// A field, drawn as its label beside its value, so the When rows read
     /// as a form: Start, Estimate, Due and Repeat each where it is looked
     /// for. Actions and free text keep their icon.
@@ -620,7 +605,6 @@ impl App {
                 .value(Some(of_list), &format!("Add agent context for {list}")),
             );
         }
-        self.add_notes_editor_stop(&mut stops, &task.id);
         // The links sit beside the name, with the button that adds one.
         if let Some(stop) = stops.iter_mut().find(|s| s.id == "title") {
             stop.links = self
@@ -734,6 +718,7 @@ impl App {
         match stop.id {
             "start" | "due" => return self.open_date_edit(stop.id),
             "repeat" => return self.open_repeat_edit(),
+            "log" => return self.open_log_edit(),
             _ => {}
         }
         match stop.kind {
@@ -999,7 +984,7 @@ impl App {
     }
 
     /// Records time worked on the selected task without a focus session.
-    fn log_selected_work(&mut self, seconds: i64) {
+    pub(super) fn log_selected_work(&mut self, seconds: i64) {
         let Some(id) = self.selected_task.clone() else {
             return;
         };
@@ -1203,7 +1188,6 @@ mod tests {
         let ids = [
             "focus",
             "notes",
-            "notes-editor",
             "estimate",
             "tags",
             "conditions",
@@ -1385,7 +1369,6 @@ mod tests {
         assert_eq!(value("start"), "Mon 9 Nov, 14:00\u{2013}14:30");
         assert_eq!(value("due"), "Fri 13 Nov");
         assert_eq!(value("repeat"), "Weekly");
-        assert_eq!(stops[from].section(), Some("When"));
         assert!(stops[from..from + 6].iter().all(Stop::labelled));
         assert_eq!(format_slot(start, None), "Mon 9 Nov, 14:00");
     }

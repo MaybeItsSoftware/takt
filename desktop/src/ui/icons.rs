@@ -61,6 +61,9 @@ const NAMES: &[&str] = &[
     "palette",
     "keyboard",
     "timer",
+    "maximize-2",
+    "plus",
+    "minus",
     "bell",
     "party",
     "refresh",
@@ -150,6 +153,11 @@ fn body(name: &str) -> Option<&'static str> {
         "keyboard" => {
             r#"<rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/>"#
         }
+        "maximize-2" => {
+            r#"<path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/>"#
+        }
+        "plus" => r#"<path d="M5 12h14"/><path d="M12 5v14"/>"#,
+        "minus" => r#"<path d="M5 12h14"/>"#,
         "timer" => r#"<path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/>"#,
         "bell" => {
             r#"<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>"#
