@@ -95,7 +95,7 @@ impl Mode {
 }
 
 /// What `o` opens in the main window.
-enum Target {
+pub enum Target {
     Task(String),
     List(String),
 }
@@ -418,7 +418,7 @@ impl FocusPanel {
 
     /// `o` (`⌘O` while typing): the task, or list, in the main window,
     /// which takes the keyboard; the panel goes back to the pill.
-    fn open_in_main(&mut self, target: Target, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_in_main(&mut self, target: Target, window: &mut Window, cx: &mut Context<Self>) {
         let takt = self.takt.clone();
         takt.update(cx, |takt, _| takt.panel_return_to = None);
         window.remove_window();

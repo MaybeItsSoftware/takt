@@ -444,19 +444,23 @@ impl Takt {
 
     /// Brings the main window forward, opening a new one onto this same
     /// state if it was closed.
+    ///
+    /// Always once this update ends: the main window's root is this entity,
+    /// so reaching the window (or drawing a new one) from inside one of its
+    /// updates would lease it twice and abort.
     pub fn show_main_window(&mut self, cx: &mut Context<Self>) {
-        if let Some(handle) = self.main
-            && handle
-                .update(cx, |_, window, _| window.activate_window())
-                .is_ok()
-        {
-            cx.activate(true);
-            return;
-        }
-        self.main = None;
-        // Once this update ends: the window's first draw reads this entity.
+        let main = self.main;
         let takt = cx.entity();
         cx.defer(move |cx| {
+            if let Some(handle) = main
+                && handle
+                    .update(cx, |_, window, _| window.activate_window())
+                    .is_ok()
+            {
+                cx.activate(true);
+                return;
+            }
+            takt.update(cx, |this, _| this.main = None);
             open_main(&takt, cx);
         });
     }
@@ -626,6 +630,29 @@ impl Takt {
                     )
                 });
                 println!("smoke panel: {line}");
+                // The panel's `o`: the panel goes and the main window shows
+                // the task.
+                let id = takt.read(cx).app.selected_task.clone();
+                takt.update(cx, |this, cx| {
+                    this.app.wants_panel = Some(true);
+                    this.open_requested_windows(cx);
+                });
+                let takt = takt.clone();
+                cx.defer(move |cx| {
+                    let handle = takt.read(cx).panel;
+                    let (Some(handle), Some(id)) = (handle, id) else {
+                        println!("smoke panel open in takt: skipped");
+                        return;
+                    };
+                    let _ = handle.update(cx, |panel, window, cx| {
+                        panel.open_in_main(panel::Target::Task(id.clone()), window, cx)
+                    });
+                    let takt = takt.clone();
+                    cx.defer(move |cx| {
+                        let shown = takt.read(cx).app.selected_task.as_deref() == Some(id.as_str());
+                        println!("smoke panel open in takt: selected {shown}");
+                    });
+                });
             });
         });
     }
