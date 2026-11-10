@@ -112,7 +112,8 @@ So none of it is reachable only by something you already have to know.
 | `tc` | Hide or show completed tasks — a completed task stays put for three seconds and then leaves the list; `tc` shows them all again |
 | `bu` | Bury the task: it starts tomorrow, so until then it sinks, greyed and subtasks and all, to the **Buried** section below its blocked siblings in the outline, on the board and in the matrix — and Today picks it up the morning it arrives. `start <value>` buries it until any other time; `clear start` digs it up |
 | `tl` | Hide or show buried tasks — anything whose start is still to come. Shown by default; `tl` hides them, with their subtasks. A filter list with a start-date rule always shows what it matches, and jumping to a buried task from search shows them again |
-| `gf` | Start a focus block on the task — on Today, queue it behind a running block |
+| `gf` | Start a focus timer on the task: it counts up, with no set length and no break. With a block running, queue the task behind it |
+| `gp` | Start a pomodoro on the task: a block of the suggested length (25 minutes unless the task's estimate says otherwise), with a break offered at its end. With a block running, queue the task behind it. Mac only |
 | `Cmd+Shift+Return` | Finish the running focus block — completes its task and asks how it went, as Done does. Works from anywhere in the window, inside a field too |
 | `Cmd+Shift+.` | Stop the running focus block — the time so far is logged unscored, the task stays open and the queue is dropped. Works from anywhere, the focus panel included |
 | `Cmd+Alt+8` / `ga` | Set what's available now — the right dock's Conditions tab, with the keyboard in it: the conditions (Home, Campus, Floor space…) that hold here, which decide what the day offers. Again from inside it puts the dock away. See [Conditions](#conditions) |
@@ -363,7 +364,7 @@ the hotkey summons over other apps. One component, two mounts — a day that rea
 differently depending on where you opened it would be two days.
 
 Each card carries what the task is, what it should cost, and what it has cost so
-far. `gf` (or `Tab` in the panel) on a card starts it; the card you are on grows a live clock and a
+far. `gf` (or `Return` in the panel) on a card starts a timer on it, `gp` (or `p`) a pomodoro; the card you are on grows a live clock and a
 strip of pause, skip, log and done, so a whole block runs without the list ever
 going away.
 
@@ -426,7 +427,7 @@ dock under them — so none of it is reachable only by a key you have to already
 | `Up` / `Down` (or `j` / `k`) | Move between cards, and through the subtasks of an open one |
 | `Right` / `l` | Open a card to show its subtasks, then step into them — on one with none, go to the inspector |
 | `Left` / `h` | Fold an open card, or step from a subtask up to its card — at the top of the day, back to the list in the sidebar |
-| `gf` (window) / `Tab` (panel) | Start the card you are on, or queue it behind the one running |
+| `gf` / `gp` (window), `Return` / `p` (panel) | Start a timer / a pomodoro on the card you are on, or queue it behind the one running |
 | `Space` / `x` | Tick the card off without running a block — on the running card, finish it |
 | `Return` | Add a task — on a subtask, the next subtask under the same card (in the panel, from what you typed) |
 | `Ctrl+T` | Plan the card for today, or take it off — an overdue or dated card becomes one you placed |
@@ -440,10 +441,17 @@ moved to `Ctrl`.
 ## Focus
 
 Focus is the floating panel described [below](#the-focus-panel): the day to
-pick from while nothing runs, and the running block's strip once something
-does. There is no focus pane in the main window. `Cmd+8`, the title bar's
-**Focus** button and Today's **Focus** button all raise the panel, and
-`⌃⌥⇧⌘F` summons it from any app.
+pick from while nothing runs, and the queue once something does. There is no
+focus pane in the main window. `Cmd+8`, the title bar's **Focus** button and
+Today's **Focus** button all raise the panel, and `⌃⌥⇧⌘F` summons it from any
+app.
+
+A block is one of two kinds. **A timer** (`gf`, the inspector's *Start focus*,
+`Return` in the panel) counts up for as long as you work, with no length and
+no break; you end it with Finish or Stop. **A pomodoro** (`gp`, `p` in the
+panel) runs for the suggested length, 25 minutes unless the task's estimate
+says otherwise, and when it runs out asks how it went and offers a 5-minute
+break. Either one puts up [the focus pill](#the-focus-pill).
 
 The quality question is what turns minutes into points, so it is asked by
 default — but **Ask how each focus block went** in Settings turns it off, and
@@ -623,147 +631,37 @@ for now; what they do there reaches the phones through sync.
 
 ### The focus panel
 
-`⌃⌥⇧⌘F` summons the focus panel over whatever app you are in — the one surface
-you can reach without going to the app. It comes up with the caret already in
-its field, so there is nothing to click, and it comes up **alone**: the main
-window stays wherever you left it, open or closed, rather than being dragged
-forward along with it.
+`⌃⌥⇧⌘F` summons the focus panel over whatever app you are in, or brings it
+forward with the keyboard in it when it is already up; `Esc` puts it away.
+The status item's menu and `Cmd+8` open it too. Rebind or disable the hotkey
+in Settings → Keyboard.
 
-It **stays where you put it**. Clicking back into your editor does not dismiss
-it: it floats above the other window, at the size and position you gave it,
-until you press `Esc` or the hotkey again. Drag it anywhere, drag its edges to
-resize, and it comes back the same next time. It is a panel you leave up while
-you work, not an overlay you summon and lose.
-
-What it shows is **the day as a list of cards**, numbered, each with its
-estimate and the time already on it, under a bar showing what the day is meant
-to cost against what it has cost so far.
-
-The day is not only what you dragged into the Today column. It is, in order:
-the block you are running, then whatever you put on Today by hand, then
-anything overdue, then anything **due today**, then anything **starting
-today**. Each task appears once, under the strongest reason that claims it, and
-the card says which — so work with a date on it turns up in the panel without
-you having to go and find it first. A task you placed on Today by hand still
-outranks every automatic reason, because a plan you made is a decision and a
-due date is only a fact. The planned cards are also the only ones you arrange:
-`Ctrl+T` plans the card you are on (or takes it off), and `Alt+↑` / `Alt+↓`
-move a planned card through the day. A dated card stays where its date puts it
-— press `Alt+↓` on one and the status bar says to plan it first. Press a
-card and it starts; the card you are on grows a live clock and its own strip of
-controls — pause, skip, log, done — while the rest of the list stays visible
-underneath. Finished work collects at the bottom, one line per task rather than
-one per sitting.
-
-It deliberately does **not** put you through questions before you may begin —
-conditions, an available-time window, an estimate to commit to. Those are how
-you decide what a day should be; this is the panel you keep open while working
-it, so pressing play on a row is the whole gesture.
-
-Everything a block needs it can do on its own — pick the task, run the clock,
-pause it, log progress, and score the block when it ends. Nothing in it reaches
-for the main window, so **Takt needs no Dock icon** for any of it: close
-the main window and the app drops to the menu bar, and the panel keeps working
-exactly as before, keyboard included. Closing the window while the panel is up
-hands the caret straight back to it.
-
-Where a started block runs is a preference — **Run focus blocks in** under
-Settings → Focus. *Floating panel*, the default, keeps the panel up.
-*Menu bar* puts the panel away too: the status item carries the task and its
-clock, and the keyboard goes back to the app you were in. *Both* does both.
-With the panel alone, the status item leaves the menu bar while a block runs.
-So the hotkey, a task name and `Return` is the whole way from a thought to a
-running block, whichever you choose.
-
-While a block runs the panel is **a strip**: the task and its clock, one row
-high, and nothing else. `Space` finishes and asks how it went, `P` pauses and
-resumes, `Return` opens the day to add a task, `Cmd+Return` opens the main window, `↓` (or a double-click) brings
-the day back for queueing or switching, and `Esc` hides it. In the day, the running card's minimise button and `Esc` shrink it back to the strip, and clicking the running card only selects it — `Done` is the one way to finish. A break, the score
-at the end, or the next summon puts it back to the full day or the strip as the
-block calls for; the panel keeps the size you gave it for the day.
-
-Under the day's bar, a second line sets today against **the week it belongs
-to**: how many tasks you have finished today, how much time the week has taken
-so far, and what that comes to per day over the days that have actually
-happened. There is no target to configure first — the week is its own
-denominator, which is the only way to know whether a thin-feeling day really is
-one.
-
-| | |
-| --- | --- |
-| **Empty field** | The day's cards, running task first. A day that claims nothing falls back to the ranked shortlist |
-| **Anything typed** | Every task whose title or notes match, wherever it lives, with *Add “…” to today* at the foot |
+At the top are the running task and its clock. Under them, while nothing
+runs, is the day to start from; while a block runs, the queue behind it.
+Every action is a letter, and a footer of key hints spells them out:
 
 | Key | Action |
 | --- | --- |
-| `↑` / `↓` | Choose |
-| `Return` | Add what you typed to Today and start it — or, with a block already running, queue it |
-| `Space` | With the field empty, tick off the card you are on — on the running card, Done |
-| `Tab` | Start the card you are on, or queue it behind a running block |
-| `Cmd+Return` | Open it in the main window instead |
-| `Cmd+Shift+.` / `Cmd+Shift+Return` | Stop the running block / finish it |
-| `Esc` | Clear the field, then minimise to the running block's strip — or, with nothing running, hide the panel |
-| `Cmd+C` / `Cmd+V` | Copy and paste, sent straight to the field — an app with no Dock icon has no Edit menu to route them |
-| `Cmd+P` | Go to a list — see *Lists in the panel* below |
+| `j` / `k`, `↓` / `↑` | Move through the rows |
+| `Return` | Start a timer on the highlighted task, or queue it behind a running block |
+| `p` | Start a pomodoro on it, or queue it behind a running block |
+| `Space` | Pause or resume the running block (on a break, back to work) |
+| `d` | Finish the block, completing its task, and ask how it went |
+| `s` | Stop: the time so far is logged and the task stays open |
+| `n` | A new task: type it as in Quick Add (`45m`, `#tag`, `@fri`, `!1`), and `Return` files it where Quick Add files and highlights it, ready to start |
+| `/` | Find a task or a list. Typing filters every open task and list; `↑` / `↓` (or `Ctrl+N` / `Ctrl+P`) choose and `Return` picks. A task picked is highlighted, ready to start; a list picked narrows the finder to its tasks, and `Esc` goes back out to everything |
+| `Esc` | Close the field, then hide the panel |
 
-#### Lists in the panel
+While the block's "how did it go?" question is up, the keys answer it instead.
 
-The panel is not only Today. `Cmd+P` (or the list button in its header) brings
-up **Go to**: Today, then every list and nested list in quick add's rows,
-filtered as you type — `↑`/`↓` choose, `Return` goes, `Esc` goes back.
-`Cmd+T` goes straight to Today and `Cmd+Shift+{` / `Cmd+Shift+}` step to the
-place before or after (Today, then the lists in order). A list shows its
-outline as the window's outline pane would — the same completed and buried
-tasks hidden or shown, the same folds — in the day's row shape, with the
-running block as one line over it (its pause and Done, and a double-click for
-Today). Going there moves nothing in the main window. The panel remembers the
-place across summons; `Cmd+Return` opens the main window on that list and row.
+### The focus pill
 
-On a list the field filters that list, every level, best match first, and
-`Return` adds what you typed to the list. `Space`, `Tab`, `Cmd+Delete` and
-`Esc` mean what they mean on Today.
-
-#### Quick edits in the panel
-
-`↓` (or `↑`) from an **empty** field puts the keyboard on the cards or rows,
-and from there the window's own keys work on the row under the panel's cursor
-— read through your keymap, so a key you rebind moves in both. With text in
-the field the arrows only choose, so you can keep refining a search.
-
-| Key, on the rows | Action |
-| --- | --- |
-| `↑` / `↓`, `j` / `k`, `Page Up` / `Page Down`, `gg` / `Shift+G` | Move |
-| `→` / `l` | Show the subtasks, then step into them |
-| `←` / `h` | Hide them, step out to the parent — and from the top level, out to **Go to** |
-| `:` then a number, `Return` | Go to that row: Today's numbers, or a list's, shown while you type |
-| `Space` / `x` | Complete (on the running card, Done) |
-| `Tab` / `gf` | Start, or queue behind the running block; on a nested list's row, go into it |
-| `ee` / `F2` | Edit the title |
-| `dd` / `Cmd+D` | Edit the due date |
-| `ds` / `Alt+T` | Schedule it (the start: a day, a time and how long) / edit the time estimate |
-| `nn`, `tt`, `dr` | Edit the notes, the tags, how it repeats |
-| `td` / `tm` / `cd` | Due today / tomorrow / clear the due date |
-| `cs` | Clear the start date, so a buried task is back among its siblings at once. `⌫` in the `ds` editor does the same |
-| `1`–`4` / `0` | Set the priority (which moves the task to the top of its list) / clear it |
-| `-` / `-1`–`-4` | Send it to the back (priority −1, which moves it to the bottom of its list) / set −1 to −4 |
-| `cc` | Conditions: what the task needs |
-| `Delete` / `Cmd+Delete` | Delete, then `Return` to confirm |
-| `Cmd+Z` / `Cmd+Shift+Z` | Undo / redo |
-| `/` or `Return` | Back to the field, to search or to add |
-| `Esc` | Minimise to the strip, or hide the panel |
-
-The chorded ones — `Cmd+D`, `Alt+S`, `Alt+T`, `F2`, `Cmd+P`, `Cmd+T` — work
-from inside the field too. Every edit is the window's own: the quick-edit card
-and the conditions finder open over the panel, `Return` saves and `Esc`
-cancels, moving a repeating task onto the day it comes round again asks first,
-and each change is one step for `Cmd+Z` here or in the window.
-
-Hiding it hands the keyboard back to the app it interrupted, so summoning it
-mid-sentence and pressing `Esc` puts the caret back where it was. Clicking away
-instead leaves the panel up and makes no such promise. The status
-item's context menu has **Focus Panel** too, so the hotkey is a shortcut for
-something visible rather than the only way in. Rebind or disable it in
-Settings → Keyboard.
+Starting any block, a timer or a pomodoro, puts up **the focus pill**: a small
+strip at the top centre of the main display with the task's title and its
+clock, counting up for a timer and down for a pomodoro or a break. It floats
+over every app without taking the keyboard from the one you are in. Drag it
+anywhere; click it for the focus panel. It goes when the session ends. Turn it
+off with **Show the focus pill while a block runs** in Settings → Focus.
 
 ## Command palette
 
