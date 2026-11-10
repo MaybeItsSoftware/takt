@@ -158,7 +158,6 @@ fn smoke_frames(window: &mut gpui::Window) {
 /// key sent), then a report and quit.
 fn smoke_platform(cx: &mut gpui::Context<ui::Takt>) {
     use platform::Event;
-    platform::push(Event::QuickCapture);
     platform::push(Event::FocusPanel);
     platform::push(Event::Menu("focus-pause".into()));
     cx.spawn(async move |this, cx| {

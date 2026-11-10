@@ -327,8 +327,9 @@ impl SettingRow {
             "focus-sound" => "A sound with that notification.",
             "focus-panel" => "Float a small panel with the running block over other windows.",
             "hotkeys" => "Shortcuts that reach Takt from any app.",
-            "hotkey-capture" => "Open quick capture from anywhere.",
-            "hotkey-panel" => "Show or hide the focus panel from anywhere.",
+            "hotkey-panel" => {
+                "Show or hide the focus panel from anywhere: start a task, or find or add one."
+            }
             "hotkey-window" => "Bring the main window forward from anywhere.",
             "keymap-open" => "Your own bindings, laid over the built-in ones.",
             "keymap-reload" => "Read keymap.json again without relaunching.",
@@ -510,12 +511,6 @@ impl App {
                 on(p.hotkeys_enabled),
             ),
             row(
-                "hotkey-capture",
-                "Keyboard",
-                "Quick capture from any app",
-                shortcut(&p.hotkey_quick_capture),
-            ),
-            row(
                 "hotkey-panel",
                 "Keyboard",
                 "The focus panel from any app",
@@ -552,7 +547,7 @@ impl App {
         // waits for that switch.
         let p = &self.prefs;
         rows.retain(|row| match row.id.as_str() {
-            "hotkey-capture" | "hotkey-panel" | "hotkey-window" => p.hotkeys_enabled,
+            "hotkey-panel" | "hotkey-window" => p.hotkeys_enabled,
             "focus-sound" => p.focus_notifications,
             "remind-due-today-at" => p.remind_due_today,
             "remind-dailies-at" => p.remind_dailies_left,
@@ -1050,7 +1045,6 @@ impl App {
                 p.hotkeys_enabled = !p.hotkeys_enabled;
                 self.hotkeys_changed = true;
             }
-            "hotkey-capture" => return self.record_hotkey(Hotkey::QuickCapture),
             "hotkey-panel" => return self.record_hotkey(Hotkey::FocusPanel),
             "hotkey-window" => return self.record_hotkey(Hotkey::ShowWindow),
             other => {
@@ -1101,7 +1095,6 @@ impl App {
         };
         let p = &mut self.prefs;
         match which {
-            Hotkey::QuickCapture => p.hotkey_quick_capture = value,
             Hotkey::FocusPanel => p.hotkey_focus_panel = value,
             Hotkey::ShowWindow => p.hotkey_show_window = value,
         }
@@ -1119,7 +1112,6 @@ impl App {
         let on = |s: &Option<String>| s.clone().filter(|_| p.hotkeys_enabled);
         vec![
             (Hotkey::ShowWindow, on(&p.hotkey_show_window)),
-            (Hotkey::QuickCapture, on(&p.hotkey_quick_capture)),
             (Hotkey::FocusPanel, on(&p.hotkey_focus_panel)),
         ]
     }
@@ -1270,7 +1262,7 @@ mod tests {
             Control::Select(_)
         ));
         assert!(matches!(
-            row("hotkey-capture", "Keyboard").control(),
+            row("hotkey-panel", "Keyboard").control(),
             Control::Shortcut(_)
         ));
         assert!(matches!(

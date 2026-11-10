@@ -19,7 +19,6 @@ pub enum Event {
     /// Bring the main window forward, opening it if it was closed.
     ShowWindow,
     /// Toggle the quick capture window.
-    QuickCapture,
     /// Bring the floating focus panel up, or forward.
     FocusPanel,
     /// A status item menu entry, by its action.

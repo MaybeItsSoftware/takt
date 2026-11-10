@@ -57,7 +57,7 @@ entry: `⌘1`–`⌘7` the categories, `⌥⌘1`–`⌥⌘6` the plugins' pages,
 | General | Launch at login, confirming deletes, and reminders |
 | Focus | Where a started block runs, and whether each block is scored |
 | Appearance | The theme gallery, light/dark/system, the interface, heading and numeral fonts, the text size, and the completion celebration (its switch, its style and its sound) |
-| Keyboard | The three global hotkeys (show the window, focus panel `⌃⌥⇧⌘F`, Quick Add `⌃⌥⇧⌘D`, which opens the focus panel ready to add — see *The focus panel*), the list Quick Add captures into; the shortcut rows show only while global hotkeys are on |
+| Keyboard | The two global hotkeys (show the window, and the focus panel `⌃⌥⇧⌘F`, which also adds tasks — see *The focus panel*), the list Quick Add captures into; the shortcut rows show only while global hotkeys are on |
 | AI | **AI features** (on by default; off hides the agent panel, quick ask and MCP, and sends nothing to an AI), and MCP: adding Takt's server to the assistants on this Mac |
 | Plugins | A heading in the sidebar with a page under it for each built-in plugin — Google Calendar, Google Tasks, Google Drive, Checkvist, Obsidian, the Markdown editor — each with its switch beside its name. The Google plugins fold under a **Google** entry (its chevron folds them away) with a switch of its own: off, every Google plugin stops, and each keeps its own switch for when Google is on again. Its page holds that switch and the Google sign-in (**Connect Google Calendar, Tasks & Drive**, which is not your Takt account); each plugin's own switch is what turns its mirroring or linking on, with nothing further to switch inside it. Google signs in through Takt's own client; **Use your own Google client** (off by default) asks for a client ID from a Cloud project of yours and only then shows its ID and secret rows, and turning it off forgets them and signs Google out. A plugin's page holds its switch and, while it is on, its settings. Off, a plugin's settings, link-picker rows and background work go |
 | Sync | The account that keeps the Mac and phones on one workspace, drawn as an account screen: choose **Takt Sync** or **Your own server** ([self-hosting](docs/self-hosting.md); it asks for the address), then sign in with Apple, Google or email, or create an account. Signed in, the card shows who you are, when it last synced, your devices and Takt Sync, with Sync now, the password, Sign out and Delete account. Changing server signs you out |
@@ -634,12 +634,12 @@ for now; what they do there reaches the phones through sync.
 
 ### The focus panel
 
-`⌃⌥⇧⌘F` summons the focus panel over whatever app you are in, or brings it
-forward with the keyboard in it when it is already up; `Esc` puts it away.
-It appears and goes at once, with no fade. The status item's menu and `Cmd+8`
-open it too, and **Quick Add's hotkey `⌃⌥⇧⌘D` opens this same panel**,
-ready to add: there is one floating window, not two. Rebind or disable the
-hotkeys in Settings → Keyboard.
+`⌃⌥⇧⌘F` summons the focus panel over whatever app you are in, and pressing
+it again puts the panel away; `Esc` does too. It appears and goes at once,
+with no fade. It is the one hotkey for starting, finding and adding tasks:
+Quick Add has no hotkey of its own any more. The status item's menu, `Cmd+8`
+and the app menu's Quick Add open it too. Rebind or disable the hotkey in
+Settings → Keyboard.
 
 At the top are the running task and its clock.
 
@@ -652,9 +652,10 @@ row):
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` (or `Ctrl+N` / `Ctrl+P`) | Move through the rows |
-| `Return` | On a task, start a timer on it. On a list, narrow to that list's tasks, and Add then files there. On Add, file the task: opened by Quick Add's hotkey, the panel then goes; otherwise the new task heads the day, highlighted, and `Return` again starts it |
+| `Return` | On a task, start a timer on it. On a list, narrow to that list's tasks, and Add then files there. On Add, file the task: it heads the day, highlighted, and `Return` again starts it (opened from the app menu's Quick Add, the panel goes instead) |
+| `Cmd+Return` | On Add, file the task and put the panel away |
 | `Option+Return` | Start a pomodoro on the highlighted task |
-| `Tab` / `Shift+Tab` | Step the list Add files into (shown under the field; it starts at Quick Add's list) |
+| `Tab` | Choose the list Add files into: a picker of every list, with its folder, that you type to filter; `↑` / `↓` (or `Tab`) move, `Return` chooses and `Esc` goes back to your typing. Clicking **Adds to …** under the field opens it too. It starts at Quick Add's list, and narrowing to a list chooses that list |
 | `Esc` | Clear what you typed, then leave a narrowed list, then hide the panel |
 
 **While a block runs, every action is a letter**, and a footer of key hints

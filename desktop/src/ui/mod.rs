@@ -309,8 +309,11 @@ impl Takt {
         use crate::platform::Event;
         match event {
             Event::ShowWindow => self.show_main_window(cx),
-            Event::QuickCapture => self.app.wants_capture = true,
-            Event::FocusPanel => self.app.wants_panel = Some(true),
+            // The one hotkey shows the panel, or puts it away when it is up.
+            Event::FocusPanel => {
+                let open = self.panel_open(cx);
+                self.app.wants_panel = Some(!open);
+            }
             Event::Sync { workspace } => {
                 if workspace {
                     self.app.reload_all();

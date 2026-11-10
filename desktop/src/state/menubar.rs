@@ -180,11 +180,6 @@ impl App {
             tooltip: tip(spelled),
         };
         menu.push(with_tip(
-            "Quick Add…",
-            "quick-capture",
-            &self.prefs.hotkey_quick_capture,
-        ));
-        menu.push(with_tip(
             "Focus Panel",
             "focus-panel",
             &self.prefs.hotkey_focus_panel,

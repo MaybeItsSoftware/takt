@@ -904,7 +904,6 @@ impl Takt {
     fn setting_control(&self, row: &SettingRow, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let open = self.app.setting_menu().is_some_and(|m| m.row == row.id);
         let hotkey = match row.id.as_str() {
-            "hotkey-capture" => Some(Hotkey::QuickCapture),
             "hotkey-panel" => Some(Hotkey::FocusPanel),
             "hotkey-window" => Some(Hotkey::ShowWindow),
             _ => None,

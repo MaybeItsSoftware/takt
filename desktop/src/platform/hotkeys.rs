@@ -77,21 +77,20 @@ const SHIFT: u32 = 0x200;
 const OPTION: u32 = 0x800;
 const CONTROL: u32 = 0x1000;
 
-/// The three things a hotkey can do, by the id Carbon hands back.
+/// The two things a hotkey can do, by the id Carbon hands back. (2 was
+/// quick capture's, which is the focus panel now.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hotkey {
     ShowWindow = 1,
-    QuickCapture = 2,
     FocusPanel = 3,
 }
 
 impl Hotkey {
-    pub const ALL: [Hotkey; 3] = [Hotkey::ShowWindow, Hotkey::QuickCapture, Hotkey::FocusPanel];
+    pub const ALL: [Hotkey; 2] = [Hotkey::ShowWindow, Hotkey::FocusPanel];
 
     fn event(self) -> Event {
         match self {
             Hotkey::ShowWindow => Event::ShowWindow,
-            Hotkey::QuickCapture => Event::QuickCapture,
             Hotkey::FocusPanel => Event::FocusPanel,
         }
     }

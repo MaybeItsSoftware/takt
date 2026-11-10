@@ -47,7 +47,6 @@ pub struct Prefs {
     pub hotkeys_enabled: bool,
     /// The global shortcuts, spelled as the keymap spells keys; none is off.
     pub hotkey_show_window: Option<String>,
-    pub hotkey_quick_capture: Option<String>,
     pub hotkey_focus_panel: Option<String>,
     /// `lists` or `agent`.
     pub left_dock_tab: String,
@@ -137,7 +136,6 @@ impl Default for Prefs {
             focus_panel: true,
             hotkeys_enabled: true,
             hotkey_show_window: None,
-            hotkey_quick_capture: Some("cmd+ctrl+option+shift+d".into()),
             hotkey_focus_panel: Some("cmd+ctrl+option+shift+f".into()),
             left_dock_tab: "lists".into(),
             agent_client: "claude".into(),
