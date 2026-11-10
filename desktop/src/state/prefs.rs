@@ -52,6 +52,9 @@ pub struct Prefs {
     pub left_dock_tab: String,
     /// `claude` or `codex`.
     pub agent_client: String,
+    /// A time in the title of a task added in Google Tasks is its start
+    /// (Google keeps none of its own). Off by default.
+    pub google_tasks_title_times: bool,
     /// The person's own Google OAuth client ID; else the Swift app's.
     pub google_client_id: Option<String>,
     /// The Desktop client's secret, which Google wants on token calls.
@@ -139,6 +142,7 @@ impl Default for Prefs {
             hotkey_focus_panel: Some("cmd+ctrl+option+shift+f".into()),
             left_dock_tab: "lists".into(),
             agent_client: "claude".into(),
+            google_tasks_title_times: false,
             google_client_id: None,
             google_client_secret: None,
             google_calendar: false,

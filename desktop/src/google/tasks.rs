@@ -22,6 +22,9 @@ use takt_core::google_tasks::{
 use takt_core::workspace::CoreWorkspace;
 
 const SERVICE: &str = "Google Tasks";
+
+/// One pass or removal at a time: each reads and saves the ledger whole.
+static WORKING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 const ROOT: &str = "https://tasks.googleapis.com/tasks/v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -236,7 +239,9 @@ pub fn run_pass(
     workspace_id: &str,
     client_id: &str,
     zone: &str,
+    title_times: bool,
 ) -> Result<Summary, GoogleError> {
+    let _working = WORKING.lock().unwrap_or_else(|p| p.into_inner());
     let api = Api {
         token: access_token(client_id, &TASKS_SCOPES, SERVICE)?,
     };
@@ -310,6 +315,7 @@ pub fn run_pass(
     let result = apply(
         core,
         zone,
+        title_times,
         &api,
         &plan.operations,
         &mut ledger,
@@ -325,6 +331,7 @@ pub fn run_pass(
 fn apply(
     core: &CoreWorkspace,
     zone: &str,
+    title_times: bool,
     api: &Api,
     operations: &[GoogleTasksOperation],
     ledger: &mut Ledger,
@@ -493,19 +500,7 @@ fn apply(
                     is_completed: false,
                     parent_remote_id: None,
                 };
-                if (!payload.notes.is_empty() || payload.due.is_some())
-                    && core
-                        .update_task(
-                            id.clone(),
-                            payload.title.clone(),
-                            payload.notes.clone(),
-                            payload.due.as_deref().and_then(|d| parse_due(d, zone)),
-                            None,
-                            now(),
-                            zone.into(),
-                        )
-                        .is_ok()
-                {
+                if land_adopted(core, &id, payload, zone, title_times, now()) {
                     landed = payload.clone();
                 }
                 ledger.tasks.insert(
@@ -517,6 +512,167 @@ fn apply(
         }
     }
     Ok(())
+}
+
+/// Gives a task adopted from Google its notes and due day, and with
+/// `title_times` the start and length its title names. True when the
+/// notes and day landed, which is what the ledger then records.
+fn land_adopted(
+    core: &CoreWorkspace,
+    id: &str,
+    payload: &GoogleTasksPayload,
+    zone: &str,
+    title_times: bool,
+    now: i64,
+) -> bool {
+    let due = payload.due.as_deref().and_then(|d| parse_due(d, zone));
+    // Google keeps no time on a task, so with the setting on a time in its
+    // title is the start, and a range its length.
+    let times = due
+        .filter(|_| title_times)
+        .and_then(|due| title_times_on(&payload.title, due, zone));
+    if payload.notes.is_empty() && due.is_none() {
+        return false;
+    }
+    // Google's day comes in at noon, before an afternoon start, which the
+    // store refuses: a timed task is due by the end of its day instead.
+    let due = match (due, times) {
+        (Some(due), Some(_)) => end_of_day(due, zone).or(Some(due)),
+        (due, _) => due,
+    };
+    let landed = core
+        .update_task(
+            id.into(),
+            payload.title.clone(),
+            payload.notes.clone(),
+            due,
+            times.and_then(|(start, end)| end.map(|end| (end - start) / 1000)),
+            now,
+            zone.into(),
+        )
+        .is_ok();
+    if landed && let Some((start, _)) = times {
+        let _ = core.schedule_task(id.into(), Some(start), now, zone.into());
+    }
+    landed
+}
+
+/// The last minute of the day `ms` falls on in `zone`.
+fn end_of_day(ms: i64, zone: &str) -> Option<i64> {
+    use chrono::TimeZone;
+    let zone = takt_core::periodic::zone(zone);
+    let day = zone.timestamp_millis_opt(ms).single()?.date_naive();
+    zone.from_local_datetime(&day.and_hms_opt(23, 59, 0)?)
+        .latest()
+        .map(|t| t.timestamp_millis())
+}
+
+/// Deletes every Google Tasks list the mirror made or adopted, and forgets
+/// the mirror, so the next pass with Google Tasks on starts afresh. Lists
+/// it never mirrored are left alone; Takt's own lists and tasks too.
+pub fn remove_mirror(client_id: &str) -> Result<usize, GoogleError> {
+    let _working = WORKING.lock().unwrap_or_else(|p| p.into_inner());
+    let api = Api {
+        token: access_token(client_id, &TASKS_SCOPES, SERVICE)?,
+    };
+    let mut ledger = load_ledger();
+    let lists: Vec<(String, String)> = ledger
+        .lists
+        .iter()
+        .map(|(local, remote)| (local.clone(), remote.clone()))
+        .collect();
+    let mut removed = 0;
+    let mut outcome = Ok(());
+    for (local, remote) in lists {
+        if let Err(error) = api.call(
+            "DELETE",
+            &format!("/users/@me/lists/{}", escape(&remote)),
+            None,
+        ) {
+            outcome = Err(error);
+            break;
+        }
+        // Gone from Google: its tasks went with it.
+        ledger.lists.remove(&local);
+        ledger
+            .tasks
+            .retain(|_, entry| entry.remote_list_id != remote);
+        removed += 1;
+    }
+    if outcome.is_ok() {
+        ledger = Ledger::default();
+    }
+    save_ledger(&ledger).map_err(GoogleError::Other)?;
+    outcome.map(|()| removed)
+}
+
+/// Whether the mirror has made any Google Tasks lists.
+pub fn has_mirror() -> bool {
+    !load_ledger().lists.is_empty()
+}
+
+/// A time or time range in a title, on the day `due_ms` falls on in
+/// `zone`: "14:00", "2pm", "14:00–15:00", "2-3pm", "9.30am to 11". The
+/// start, and the end when it is a range that ends after it starts. Only
+/// written times count, not words like "tonight".
+pub fn title_times_on(title: &str, due_ms: i64, zone: &str) -> Option<(i64, Option<i64>)> {
+    use chrono::TimeZone;
+    let (start, end) = title_times(title)?;
+    let zone = takt_core::periodic::zone(zone);
+    let day = zone.timestamp_millis_opt(due_ms).single()?.date_naive();
+    let at = |(hour, minute): (u32, u32)| {
+        zone.from_local_datetime(&day.and_hms_opt(hour, minute, 0)?)
+            .earliest()
+            .map(|t| t.timestamp_millis())
+    };
+    let start_ms = at(start)?;
+    let end_ms = end.and_then(at).filter(|end| *end > start_ms);
+    Some((start_ms, end_ms))
+}
+
+/// An hour and minute.
+type Clock = (u32, u32);
+
+fn title_times(title: &str) -> Option<(Clock, Option<Clock>)> {
+    static RANGE: std::sync::LazyLock<regex_lite::Regex> = std::sync::LazyLock::new(|| {
+        regex_lite::Regex::new(
+            r"(?i)(?:^|[\s(@])(\d{1,2}(?:[:.]\d{2})?)\s*(am|pm|a|p)?\s*(?:-|–|—|to)\s*(\d{1,2}(?:[:.]\d{2})?)\s*(am|pm|a|p)?(?:$|[\s),.])",
+        )
+        .expect("range pattern")
+    });
+    static SINGLE: std::sync::LazyLock<regex_lite::Regex> = std::sync::LazyLock::new(|| {
+        regex_lite::Regex::new(
+            r"(?i)(?:^|[\s(@])(\d{1,2}[:.]\d{2}|\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm|a|p))(?:$|[\s),.])",
+        )
+        .expect("time pattern")
+    });
+    let read = |digits: &str, suffix: Option<&str>| {
+        let word = format!("{digits}{}", suffix.unwrap_or_default()).to_lowercase();
+        takt_core::capture::time_of_day(&word).or_else(|| {
+            // A bare hour only as the half of a range with no suffix.
+            let hour: u32 = digits.parse().ok()?;
+            (hour < 24).then_some((hour, 0))
+        })
+    };
+    if let Some(c) = RANGE.captures(title) {
+        let first_suffix = c.get(2).map(|m| m.as_str());
+        let second_suffix = c.get(4).map(|m| m.as_str());
+        let has_clock =
+            |m: Option<regex_lite::Match>| m.is_some_and(|m| m.as_str().contains([':', '.']));
+        // "2-3" alone is likely not a time; one side needs a suffix or minutes.
+        if first_suffix.is_some()
+            || second_suffix.is_some()
+            || has_clock(c.get(1))
+            || has_clock(c.get(3))
+        {
+            let start = read(&c[1], first_suffix.or(second_suffix))?;
+            let end = read(&c[3], second_suffix.or(first_suffix))?;
+            return Some((start, Some(end)));
+        }
+    }
+    let c = SINGLE.captures(title)?;
+    let word = c[1].replace(' ', "").to_lowercase();
+    Some((takt_core::capture::time_of_day(&word)?, None))
 }
 
 #[cfg(test)]
@@ -533,6 +689,85 @@ mod tests {
             due_string(ms + 5 * 3_600_000, zone),
             "2026-03-05T00:00:00.000Z"
         );
+    }
+
+    #[test]
+    fn times_are_read_from_titles() {
+        assert_eq!(
+            title_times("Call Sam 14:00–15:00"),
+            Some(((14, 0), Some((15, 0))))
+        );
+        assert_eq!(
+            title_times("Call Sam 14:00 - 15:30"),
+            Some(((14, 0), Some((15, 30))))
+        );
+        assert_eq!(title_times("Gym 2-3pm"), Some(((14, 0), Some((15, 0)))));
+        assert_eq!(
+            title_times("Lecture 9.30am to 11"),
+            Some(((9, 30), Some((11, 0))))
+        );
+        assert_eq!(title_times("Dentist 2pm"), Some(((14, 0), None)));
+        assert_eq!(title_times("Standup at 09:15."), Some(((9, 15), None)));
+        assert_eq!(title_times("Read chapters 2-3"), None);
+        assert_eq!(title_times("Pay £20 tonight"), None);
+        assert_eq!(title_times("Buy milk"), None);
+        let zone = "Europe/London";
+        let due = parse_due("2026-11-12T00:00:00.000Z", zone).unwrap();
+        let (start, end) = title_times_on("Call 14:00–15:00", due, zone).unwrap();
+        assert_eq!(end.unwrap() - start, 3_600_000);
+        assert_eq!(due_string(start, zone), "2026-11-12T00:00:00.000Z");
+    }
+
+    #[test]
+    fn an_adopted_task_takes_its_titles_times() {
+        let path = std::env::temp_dir().join(format!("takt-adopt-{}.sqlite", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let path_text = path.to_string_lossy().into_owned();
+        takt_core::schema::migrate_workspace(path_text.clone()).unwrap();
+        let core = CoreWorkspace::open(path_text).unwrap();
+        let now = crate::state::store::now_ms();
+        let workspace = core.bootstrap(now).unwrap();
+        let list = core
+            .create_list(workspace, "L".into(), None, now)
+            .unwrap()
+            .id;
+        let zone = "Europe/London";
+        let adopt = |title: &str, on: bool| {
+            let id = core
+                .create_task(
+                    takt_core::tasks::NewTask {
+                        list_id: list.clone(),
+                        title: title.into(),
+                        kind: "task".into(),
+                        ..Default::default()
+                    },
+                    now,
+                )
+                .unwrap();
+            let payload = GoogleTasksPayload {
+                title: title.into(),
+                notes: String::new(),
+                due: Some("2030-03-14T00:00:00.000Z".into()),
+                is_completed: false,
+                parent_remote_id: None,
+            };
+            assert!(land_adopted(&core, &id, &payload, zone, on, now));
+            core.editor_snapshot(id).unwrap()
+        };
+        let timed = adopt("Call Sam 14:00\u{2013}15:30", true);
+        let start = timed.planning.and_then(|p| p.start_at_ms).expect("a start");
+        let expected = title_times_on("14:00", parse_due("2030-03-14", zone).unwrap(), zone)
+            .unwrap()
+            .0;
+        assert_eq!(start, expected);
+        assert_eq!(timed.estimate_seconds, Some(90 * 60));
+        let due = timed.due_at_ms.expect("still due");
+        assert_eq!(due_string(due, zone), "2030-03-14T00:00:00.000Z");
+        let plain = adopt("Call Sam 14:00\u{2013}15:30", false);
+        assert_eq!(plain.planning.and_then(|p| p.start_at_ms), None);
+        assert_eq!(plain.estimate_seconds, None);
+        drop(core);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

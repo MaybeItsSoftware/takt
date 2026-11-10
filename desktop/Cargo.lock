@@ -4919,6 +4919,7 @@ dependencies = [
  "iana-time-zone",
  "objc",
  "raw-window-handle",
+ "regex-lite",
  "security-framework 2.11.1",
  "serde",
  "serde_json",

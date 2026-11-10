@@ -22,6 +22,21 @@ The day is taken in your calendar and sent as midnight UTC; reading one back
 reverses that. Doing either half naively moves a late-evening task to the wrong
 day, in opposite directions on either side of Greenwich.
 
+A task typed in Google Tasks comes in with that day and no time. With
+**Read times from task titles** on (off by default), a written time in its
+title — `14:00`, `2pm`, `9.30am` — is its start on that day, and a range —
+`14:00–15:00`, `2-3pm`, `9.30am to 11` — its start and length; such a task
+is due by the end of its day rather than at noon, because a start after its
+deadline is refused. Words such as "tonight" don't count, nor does a bare
+`2-3`. The title itself is left as it is.
+
+Turning Google Tasks off stops the mirror and leaves Google Tasks as it was.
+**Remove Takt's lists from Google Tasks** (on the Google page whenever the
+ledger holds any) turns it off, deletes every list in the ledger from Google,
+with their tasks, and empties the ledger, so the next pass makes them afresh.
+A list Takt adopted by name is in the ledger, and goes too; lists it never
+mirrored don't. Nothing in Takt changes.
+
 ## Who wins
 
 | What happened | What the mirror does |

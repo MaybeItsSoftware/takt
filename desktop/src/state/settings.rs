@@ -229,7 +229,7 @@ pub enum Control {
     Shortcut(String),
 }
 
-const SWITCHES: [&str; 16] = [
+const SWITCHES: [&str; 17] = [
     "sync-self-hosted",
     "google-own-client",
     "ai-on",
@@ -246,6 +246,7 @@ const SWITCHES: [&str; 16] = [
     "remind-dailies",
     "celebration-sound",
     "google-import-events",
+    "google-tasks-title-times",
 ];
 
 fn button_label(id: &str) -> Option<&'static str> {
@@ -260,6 +261,7 @@ fn button_label(id: &str) -> Option<&'static str> {
         "sync-new-password" => "Change",
         "sync-sign-out" => "Sign out",
         "sync-delete" => "Delete",
+        "google-tasks-remove" => "Remove…",
         "sync-google" | "sync-apple" | "sync-email" => "Sign in",
         "sync-create" => "Create",
         "sync-reset" => "Reset",
@@ -385,6 +387,12 @@ impl SettingRow {
             }
             "google-import-events" => "Events added in the calendar become tasks.",
             "google-sync-now" => "Pass the calendar and tasks mirrors now.",
+            "google-tasks-title-times" => {
+                "Google Tasks keeps a day but no time, so a task added there with \u{201c}14:00\u{201d} or \u{201c}14:00\u{2013}15:00\u{201d} in its title comes in scheduled for then, the range as its length."
+            }
+            "google-tasks-remove" => {
+                "Deletes the lists Takt mirrors in Google Tasks and turns Google Tasks off. Nothing in Takt changes; on again, it mirrors afresh."
+            }
             "links-vault-add" => "Notes in Obsidian vaults are offered when you link a task.",
             "links-vault-forget" => "Drop the vault folders added by hand; Obsidian's own stay.",
             mcp if mcp.starts_with("mcp:") => "Let this assistant read and change your tasks.",

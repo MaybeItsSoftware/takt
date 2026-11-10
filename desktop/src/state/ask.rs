@@ -20,6 +20,8 @@ pub enum Ask {
     SyncServer,
     /// "delete", typed, to delete the sync account.
     SyncDelete,
+    /// "remove", typed, to delete the lists Takt made in Google Tasks.
+    GoogleTasksRemove,
     /// Checkvist's account email, then its API key.
     CheckvistEmail,
     CheckvistKey {
@@ -53,6 +55,7 @@ impl Ask {
             Ask::SyncNewPassword => "Choose a new password",
             Ask::SyncServer => "Self-hosted sync server",
             Ask::SyncDelete => "Delete the sync account",
+            Ask::GoogleTasksRemove => "Remove Takt's lists from Google Tasks",
             Ask::CheckvistEmail | Ask::CheckvistKey { .. } => "Connect Checkvist",
             Ask::Agent => "Ask the agent",
             Ask::GoogleClientId => "Google OAuth client ID",
@@ -70,6 +73,7 @@ impl Ask {
             Ask::SyncPassword { .. } | Ask::SyncNewPassword => "Password",
             Ask::SyncServer => "https://sync.example.com",
             Ask::SyncDelete => "delete",
+            Ask::GoogleTasksRemove => "remove",
             Ask::CheckvistKey { .. } => "API key (checkvist.com → Profile → Open API key)",
             Ask::Agent => "Make it due Friday, split it up, explain it…",
             Ask::GoogleClientId => "….apps.googleusercontent.com",
@@ -86,6 +90,9 @@ impl Ask {
             Ask::SyncPassword { email, .. } => format!("For {email}."),
             Ask::SyncDelete => {
                 "Deletes the account, everything synced to it and its devices. This Mac keeps its workspace. Type delete to go ahead.".into()
+            }
+            Ask::GoogleTasksRemove => {
+                "Deletes from Google Tasks every list Takt mirrors there, with their tasks, and turns Google Tasks off. Your lists and tasks in Takt stay, and lists you made in Google yourself are left alone. Type remove to go ahead.".into()
             }
             Ask::SyncServer => {
                 "Run sync-server/ from Takt's repository; it must trust the same Supabase project. Leave it empty for Takt Sync.".into()
@@ -172,6 +179,14 @@ impl App {
             Ask::SyncServer => {
                 if let Err(problem) = self.sync.use_server(text) {
                     self.message = Some(problem);
+                }
+                self.open_overlay(Overlay::Settings);
+            }
+            Ask::GoogleTasksRemove => {
+                if text.eq_ignore_ascii_case("remove") {
+                    self.remove_google_tasks_mirror();
+                } else {
+                    self.message = Some("Left Google Tasks as it is.".into());
                 }
                 self.open_overlay(Overlay::Settings);
             }

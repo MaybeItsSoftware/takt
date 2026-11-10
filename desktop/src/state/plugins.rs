@@ -116,6 +116,7 @@ impl Plugin {
     pub fn of_row(id: &str) -> Option<Plugin> {
         Some(match id {
             "google-calendar-choose" | "google-import-events" => Plugin::GoogleCalendar,
+            "google-tasks-title-times" => Plugin::GoogleTasks,
             "links-vault-add" | "links-vault-forget" => Plugin::Obsidian,
             "celebration" | "celebration-sound" => Plugin::Celebration,
             checkvist if checkvist.starts_with("checkvist-") => Plugin::Checkvist,
@@ -145,7 +146,7 @@ impl App {
     }
 
     /// Its own switch, whatever Google's says.
-    fn plugin_switched_on(&self, plugin: Plugin) -> bool {
+    pub(super) fn plugin_switched_on(&self, plugin: Plugin) -> bool {
         self.prefs.plugins.get(plugin.id()).copied().unwrap_or(true)
     }
 

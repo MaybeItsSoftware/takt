@@ -24,6 +24,7 @@ struct Config {
     client_id: String,
     calendar: bool,
     tasks: bool,
+    title_times: bool,
 }
 
 #[derive(Default)]
@@ -73,7 +74,13 @@ fn pass(core: &CoreWorkspace, workspace_id: &str, zone: &str, config: &Config) -
         }
     }
     if config.tasks {
-        match google::tasks::run_pass(core, workspace_id, &config.client_id, zone) {
+        match google::tasks::run_pass(
+            core,
+            workspace_id,
+            &config.client_id,
+            zone,
+            config.title_times,
+        ) {
             Ok(summary) => {
                 wrote |= summary.wrote_locally;
                 said.push(if summary.conflicts > 0 {
@@ -97,6 +104,7 @@ impl App {
             client_id: self.google_client_id(),
             calendar: self.plugin_on(Plugin::GoogleCalendar),
             tasks: self.plugin_on(Plugin::GoogleTasks),
+            title_times: self.prefs.google_tasks_title_times,
         }
     }
 
@@ -276,12 +284,28 @@ impl App {
                 on(settings.import_events),
             ),
             (
+                "google-tasks-title-times",
+                "Google",
+                "Read times from task titles",
+                on(self.prefs.google_tasks_title_times),
+            ),
+            (
                 "google-sync-now",
                 "Google",
                 "Sync Google now",
                 self.google.status(),
             ),
         ]);
+        // Shown whenever there is a mirror to remove, even with Google
+        // Tasks off: that is when it is wanted.
+        if google::tasks::has_mirror() {
+            rows.push((
+                "google-tasks-remove",
+                "Google",
+                "Remove Takt's lists from Google Tasks",
+                String::new(),
+            ));
+        }
         rows
     }
 
@@ -356,10 +380,44 @@ impl App {
             "google-sync-now" => {
                 self.google_now();
             }
+            "google-tasks-title-times" => {
+                self.prefs.google_tasks_title_times = !self.prefs.google_tasks_title_times;
+                self.prefs.save();
+                *lock(&self.google.config) = self.google_config();
+            }
+            "google-tasks-remove" => {
+                self.ask(super::ask::Ask::GoogleTasksRemove);
+                return true;
+            }
             _ => return false,
         }
         self.open_overlay(Overlay::Settings);
         true
+    }
+
+    /// Turns Google Tasks off, so no pass makes the lists again, then
+    /// deletes them from Google in the background.
+    pub fn remove_google_tasks_mirror(&mut self) {
+        if self.plugin_switched_on(Plugin::GoogleTasks) {
+            self.toggle_plugin(Plugin::GoogleTasks);
+        }
+        *lock(&self.google.config) = self.google_config();
+        let client = self.google_client_id();
+        self.message = Some("Removing Takt's lists from Google Tasks…".into());
+        std::thread::spawn(move || {
+            let said = match google::tasks::remove_mirror(&client) {
+                Ok(0) => "Google Tasks had none of Takt's lists left.".to_string(),
+                Ok(n) => format!(
+                    "Removed {n} list{} from Google Tasks. Turning Google Tasks on again mirrors your lists afresh.",
+                    if n == 1 { "" } else { "s" }
+                ),
+                Err(error) => format!(
+                    "Couldn't finish removing the lists: {}. Try again to remove the rest.",
+                    error.message()
+                ),
+            };
+            crate::sync::announce(&said, false);
+        });
     }
 
     pub fn set_google_client_secret(&mut self, text: &str) {
