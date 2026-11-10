@@ -1198,22 +1198,27 @@ task is completed from `takt` or an assistant.
 
 `Cmd+Shift+D`, or **Commit periodically…** under the inspector's Repeat
 row, commits you to working on the selected task on a rhythm. It opens a
-small form rather than flipping a switch:
+small form of controls rather than flipping a switch; its header names the
+task the commitment's subtask goes under and whose completion ends it.
 
 | Row | What it sets |
 | --- | --- |
-| Parent task | Shown, not chosen: the selected task, with its list, which the commitment's subtask goes under and whose completion ends it |
-| Name | What turns up in Dailies, prefilled as "Work on *task*" |
-| How often | **Every day**, **Weekdays**, **Weekly** (on a day you pick; `←` `→` or `1`–`7` for Mon–Sun) or **Custom**, in the repeat syntax: `every 2 weeks`, `every 3 days`, `every friday`, `mon, wed, fri` |
-| If missed | **Vanishes** (the default) or **Stacks**; see below |
-| Ends | **When “*task*” is done** (named "the parent task" when its title is long), or **after a date**: type the last day it should appear, in the follow-up field's shorthands (`fri`, `3w`, `2026-12-31`) |
+| Title | What turns up in Today and Dailies, prefilled as "Work on *task*"; a title is required |
+| Repeat | **Daily**, **Weekdays**, **On days**, **Every *n* days** or **Every *n* weeks**. `←` `→` choose, digits type the count (on a choice without one they mean days), `+` `-` step it, `d` and `w` pick days and weeks |
+| On | With **On days**: the day chips, Mon to Sun. `←` `→` move, `Space` (or `1`–`7`) ticks a day; the last one ticked stays |
+| Until | **No end** (it runs until the task is done) or the last day it appears: `←` `→` step a day, `Shift+←` `Shift+→` a week, never before today; `x` goes back to no end |
+| Missed | The switch "A missed day stays owed until done" (**Stacks**), off by default (**Vanishes**); `Space` flips it |
 
-`↑` `↓` (or `Tab`) move between rows and `←` `→` change a choice.
+`Tab` / `Shift+Tab` or `↓` / `↑` move between rows (on the Title row the
+letters are typed, and `↑` `↓` still move), `Return` saves, `Esc` cancels, and
+every chip, row and button can be clicked. Under the rows, **Next** shows the
+next four days it would appear (an every-*n*-days rhythm already saved counts
+from the day it was made, so it shows the rule instead).
 
 Saving adds a subtask under the task, carrying a habit whose source is the
 task: it lands in Today on its days and appears in Dailies, where ticking it
 records the day's contribution and leaves both tasks open. What happens to a
-missed appearance is the **If missed** row's:
+missed appearance is the **Missed** row's:
 
 - **Vanishes** — as commitments always behaved: a daily rhythm drops a missed
   day at its end, and a weekly one, or one day a week, stays until the next one
@@ -1248,7 +1253,7 @@ The task's inspector lists its commitments with **Edit** and **Stop**; stopping
 keeps what was logged and closes the subtask. Completing the task ends every
 commitment on it, whatever its end date, and closes their subtasks — undo
 brings them back. On a task that has a commitment, `Cmd+Shift+D` opens it for
-editing (`Cmd+Delete` in the form stops it); on a task that is still a daily
+editing (`Cmd+Delete` in the form, off the Title row, stops it); on a task that is still a daily
 itself, from before commitments, it stops that daily.
 
 ### What the day records

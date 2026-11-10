@@ -433,6 +433,22 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 value(app, "start"),
                 value(app, "repeat"),
             ));
+            // The commitment form, worked by its keys and left unsaved.
+            app.begin_commitment();
+            let form = matches!(app.editing, Some(state::Editing::Commitment));
+            for key in [
+                "down", "right", "right", "tab", "right", "space", "tab", "right",
+            ] {
+                app.commitment_key(key);
+            }
+            let rule = app.commitment_form.as_ref().map(|f| f.rule());
+            let until = app.commitment_form.as_ref().and_then(|f| f.until);
+            app.commitment_key("escape");
+            app.close_commitment_form();
+            report.push(format!(
+                "commitment form {form}: rule {rule:?}, until {until:?}, closed {}",
+                app.editing.is_none()
+            ));
         }
         let started = Instant::now();
         app.start_focus_on_selected(true);

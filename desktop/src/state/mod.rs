@@ -16,6 +16,7 @@ pub mod celebration;
 pub mod checkvist;
 pub mod columns;
 pub mod commands;
+pub mod commitment_form;
 pub mod conditions;
 pub mod context_menu;
 pub mod date_edit;
@@ -189,6 +190,9 @@ pub enum Editing {
     Date(date_edit::DateEdit),
     /// The repeat selector open under the inspector's repeat row.
     Repeat(repeat::RepeatEdit),
+    /// The "Commit periodically" form: `App::commitment_form` holds it,
+    /// so a key that changes it doesn't reopen the title field.
+    Commitment,
     /// The minute selector open under the inspector's Log time row.
     Log(log_edit::LogEdit),
     /// The Markdown editor, over the window: `App::notes_editor` says what
@@ -276,6 +280,8 @@ pub struct App {
     pub pending_focus: Option<(String, focus::FocusKind)>,
     /// "How did it go?", while it is asked.
     pub focus_prompt: Option<focus_prompt::FocusPrompt>,
+    /// The commitment form, while `Editing::Commitment` is open.
+    pub commitment_form: Option<commitment_form::CommitmentForm>,
     /// The block (or break) whose end has been announced.
     pub focus_notified: Option<String>,
     pub focus_checkpointed_at: i64,
@@ -379,6 +385,7 @@ impl App {
             focus_session: None,
             pending_focus: None,
             focus_prompt: None,
+            commitment_form: None,
             focus_notified: None,
             focus_checkpointed_at: 0,
             celebration: None,

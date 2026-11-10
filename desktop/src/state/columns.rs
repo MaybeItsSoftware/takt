@@ -26,11 +26,6 @@ pub enum RulesTarget {
     Column(String),
     FilterList(String),
     NewFilterList,
-    /// A periodic commitment to `task_id`, or editing the one on `editing`.
-    Commitment {
-        task_id: String,
-        editing: Option<String>,
-    },
     /// A habit: editing the one on `habit_task_id`, or a new one, made from
     /// `source` when there is one.
     Habit {
@@ -46,10 +41,7 @@ impl RulesTarget {
     pub fn is_form(&self) -> bool {
         matches!(
             self,
-            RulesTarget::Commitment { .. }
-                | RulesTarget::Habit { .. }
-                | RulesTarget::List(_)
-                | RulesTarget::Folder(_)
+            RulesTarget::Habit { .. } | RulesTarget::List(_) | RulesTarget::Folder(_)
         )
     }
 
@@ -58,8 +50,6 @@ impl RulesTarget {
             RulesTarget::Column(_) => "Column rules",
             RulesTarget::NewFilterList => "New filter list",
             RulesTarget::FilterList(_) => "Filter list",
-            RulesTarget::Commitment { editing: None, .. } => "Commit periodically",
-            RulesTarget::Commitment { .. } => "Commitment",
             RulesTarget::Habit {
                 habit_task_id: None,
                 ..

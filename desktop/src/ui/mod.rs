@@ -10,6 +10,7 @@ mod calendar;
 pub mod capture;
 mod celebrate;
 mod chrome;
+mod commitment;
 mod dock;
 pub mod icons;
 mod log_time;
@@ -967,6 +968,9 @@ impl Takt {
             }
             return true;
         }
+        if matches!(self.app.editing, Some(Editing::Commitment)) {
+            return self.commitment_key(keystroke, cx);
+        }
         // So does the repeat selector: only the count's digits are typed.
         if matches!(self.app.editing, Some(Editing::Repeat(_))) {
             if let Some(key) = spell(&Press::from_keystroke(keystroke)) {
@@ -1221,6 +1225,12 @@ impl Takt {
                 TextField::selecting_all(&title)
             }
             Some(Editing::Rules(target)) => TextField::multiline(&self.app.rules_text(target)),
+            Some(Editing::Commitment) => TextField::new(
+                self.app
+                    .commitment_form
+                    .as_ref()
+                    .map_or("", |f| f.title.as_str()),
+            ),
             Some(Editing::ConditionTime) => TextField::new(
                 self.app
                     .conditions
@@ -1562,6 +1572,10 @@ impl Render for Takt {
                 |d| d.child(self.rules_sheet(t)),
             )
             .when(
+                !settings && matches!(self.app.editing, Some(Editing::Commitment)),
+                |d| d.child(self.commitment_sheet(t, cx)),
+            )
+            .when(
                 !settings && matches!(self.app.editing, Some(Editing::NotesEditor)),
                 |d| d.child(self.notes_editor_view(t, cx)),
             )
@@ -1594,6 +1608,10 @@ impl Takt {
                 self.app.editing,
                 Some(Editing::Date(_) | Editing::Repeat(_) | Editing::Log(_))
             )
+            && !(matches!(self.app.editing, Some(Editing::Commitment))
+                && self.app.commitment_form.as_ref().is_some_and(|f| {
+                    f.field != crate::state::commitment_form::CommitmentField::Title
+                }))
         {
             Some(&mut self.field)
         } else if self.app.setting_menu().is_some() {

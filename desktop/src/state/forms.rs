@@ -1,14 +1,16 @@
 //! The forms that are more than one field, typed as a sheet of `key value`
-//! lines in the rules editor: a periodic commitment, a habit, a list's
-//! settings. The Swift app drew each as its own sheet of controls
-//! (`WorkspaceCommitmentOverlay`, `WorkspaceHabitOverlay`, the list settings
-//! page); a line each keeps them on the keyboard, and the line under the
-//! sheet says what will be saved before it is.
+//! lines in the rules editor: a habit, a list's settings, a folder's. The
+//! Swift app drew each as its own sheet of controls (`WorkspaceHabitOverlay`,
+//! the list settings page); a line each keeps them on the keyboard, and the
+//! line under the sheet says what will be saved before it is. A periodic
+//! commitment has a form of controls instead (`commitment_form`); this file
+//! opens it.
 
 use super::App;
 use super::columns::RulesTarget;
+use super::commitment_form::{CommitmentForm, day_of};
 use super::store::now_ms;
-use takt_core::commitments::{CommitmentDraft, rule_text, schedule};
+use takt_core::commitments::{rule_text, schedule};
 use takt_core::habits::HabitDraft;
 
 /// `key value` lines; `#` starts a comment; keys are case-blind.
@@ -47,39 +49,6 @@ fn day_text(ms: Option<i64>) -> String {
     ms.and_then(|ms| Local.timestamp_millis_opt(ms).single())
         .map(|d| d.format("%Y-%m-%d").to_string())
         .unwrap_or_default()
-}
-
-/// What a commitment sheet reads as.
-pub fn read_commitment(text: &str, zone: &str) -> Result<CommitmentDraft, String> {
-    let mut draft = CommitmentDraft {
-        title: String::new(),
-        rule: "daily".into(),
-        expires_at_ms: None,
-        stacks_missed: false,
-    };
-    for (key, value) in lines(text) {
-        match key.as_str() {
-            "title" | "name" => draft.title = value,
-            "repeat" | "every" | "on" => {
-                let rule = if key == "every" {
-                    format!("every {value}")
-                } else {
-                    value
-                };
-                let parsed = schedule(&rule).ok_or_else(|| {
-                    format!("Couldn't read \u{201c}{rule}\u{201d} as a schedule.")
-                })?;
-                draft.rule = rule_text(&parsed);
-            }
-            "until" | "ends" => draft.expires_at_ms = day(&value, zone)?,
-            "stacks" | "stack" => draft.stacks_missed = yes(&value)?,
-            other => return Err(format!("A commitment has no \u{201c}{other}\u{201d}.")),
-        }
-    }
-    if draft.title.trim().is_empty() {
-        return Err("A commitment needs a title.".into());
-    }
-    Ok(draft)
 }
 
 pub fn read_habit(text: &str, zone: &str) -> Result<HabitDraft, String> {
@@ -151,22 +120,20 @@ impl App {
             return;
         }
         let core = &self.store.core;
-        if let Some(carried) = core.commitment(task.id.clone()).ok().flatten() {
-            self.editing = Some(super::Editing::Rules(RulesTarget::Commitment {
-                task_id: carried.parent_task_id,
-                editing: Some(carried.task_id),
-            }));
-            return;
-        }
-        if let Some(first) = core
-            .commitments(task.id.clone())
-            .ok()
-            .and_then(|c| c.into_iter().next())
-        {
-            self.editing = Some(super::Editing::Rules(RulesTarget::Commitment {
-                task_id: task.id,
-                editing: Some(first.task_id),
-            }));
+        let saved = core.commitment(task.id.clone()).ok().flatten().or_else(|| {
+            core.commitments(task.id.clone())
+                .ok()
+                .and_then(|c| c.into_iter().next())
+        });
+        if let Some(c) = saved {
+            self.open_commitment_form(CommitmentForm::editing(
+                c.parent_task_id,
+                c.task_id,
+                c.title,
+                &c.rule,
+                c.expires_at_ms.and_then(day_of),
+                c.stacks_missed,
+            ));
             return;
         }
         let daily = core.daily_for_task(task.id.clone()).ok().flatten();
@@ -176,10 +143,8 @@ impl App {
             self.message = Some("No longer a daily.".into());
             return;
         }
-        self.editing = Some(super::Editing::Rules(RulesTarget::Commitment {
-            task_id: task.id,
-            editing: None,
-        }));
+        let title = takt_core::commitments::default_title(&task.title);
+        self.open_commitment_form(CommitmentForm::new(task.id, title));
     }
 
     /// `taskHabit`: makes a habit from the selection, edits its habit, or
@@ -210,30 +175,6 @@ impl App {
     pub fn form_text(&self, target: &RulesTarget) -> String {
         let core = &self.store.core;
         match target {
-            RulesTarget::Commitment { task_id, editing } => {
-                let existing = editing
-                    .as_ref()
-                    .and_then(|id| core.commitment(id.clone()).ok().flatten());
-                let title = core
-                    .task(task_id.clone())
-                    .ok()
-                    .flatten()
-                    .map(|t| t.title)
-                    .unwrap_or_default();
-                match existing {
-                    Some(c) => format!(
-                        "title {}\nrepeat {}\nuntil {}\nstacks {}",
-                        c.title,
-                        c.rule,
-                        day_text(c.expires_at_ms),
-                        if c.stacks_missed { "yes" } else { "no" }
-                    ),
-                    None => format!(
-                        "title {}\nrepeat daily\nuntil \nstacks no",
-                        takt_core::commitments::default_title(&title)
-                    ),
-                }
-            }
             RulesTarget::Habit {
                 habit_task_id,
                 source,
@@ -394,24 +335,6 @@ impl App {
     pub fn form_describe(&self, target: &RulesTarget, text: &str) -> String {
         let zone = &self.store.zone;
         match target {
-            RulesTarget::Commitment { .. } => match read_commitment(text, zone) {
-                Ok(d) => format!(
-                    "\u{201c}{}\u{201d} {}, {}{}",
-                    d.title,
-                    d.rule,
-                    if d.expires_at_ms.is_some() {
-                        format!("until {}", day_text(d.expires_at_ms))
-                    } else {
-                        "until the task is done".into()
-                    },
-                    if d.stacks_missed {
-                        ", missed days stack"
-                    } else {
-                        ""
-                    }
-                ),
-                Err(e) => e,
-            },
             RulesTarget::Habit { .. } => match read_habit(text, zone) {
                 Ok(d) => {
                     let repeat = rule_text(&takt_core::commitments::CommitmentSchedule {
@@ -466,11 +389,6 @@ impl App {
 
     pub fn form_help(target: &RulesTarget) -> Vec<String> {
         match target {
-            RulesTarget::Commitment { .. } => vec![
-                "repeat  daily · weekdays · every friday · mon, wed · every 2 weeks".into(),
-                "until   a day it stops (2026-12-01, in 3 weeks), or blank".into(),
-                "stacks  yes: a missed day stays owed until done".into(),
-            ],
             RulesTarget::Habit { .. } => vec![
                 "repeat   daily · weekdays · every friday · mon, wed · every 3 days".into(),
                 "drops    yes: a missed day goes at the end of it".into(),
@@ -494,27 +412,6 @@ impl App {
         let zone = self.store.zone.clone();
         let now = now_ms();
         match target {
-            RulesTarget::Commitment { task_id, editing } => {
-                let draft = match read_commitment(text, &zone) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        self.message = Some(e);
-                        return false;
-                    }
-                };
-                if self
-                    .write(|s| {
-                        s.core
-                            .save_commitment(task_id.clone(), draft, editing, now, zone)
-                    })
-                    .is_some()
-                {
-                    self.message = Some("Committed.".into());
-                    self.after_structure_change();
-                    return true;
-                }
-                false
-            }
             RulesTarget::Habit {
                 habit_task_id,
                 source,
@@ -633,16 +530,6 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_commitment_reads_its_lines() {
-        let d = read_commitment("title Read\nrepeat mon, wed\nstacks yes", "UTC").unwrap();
-        assert_eq!(d.title, "Read");
-        assert!(d.stacks_missed);
-        assert_ne!(d.rule, "daily");
-        assert!(read_commitment("repeat daily", "UTC").is_err());
-        assert!(read_commitment("title X\ncolour red", "UTC").is_err());
-    }
 
     #[test]
     fn a_habit_reads_its_lines() {
