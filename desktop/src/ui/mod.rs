@@ -92,6 +92,9 @@ pub struct Takt {
     /// The settings window, while it is open: a second window onto this
     /// same entity, drawing only the settings page.
     settings_window: Option<gpui::WindowHandle<Takt>>,
+    /// The settings window closed but not yet gone: it keeps drawing the
+    /// settings page, never the main window's, until it is removed.
+    settings_closing: Option<gpui::WindowId>,
     /// The settings window is the one in front: sheets and pickers come
     /// up there rather than in the main window.
     settings_active: bool,
@@ -201,6 +204,7 @@ impl Takt {
             pill_at: None,
             main: None,
             settings_window: None,
+            settings_closing: None,
             settings_active: false,
             settings_wanted_front: false,
             platform_live: false,
@@ -736,8 +740,10 @@ impl Takt {
         }
         if keystroke.modifiers.platform && keystroke.key == "w" {
             let handle = window.window_handle();
+            // Not through the root: that is this entity, which may be
+            // mid-update when the deferral runs.
             cx.defer(move |cx| {
-                let _ = handle.update(cx, |_, window, _| window.remove_window());
+                let _ = cx.update_window(handle, |_, window, _| window.remove_window());
             });
             return;
         }

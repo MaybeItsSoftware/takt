@@ -91,7 +91,7 @@ pub(super) struct MenuView {
 impl Takt {
     /// ⌘,: the page, its search empty, where it was left. The window
     /// follows in `open_requested_windows`.
-    pub(super) fn open_settings_page(&mut self) {
+    pub fn open_settings_page(&mut self) {
         if self.app.settings_page.is_none() {
             self.settings_field = TextField::default();
         }
@@ -101,8 +101,11 @@ impl Takt {
     }
 
     pub(super) fn is_settings_window(&self, window: &gpui::Window) -> bool {
-        self.settings_window
-            .is_some_and(|handle| handle.window_id() == window.window_handle().window_id())
+        let id = window.window_handle().window_id();
+        self.settings_closing == Some(id)
+            || self
+                .settings_window
+                .is_some_and(|handle| handle.window_id() == id)
     }
 
     /// The window kept to the state: opened (or brought forward) while the
@@ -125,8 +128,11 @@ impl Takt {
             (false, Some(handle)) => {
                 self.settings_window = None;
                 self.settings_active = false;
+                self.settings_closing = Some(handle.window_id());
+                let takt = cx.entity();
                 cx.defer(move |cx| {
-                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    let _ = cx.update_window(handle.into(), |_, window, _| window.remove_window());
+                    takt.update(cx, |this, _| this.settings_closing = None);
                 });
             }
             (false, None) => {}
@@ -522,6 +528,16 @@ impl Takt {
             "window up {in_window}, closed by esc {}",
             self.app.settings_page.is_none() && self.settings_window.is_none()
         )
+    }
+
+    /// For the smoke run: no settings window, closing or open, is left.
+    pub fn settings_gone(&self, cx: &gpui::App) -> bool {
+        let ids: Vec<_> = cx.windows().iter().map(|w| w.window_id()).collect();
+        self.settings_window.is_none() && self.settings_closing.is_none_or(|id| !ids.contains(&id))
+    }
+
+    pub fn main_window_id(&self) -> Option<gpui::WindowId> {
+        self.main.map(|m| m.window_id())
     }
 
     pub fn settings_window_handle(&self) -> Option<gpui::WindowHandle<Takt>> {

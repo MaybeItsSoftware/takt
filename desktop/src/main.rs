@@ -21,7 +21,7 @@ mod ui;
 
 use gpui::{App, AppContext, Application};
 use std::borrow::Cow;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 fn load_fonts(cx: &App) {
     let fonts: Vec<Cow<'static, [u8]>> = vec![
@@ -117,6 +117,48 @@ fn main() {
                                 windows,
                                 closed.unwrap_or_else(|| "no window".into())
                             );
+                            // Again with one real Esc in the window, as a
+                            // person presses it: still one main window.
+                            takt.update(cx, |this, cx| {
+                                this.open_settings_page();
+                                this.open_requested_windows(cx);
+                            });
+                            let takt = takt.clone();
+                            cx.spawn(async move |cx| {
+                                cx.background_executor()
+                                    .timer(Duration::from_millis(400))
+                                    .await;
+                                let _ = cx.update(|cx| {
+                                    let handle = takt.read(cx).settings_window_handle();
+                                    if let Some(handle) = handle {
+                                        let _ = cx.update_window(handle.into(), |_, window, cx| {
+                                            window.dispatch_keystroke(
+                                                gpui::Keystroke::parse("escape").expect("a key"),
+                                                cx,
+                                            );
+                                        });
+                                    }
+                                });
+                                cx.background_executor()
+                                    .timer(Duration::from_millis(600))
+                                    .await;
+                                let _ = cx.update(|cx| {
+                                    let main = takt.read(cx).main_window_id();
+                                    let mains = cx
+                                        .windows()
+                                        .iter()
+                                        .filter(|w| Some(w.window_id()) == main)
+                                        .count();
+                                    println!(
+                                        "smoke settings esc: {} windows after ({} main, settings gone {}), settings page {}",
+                                        cx.windows().len(),
+                                        mains,
+                                        takt.read(cx).settings_gone(cx),
+                                        takt.read(cx).app.settings_page.is_some()
+                                    );
+                                });
+                            })
+                            .detach();
                         });
                     }
                     if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() {
