@@ -778,7 +778,13 @@ impl Takt {
             return;
         }
         cx.stop_propagation();
-        if self.app.editing != editing_before {
+        // A draft moved by Tab or ⇧Tab is the same draft: what is typed
+        // in it stays.
+        let draft_moved = matches!(
+            (&editing_before, &self.app.editing),
+            (Some(Editing::NewTask { .. }), Some(Editing::NewTask { .. }))
+        );
+        if self.app.editing != editing_before && !draft_moved {
             self.begin_editing();
         }
         self.after_change(cx);
@@ -802,6 +808,57 @@ impl Takt {
             this.key_down(&event, window, cx);
             started.elapsed().as_secs_f64() * 1000.0
         };
+        // In a list's outline: Return on a task drafts below it, and Tab
+        // while typing makes the draft a subtask of the task above.
+        self.app.overlay = None;
+        self.app.editing = None;
+        self.app.region = crate::state::Region::Tasks;
+        let list = self.app.lists_in_sidebar_order().into_iter().find(|id| {
+            self.app.select_list(id);
+            self.app.rows.iter().filter(|r| r.depth == 0).count() >= 2
+        });
+        if list.is_some() {
+            self.app.select_view_mode(crate::state::ViewMode::Outline);
+            self.app.select_row(0);
+            let first = self.app.selected_task.clone();
+            press(self, "enter", window, cx);
+            self.field = TextField::new("smoke below");
+            press(self, "enter", window, cx);
+            let below = self.app.selected_task.clone();
+            let ix = |app: &crate::state::App, id: &Option<String>| {
+                app.rows
+                    .iter()
+                    .position(|r| Some(&r.task.id) == id.as_ref())
+            };
+            let first_ix = ix(&self.app, &first);
+            let first_end = first_ix.map(|i| {
+                let depth = self.app.rows[i].depth;
+                i + 1
+                    + self.app.rows[i + 1..]
+                        .iter()
+                        .take_while(|r| r.depth > depth)
+                        .count()
+            });
+            said.push(format!(
+                "outline below: right after {}",
+                first_end.is_some() && ix(&self.app, &below) == first_end
+            ));
+            press(self, "enter", window, cx);
+            self.field = TextField::new("smoke child");
+            press(self, "tab", window, cx);
+            let kept = self.field.text == "smoke child";
+            press(self, "enter", window, cx);
+            let child = self.app.selected_task.clone();
+            let parent = child
+                .as_ref()
+                .and_then(|id| self.app.task(id))
+                .and_then(|t| t.parent_task_id.clone());
+            said.push(format!(
+                "tab makes a subtask {}, keeping the typing {kept}",
+                parent.is_some() && parent == below
+            ));
+            press(self, "escape", window, cx);
+        }
         // On the board: a card in the focused column, three times over.
         self.app.overlay = None;
         self.app.editing = None;
