@@ -10,6 +10,11 @@
 #
 # versionCode must rise with every upload. It is the number of commits on
 # HEAD, which only ever grows on main, so nobody has to remember to bump it.
+# Takt Sync's purchase needs RevenueCat's public Play key (`goog_…`): the
+# Gradle property taktRevenueCatKey, TAKT_REVENUECAT_ANDROID_KEY,
+# `taktRevenueCatKey=` in local.properties, or that variable's line in
+# ~/.config/takt/revenuecat.env. Without it the bundle can't sell Takt Sync.
+#
 # TAKT_VERSION_CODE overrides that (Tramline assigns its own build numbers).
 set -euo pipefail
 
@@ -21,6 +26,14 @@ version_code="${TAKT_VERSION_CODE:-$(git -C "$root" rev-list --count HEAD)}"
 if [[ ! -f "$android/keystore.properties" ]]; then
   echo "error: mobile/android/keystore.properties is missing, so the bundle would be signed with the debug key, which Play rejects." >&2
   exit 1
+fi
+
+if [[ -z "${TAKT_REVENUECAT_ANDROID_KEY:-}" && -f "$HOME/.config/takt/revenuecat.env" ]]; then
+  TAKT_REVENUECAT_ANDROID_KEY="$(sed -n 's/^TAKT_REVENUECAT_ANDROID_KEY=//p' "$HOME/.config/takt/revenuecat.env" | head -n1)"
+  export TAKT_REVENUECAT_ANDROID_KEY
+fi
+if [[ -z "${TAKT_REVENUECAT_ANDROID_KEY:-}" ]] && ! grep -qE '^taktRevenueCatKey=.+' "$android/local.properties" 2>/dev/null; then
+  echo "warning: no RevenueCat Play key, so this bundle can't sell Takt Sync." >&2
 fi
 
 echo "Building Takt $version_name ($version_code)"

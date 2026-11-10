@@ -19,6 +19,11 @@
 # with bundle id uk.co.maybeitssoftware.takt (its widgets extension is
 # uk.co.maybeitssoftware.takt.widgets).
 #
+# Takt Sync's purchase needs RevenueCat's public Apple key (`appl_…`):
+# REVENUECAT_IOS_KEY, else that line in ~/.config/takt/revenuecat.env.
+# Without it the build still works, and its Takt Sync row says the purchase
+# isn't available — fine for TestFlight, wrong for the App Store.
+#
 # The build number must rise with every upload. It is the number of commits
 # on HEAD, as for the Play bundle, so nobody has to remember to bump it.
 set -euo pipefail
@@ -34,6 +39,13 @@ archive="$out/TaktMobile.xcarchive"
 build_number="$(git -C "$root" rev-list --count HEAD)"
 destination="export"
 [[ "${1:-}" == "--upload" ]] && destination="upload"
+
+if [[ -z "${REVENUECAT_IOS_KEY:-}" && -f "$HOME/.config/takt/revenuecat.env" ]]; then
+  REVENUECAT_IOS_KEY="$(sed -n 's/^REVENUECAT_IOS_KEY=//p' "$HOME/.config/takt/revenuecat.env" | head -n1)"
+fi
+if [[ -z "${REVENUECAT_IOS_KEY:-}" ]]; then
+  echo "warning: no REVENUECAT_IOS_KEY, so this build can't sell Takt Sync." >&2
+fi
 
 # With no key named, the one upload_app_store_listing.sh uses: written out
 # of ~/.config/takt/asc.env to a private temporary .p8 for xcodebuild.
@@ -86,6 +98,7 @@ xcodebuild -project "$ios/TaktMobile.xcodeproj" -scheme TaktMobile \
   -configuration Release -destination 'generic/platform=iOS' \
   -archivePath "$archive" -allowProvisioningUpdates ${auth[@]+"${auth[@]}"} \
   CURRENT_PROJECT_VERSION="$build_number" \
+  REVENUECAT_IOS_KEY="${REVENUECAT_IOS_KEY:-}" \
   archive -quiet
 
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$out" \
