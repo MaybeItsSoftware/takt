@@ -50,7 +50,9 @@ Or build it yourself — see [Build from source](#build-from-source).
 Open Settings with `Cmd+,`. It is one window with a sidebar of pages — type
 to filter them, walk them with `Tab`, or jump with a key, shown beside each
 entry: `⌘1`–`⌘7` the categories, `⌥⌘1`–`⌥⌘6` the plugins' pages, and
-`⇧⌥⌘1`–`⇧⌥⌘6` a plugin's switch, on or off:
+`⇧⌥⌘1`–`⇧⌥⌘6` a plugin's switch, on or off. `↑`/`↓` move between
+settings, and `Return` or `Space` flips a switch or opens a choice (`Space`
+only while nothing is typed in the filter; after that it is a space in it):
 
 | Page | What |
 | --- | --- |

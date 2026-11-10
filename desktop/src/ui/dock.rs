@@ -28,7 +28,8 @@ impl Takt {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let tab = self.app.prefs.right_dock_tab.clone();
-        let focused = matches!(self.app.region, Region::Inspector | Region::Conditions);
+        // The highlighted row inside says the pane has the keyboard; its
+        // edge stays a plain hairline.
         div()
             .w(px(self.app.prefs.right_dock_width.clamp(240., 520.)))
             .flex_none()
@@ -37,7 +38,7 @@ impl Takt {
             .flex_col()
             .bg(t.surface)
             .border_l_1()
-            .border_color(if focused { t.accent } else { t.border })
+            .border_color(t.border)
             .child(if tab == "conditions" {
                 self.conditions_pane(t, cx).into_any_element()
             } else {

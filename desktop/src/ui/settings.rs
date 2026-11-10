@@ -182,7 +182,16 @@ impl Takt {
                 _ => {}
             }
         }
-        let outcome = self.settings_field.handle(keystroke);
+        // Space flips the highlighted setting as Return does, while nothing
+        // is typed in the search; once something is, it is a space in it.
+        let m = &keystroke.modifiers;
+        let space = matches!(keystroke.key.as_str(), "space" | " ")
+            && !(m.platform || m.control || m.alt || m.shift);
+        let outcome = if space && query.is_empty() {
+            FieldKey::Commit
+        } else {
+            self.settings_field.handle(keystroke)
+        };
         if Self::clipboard_key(&mut self.settings_field, &outcome, cx) {
             self.settings_searched();
             return true;
