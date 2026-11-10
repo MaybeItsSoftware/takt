@@ -29,6 +29,20 @@ pub enum FocusKind {
     Pomodoro,
 }
 
+/// A row of the focus panel's finder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FinderHit {
+    Task {
+        id: String,
+        title: String,
+        list: String,
+    },
+    List {
+        id: String,
+        name: String,
+    },
+}
+
 /// A timer, counting up with no length, rather than a pomodoro.
 pub fn is_timer(session: &SessionRow) -> bool {
     session.work_duration_seconds >= OPEN_ENDED_SECONDS
@@ -112,7 +126,7 @@ impl App {
     }
 
     fn start_focus(&mut self, kind: FocusKind, override_availability: bool) {
-        let Some(task) = self.selected().cloned() else {
+        let Some(task) = self.focus_target() else {
             return;
         };
         if task.item_kind.as_deref() == Some("list") {
@@ -190,8 +204,7 @@ impl App {
     /// Adds the selection to the running session's queue, to come after
     /// the block in hand.
     pub fn add_selected_to_focus_queue(&mut self) {
-        let (Some(session), Some(task)) = (self.focus_session.clone(), self.selected().cloned())
-        else {
+        let (Some(session), Some(task)) = (self.focus_session.clone(), self.focus_target()) else {
             return;
         };
         if self
@@ -206,6 +219,97 @@ impl App {
         {
             self.message = Some(format!("Queued \u{201c}{}\u{201d}.", task.title));
         }
+    }
+
+    /// The selected task, read from the core when it isn't among the rows
+    /// on screen: the focus panel picks from every list.
+    fn focus_target(&self) -> Option<takt_core::records::TaskRow> {
+        self.selected().cloned().or_else(|| {
+            let id = self.selected_task.clone()?;
+            self.store.core.task(id).ok().flatten()
+        })
+    }
+
+    /// Starts (or, behind a running block, queues) a task picked in the
+    /// focus panel. The main window's selection moves to it only when it is
+    /// on screen there.
+    pub fn focus_from_panel(&mut self, task_id: &str, kind: FocusKind) {
+        let before = self.selected_task.replace(task_id.to_string());
+        if self.focus_running() {
+            self.add_selected_to_focus_queue();
+        } else {
+            self.start_focus(kind, true);
+        }
+        if self.task(task_id).is_none() {
+            self.selected_task = before;
+        }
+    }
+
+    /// The focus panel's finder: with a list chosen, its open tasks whose
+    /// titles match; otherwise the lists whose names match (every list
+    /// when nothing is typed) and then the open tasks that match anywhere.
+    pub fn focus_finder(&self, query: &str, list_id: Option<&str>) -> Vec<FinderHit> {
+        const LIMIT: usize = 60;
+        let needle = query.trim().to_lowercase();
+        let task_hit = |task: takt_core::records::TaskRow| {
+            let list = self
+                .list(&task.list_id)
+                .map(|l| l.name.clone())
+                .unwrap_or_default();
+            FinderHit::Task {
+                id: task.id,
+                title: task.title,
+                list,
+            }
+        };
+        let workable = |task: &takt_core::records::TaskRow| {
+            task.status == "open" && task.item_kind.as_deref() != Some("list")
+        };
+        if let Some(list_id) = list_id {
+            return self
+                .store
+                .core
+                .tasks_in_lists(vec![list_id.to_string()])
+                .unwrap_or_default()
+                .into_iter()
+                .filter(workable)
+                .filter(|t| needle.is_empty() || t.title.to_lowercase().contains(&needle))
+                .take(LIMIT)
+                .map(task_hit)
+                .collect();
+        }
+        let mut hits: Vec<FinderHit> = self
+            .lists
+            .iter()
+            .filter(|l| !l.is_archived && l.completed_at_ms.is_none())
+            .filter(|l| needle.is_empty() || l.name.to_lowercase().contains(&needle))
+            .take(if needle.is_empty() { LIMIT } else { 6 })
+            .map(|l| FinderHit::List {
+                id: l.id.clone(),
+                name: l.name.clone(),
+            })
+            .collect();
+        if !needle.is_empty() {
+            let tasks = self
+                .store
+                .core
+                .search_tasks(
+                    self.store.workspace_id.clone(),
+                    query.trim().to_string(),
+                    false,
+                    false,
+                    LIMIT as i64,
+                )
+                .unwrap_or_default();
+            hits.extend(
+                tasks
+                    .into_iter()
+                    .map(|hit| hit.task)
+                    .filter(workable)
+                    .map(task_hit),
+            );
+        }
+        hits
     }
 
     /// Stops the session, logging the time so far without ticking the task.

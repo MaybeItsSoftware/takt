@@ -64,6 +64,12 @@ impl App {
     /// Files `text` from the quick capture window, at the top of its list.
     /// Returns what to say: Ok with the title filed, Err with why not.
     pub fn quick_capture(&mut self, text: &str) -> Result<String, String> {
+        self.quick_capture_task(text).map(|(_, title)| title)
+    }
+
+    /// Files `text` as quick capture does, returning the new task's id and
+    /// its title: the focus panel's `n` picks it to start.
+    pub fn quick_capture_task(&mut self, text: &str) -> Result<(String, String), String> {
         let Some((list_id, list_name)) = self.quick_capture_destination() else {
             return Err("Make a list first.".into());
         };
@@ -72,11 +78,11 @@ impl App {
         let title = new.title.clone();
         let created = self.write(|store| store.core.create_task(new, now_ms()));
         match created {
-            Some(_) => {
+            Some(id) => {
                 self.reload_rows();
                 self.reload_today();
                 self.message = Some(format!("Added “{title}” to {list_name}."));
-                Ok(title)
+                Ok((id, title))
             }
             None => Err(self
                 .message

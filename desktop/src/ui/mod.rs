@@ -580,6 +580,29 @@ impl Takt {
                 println!(
                     "smoke pill: timer {timer}, pill opened {opened}, stopped {stopped}, pill closed {closed}"
                 );
+                // The panel's `n` then `p`: a task filed as quick capture
+                // files it, found by the finder, started as a pomodoro.
+                let line = takt.update(cx, |this, cx| {
+                    let app = &mut this.app;
+                    let Ok((id, title)) = app.quick_capture_task("Smoke panel task") else {
+                        return "skipped (nowhere to file)".to_string();
+                    };
+                    let found = app.focus_finder(&title, None).iter().any(|hit| {
+                        matches!(hit, crate::state::focus::FinderHit::Task { id: found, .. } if *found == id)
+                    });
+                    app.focus_from_panel(&id, crate::state::focus::FocusKind::Pomodoro);
+                    let pomodoro = app
+                        .focus_session
+                        .as_ref()
+                        .is_some_and(|s| !crate::state::focus::is_timer(s));
+                    app.stop_focus();
+                    this.open_requested_windows(cx);
+                    format!(
+                        "found {found}, pomodoro {pomodoro}, stopped {}",
+                        !this.app.focus_running()
+                    )
+                });
+                println!("smoke panel: {line}");
             });
         });
     }
