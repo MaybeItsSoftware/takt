@@ -49,6 +49,16 @@ impl App {
         })
     }
 
+    /// The lists a task can be filed into, in sidebar order: the focus
+    /// panel's Tab steps through them.
+    pub fn capture_lists(&self) -> Vec<(String, String)> {
+        self.lists
+            .iter()
+            .filter(|l| !l.is_archived && l.completed_at_ms.is_none())
+            .map(|l| (l.id.clone(), l.name.clone()))
+            .collect()
+    }
+
     /// Where quick capture files a task: the chosen list while it exists,
     /// else the inbox, else the first list.
     pub fn quick_capture_destination(&self) -> Option<(String, String)> {
@@ -61,16 +71,21 @@ impl App {
             .map(|list| (list.id.clone(), list.name.clone()))
     }
 
-    /// Files `text` from the quick capture window, at the top of its list.
-    /// Returns what to say: Ok with the title filed, Err with why not.
-    pub fn quick_capture(&mut self, text: &str) -> Result<String, String> {
-        self.quick_capture_task(text).map(|(_, title)| title)
-    }
-
     /// Files `text` as quick capture does, returning the new task's id and
     /// its title: the focus panel's `n` picks it to start.
     pub fn quick_capture_task(&mut self, text: &str) -> Result<(String, String), String> {
-        let Some((list_id, list_name)) = self.quick_capture_destination() else {
+        self.capture_into(text, None)
+    }
+
+    /// Files `text` at the top of `list` (id, name), or where quick capture
+    /// files when that is None: the focus panel files into the list it is
+    /// in, or the one Tab chose.
+    pub fn capture_into(
+        &mut self,
+        text: &str,
+        list: Option<(String, String)>,
+    ) -> Result<(String, String), String> {
+        let Some((list_id, list_name)) = list.or_else(|| self.quick_capture_destination()) else {
             return Err("Make a list first.".into());
         };
         let mut new = self.new_task_from(text, &list_id)?;

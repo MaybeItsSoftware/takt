@@ -1,14 +1,20 @@
-//! The focus panel: a small window that floats over everything, for the
-//! block in hand once the main window is put away. The running task and its
-//! clock, the queue behind it, and with nothing running the day's ladder to
-//! start from. `FocusPanelController.swift` and `FocusPanelView.swift`.
+//! The focus panel: the one small window that floats over everything for
+//! starting work and capturing it. The running task and its clock, the queue
+//! behind it, and a field to find or add a task. `FocusPanelController.swift`
+//! and `FocusPanelView.swift`, with `QuickCapturePanelController.swift`
+//! folded in.
 //!
-//! It is worked from the keyboard, a letter an action: Return starts a
-//! timer on the highlighted task (or queues it behind a running block), `p`
-//! a pomodoro, space pauses, `d` finishes, `s` stops. `n` opens a field for
-//! a new task, filed where quick capture files, and `/` a finder over every
-//! list and task; either one leaves its task highlighted, ready to start.
-//! The footer spells the letters out.
+//! With nothing running it opens typing: the day's ladder until you type,
+//! then every task and list that matches, and last an "Add" row that files
+//! what you typed. Return starts a timer on the highlighted task, `⌥↩` a
+//! pomodoro; on a list it narrows to that list's tasks, and Add then files
+//! there; `Tab` steps the list Add files into. Quick capture's hotkey opens
+//! it the same way, and there Add files the task and the panel goes.
+//!
+//! While a block runs a letter is an action: Return queues the highlighted
+//! task, `p` as a pomodoro, space pauses, `d` finishes, `s` stops, and `/`
+//! or `n` goes back to typing. The footer spells the keys out. It shows and
+//! hides at once, with no fade.
 //!
 //! It holds no workspace state of its own, only its cursor, its field and
 //! the task it picked: it reads the main window's `App` through the `Takt`
@@ -18,6 +24,7 @@
 use super::Takt;
 use super::widgets::{field_text, key_hint};
 use crate::keys::{Press, spell};
+use crate::platform::window_move;
 use crate::state::App;
 use crate::state::focus::{FinderHit, FocusKind};
 use crate::text_field::{FieldKey, TextField};
@@ -34,8 +41,12 @@ pub struct FocusPanel {
     this: WeakEntity<Self>,
     focus: FocusHandle,
     cursor: usize,
-    /// A task picked with `n` or `/`, listed first until it is started.
+    /// A task just added, listed first in the ladder until it is started.
     picked: Option<String>,
+    /// Opened by quick capture's hotkey: adding a task puts the panel away.
+    capturing: bool,
+    /// Where Add files, once `Tab` has chosen; else quick capture's list.
+    destination: Option<(String, String)>,
     mode: Mode,
 }
 
@@ -43,27 +54,48 @@ pub struct FocusPanel {
 enum Mode {
     /// Moving through the rows; letters are actions.
     Rows,
-    /// `n`: typing a new task. Why the last Return didn't file it.
-    New {
-        field: TextField,
-        problem: Option<String>,
-    },
-    /// `/`: finding a task or a list; with a list chosen, its tasks.
-    Find {
+    /// Typing to find a task or a list, or to add a task. With a list
+    /// chosen, its tasks, and Add files there. Why the last Add didn't file.
+    Type {
         field: TextField,
         list: Option<(String, String)>,
         hits: Vec<FinderHit>,
-        cursor: usize,
+        problem: Option<String>,
     },
 }
 
 impl Mode {
+    fn typing() -> Self {
+        Mode::Type {
+            field: TextField::default(),
+            list: None,
+            hits: Vec::new(),
+            problem: None,
+        }
+    }
+
     fn field(&mut self) -> Option<&mut TextField> {
         match self {
             Mode::Rows => None,
-            Mode::New { field, .. } | Mode::Find { field, .. } => Some(field),
+            Mode::Type { field, .. } => Some(field),
         }
     }
+}
+
+/// A row of the panel.
+#[derive(Clone, Debug, PartialEq)]
+enum Entry {
+    Task {
+        id: String,
+        title: String,
+        detail: String,
+    },
+    List {
+        id: String,
+        name: String,
+    },
+    /// File what was typed as a new task.
+    Add,
 }
 
 impl Focusable for FocusPanel {
@@ -72,8 +104,13 @@ impl Focusable for FocusPanel {
     }
 }
 
-/// Opens the panel at the top right of the main display.
-pub fn open(takt: Entity<Takt>, cx: &mut GpuiApp) -> Option<gpui::WindowHandle<FocusPanel>> {
+/// Opens the panel at the top right of the main display, in front of
+/// whatever app is, typing when nothing runs or when `capturing`.
+pub fn open(
+    takt: Entity<Takt>,
+    capturing: bool,
+    cx: &mut GpuiApp,
+) -> Option<gpui::WindowHandle<FocusPanel>> {
     let display = cx.primary_display();
     let origin = display
         .map(|d| {
@@ -95,296 +132,385 @@ pub fn open(takt: Entity<Takt>, cx: &mut GpuiApp) -> Option<gpui::WindowHandle<F
         show: true,
         ..Default::default()
     };
-    cx.open_window(options, |window, cx| {
-        let panel = cx.new(|cx| {
-            cx.observe(&takt, |_, _, cx| cx.notify()).detach();
-            FocusPanel {
-                takt: takt.clone(),
-                this: cx.entity().downgrade(),
-                focus: cx.focus_handle(),
-                cursor: 0,
-                picked: None,
-                mode: Mode::Rows,
+    let handle = cx
+        .open_window(options, |window, cx| {
+            if let Some(ns_window) = window_move::ns_window(window) {
+                window_move::no_animation(ns_window);
             }
-        });
-        window.focus(&panel.focus_handle(cx));
-        panel
-    })
-    .ok()
+            let running = takt.read(cx).app.focus_session.is_some();
+            let panel = cx.new(|cx| {
+                cx.observe(&takt, |_, _, cx| cx.notify()).detach();
+                FocusPanel {
+                    takt: takt.clone(),
+                    this: cx.entity().downgrade(),
+                    focus: cx.focus_handle(),
+                    cursor: 0,
+                    picked: None,
+                    capturing,
+                    destination: None,
+                    mode: if running && !capturing {
+                        Mode::Rows
+                    } else {
+                        Mode::typing()
+                    },
+                }
+            });
+            window.focus(&panel.focus_handle(cx));
+            panel
+        })
+        .ok();
+    cx.activate(true);
+    handle
 }
 
-/// What the panel lists: the queue while a block runs, the day's ladder
-/// when nothing does, with a task picked by `n` or `/` first when it isn't
-/// already among them. (id, title, detail).
-fn rows(app: &App, picked: Option<&str>) -> Vec<(String, String, String)> {
+/// The day's open tasks to start from, with a task just added first when
+/// it isn't already among them.
+fn ladder(app: &App, picked: Option<&str>) -> Vec<Entry> {
     let list_name = |list_id: &str| {
         app.list(list_id)
             .map(|l| l.name.clone())
             .unwrap_or_default()
     };
-    let mut listed: Vec<(String, String, String)> = if app.focus_session.is_some() {
-        app.focus_queue()
-            .into_iter()
-            .map(|entry| {
-                let list = list_name(&entry.task.list_id);
-                (entry.task.id, entry.task.title, list)
-            })
-            .collect()
-    } else {
-        app.today
-            .rows()
-            .filter(|row| row.task.status == "open")
-            .map(|row| {
-                (
-                    row.task.id.clone(),
-                    row.task.title.clone(),
-                    list_name(&row.task.list_id),
-                )
-            })
-            .collect()
-    };
+    let mut listed: Vec<Entry> = app
+        .today
+        .rows()
+        .filter(|row| row.task.status == "open")
+        .map(|row| Entry::Task {
+            id: row.task.id.clone(),
+            title: row.task.title.clone(),
+            detail: list_name(&row.task.list_id),
+        })
+        .collect();
     if let Some(id) = picked
-        && !listed.iter().any(|(listed, _, _)| listed == id)
+        && !listed
+            .iter()
+            .any(|e| matches!(e, Entry::Task { id: listed, .. } if listed == id))
         && let Some(task) = app
             .task(id)
             .cloned()
             .or_else(|| app.store.core.task(id.into()).ok().flatten())
             .filter(|task| task.status == "open")
     {
-        let list = list_name(&task.list_id);
-        listed.insert(0, (task.id, task.title, list));
+        let detail = list_name(&task.list_id);
+        listed.insert(
+            0,
+            Entry::Task {
+                id: task.id,
+                title: task.title,
+                detail,
+            },
+        );
     }
     listed
 }
 
+/// The running session's queue.
+fn queue(app: &App) -> Vec<Entry> {
+    app.focus_queue()
+        .into_iter()
+        .map(|entry| Entry::Task {
+            detail: app
+                .list(&entry.task.list_id)
+                .map(|l| l.name.clone())
+                .unwrap_or_default(),
+            id: entry.task.id,
+            title: entry.task.title,
+        })
+        .collect()
+}
+
 impl FocusPanel {
-    fn listed(&self, cx: &GpuiApp) -> Vec<(String, String, String)> {
-        rows(&self.takt.read(cx).app, self.picked.as_deref())
+    /// The rows as the mode lists them.
+    fn entries(&self, app: &App) -> Vec<Entry> {
+        match &self.mode {
+            Mode::Rows if app.focus_session.is_some() => queue(app),
+            Mode::Rows => ladder(app, self.picked.as_deref()),
+            Mode::Type {
+                field, list, hits, ..
+            } => {
+                if field.text.trim().is_empty() && list.is_none() {
+                    return ladder(app, self.picked.as_deref());
+                }
+                let mut entries: Vec<Entry> = hits
+                    .iter()
+                    .map(|hit| match hit.clone() {
+                        FinderHit::Task { id, title, list } => Entry::Task {
+                            id,
+                            title,
+                            detail: list,
+                        },
+                        FinderHit::List { id, name } => Entry::List { id, name },
+                    })
+                    .collect();
+                if !field.text.trim().is_empty() {
+                    entries.push(Entry::Add);
+                }
+                entries
+            }
+        }
     }
 
-    /// Highlights `id` among the rows, picking it so it stays listed.
-    fn pick(&mut self, id: String, cx: &GpuiApp) {
-        self.picked = Some(id.clone());
-        self.cursor = self
-            .listed(cx)
-            .iter()
-            .position(|(listed, _, _)| *listed == id)
-            .unwrap_or(0);
+    /// Where Add files: the list typed into, else the one `Tab` chose,
+    /// else quick capture's.
+    fn filing_into(&self, app: &App) -> Option<(String, String)> {
+        match &self.mode {
+            Mode::Type {
+                list: Some(list), ..
+            } => Some(list.clone()),
+            _ => self
+                .destination
+                .clone()
+                .or_else(|| app.quick_capture_destination()),
+        }
+    }
+
+    /// Quick capture's hotkey on an open panel: back to typing, to add.
+    pub fn begin_capture(&mut self) {
+        self.capturing = true;
+        if matches!(self.mode, Mode::Rows) {
+            self.mode = Mode::typing();
+            self.cursor = 0;
+        }
     }
 
     fn refind(&mut self, cx: &GpuiApp) {
-        if let Mode::Find {
+        if let Mode::Type {
             field,
             list,
             hits,
-            cursor,
+            problem,
         } = &mut self.mode
         {
+            *problem = None;
             *hits = self
                 .takt
                 .read(cx)
                 .app
                 .focus_finder(&field.text, list.as_ref().map(|(id, _)| id.as_str()));
-            *cursor = 0;
         }
+        // On what was typed, the best match; on nothing, the top.
+        self.cursor = 0;
+    }
+
+    /// Settles the main window once this window's update is over: `Takt`
+    /// can't see this window while it updates.
+    fn settle(&self, cx: &mut Context<Self>) {
+        let takt = self.takt.clone();
+        cx.defer(move |cx| takt.update(cx, |takt, cx| takt.settle(cx)));
+    }
+
+    /// Starts (or queues) a timer or a pomodoro on `id`.
+    fn start(&mut self, id: String, kind: FocusKind, cx: &mut Context<Self>) {
+        self.takt
+            .update(cx, |takt, _| takt.app.focus_from_panel(&id, kind));
+        if self.picked.as_deref() == Some(id.as_str()) {
+            self.picked = None;
+        }
+        self.mode = Mode::Rows;
+        self.cursor = 0;
+        self.settle(cx);
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if !matches!(self.mode, Mode::Rows) {
-            self.field_key(event, cx);
+            self.field_key(event, window, cx);
             return;
         }
         let Some(key) = spell(&Press::from_keystroke(&event.keystroke)) else {
             return;
         };
         cx.stop_propagation();
-        if key == "escape" && self.takt.read(cx).app.focus_prompt.is_none() {
-            window.remove_window();
+        let prompt = self.takt.read(cx).app.focus_prompt.is_some();
+        if prompt {
+            self.takt
+                .update(cx, |takt, _| takt.app.focus_prompt_key(&key));
+            self.settle(cx);
+            cx.notify();
             return;
         }
-        if self.takt.read(cx).app.focus_prompt.is_none() {
-            match key.as_str() {
-                "n" => {
-                    self.mode = Mode::New {
-                        field: TextField::default(),
-                        problem: None,
-                    };
-                    cx.notify();
-                    return;
-                }
-                "/" => {
-                    self.mode = Mode::Find {
-                        field: TextField::default(),
-                        list: None,
-                        hits: Vec::new(),
-                        cursor: 0,
-                    };
-                    self.refind(cx);
-                    cx.notify();
-                    return;
-                }
-                _ => {}
-            }
-        }
-        let listed = self.listed(cx);
-        let highlighted = listed.get(self.cursor).map(|(id, _, _)| id.clone());
-        let mut close = false;
-        let mut started = false;
-        self.takt.update(cx, |takt, _| {
-            let app = &mut takt.app;
-            if app.focus_prompt.is_some() {
-                app.focus_prompt_key(&key);
-                return;
-            }
-            match key.as_str() {
-                "enter" | "p" => {
-                    if let Some(id) = &highlighted {
-                        let kind = if key == "p" {
-                            FocusKind::Pomodoro
-                        } else {
-                            FocusKind::Timer
-                        };
-                        app.focus_from_panel(id, kind);
-                        started = true;
-                    }
-                }
-                "d" => app.request_focus_completion(true),
-                "s" => app.stop_focus(),
-                "space" => {
-                    if app
-                        .focus_session
-                        .as_ref()
-                        .is_some_and(|s| s.phase == "onBreak")
-                    {
-                        app.end_focus_break();
-                    } else {
-                        app.toggle_focus_pause();
-                    }
-                }
-                "cmd+w" => close = true,
-                _ => {}
-            }
-        });
-        if started && highlighted == self.picked {
-            self.picked = None;
-        }
-        // The pill, the day and the status item catch up once this window's
-        // update is over: `Takt` can't see this window while it updates.
-        let takt = self.takt.clone();
-        cx.defer(move |cx| takt.update(cx, |takt, cx| takt.settle(cx)));
-        let count = self.listed(cx).len();
+        let entries = self.entries(&self.takt.read(cx).app);
+        let highlighted = match entries.get(self.cursor) {
+            Some(Entry::Task { id, .. }) => Some(id.clone()),
+            _ => None,
+        };
         match key.as_str() {
-            "j" | "down" if count > 0 => self.cursor = (self.cursor + 1).min(count - 1),
+            "escape" | "cmd+w" => return window.remove_window(),
+            "n" | "/" => {
+                self.mode = Mode::typing();
+                self.cursor = 0;
+            }
+            "enter" | "p" => {
+                if let Some(id) = highlighted {
+                    let kind = if key == "p" {
+                        FocusKind::Pomodoro
+                    } else {
+                        FocusKind::Timer
+                    };
+                    self.start(id, kind, cx);
+                }
+            }
+            "d" | "s" | "space" => {
+                self.takt.update(cx, |takt, _| {
+                    let app = &mut takt.app;
+                    match key.as_str() {
+                        "d" => app.request_focus_completion(true),
+                        "s" => app.stop_focus(),
+                        _ if app
+                            .focus_session
+                            .as_ref()
+                            .is_some_and(|s| s.phase == "onBreak") =>
+                        {
+                            app.end_focus_break()
+                        }
+                        _ => app.toggle_focus_pause(),
+                    }
+                });
+                self.settle(cx);
+            }
+            "j" | "down" => self.cursor = (self.cursor + 1).min(entries.len().saturating_sub(1)),
             "k" | "up" => self.cursor = self.cursor.saturating_sub(1),
-            _ => self.cursor = self.cursor.min(count.saturating_sub(1)),
-        }
-        if close {
-            window.remove_window();
+            _ => {}
         }
         cx.notify();
     }
 
-    /// A key while the new-task field or the finder is open.
-    fn field_key(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
+    /// A key while typing.
+    fn field_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let Some(field) = self.mode.field() else {
             return;
         };
         let outcome = field.handle(&event.keystroke);
         if Takt::clipboard_key(field, &outcome, cx) {
-            self.after_edit(cx);
+            self.refind(cx);
             cx.stop_propagation();
             cx.notify();
             return;
         }
         let ctrl = event.keystroke.modifiers.control;
-        let step = match (event.keystroke.key.as_str(), &outcome) {
-            (_, FieldKey::Down) | ("n", _) if ctrl || outcome == FieldKey::Down => Some(1),
-            (_, FieldKey::Up) | ("p", _) if ctrl || outcome == FieldKey::Up => Some(-1),
+        let key = event.keystroke.key.as_str();
+        let step = match outcome {
+            FieldKey::Down => Some(1),
+            FieldKey::Up => Some(-1),
+            _ if ctrl && key == "n" => Some(1),
+            _ if ctrl && key == "p" => Some(-1),
             _ => None,
         };
         match outcome {
             // Printable: the input method types it.
             FieldKey::Text(_) if step.is_none() => return,
-            FieldKey::Edited => self.after_edit(cx),
-            FieldKey::Commit => self.commit(cx),
-            FieldKey::Cancel => self.cancel(cx),
+            FieldKey::Edited => self.refind(cx),
+            FieldKey::Commit => {
+                let kind = if event.keystroke.modifiers.alt {
+                    FocusKind::Pomodoro
+                } else {
+                    FocusKind::Timer
+                };
+                if self.commit(kind, cx) {
+                    return window.remove_window();
+                }
+            }
+            FieldKey::Cancel => {
+                if self.cancel(cx) {
+                    return window.remove_window();
+                }
+            }
+            FieldKey::Tab { shift } => self.step_destination(if shift { -1 } else { 1 }, cx),
             _ => {}
         }
-        if let (Some(step), Mode::Find { hits, cursor, .. }) = (step, &mut self.mode) {
-            let last = hits.len().saturating_sub(1);
-            *cursor = if step > 0 {
-                (*cursor + 1).min(last)
+        if let Some(step) = step {
+            let count = self.entries(&self.takt.read(cx).app).len();
+            self.cursor = if step > 0 {
+                (self.cursor + 1).min(count.saturating_sub(1))
             } else {
-                cursor.saturating_sub(1)
+                self.cursor.saturating_sub(1)
             };
         }
         cx.stop_propagation();
         cx.notify();
     }
 
-    fn after_edit(&mut self, cx: &GpuiApp) {
-        match &mut self.mode {
-            Mode::New { problem, .. } => *problem = None,
-            Mode::Find { .. } => self.refind(cx),
-            Mode::Rows => {}
+    /// `Tab`: the next list for Add to file into.
+    fn step_destination(&mut self, by: i32, cx: &GpuiApp) {
+        if let Mode::Type { list: Some(_), .. } = self.mode {
+            return;
         }
+        let app = &self.takt.read(cx).app;
+        let lists = app.capture_lists();
+        if lists.is_empty() {
+            return;
+        }
+        let at = self
+            .filing_into(app)
+            .and_then(|(id, _)| lists.iter().position(|(l, _)| *l == id))
+            .unwrap_or(0) as i32;
+        let next = (at + by).rem_euclid(lists.len() as i32) as usize;
+        self.destination = Some(lists[next].clone());
     }
 
-    fn commit(&mut self, cx: &mut Context<Self>) {
-        match &mut self.mode {
-            Mode::New { field, problem } => {
-                let text = field.text.clone();
-                if text.trim().is_empty() {
-                    self.mode = Mode::Rows;
-                    return;
+    /// Return on a row. True when the panel should go.
+    fn commit(&mut self, kind: FocusKind, cx: &mut Context<Self>) -> bool {
+        let entries = self.entries(&self.takt.read(cx).app);
+        match entries.get(self.cursor).cloned() {
+            Some(Entry::Task { id, .. }) => self.start(id, kind, cx),
+            Some(Entry::List { id, name }) => {
+                if let Mode::Type { field, list, .. } = &mut self.mode {
+                    *list = Some((id, name));
+                    *field = TextField::default();
                 }
+                self.refind(cx);
+            }
+            Some(Entry::Add) => {
+                let Mode::Type { field, .. } = &self.mode else {
+                    return false;
+                };
+                let text = field.text.clone();
+                let into = self.filing_into(&self.takt.read(cx).app);
                 let filed = self.takt.update(cx, |takt, _| {
-                    let filed = takt.app.quick_capture_task(&text);
+                    let filed = takt.app.capture_into(&text, into);
                     takt.app.today_stale = true;
                     filed
                 });
                 match filed {
-                    Ok((id, _)) => {
-                        self.mode = Mode::Rows;
-                        self.pick(id, cx);
-                        let takt = self.takt.clone();
-                        cx.defer(move |cx| takt.update(cx, |takt, cx| takt.settle(cx)));
+                    Ok(_) if self.capturing => {
+                        self.settle(cx);
+                        return true;
                     }
-                    Err(why) => *problem = Some(why),
+                    Ok((id, _)) => {
+                        // Back to the ladder with it first, to start.
+                        self.mode = Mode::typing();
+                        self.picked = Some(id);
+                        self.cursor = 0;
+                        self.settle(cx);
+                    }
+                    Err(why) => {
+                        if let Mode::Type { problem, .. } = &mut self.mode {
+                            *problem = Some(why);
+                        }
+                    }
                 }
             }
-            Mode::Find {
-                field,
-                list,
-                hits,
-                cursor,
-            } => match hits.get(*cursor).cloned() {
-                Some(FinderHit::Task { id, .. }) => {
-                    self.mode = Mode::Rows;
-                    self.pick(id, cx);
-                }
-                Some(FinderHit::List { id, name }) => {
-                    *list = Some((id, name));
-                    *field = TextField::default();
-                    self.refind(cx);
-                }
-                None => {}
-            },
-            Mode::Rows => {}
+            None => {}
         }
+        false
     }
 
-    /// Esc: out of a chosen list back to everything, else back to the rows.
-    fn cancel(&mut self, cx: &GpuiApp) {
-        if let Mode::Find { list, field, .. } = &mut self.mode
-            && list.is_some()
-        {
-            *list = None;
-            *field = TextField::default();
-            self.refind(cx);
-            return;
+    /// Esc: clears what was typed, then leaves a chosen list, then goes back
+    /// to the running block's keys. True when the panel should go.
+    fn cancel(&mut self, cx: &GpuiApp) -> bool {
+        let running = self.takt.read(cx).app.focus_session.is_some();
+        if let Mode::Type { field, list, .. } = &mut self.mode {
+            if !field.text.is_empty() {
+                *field = TextField::default();
+            } else if list.is_some() {
+                *list = None;
+            } else if running && !self.capturing {
+                self.mode = Mode::Rows;
+            } else {
+                return true;
+            }
         }
-        self.mode = Mode::Rows;
+        self.refind(cx);
+        false
     }
 }
 
@@ -406,13 +532,14 @@ impl Render for FocusPanel {
         let status = app.focus_status();
         let running = app.focus_session.is_some();
         let prompt = app.focus_prompt.clone();
-        let destination = app
-            .quick_capture_destination()
+        let entries = self.entries(app);
+        let filing_into = self
+            .filing_into(app)
             .map(|(_, name)| name)
             .unwrap_or_else(|| "No list".into());
-        let listed = rows(app, self.picked.as_deref());
+        let cursor = self.cursor.min(entries.len().saturating_sub(1));
         let hook = Some((self.this.clone(), self.focus.clone()));
-        let row = |here: bool, title: String, detail: String| {
+        let row = |here: bool| {
             div()
                 .px_2()
                 .py(px(3.))
@@ -425,16 +552,52 @@ impl Render for FocusPanel {
                 })
                 .when(here, |d| d.bg(t.selected))
                 .flex()
+                .items_center()
                 .gap_2()
-                .child(div().flex_1().min_w_0().truncate().child(title))
-                .child(
-                    div()
-                        .flex_none()
-                        .text_size(px(11.))
-                        .text_color(t.placeholder)
-                        .child(detail),
-                )
         };
+        let detail = |text: String| {
+            div()
+                .flex_none()
+                .text_size(px(11.))
+                .text_color(t.placeholder)
+                .child(text)
+        };
+        let typed = match &self.mode {
+            Mode::Type { field, .. } => field.text.trim().to_string(),
+            Mode::Rows => String::new(),
+        };
+        let labels = app.capture_labels(&typed);
+        let rows = entries.into_iter().enumerate().map(|(ix, entry)| {
+            let here = ix == cursor;
+            match entry {
+                Entry::Task {
+                    title, detail: d, ..
+                } => row(here)
+                    .child(div().flex_1().min_w_0().truncate().child(title))
+                    .child(detail(d)),
+                Entry::List { name, .. } => row(here)
+                    .child(div().flex_1().min_w_0().truncate().child(name))
+                    .child(detail("list".into())),
+                Entry::Add => row(here)
+                    .child(div().flex_none().text_color(t.accent).child("+"))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .child(format!("Add \u{201c}{typed}\u{201d}")),
+                    )
+                    .children(labels.iter().map(|l| detail(l.clone())))
+                    .child(detail(format!("\u{2192} {filing_into}"))),
+            }
+        });
+        let list_area = div()
+            .id("focus-panel-rows")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .p_1()
+            .children(rows);
         let heading = |text: String| {
             div()
                 .px_3()
@@ -443,17 +606,6 @@ impl Render for FocusPanel {
                 .text_color(t.placeholder)
                 .child(text)
         };
-        let field_row = |field: &TextField, placeholder: &str| {
-            div()
-                .mx_2()
-                .mt_2()
-                .px_2()
-                .py_1()
-                .rounded(px(4.))
-                .border_1()
-                .border_color(t.accent)
-                .child(field_text(field, placeholder, t, hook.clone()))
-        };
         let (body, hints): (Vec<AnyElement>, Vec<(&str, &str)>) = match &self.mode {
             Mode::Rows => (
                 vec![
@@ -461,107 +613,115 @@ impl Render for FocusPanel {
                         if running {
                             "Up next in this session"
                         } else {
-                            "Start on…"
+                            "Start on\u{2026}"
                         }
                         .into(),
                     )
                     .into_any_element(),
-                    div()
-                        .id("focus-panel-rows")
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                        .p_1()
-                        .children(
-                            listed
-                                .into_iter()
-                                .enumerate()
-                                .map(|(ix, (_, title, list))| row(ix == self.cursor, title, list)),
-                        )
-                        .into_any_element(),
+                    list_area.into_any_element(),
                 ],
                 if prompt.is_some() {
                     vec![]
                 } else if running {
                     vec![
-                        ("↩", "queue"),
-                        ("p", "queue"),
-                        ("␣", "pause"),
-                        ("d", "done"),
-                        ("s", "stop"),
-                        ("n", "new"),
-                        ("/", "find"),
+                        ("\u{21a9}", "queue"),
+                        ("p", "queue pomodoro"),
+                        ("j k", "move"),
+                        ("/", "find or add"),
                         ("esc", "hide"),
                     ]
                 } else {
                     vec![
-                        ("↩", "timer"),
+                        ("\u{21a9}", "timer"),
                         ("p", "pomodoro"),
                         ("j k", "move"),
-                        ("n", "new"),
-                        ("/", "find"),
+                        ("/", "find or add"),
                         ("esc", "hide"),
                     ]
                 },
             ),
-            Mode::New { field, problem } => (
-                vec![
-                    heading(format!("New task → {destination}")).into_any_element(),
-                    field_row(field, "Add a task… 45m #tag @fri !1").into_any_element(),
-                    div()
-                        .px_3()
-                        .pt_1()
-                        .text_size(px(11.))
-                        .text_color(t.error)
-                        .when_some(problem.clone(), |d, why| d.child(why))
-                        .into_any_element(),
-                    div().flex_1().into_any_element(),
-                ],
-                vec![("↩", "add"), ("esc", "back")],
-            ),
-            Mode::Find {
+            Mode::Type {
                 field,
                 list,
-                hits,
-                cursor,
-            } => (
-                vec![
-                    heading(match list {
-                        Some((_, name)) => format!("Tasks in {name}"),
-                        None => "Find a task, or a list".into(),
-                    })
-                    .into_any_element(),
-                    field_row(
-                        field,
-                        if list.is_some() {
-                            "Filter…"
+                problem,
+                ..
+            } => {
+                let placeholder = match list {
+                    Some((_, name)) => format!("Find or add in {name}\u{2026}"),
+                    None if self.capturing => "Add a task\u{2026} 45m #tag @fri !1".into(),
+                    None => "Find a task or list, or add one\u{2026}".into(),
+                };
+                (
+                    vec![
+                        div()
+                            .mx_2()
+                            .mt_2()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(4.))
+                            .border_1()
+                            .border_color(t.accent)
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .when_some(list.clone(), |d, (_, name)| {
+                                d.child(
+                                    div()
+                                        .flex_none()
+                                        .px_1()
+                                        .rounded(px(4.))
+                                        .bg(t.selected)
+                                        .text_size(px(11.))
+                                        .child(name),
+                                )
+                            })
+                            .child(div().flex_1().min_w_0().child(field_text(
+                                field,
+                                &placeholder,
+                                t,
+                                hook.clone(),
+                            )))
+                            .into_any_element(),
+                        div()
+                            .px_3()
+                            .pt_1()
+                            .flex()
+                            .justify_between()
+                            .text_size(px(11.))
+                            .child(div().text_color(t.error).children(problem.clone()))
+                            .child(
+                                div()
+                                    .text_color(t.placeholder)
+                                    .child(format!("Adds to {filing_into}")),
+                            )
+                            .into_any_element(),
+                        if typed.is_empty() && list.is_none() {
+                            heading("Start on\u{2026}".into()).into_any_element()
                         } else {
-                            "Search tasks and lists…"
+                            div().into_any_element()
                         },
-                    )
-                    .into_any_element(),
-                    div()
-                        .id("focus-panel-finds")
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                        .p_1()
-                        .children(hits.iter().enumerate().map(|(ix, hit)| match hit {
-                            FinderHit::Task { title, list, .. } => {
-                                row(ix == *cursor, title.clone(), list.clone())
-                            }
-                            FinderHit::List { name, .. } => {
-                                row(ix == *cursor, name.clone(), "list".into())
-                            }
-                        }))
-                        .into_any_element(),
-                ],
-                vec![
-                    ("↑↓", "move"),
-                    ("↩", "pick"),
-                    ("esc", if list.is_some() { "all lists" } else { "back" }),
-                ],
-            ),
+                        list_area.into_any_element(),
+                    ],
+                    vec![
+                        ("\u{21a9}", "timer / add"),
+                        ("\u{2325}\u{21a9}", "pomodoro"),
+                        ("\u{2191}\u{2193}", "move"),
+                        ("\u{21e5}", "list"),
+                        (
+                            "esc",
+                            if !typed.is_empty() {
+                                "clear"
+                            } else if list.is_some() {
+                                "all lists"
+                            } else if running && !self.capturing {
+                                "back"
+                            } else {
+                                "hide"
+                            },
+                        ),
+                    ],
+                )
+            }
         };
         div()
             .id("focus-panel")
@@ -599,19 +759,22 @@ impl Render for FocusPanel {
                                 .child(clock),
                         )
                     })
-                    .when(running && prompt.is_none(), |d| {
-                        d.child(
-                            div()
-                                .flex()
-                                .flex_wrap()
-                                .gap_2()
-                                .text_size(px(11.))
-                                .text_color(t.placeholder)
-                                .child(hint("␣", "pause", t))
-                                .child(hint("d", "done", t))
-                                .child(hint("s", "stop", t)),
-                        )
-                    }),
+                    .when(
+                        running && prompt.is_none() && matches!(self.mode, Mode::Rows),
+                        |d| {
+                            d.child(
+                                div()
+                                    .flex()
+                                    .flex_wrap()
+                                    .gap_2()
+                                    .text_size(px(11.))
+                                    .text_color(t.placeholder)
+                                    .child(hint("\u{2423}", "pause", t))
+                                    .child(hint("d", "done", t))
+                                    .child(hint("s", "stop", t)),
+                            )
+                        },
+                    ),
             )
             .when_some(prompt, |d, prompt| {
                 let selected = prompt.selected();
@@ -624,7 +787,7 @@ impl Render for FocusPanel {
                         .border_b_1()
                         .border_color(t.border_variant)
                         .child(div().child(format!(
-                            "How did it go? ×{:.1} · {:.1} pts",
+                            "How did it go? \u{d7}{:.1} \u{b7} {:.1} pts",
                             prompt.multiplier(),
                             prompt.points()
                         )))
@@ -647,7 +810,7 @@ impl Render for FocusPanel {
                             div()
                                 .text_size(px(11.))
                                 .text_color(t.placeholder)
-                                .child("↑↓ score · ←→ choose · ↩ takes it"),
+                                .child("\u{2191}\u{2193} score \u{b7} \u{2190}\u{2192} choose \u{b7} \u{21a9} takes it"),
                         ),
                 )
             })
@@ -701,7 +864,7 @@ impl EntityInputHandler for FocusPanel {
 
     fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> {
         match &self.mode {
-            Mode::New { field, .. } | Mode::Find { field, .. } => field
+            Mode::Type { field, .. } => field
                 .marked
                 .as_ref()
                 .map(|range| field.range_to_utf16(range)),
@@ -732,7 +895,7 @@ impl EntityInputHandler for FocusPanel {
             }
             None => field.insert(text),
         }
-        self.after_edit(cx);
+        self.refind(cx);
         cx.notify();
     }
 

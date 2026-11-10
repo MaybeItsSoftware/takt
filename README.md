@@ -57,7 +57,7 @@ entry: `⌘1`–`⌘7` the categories, `⌥⌘1`–`⌥⌘6` the plugins' pages,
 | General | Launch at login, confirming deletes, and reminders |
 | Focus | Where a started block runs, and whether each block is scored |
 | Appearance | The theme gallery, light/dark/system, the interface, heading and numeral fonts, the text size, and the completion celebration (its switch, its style and its sound) |
-| Keyboard | The three global hotkeys (show the window, focus panel `⌃⌥⇧⌘F`, Quick Add `⌃⌥⇧⌘D`, which opens one of the window's overlays over whatever app you are in, in the theme you have chosen: the field, the chips that say what `30m`, `@fri`, `#work` and `!1` will set as the window's add row does, and under it every list in the list finder's rows — `↑`/`↓` pick the list, `→` at the end of the text (or `Tab`) walks into its date, conditions and time slots — see *Quick Add's slots* below — `Return` files it, `Esc` or a click away drops it), the list Quick Add captures into; the shortcut rows show only while global hotkeys are on |
+| Keyboard | The three global hotkeys (show the window, focus panel `⌃⌥⇧⌘F`, Quick Add `⌃⌥⇧⌘D`, which opens the focus panel ready to add — see *The focus panel*), the list Quick Add captures into; the shortcut rows show only while global hotkeys are on |
 | AI | **AI features** (on by default; off hides the agent panel, quick ask and MCP, and sends nothing to an AI), and MCP: adding Takt's server to the assistants on this Mac |
 | Plugins | A heading in the sidebar with a page under it for each built-in plugin — Google Calendar, Google Tasks, Google Drive, Checkvist, Obsidian, the Markdown editor — each with its switch beside its name. The Google plugins fold under a **Google** entry (its chevron folds them away) with a switch of its own: off, every Google plugin stops, and each keeps its own switch for when Google is on again. Its page holds that switch and the Google sign-in (**Connect Google Calendar, Tasks & Drive**, which is not your Takt account); each plugin's own switch is what turns its mirroring or linking on, with nothing further to switch inside it. Google signs in through Takt's own client; **Use your own Google client** (off by default) asks for a client ID from a Cloud project of yours and only then shows its ID and secret rows, and turning it off forgets them and signs Google out. A plugin's page holds its switch and, while it is on, its settings. Off, a plugin's settings, link-picker rows and background work go |
 | Sync | The account that keeps the Mac and phones on one workspace, drawn as an account screen: choose **Takt Sync** or **Your own server** ([self-hosting](docs/self-hosting.md); it asks for the address), then sign in with Apple, Google or email, or create an account. Signed in, the card shows who you are, when it last synced, your devices and Takt Sync, with Sync now, the password, Sign out and Delete account. Changing server signs you out |
@@ -636,24 +636,39 @@ for now; what they do there reaches the phones through sync.
 
 `⌃⌥⇧⌘F` summons the focus panel over whatever app you are in, or brings it
 forward with the keyboard in it when it is already up; `Esc` puts it away.
-The status item's menu and `Cmd+8` open it too. Rebind or disable the hotkey
-in Settings → Keyboard.
+It appears and goes at once, with no fade. The status item's menu and `Cmd+8`
+open it too, and **Quick Add's hotkey `⌃⌥⇧⌘D` opens this same panel**,
+ready to add: there is one floating window, not two. Rebind or disable the
+hotkeys in Settings → Keyboard.
 
-At the top are the running task and its clock. Under them, while nothing
-runs, is the day to start from; while a block runs, the queue behind it.
-Every action is a letter, and a footer of key hints spells them out:
+At the top are the running task and its clock.
+
+**With nothing running it opens typing.** Until you type, it lists the day to
+start from. Type and it finds every open task and list that matches, with a
+last row, **Add "…"**, that files what you typed as a new task (`45m`,
+`#tag`, `@fri` and `!1` read as in Quick Add, and their chips show on the
+row):
 
 | Key | Action |
 | --- | --- |
-| `j` / `k`, `↓` / `↑` | Move through the rows |
-| `Return` | Start a timer on the highlighted task, or queue it behind a running block |
-| `p` | Start a pomodoro on it, or queue it behind a running block |
+| `↑` / `↓` (or `Ctrl+N` / `Ctrl+P`) | Move through the rows |
+| `Return` | On a task, start a timer on it. On a list, narrow to that list's tasks, and Add then files there. On Add, file the task: opened by Quick Add's hotkey, the panel then goes; otherwise the new task heads the day, highlighted, and `Return` again starts it |
+| `Option+Return` | Start a pomodoro on the highlighted task |
+| `Tab` / `Shift+Tab` | Step the list Add files into (shown under the field; it starts at Quick Add's list) |
+| `Esc` | Clear what you typed, then leave a narrowed list, then hide the panel |
+
+**While a block runs, every action is a letter**, and a footer of key hints
+spells them out:
+
+| Key | Action |
+| --- | --- |
+| `j` / `k`, `↓` / `↑` | Move through the queue |
+| `Return` / `p` | Queue the highlighted task behind the running block, as a timer / a pomodoro |
 | `Space` | Pause or resume the running block (on a break, back to work) |
 | `d` | Finish the block, completing its task, and ask how it went |
 | `s` | Stop: the time so far is logged and the task stays open |
-| `n` | A new task: type it as in Quick Add (`45m`, `#tag`, `@fri`, `!1`), and `Return` files it where Quick Add files and highlights it, ready to start |
-| `/` | Find a task or a list. Typing filters every open task and list; `↑` / `↓` (or `Ctrl+N` / `Ctrl+P`) choose and `Return` picks. A task picked is highlighted, ready to start; a list picked narrows the finder to its tasks, and `Esc` goes back out to everything |
-| `Esc` | Close the field, then hide the panel |
+| `/` or `n` | Back to typing, to find or add a task; `Return` on one queues it |
+| `Esc` | Hide the panel (from typing, back to the letters first) |
 
 While the block's "how did it go?" question is up, the keys answer it instead.
 

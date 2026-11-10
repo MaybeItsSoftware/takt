@@ -7,7 +7,6 @@
 
 pub mod board_links;
 mod calendar;
-pub mod capture;
 mod celebrate;
 mod chrome;
 mod commitment;
@@ -83,7 +82,6 @@ pub struct Takt {
     /// The main window, while it is open: closing it leaves the app in the
     /// menu bar, and this entity lives on for the next one.
     main: Option<gpui::WindowHandle<Takt>>,
-    capture: Option<gpui::WindowHandle<capture::QuickCapture>>,
     /// The settings window, while it is open: a second window onto this
     /// same entity, drawing only the settings page.
     settings_window: Option<gpui::WindowHandle<Takt>>,
@@ -191,7 +189,6 @@ impl Takt {
             pill: None,
             pill_opening: false,
             main: None,
-            capture: None,
             settings_window: None,
             settings_active: false,
             settings_wanted_front: false,
@@ -410,12 +407,8 @@ impl Takt {
     /// What the platform smoke check prints.
     pub fn platform_report(&self, cx: &mut Context<Self>) -> String {
         let snapshot = self.app.status_snapshot();
-        let capture = self
-            .capture
-            .as_ref()
-            .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
         format!(
-            "status \"{}\" ({} menu rows); hotkeys {:?}, refused {:?}; capture open {capture}; panel open {}; {}",
+            "status \"{}\" ({} menu rows); hotkeys {:?}, refused {:?}; panel open {}; {}",
             snapshot.title,
             snapshot.menu.len(),
             self.app
@@ -464,26 +457,11 @@ impl Takt {
                 self.register_hotkeys();
             }
         }
-        if std::mem::take(&mut self.app.wants_capture) {
-            let open = self
-                .capture
-                .as_ref()
-                .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
-            if open {
-                // Closed once this update ends: closing a window runs
-                // `window_closed`, which reads this entity, leased now.
-                if let Some(handle) = self.capture.take() {
-                    cx.defer(move |cx| {
-                        let _ = handle.update(cx, |_, window, _| window.remove_window());
-                    });
-                }
-            } else {
-                let takt = cx.entity();
-                cx.defer(move |cx| {
-                    let handle = capture::open(takt.clone(), cx);
-                    takt.update(cx, |this, _| this.capture = handle);
-                });
-            }
+        // Quick capture is the focus panel, typing to add: opened so, or
+        // turned to it when it is up already.
+        let capturing = std::mem::take(&mut self.app.wants_capture);
+        if capturing {
+            self.app.wants_panel = Some(true);
         }
         if let Some(wanted) = self.app.wants_panel.take() {
             let open = self
@@ -501,11 +479,18 @@ impl Takt {
                 // this entity, which is leased while it updates.
                 let takt = cx.entity();
                 cx.defer(move |cx| {
-                    let handle = panel::open(takt.clone(), cx);
+                    let handle = panel::open(takt.clone(), capturing, cx);
                     takt.update(cx, |this, _| this.panel = handle);
                 });
             } else if open && let Some(handle) = &self.panel {
-                let _ = handle.update(cx, |_, window, _| window.activate_window());
+                let _ = handle.update(cx, |panel, window, cx| {
+                    if capturing {
+                        panel.begin_capture();
+                        cx.notify();
+                    }
+                    window.activate_window();
+                });
+                cx.activate(true);
             }
         }
         self.sync_pill(cx);

@@ -56,3 +56,13 @@ pub fn set_origin(ns_window: usize, x: f64, y: f64) {
         let _: () = msg_send![ns_window as *mut Object, setFrameOrigin: point];
     }
 }
+
+/// Shows and hides the window at once, with none of AppKit's fade: a panel
+/// that is summoned and dismissed by a key should be there, then gone.
+pub fn no_animation(ns_window: usize) {
+    // NSWindowAnimationBehaviorNone.
+    let none: i64 = 2;
+    unsafe {
+        let _: () = msg_send![ns_window as *mut Object, setAnimationBehavior: none];
+    }
+}

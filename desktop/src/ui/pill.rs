@@ -71,6 +71,9 @@ pub fn open(takt: Entity<Takt>, cx: &mut GpuiApp) -> Option<gpui::WindowHandle<F
     };
     cx.open_window(options, |window, cx| {
         let ns_window = window_move::ns_window(window);
+        if let Some(ns_window) = ns_window {
+            window_move::no_animation(ns_window);
+        }
         cx.new(|cx| {
             cx.observe(&takt, |_, _, cx| cx.notify()).detach();
             FocusPill {
