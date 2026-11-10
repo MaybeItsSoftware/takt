@@ -568,7 +568,8 @@ final class FocusModel {
       lastCheckpointAt = now
       try? model.store.checkpointFocusSession(id: session.id, now: now)
     }
-    if session.elapsedSeconds(now: now) >= session.workDurationSeconds,
+    // A timer never runs out: its stored length is only a stand-in.
+    if !session.openEnded, session.elapsedSeconds(now: now) >= session.workDurationSeconds,
       expiryPromptedBlockID != session.activeBlockId, pendingCompletion == nil {
       expiryPromptedBlockID = session.activeBlockId
       requestCompletion(completeTask: false, now: now)

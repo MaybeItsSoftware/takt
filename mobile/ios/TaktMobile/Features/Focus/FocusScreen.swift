@@ -613,6 +613,19 @@ private struct FocusRunningView: View {
         .minimumScaleFactor(0.5)
         .foregroundStyle(theme.ink)
         .accessibilityIdentifier("focus.clock")
+      // A timer has no length, so there is no bar to fill and nothing planned:
+      // only the time so far, counting up.
+      if session.openEnded {
+        Text("so far")
+          .font(theme.type.caption).foregroundStyle(theme.muted)
+      } else {
+        bar(elapsed: elapsed, planned: planned, fraction: fraction)
+      }
+    }
+  }
+
+  private func bar(elapsed: Int, planned: Int, fraction: Double) -> some View {
+    VStack(alignment: .leading, spacing: theme.space.sm) {
       GeometryReader { proxy in
         ZStack(alignment: .leading) {
           Rectangle().fill(theme.well)
@@ -670,7 +683,9 @@ private struct FocusRunningView: View {
         HStack {
           Text(entry.task.title).font(theme.type.body).foregroundStyle(theme.ink)
           Spacer()
-          if let planned = entry.item.plannedSeconds {
+          if entry.item.openEnded {
+            Text("timer").font(theme.type.numeral).foregroundStyle(theme.muted)
+          } else if let planned = entry.item.plannedSeconds {
             Text(Format.duration(planned)).font(theme.type.numeral).foregroundStyle(theme.muted)
           }
         }

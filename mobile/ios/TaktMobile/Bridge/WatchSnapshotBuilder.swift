@@ -14,7 +14,7 @@ enum WatchSnapshotBuilder {
   /// still owed today that the day did not already hold.
   ///
   /// `plannedSeconds` is the block's commitment when the queue knows it;
-  /// the session's own work length stands in otherwise.
+  /// the session's own work length stands in otherwise, and a timer has none.
   static func make(day: DaySnapshot, plannedSeconds: Int? = nil, runningTitle: String? = nil, now: Date = .now)
     -> WatchSnapshot
   {
@@ -26,7 +26,8 @@ enum WatchSnapshotBuilder {
         taskId: taskID, title: title, phase: session.pausedAt == nil ? .running : .paused,
         startedAt: session.pausedAt ?? session.activeTaskStartedAt,
         accumulatedSeconds: max(0, session.accumulatedSeconds ?? 0),
-        plannedSeconds: plannedSeconds ?? session.workDurationSeconds)
+        // A timer has no length: with none, the watch counts up.
+        plannedSeconds: session.openEnded ? nil : plannedSeconds ?? session.workDurationSeconds)
     }
     let runningID = session?.taskId
 

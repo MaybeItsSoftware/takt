@@ -107,6 +107,7 @@ extension FocusSession {
     accumulatedSeconds = row.accumulatedSeconds.int
     pausedAt = row.pausedAtMs.date
     checkpointAt = row.checkpointAtMs.date
+    openEnded = row.openEnded
   }
 }
 
@@ -117,7 +118,7 @@ extension FocusQueueTask {
       id: row.id, sessionId: row.sessionId, taskId: row.taskId, sortOrder: Int(row.sortOrder),
       state: FocusQueueState(rawValue: row.state) ?? .queued, plannedSeconds: row.plannedSeconds.int,
       completedAt: row.completedAtMs.date, skippedAt: row.skippedAtMs.date,
-      createdAt: Date(coreMilliseconds: row.createdAtMs))
+      createdAt: Date(coreMilliseconds: row.createdAtMs), openEnded: row.openEnded)
     self.init(item: item, task: WorkspaceTask(entry.task))
   }
 }

@@ -246,6 +246,10 @@ public struct FocusSession: Codable, Identifiable, Sendable, Equatable {
   public var accumulatedSeconds: Int?
   public var pausedAt: Date?
   public var checkpointAt: Date?
+  /// A timer: the block in hand has no length and counts up until it is
+  /// finished. `workDurationSeconds` then holds only a day, a stand-in for
+  /// clients that predate the flag, and is never a length to count down from.
+  public var openEnded = false
 
   public func elapsedSeconds(now: Date) -> Int {
     max(0, accumulatedSeconds ?? 0) + (pausedAt == nil ? Int(max(0, now.timeIntervalSince(activeTaskStartedAt))) : 0)
@@ -270,6 +274,8 @@ public struct FocusQueueItem: Codable, Identifiable, Sendable, Equatable {
   public var completedAt: Date?
   public var skippedAt: Date?
   public let createdAt: Date
+  /// Runs as a timer, counting up, rather than as a block of a length.
+  public var openEnded = false
 }
 
 public struct FocusQueueTask: Identifiable, Sendable, Equatable {

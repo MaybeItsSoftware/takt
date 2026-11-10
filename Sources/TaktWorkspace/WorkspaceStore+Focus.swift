@@ -36,6 +36,27 @@ extension WorkspaceStore {
     return session
   }
 
+  /// Starts a timer on a task — a block with no length, counting up until it
+  /// is finished — or returns the session already running: the Rust core's
+  /// `focus::start_timer`.
+  public func startFocusTimer(
+    taskId: String,
+    breakDurationSeconds: Int = 5 * 60,
+    context: FocusContext? = nil,
+    overrideAvailability: Bool = false,
+    now: Date = .now
+  ) throws -> FocusSession {
+    let id = try coreWrite {
+      try core.startFocusTimer(
+        taskId: taskId, breakSeconds: Int64(breakDurationSeconds), context: context?.core,
+        overrideAvailability: overrideAvailability, nowMs: now.coreMilliseconds, zone: TimeZone.current.identifier)
+    }
+    guard let session = try Self.mappingCoreErrors({ try core.focusSession(id: id) }).map(FocusSession.init) else {
+      throw WorkspaceStoreError.noActiveFocusTask
+    }
+    return session
+  }
+
   public func addToFocusQueue(
     sessionId: String, taskId: String, plannedSeconds: Int? = nil, now: Date = .now
   ) throws {

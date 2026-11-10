@@ -76,6 +76,18 @@ final class WidgetSnapshotTests: XCTestCase {
     XCTAssertTrue(FocusLiveActivityController.differs(focus.state, paused.state))
   }
 
+  func testATimerCommitsTheLiveActivityToNoLength() throws {
+    let task = try store.createTask(listId: listID, title: "Open ended", estimateSeconds: 3_000)
+    let session = try store.startFocusTimer(
+      taskId: task.id, overrideAvailability: true, now: Date().addingTimeInterval(-90))
+    XCTAssertTrue(session.openEnded)
+
+    let focus = try XCTUnwrap(WidgetSnapshotBuilder.focusState(store: store))
+    XCTAssertNil(focus.state.plannedSeconds, "a timer has no end to draw progress towards")
+    XCTAssertNil(focus.state.plannedEnd)
+    XCTAssertEqual(focus.state.elapsedSeconds, 90, accuracy: 3)
+  }
+
   func testTheLiveActivityIsNotUpdatedJustBecauseTimePassed() {
     let start = Date()
     let state = FocusActivityAttributes.ContentState(

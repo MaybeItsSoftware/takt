@@ -470,9 +470,13 @@ struct RunningDayCard: View {
       }
       HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-          let reading = FocusTimerDisplay.reading(
-            elapsed: TimeInterval(session.elapsedSeconds(now: context.date)),
-            planned: TimeInterval(session.workDurationSeconds))
+          let elapsed = session.elapsedSeconds(now: context.date)
+          // A timer counts up from nothing; only a block of a length counts
+          // down to its end.
+          let reading = session.openEnded
+            ? FocusTimerDisplay.Reading(text: Format.clock(elapsed), isOverrun: false)
+            : FocusTimerDisplay.reading(
+              elapsed: TimeInterval(elapsed), planned: TimeInterval(session.workDurationSeconds))
           Text(reading.text)
             .font(theme.type.display)
             .monospacedDigit()
@@ -480,7 +484,7 @@ struct RunningDayCard: View {
             .contentTransition(.numericText())
             .accessibilityIdentifier("today.clock")
         }
-        Text(isPaused ? "paused" : "of \(Format.duration(session.workDurationSeconds))")
+        Text(isPaused ? "paused" : (session.openEnded ? "so far" : "of \(Format.duration(session.workDurationSeconds))"))
           .font(theme.type.caption)
           .foregroundStyle(isPaused ? theme.warning : theme.muted)
         Spacer(minLength: 0)

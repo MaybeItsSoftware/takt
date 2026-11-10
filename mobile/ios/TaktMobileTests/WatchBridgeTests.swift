@@ -132,6 +132,17 @@ final class WatchBridgeTests: XCTestCase {
     XCTAssertLessThan(session.elapsedSeconds(at: .now), 5)
   }
 
+  func testATimerReachesTheWatchWithNoLengthSoItCountsUp() throws {
+    let task = try add("Timed", estimate: 600)
+    try model.store.setPlannedForToday(true, taskIds: [task.id])
+    _ = try model.store.startFocusTimer(taskId: task.id, overrideAvailability: true)
+
+    let session = try XCTUnwrap(try snapshot().session)
+    XCTAssertEqual(session.taskId, task.id)
+    XCTAssertNil(session.plannedSeconds, "not the day a timer stores for older clients")
+    XCTAssertNil(session.plannedEnd)
+  }
+
   func testADailyLoggedTodayLeavesTheWatch() throws {
     let practice = try add("Practice")
     let daily = try model.store.makeDaily(taskId: practice.id)

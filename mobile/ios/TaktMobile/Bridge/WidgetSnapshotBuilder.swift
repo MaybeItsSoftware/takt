@@ -88,7 +88,9 @@ enum WidgetSnapshotBuilder {
     let state = FocusActivityAttributes.ContentState(
       taskID: taskID, taskTitle: task.title,
       timerStart: now.addingTimeInterval(-TimeInterval(elapsed)), isPaused: session.pausedAt != nil,
-      elapsedSeconds: elapsed, plannedSeconds: planned ?? session.workDurationSeconds)
+      // A timer commits to no length, so it carries none: the activity then
+      // draws no progress bar towards an end that isn't there.
+      elapsedSeconds: elapsed, plannedSeconds: session.openEnded ? nil : planned ?? session.workDurationSeconds)
     return (session.id, state)
   }
 }

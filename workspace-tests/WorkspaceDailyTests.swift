@@ -125,6 +125,20 @@ final class WorkspaceDailyTests: XCTestCase {
     XCTAssertEqual(try store.focusQueue(for: session.id).first?.item.plannedSeconds, 45 * 60)
   }
 
+  func testATimerReadsAsOpenEndedAndAPomodoroDoesNot() throws {
+    let timed = try store.createTask(listId: list.id, title: "Timed")
+    let timer = try store.startFocusTimer(taskId: timed.id)
+    XCTAssertTrue(timer.openEnded)
+    XCTAssertTrue(try XCTUnwrap(store.activeFocusSession()).openEnded)
+    try store.finishFocusSession(id: timer.id)
+
+    let blocked = try store.createTask(listId: list.id, title: "Blocked")
+    let pomodoro = try store.startFocusSession(taskId: blocked.id, plannedSeconds: 25 * 60)
+    XCTAssertFalse(pomodoro.openEnded)
+    XCTAssertEqual(pomodoro.workDurationSeconds, 25 * 60)
+    XCTAssertFalse(try XCTUnwrap(store.focusQueue(for: pomodoro.id).first).item.openEnded)
+  }
+
   // MARK: - Next up
 
   func testNextUpKeepsDeadlinePrecedenceAndDropsContributedDailies() throws {
