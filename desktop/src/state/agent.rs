@@ -17,50 +17,160 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 
 pub const SERVER: &str = "takt";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Which agent a thread runs: Claude Code, on its default profile or one of
+/// the user's own (`~/.claude-<name>`, or a `claude-<name>` command), or
+/// Codex. Kept in the prefs as `claude`, `claude:<name>` or `codex`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Client {
-    ClaudeCode,
+    ClaudeCode(Option<String>),
     Codex,
+}
+
+/// Where Takt looks for an agent's command: apps get no login shell, so
+/// not the user's PATH.
+const BIN_DIRS: [&str; 3] = ["~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"];
+
+/// How a thread's process is started.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Launch {
+    pub program: String,
+    /// `CLAUDE_CONFIG_DIR`, for a profile with no command of its own.
+    pub config_dir: Option<String>,
 }
 
 impl Client {
     pub fn from_pref(raw: &str) -> Self {
         if raw == "codex" {
             Client::Codex
+        } else if let Some(profile) = raw.strip_prefix("claude:").filter(|p| !p.is_empty()) {
+            Client::ClaudeCode(Some(profile.into()))
         } else {
-            Client::ClaudeCode
+            Client::ClaudeCode(None)
         }
     }
 
-    pub fn name(self) -> &'static str {
+    pub fn pref(&self) -> String {
         match self {
-            Client::ClaudeCode => "Claude Code",
-            Client::Codex => "Codex",
+            Client::ClaudeCode(None) => "claude".into(),
+            Client::ClaudeCode(Some(profile)) => format!("claude:{profile}"),
+            Client::Codex => "codex".into(),
         }
     }
 
-    fn candidates(self, home: &str) -> Vec<String> {
+    pub fn name(&self) -> String {
         match self {
-            Client::ClaudeCode => vec![
-                format!("{home}/.local/bin/claude"),
-                format!("{home}/.claude/local/claude"),
-                "/opt/homebrew/bin/claude".into(),
-                "/usr/local/bin/claude".into(),
-            ],
-            Client::Codex => vec![
-                "/opt/homebrew/bin/codex".into(),
-                "/usr/local/bin/codex".into(),
-                format!("{home}/.local/bin/codex"),
-            ],
+            Client::ClaudeCode(None) => "Claude Code".into(),
+            Client::ClaudeCode(Some(profile)) => format!("Claude Code ({profile})"),
+            Client::Codex => "Codex".into(),
         }
     }
 
-    pub fn executable(self) -> Option<String> {
+    pub fn is_codex(&self) -> bool {
+        matches!(self, Client::Codex)
+    }
+
+    fn candidates(&self, home: &str) -> Vec<String> {
+        let in_bins = |command: &str| {
+            BIN_DIRS
+                .iter()
+                .map(|dir| format!("{}/{command}", dir.replace('~', home)))
+                .collect::<Vec<_>>()
+        };
+        match self {
+            Client::ClaudeCode(None) => {
+                let mut paths = vec![
+                    format!("{home}/.local/bin/claude"),
+                    format!("{home}/.claude/local/claude"),
+                ];
+                paths.extend(in_bins("claude").into_iter().skip(1));
+                paths
+            }
+            Client::ClaudeCode(Some(profile)) => in_bins(&format!("claude-{profile}")),
+            Client::Codex => {
+                let mut paths = in_bins("codex");
+                paths.rotate_left(1);
+                paths.push(format!("{home}/.npm-global/bin/codex"));
+                paths
+            }
+        }
+    }
+
+    /// The command to run and its environment, or None when it isn't
+    /// installed. A profile runs its own `claude-<name>` command when
+    /// there is one (it may route through a wrapper), else plain `claude`
+    /// pointed at `~/.claude-<name>`.
+    pub fn launch(&self) -> Option<Launch> {
         let home = std::env::var("HOME").unwrap_or_default();
-        self.candidates(&home)
-            .into_iter()
-            .find(|path| std::path::Path::new(path).is_file())
+        let found = |paths: Vec<String>| {
+            paths
+                .into_iter()
+                .find(|path| std::path::Path::new(path).is_file())
+        };
+        if let Some(program) = found(self.candidates(&home)) {
+            return Some(Launch {
+                program,
+                config_dir: None,
+            });
+        }
+        let Client::ClaudeCode(Some(profile)) = self else {
+            return None;
+        };
+        let dir = format!("{home}/.claude-{profile}");
+        if !std::path::Path::new(&dir).is_dir() {
+            return None;
+        }
+        found(Client::ClaudeCode(None).candidates(&home)).map(|program| Launch {
+            program,
+            config_dir: Some(dir),
+        })
     }
+
+    /// Every agent there is to choose: Claude Code, each of the user's
+    /// Claude profiles, then Codex.
+    pub fn all() -> Vec<Client> {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let mut profiles = profiles_in(&home);
+        profiles.sort();
+        profiles.dedup();
+        std::iter::once(Client::ClaudeCode(None))
+            .chain(profiles.into_iter().map(|p| Client::ClaudeCode(Some(p))))
+            .chain(std::iter::once(Client::Codex))
+            .collect()
+    }
+}
+
+/// The names of the user's Claude profiles: `~/.claude-<name>` folders and
+/// `claude-<name>` commands.
+fn profiles_in(home: &str) -> Vec<String> {
+    let names = |dir: &str, prefix: &str, want_dir: bool| -> Vec<String> {
+        let Ok(read) = std::fs::read_dir(dir) else {
+            return Vec::new();
+        };
+        read.flatten()
+            .filter(|entry| {
+                let path = entry.path();
+                if want_dir {
+                    path.is_dir()
+                } else {
+                    path.is_file()
+                }
+            })
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                let profile = name.strip_prefix(prefix)?;
+                let fine = !profile.is_empty()
+                    && profile
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+                fine.then(|| profile.to_string())
+            })
+            .collect()
+    };
+    let mut found = names(home, ".claude-", true);
+    for dir in BIN_DIRS {
+        found.extend(names(&dir.replace('~', home), "claude-", false));
+    }
+    found
 }
 
 /// What the panel draws.
@@ -157,7 +267,7 @@ impl Agent {
             changed = true;
             match event {
                 Event::Started(thread) => {
-                    if self.client == Some(Client::Codex) {
+                    if self.client.as_ref().is_some_and(Client::is_codex) {
                         self.codex_thread = Some(thread);
                     }
                 }
@@ -567,8 +677,9 @@ impl App {
         let client = self
             .agent
             .client
+            .clone()
             .unwrap_or_else(|| Client::from_pref(&self.prefs.agent_client));
-        let Some(executable) = client.executable() else {
+        let Some(launch) = client.launch() else {
             self.agent.entries.push(Entry::Notice {
                 text: format!("{} isn't installed where Takt looks for it.", client.name()),
                 error: true,
@@ -587,11 +698,11 @@ impl App {
         let context = self.agent_context();
         let message = format!("{context}\n\n{text}");
         self.agent.entries.push(Entry::User(text.into()));
-        self.agent.client = Some(client);
+        self.agent.client = Some(client.clone());
         self.agent.working = true;
         let started = match client {
-            Client::ClaudeCode => if self.agent.child.is_none() {
-                self.start_claude(&executable, &helper)
+            Client::ClaudeCode(_) => if self.agent.child.is_none() {
+                self.start_claude(&launch, &helper)
             } else {
                 Ok(())
             }
@@ -609,7 +720,7 @@ impl App {
                 writeln!(stdin, "{line}").map_err(|e| e.to_string())?;
                 stdin.flush().map_err(|e| e.to_string())
             }),
-            Client::Codex => self.start_codex_turn(&executable, &helper, &message),
+            Client::Codex => self.start_codex_turn(&launch.program, &helper, &message),
         };
         if let Err(error) = started {
             self.agent.working = false;
@@ -621,8 +732,12 @@ impl App {
         }
     }
 
-    fn start_claude(&mut self, executable: &str, helper: &str) -> Result<(), String> {
-        let mut child = Command::new(executable)
+    fn start_claude(&mut self, launch: &Launch, helper: &str) -> Result<(), String> {
+        let mut command = Command::new(&launch.program);
+        if let Some(dir) = &launch.config_dir {
+            command.env("CLAUDE_CONFIG_DIR", dir);
+        }
+        let mut child = command
             .args(claude_arguments(helper))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -782,15 +897,12 @@ impl App {
     }
 
     pub fn use_agent(&mut self, client: Client) {
-        self.prefs.agent_client = match client {
-            Client::ClaudeCode => "claude".into(),
-            Client::Codex => "codex".into(),
-        };
+        self.prefs.agent_client = client.pref();
         self.prefs.save();
         self.message = Some(format!(
             "New threads use {}{}.",
             client.name(),
-            if client.executable().is_none() {
+            if client.launch().is_none() {
                 " (not found)"
             } else {
                 ""
@@ -817,6 +929,30 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn agent_prefs_round_trip() {
+        for raw in ["claude", "claude:ucl", "codex"] {
+            assert_eq!(Client::from_pref(raw).pref(), raw);
+        }
+        assert_eq!(Client::from_pref("claude:"), Client::ClaudeCode(None));
+        assert_eq!(Client::from_pref("claude:ucl").name(), "Claude Code (ucl)");
+    }
+
+    #[test]
+    fn profiles_are_folders_and_commands() {
+        let home = std::env::temp_dir().join(format!("takt-agent-profiles-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(home.join(".claude-dad")).unwrap();
+        std::fs::create_dir_all(home.join(".claude")).unwrap();
+        std::fs::write(home.join(".claude.json"), "{}").unwrap();
+        std::fs::create_dir_all(home.join(".local/bin")).unwrap();
+        std::fs::write(home.join(".local/bin/claude-ucl"), "#!/bin/sh").unwrap();
+        let mut found = profiles_in(home.to_str().unwrap());
+        found.sort();
+        assert_eq!(found, ["dad", "ucl"]);
+        let _ = std::fs::remove_dir_all(&home);
+    }
 
     #[test]
     fn claude_lines_become_events() {

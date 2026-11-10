@@ -59,7 +59,7 @@ fn option(value: impl Into<String>, label: impl Into<String>, current: bool) -> 
 }
 
 /// The settings whose control is a dropdown of options.
-const SELECTS: [&str; 7] = [
+const SELECTS: [&str; 8] = [
     "theme",
     "appearance",
     "quick-capture-list",
@@ -67,6 +67,7 @@ const SELECTS: [&str; 7] = [
     "google-calendar-choose",
     "remind-due-today-at",
     "remind-dailies-at",
+    "agent-client",
 ];
 
 /// Past this many options a dropdown shows its filter field; it filters
@@ -337,6 +338,9 @@ impl SettingRow {
             "ai-on" => {
                 "The agent panel, quick ask, the agent's context on tasks and the MCP setup. Off, they are hidden and nothing is sent to an AI."
             }
+            "agent-client" => {
+                "What the agent panel and quick ask run: Claude Code on its own profile or one of yours (a ~/.claude-<name> folder or a claude-<name> command), or Codex. New threads use it."
+            }
             "key-hints" => "A small marking with the key beside buttons and rows that have one.",
             "remind-due-time" => "A notification when a task's due time comes.",
             "remind-due-today" => "Each morning, a notification listing what is due that day.",
@@ -536,6 +540,12 @@ impl App {
             row("diagnostics", "Advanced", "Diagnostics", String::new()),
             row("ai-on", "AI", "AI features", on(!p.ai_off)),
             row(
+                "agent-client",
+                "AI",
+                "Agent",
+                super::agent::Client::from_pref(&p.agent_client).name(),
+            ),
+            row(
                 "key-hints",
                 "Keyboard",
                 "Show key hints",
@@ -549,6 +559,7 @@ impl App {
         rows.retain(|row| match row.id.as_str() {
             "hotkey-panel" | "hotkey-window" => p.hotkeys_enabled,
             "focus-sound" => p.focus_notifications,
+            "agent-client" => !p.ai_off,
             "remind-due-today-at" => p.remind_due_today,
             "remind-dailies-at" => p.remind_dailies_left,
             _ => true,
@@ -817,6 +828,26 @@ impl App {
             }
             "remind-due-today-at" => time_options(p.remind_due_today_minute),
             "remind-dailies-at" => time_options(p.remind_dailies_left_minute),
+            "agent-client" => {
+                let current = super::agent::Client::from_pref(&p.agent_client);
+                let mut clients = super::agent::Client::all();
+                if !clients.contains(&current) {
+                    clients.insert(clients.len() - 1, current.clone());
+                }
+                clients
+                    .into_iter()
+                    .map(|client| SelectOption {
+                        value: client.pref(),
+                        label: client.name(),
+                        detail: if client.launch().is_none() {
+                            "Not found".into()
+                        } else {
+                            String::new()
+                        },
+                        current: client == current,
+                    })
+                    .collect()
+            }
             _ => return None,
         })
     }
@@ -924,6 +955,7 @@ impl App {
             }
             "remind-due-today-at" => self.set_reminder_time(false, value),
             "remind-dailies-at" => self.set_reminder_time(true, value),
+            "agent-client" => self.use_agent(super::agent::Client::from_pref(value)),
             _ => {}
         }
         self.open_overlay(Overlay::Settings);

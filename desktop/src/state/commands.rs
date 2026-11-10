@@ -320,7 +320,7 @@ impl App {
             "listIcon" => self.begin_icon_pick(),
             "listSettings" => self.begin_list_settings(),
             "windowToggleAgentPanel" => self.toggle_agent_panel(),
-            "windowUseClaudeCode" => self.use_agent(super::agent::Client::ClaudeCode),
+            "windowUseClaudeCode" => self.use_agent(super::agent::Client::ClaudeCode(None)),
             "windowUseCodex" => self.use_agent(super::agent::Client::Codex),
             "taskAskAgent" => self.open_quick_ask(),
             "windowOpenKeymap" => self.open_keymap_file(),

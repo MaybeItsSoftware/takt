@@ -157,6 +157,7 @@ impl Takt {
             .app
             .agent
             .client
+            .clone()
             .unwrap_or_else(|| Client::from_pref(&self.app.prefs.agent_client));
         let typing = matches!(self.app.editing, Some(Editing::AgentMessage));
         let entries = self

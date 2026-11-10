@@ -998,10 +998,15 @@ the bottom.
   - **Agent** (`Cmd+Shift+A`) is an assistant panel in the manner of Zed's: your
     own **Claude Code** or **Codex**, run headless, with Takt's MCP server as
     its only tools — no shell, no files, no web, and no API key (it uses your
-    own login). Choose which in **Settings ▸ Agent** (which also says which of
-    them are installed), from the chip glyph on the panel's tab bar, or with
-    **Use agent: Claude Code** / **Use agent: Codex** in the palette; the
-    choice is kept, and the quick ask uses it too. A thread keeps the agent it
+    own login). Choose which with **Agent** in Settings ▸ AI (which marks any
+    that isn't installed), or with **Use agent: Claude Code** / **Use agent:
+    Codex** in the palette; the choice is kept, and the quick ask uses it too.
+    The dropdown also lists each of your **Claude Code profiles**: every
+    `~/.claude-<name>` folder and every `claude-<name>` command in
+    `~/.local/bin`, Homebrew or `/usr/local/bin`. A profile with its own
+    `claude-<name>` command runs that (so a wrapper script works, since apps
+    get no login shell and so none of your aliases); one without runs `claude`
+    with `CLAUDE_CONFIG_DIR` set to its folder. A thread keeps the agent it
     started with — switching mid-thread says so in the transcript, and the
     next thread (New thread, or after Stop) uses the new one. It **reads freely** — the lists, tasks, dailies, the day log
     and the focus timer — and each read shows as one muted line in the
