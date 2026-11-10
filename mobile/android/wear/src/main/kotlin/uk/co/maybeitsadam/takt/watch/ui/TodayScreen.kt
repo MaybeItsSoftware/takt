@@ -212,7 +212,8 @@ private fun RunningRow(task: WearTask, session: WearSession, now: Long, onOpen: 
         Text(task.title, color = WatchColors.ink, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         val elapsed = session.elapsedSeconds(now)
         Text(
-            (if (paused) "Paused · " else "") + "${clock(elapsed)} of ${hoursAndMinutes(session.plannedSeconds)}",
+            (if (paused) "Paused · " else "") +
+                if (session.openEnded) "${clock(elapsed)} so far" else "${clock(elapsed)} of ${hoursAndMinutes(session.plannedSeconds)}",
             color = hue, fontSize = 12.sp, fontFamily = Lilex, maxLines = 1,
         )
     }

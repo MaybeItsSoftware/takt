@@ -449,10 +449,13 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
         _lastBlock.value = null
     }
 
-    /** Each second of a running block: once the planned time is up, ask how it went (once per block). */
+    /**
+     * Each second of a running block: once the planned time is up, ask how it
+     * went (once per block). A timer has no planned time, so it never asks.
+     */
     fun tick(now: Instant) {
         val session = state.value.session ?: return
-        if (!session.isTicking || _pending.value != null) return
+        if (!session.isTicking || _pending.value != null || session.openEnded) return
         if (session.elapsedSeconds(now) >= session.workDurationSeconds && expiryPromptedBlockId != session.activeBlockId) {
             expiryPromptedBlockId = session.activeBlockId
             requestCompletion(completeTask = false, now = now)

@@ -534,7 +534,11 @@ private fun RunningDayCard(
                 modifier = Modifier.testTag("today_clock"),
             )
             Text(
-                if (paused) "paused" else "of ${Format.duration(session.workDurationSeconds)}",
+                when {
+                    paused -> "paused"
+                    session.openEnded -> "so far"
+                    else -> "of ${Format.duration(session.workDurationSeconds)}"
+                },
                 style = TaktTheme.type.small,
                 color = if (paused) TaktTheme.colors.warning else TaktTheme.colors.mutedText,
                 modifier = Modifier.padding(bottom = Metrics.xs + Metrics.xxs),

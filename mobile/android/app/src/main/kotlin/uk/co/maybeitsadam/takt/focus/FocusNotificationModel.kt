@@ -44,12 +44,13 @@ data class FocusNotificationModel(
                 )
                 session.pausedAt != null -> FocusNotificationModel(
                     title = taskTitle ?: "Focus block",
-                    text = "Paused at ${Format.clock(elapsed)} of $planned",
+                    text = if (session.openEnded) "Paused at ${Format.clock(elapsed)}" else "Paused at ${Format.clock(elapsed)} of $planned",
                     isCounting = false, chronometerBaseMillis = base, isPaused = true, hasActions = true,
                 )
                 else -> FocusNotificationModel(
                     title = taskTitle ?: "Focus block",
-                    text = "Focusing · $planned planned",
+                    // A timer only counts up: there is no plan to name.
+                    text = if (session.openEnded) "Timing" else "Focusing · $planned planned",
                     isCounting = true, chronometerBaseMillis = base, isPaused = false, hasActions = true,
                 )
             }

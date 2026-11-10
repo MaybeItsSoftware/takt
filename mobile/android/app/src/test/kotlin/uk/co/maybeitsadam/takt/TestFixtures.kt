@@ -21,8 +21,9 @@ fun session(
     pausedAt: Instant? = null,
     planned: Int = 1500,
     phase: FocusSessionPhase = FocusSessionPhase.RUNNING,
+    openEnded: Boolean = false,
 ) = FocusSession(
     id = "S", startedAt = startedAt, endedAt = null, phase = phase, activeTaskId = taskId, activeTaskStartedAt = startedAt,
     workDurationSeconds = planned, breakDurationSeconds = 300, breakEndsAt = null, activeBlockId = "B",
-    accumulatedSeconds = accumulated, pausedAt = pausedAt, checkpointAt = startedAt,
+    accumulatedSeconds = accumulated, pausedAt = pausedAt, checkpointAt = startedAt, openEnded = openEnded,
 )

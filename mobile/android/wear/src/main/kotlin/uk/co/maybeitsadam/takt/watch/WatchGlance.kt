@@ -35,14 +35,17 @@ data class WatchGlance(
             if (session != null && session.taskId != null) {
                 val elapsed = session.elapsedSeconds(nowMillis)
                 val title = session.taskTitle ?: snapshot.runningTask?.title
+                // A timer has no plan: it reads as time so far, never as a length.
+                val planned = if (session.openEnded) null else session.plannedSeconds
                 return when (session.phase) {
                     WearPhase.RUNNING -> WatchGlance(
-                        "Focusing", title, "${hoursAndMinutes(session.plannedSeconds)} planned · $footer", left, true,
-                        countingFrom = nowMillis - elapsed * 1000L, plannedSeconds = session.plannedSeconds, elapsedSeconds = elapsed,
+                        "Focusing", title, (planned?.let { "${hoursAndMinutes(it)} planned" } ?: "Timer") + " · $footer", left, true,
+                        countingFrom = nowMillis - elapsed * 1000L, plannedSeconds = planned, elapsedSeconds = elapsed,
                     )
                     WearPhase.PAUSED -> WatchGlance(
-                        "Paused", title, "${hoursAndMinutes(elapsed)} of ${hoursAndMinutes(session.plannedSeconds)} · $footer", left, true,
-                        countingFrom = null, plannedSeconds = session.plannedSeconds, elapsedSeconds = elapsed,
+                        "Paused", title,
+                        "${hoursAndMinutes(elapsed)}" + (planned?.let { " of ${hoursAndMinutes(it)}" } ?: " so far") + " · $footer", left, true,
+                        countingFrom = null, plannedSeconds = planned, elapsedSeconds = elapsed,
                     )
                     WearPhase.ON_BREAK -> WatchGlance("On a break", snapshot.nextTask?.title, footer, left, false, null, null, 0)
                 }

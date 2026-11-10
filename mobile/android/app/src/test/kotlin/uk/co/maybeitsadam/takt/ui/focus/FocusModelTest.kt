@@ -4,6 +4,7 @@ import java.time.LocalTime
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import uk.co.maybeitsadam.takt.T0
@@ -76,5 +77,13 @@ class FocusModelTest {
         assertEquals("03:00", reading.text)
         assertEquals(0.3f, reading.fraction, 0.001f)
         assertTrue(ClockReading(700, 600).isOverrun)
+    }
+
+    @Test fun aTimerCountsUpWithNoPlanToFillOrOverrun() {
+        val timer = session("a", planned = 24 * 60 * 60, openEnded = true)
+        val reading = ClockReading.of(timer, T0.plusSeconds(25 * 60 * 60))
+        assertEquals(25 * 60 * 60, reading.elapsedSeconds)
+        assertEquals(0f, reading.fraction, 0f)
+        assertFalse(reading.isOverrun)
     }
 }

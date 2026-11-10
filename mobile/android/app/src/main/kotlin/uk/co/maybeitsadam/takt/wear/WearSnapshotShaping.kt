@@ -68,6 +68,7 @@ object WearSnapshotShaping {
             accumulated = maxOf(0, session.accumulatedSeconds ?: 0),
             plannedSeconds = maxOf(60, session.workDurationSeconds),
             breakEndsAt = session.breakEndsAt?.toEpochMilli(),
+            openEnded = session.openEnded,
         )
     }
 }

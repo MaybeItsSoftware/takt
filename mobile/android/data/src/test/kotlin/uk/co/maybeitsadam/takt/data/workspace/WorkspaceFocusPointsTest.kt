@@ -3,6 +3,7 @@ package uk.co.maybeitsadam.takt.data.workspace
 import java.time.LocalDateTime
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,6 +41,19 @@ class WorkspaceFocusPointsTest {
         assertEquals(37.5, award.points, 0.0)
         assertEquals(FocusQuality.SHARP, award.quality)
         assertEquals(listOf(award.id), store.focusAwards().map { it.id })
+    }
+
+    @Test
+    fun aTimerReadsAsOpenEndedAndABlockDoesNot() = fixture { w, list ->
+        val store = w.repository
+        val timer = store.startFocusTimer(taskId = store.createTask(listId = list.id, title = "Timed").id)
+        assertTrue(timer.openEnded)
+        assertTrue(store.focusQueue(timer.id).first().item.openEnded)
+        store.finishFocusSession(timer.id)
+
+        val block = store.startFocusSession(taskId = store.createTask(listId = list.id, title = "Blocked").id, plannedSeconds = 1_500)
+        assertFalse(block.openEnded)
+        assertEquals(1_500, block.workDurationSeconds)
     }
 
     @Test

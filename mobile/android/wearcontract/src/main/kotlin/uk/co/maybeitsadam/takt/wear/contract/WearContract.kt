@@ -73,6 +73,13 @@ data class WearSession(
     val plannedSeconds: Int,
     /** Epoch millis a break ends, on a break. */
     val breakEndsAt: Long? = null,
+    /**
+     * A timer: the block has no length and only counts up. [plannedSeconds]
+     * then carries the day the core stores for older clients, which a watch
+     * that knows this flag never shows. Defaults false, so a phone that
+     * predates it still decodes as a block.
+     */
+    val openEnded: Boolean = false,
 ) {
     fun elapsedSeconds(nowMillis: Long): Int {
         val running = if (phase == WearPhase.RUNNING) maxOf(0L, (nowMillis - startedAt) / 1000).toInt() else 0

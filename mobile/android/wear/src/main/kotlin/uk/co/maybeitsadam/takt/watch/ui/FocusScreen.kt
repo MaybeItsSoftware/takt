@@ -44,7 +44,8 @@ fun FocusScreen(
     val hue = if (paused) WatchColors.amber else WatchColors.azure
 
     Box(Modifier.fillMaxSize()) {
-        if (session != null && session.taskId != null && session.plannedSeconds > 0) {
+        // A timer has no length, so no ring: it would imply an end.
+        if (session != null && session.taskId != null && !session.openEnded && session.plannedSeconds > 0) {
             val fraction = session.elapsedSeconds(now).toFloat() / session.plannedSeconds
             CircularProgressIndicator(
                 progress = { fraction.coerceIn(0f, 1f) },
@@ -86,12 +87,16 @@ fun FocusScreen(
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         val elapsed = session.elapsedSeconds(now)
                         Text(clock(elapsed), color = WatchColors.ink, fontSize = 34.sp, fontFamily = Lilex)
-                        val remaining = session.plannedSeconds - elapsed
-                        Text(
-                            if (remaining >= 0) "${clock(remaining)} left" else "${clock(-remaining)} over",
-                            color = if (remaining >= 0) WatchColors.muted else WatchColors.raspberry,
-                            fontSize = 13.sp, fontFamily = Lilex,
-                        )
+                        if (session.openEnded) {
+                            Text("so far", color = WatchColors.muted, fontSize = 13.sp, fontFamily = Lilex)
+                        } else {
+                            val remaining = session.plannedSeconds - elapsed
+                            Text(
+                                if (remaining >= 0) "${clock(remaining)} left" else "${clock(-remaining)} over",
+                                color = if (remaining >= 0) WatchColors.muted else WatchColors.raspberry,
+                                fontSize = 13.sp, fontFamily = Lilex,
+                            )
+                        }
                     }
                 }
                 item(key = "controls") {

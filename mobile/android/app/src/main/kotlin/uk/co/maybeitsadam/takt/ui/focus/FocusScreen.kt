@@ -571,10 +571,14 @@ private fun RunningBlock(state: FocusUiState, vm: FocusViewModel) {
                 },
                 modifier = Modifier.testTag("focus_clock").semantics { contentDescription = "Elapsed ${reading.text}" },
             )
-            Box(Modifier.fillMaxWidth().height(4.dp).background(TaktTheme.colors.well)) {
-                Box(Modifier.fillMaxWidth(reading.fraction).height(4.dp).background(if (reading.isOverrun) TaktTheme.colors.warning else TaktTheme.colors.primary))
+            if (session.openEnded) {
+                MonoText("${Format.clock(reading.elapsedSeconds)} so far · timer")
+            } else {
+                Box(Modifier.fillMaxWidth().height(4.dp).background(TaktTheme.colors.well)) {
+                    Box(Modifier.fillMaxWidth(reading.fraction).height(4.dp).background(if (reading.isOverrun) TaktTheme.colors.warning else TaktTheme.colors.primary))
+                }
+                MonoText("${Format.clock(reading.elapsedSeconds)} / ${Format.duration(maxOf(60, session.workDurationSeconds))} planned")
             }
-            MonoText("${Format.clock(reading.elapsedSeconds)} / ${Format.duration(maxOf(60, session.workDurationSeconds))} planned")
         }
         PButton(
             "Finish",
@@ -610,7 +614,7 @@ private fun RunningBlock(state: FocusUiState, vm: FocusViewModel) {
                 for (entry in state.queue) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(entry.task.title, style = TaktTheme.type.body, color = TaktTheme.colors.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        entry.item.plannedSeconds?.let { MonoText(Format.duration(it)) }
+                        if (entry.item.openEnded) MonoText("timer") else entry.item.plannedSeconds?.let { MonoText(Format.duration(it)) }
                     }
                     Hairline(color = TaktTheme.colors.borderMuted)
                 }

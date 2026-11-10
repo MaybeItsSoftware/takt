@@ -995,6 +995,25 @@ class WorkspaceRepository(
         return database.read { it.session(id) } ?: fail(WorkspaceStoreError.NO_ACTIVE_FOCUS_TASK)
     }
 
+    /**
+     * Starts a timer on a task — a block with no length, counting up until it
+     * is finished — or returns the session running: `focus::start_timer`.
+     */
+    suspend fun startFocusTimer(
+        taskId: String,
+        breakDurationSeconds: Int = 5 * 60,
+        context: FocusContext? = null,
+        overrideAvailability: Boolean = false,
+        now: Instant = now(),
+    ): FocusSession {
+        val id = coreWrite {
+            it.startFocusTimer(
+                taskId, breakDurationSeconds.toLong(), context?.toCore(), overrideAvailability, now.toEpochMilli(), zone.id,
+            )
+        }
+        return database.read { it.session(id) } ?: fail(WorkspaceStoreError.NO_ACTIVE_FOCUS_TASK)
+    }
+
     suspend fun addToFocusQueue(sessionId: String, taskId: String, plannedSeconds: Int? = null, now: Instant = now()) {
         coreWrite { it.addToFocusQueue(sessionId, taskId, plannedSeconds?.toLong(), now.toEpochMilli()) }
     }

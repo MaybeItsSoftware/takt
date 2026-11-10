@@ -223,6 +223,12 @@ data class FocusSession(
     val accumulatedSeconds: Int?,
     val pausedAt: Instant?,
     val checkpointAt: Instant?,
+    /**
+     * A timer: the block in hand has no length and counts up until it is
+     * finished. [workDurationSeconds] then holds only a day, a stand-in for
+     * clients that predate the flag, never a length to count down from.
+     */
+    val openEnded: Boolean = false,
 ) {
     fun elapsedSeconds(now: Instant): Int {
         val running = if (pausedAt == null) {
@@ -255,6 +261,8 @@ data class FocusQueueItem(
     val completedAt: Instant?,
     val skippedAt: Instant?,
     val createdAt: Instant,
+    /** Runs as a timer, counting up, rather than as a block of a length. */
+    val openEnded: Boolean = false,
 )
 
 data class FocusQueueTask(val item: FocusQueueItem, val task: WorkspaceTask) {

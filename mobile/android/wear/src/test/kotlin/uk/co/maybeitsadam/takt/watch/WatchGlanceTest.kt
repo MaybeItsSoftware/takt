@@ -54,6 +54,17 @@ class WatchGlanceTest {
     }
 
     @Test
+    fun aTimerCountsUpWithNoPlannedLength() {
+        val session = WearSession(
+            taskId = "a", phase = WearPhase.RUNNING, startedAt = now - 90_000, plannedSeconds = 86_400, openEnded = true,
+        )
+        val glance = WatchGlance.of(WearSnapshot(tasks = listOf(write.copy(isRunning = true), call), session = session), now)
+        assertEquals(now - 90_000, glance.countingFrom)
+        assertNull(glance.plannedSeconds)
+        assertEquals("Timer · 2 left today", glance.footer)
+    }
+
+    @Test
     fun anEmptyDayIsAllDone() {
         val glance = WatchGlance.of(WearSnapshot(tasks = listOf(stretch)), now)
         assertNull(glance.title)

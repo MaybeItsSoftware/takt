@@ -199,7 +199,7 @@ internal fun SessionRow.toSession() = FocusSession(
     activeTaskId = activeTaskId, activeTaskStartedAt = activeTaskStartedAtMs.instant(),
     workDurationSeconds = workDurationSeconds.toInt(), breakDurationSeconds = breakDurationSeconds.toInt(),
     breakEndsAt = breakEndsAtMs?.instant(), activeBlockId = activeBlockId, accumulatedSeconds = accumulatedSeconds?.toInt(),
-    pausedAt = pausedAtMs?.instant(), checkpointAt = checkpointAtMs?.instant(),
+    pausedAt = pausedAtMs?.instant(), checkpointAt = checkpointAtMs?.instant(), openEnded = openEnded,
 )
 
 internal fun QueueEntry.toQueueTask() = FocusQueueTask(
@@ -207,7 +207,7 @@ internal fun QueueEntry.toQueueTask() = FocusQueueTask(
         id = item.id, sessionId = item.sessionId, taskId = item.taskId, sortOrder = item.sortOrder.toInt(),
         state = FocusQueueState.of(item.state), plannedSeconds = item.plannedSeconds?.toInt(),
         completedAt = item.completedAtMs?.instant(), skippedAt = item.skippedAtMs?.instant(),
-        createdAt = item.createdAtMs.instant(),
+        createdAt = item.createdAtMs.instant(), openEnded = item.openEnded,
     ),
     task.toTask(),
 )

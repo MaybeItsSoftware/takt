@@ -2,6 +2,7 @@ package uk.co.maybeitsadam.takt.wear
 
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -66,5 +67,7 @@ class WearSnapshotShapingTest {
         assertEquals(WearPhase.ON_BREAK, WearSnapshotShaping.session(session(null, phase = FocusSessionPhase.ON_BREAK))?.phase)
         assertNull(WearSnapshotShaping.session(session("a", phase = FocusSessionPhase.FINISHED)))
         assertNull(WearSnapshotShaping.session(null))
+        assertTrue(WearSnapshotShaping.session(session("a", openEnded = true))!!.openEnded)
+        assertFalse(WearSnapshotShaping.session(session("a"))!!.openEnded)
     }
 }

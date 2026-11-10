@@ -152,15 +152,20 @@ object FocusText {
     fun hourMinute(time: LocalTime): String = hourMinute.format(time)
 }
 
-/** The running clock as it reads: elapsed, the fraction of the plan, and whether it has overrun. */
+/**
+ * The running clock as it reads: elapsed, the fraction of the plan, and
+ * whether it has overrun. A timer ([openEnded]) has no plan: it only counts
+ * up, so it has no fraction to fill and can never overrun.
+ */
 @Immutable
-data class ClockReading(val elapsedSeconds: Int, val plannedSeconds: Int) {
+data class ClockReading(val elapsedSeconds: Int, val plannedSeconds: Int, val openEnded: Boolean = false) {
     val text: String get() = Format.clock(elapsedSeconds)
-    val fraction: Float get() = minOf(1f, elapsedSeconds.toFloat() / maxOf(60, plannedSeconds))
-    val isOverrun: Boolean get() = elapsedSeconds > maxOf(60, plannedSeconds)
+    val fraction: Float get() = if (openEnded) 0f else minOf(1f, elapsedSeconds.toFloat() / maxOf(60, plannedSeconds))
+    val isOverrun: Boolean get() = !openEnded && elapsedSeconds > maxOf(60, plannedSeconds)
 
     companion object {
-        fun of(session: FocusSession, now: Instant) = ClockReading(session.elapsedSeconds(now), session.workDurationSeconds)
+        fun of(session: FocusSession, now: Instant) =
+            ClockReading(session.elapsedSeconds(now), session.workDurationSeconds, session.openEnded)
     }
 }
 

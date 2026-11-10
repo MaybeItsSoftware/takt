@@ -25,6 +25,14 @@ class FocusNotificationModelTest {
         assertEquals("Paused at 02:05 of 25m", model.text)
     }
 
+    @Test fun aTimerNamesNoPlan() {
+        val running = FocusNotificationModel.of(session("a", planned = 86_400, openEnded = true), "Write", T0.plusSeconds(60))
+        assertTrue(running.isCounting)
+        assertEquals("Timing", running.text)
+        val paused = FocusNotificationModel.of(session("a", accumulated = 125, pausedAt = T0, openEnded = true), "Write", T0)
+        assertEquals("Paused at 02:05", paused.text)
+    }
+
     @Test fun noTaskHasNoActions() {
         val model = FocusNotificationModel.of(session(null), null, T0)
         assertFalse(model.hasActions)
