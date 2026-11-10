@@ -279,6 +279,39 @@ impl Takt {
                                     )
                                 })
                                 .child(value)
+                                // Beside Start focus, which is a plain timer:
+                                // a pomodoro, timed blocks with breaks.
+                                .when(stop.id == "focus" && !open, |d| {
+                                    d.child(
+                                        div()
+                                            .id("inspector-pomodoro")
+                                            .flex_none()
+                                            .h(px(18.))
+                                            .px(px(3.))
+                                            .flex()
+                                            .items_center()
+                                            .gap_1()
+                                            .rounded(px(4.))
+                                            .hover(|d| d.bg(t.hover))
+                                            .tooltip(super::widgets::tip(
+                                                "Start a pomodoro: timed blocks with breaks",
+                                                t,
+                                            ))
+                                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                cx.stop_propagation();
+                                                this.app.run(crate::keys::START_POMODORO, None);
+                                                this.after_change(cx);
+                                                cx.notify();
+                                            }))
+                                            .child(icon("timer", 13.).text_color(t.muted))
+                                            .when_some(
+                                                self.app.key_hint(crate::keys::START_POMODORO),
+                                                |d, keys| {
+                                                    d.child(super::widgets::key_hint(keys, t))
+                                                },
+                                            ),
+                                    )
+                                })
                                 .when_some(
                                     stop.command()
                                         .filter(|_| !open && stop.id != "title")
