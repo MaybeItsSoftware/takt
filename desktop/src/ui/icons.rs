@@ -189,7 +189,8 @@ fn body(name: &str) -> Option<&'static str> {
         }
         "chevrons-up-down" => r#"<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>"#,
         "x" => r#"<path d="M18 6 6 18M6 6l12 12"/>"#,
-        "play" => r#"<path d="M6 3l14 9-14 9z"/>"#,
+        // Centred on the 24 box, as the round icons it stands among are.
+        "play" => r#"<path d="M5 3l15 9-15 9z"/>"#,
         "sunrise" => {
             r#"<path d="M12 2v8"/><path d="m4.93 10.93 1.41 1.41M2 18h2M20 18h2M19.07 10.93l-1.41 1.41M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/>"#
         }

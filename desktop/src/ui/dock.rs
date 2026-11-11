@@ -2,6 +2,11 @@ use super::icons::icon;
 use super::*;
 use gpui::{anchored, deferred, point};
 
+/// One line of the window's text: 13pt at gpui's line height of phi. An
+/// inspector row's icon, label and buttons are this tall, so they centre on
+/// the text beside them rather than sitting a point and a half above it.
+const ROW_LINE: f32 = 13. * 1.618;
+
 /// A popover under an inspector row (the calendar, the repeat and log-time
 /// selectors): it floats over the rows below rather than pushing them down.
 fn floating(panel: AnyElement) -> AnyElement {
@@ -258,7 +263,7 @@ impl Takt {
                                     d.child(
                                         div()
                                             .w(px(72.))
-                                            .h(px(18.))
+                                            .h(px(ROW_LINE))
                                             .flex_none()
                                             .flex()
                                             .items_center()
@@ -275,7 +280,7 @@ impl Takt {
                                                 d.tooltip(super::widgets::tip(text, t))
                                             })
                                             .w(px(16.))
-                                            .h(px(18.))
+                                            .h(px(ROW_LINE))
                                             .flex_none()
                                             .flex()
                                             .items_center()
@@ -294,7 +299,7 @@ impl Takt {
                                         div()
                                             .id("inspector-pomodoro")
                                             .flex_none()
-                                            .h(px(18.))
+                                            .h(px(ROW_LINE))
                                             .px(px(3.))
                                             .flex()
                                             .items_center()
