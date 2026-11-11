@@ -304,7 +304,11 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
     report.push(time("outline j", &vec!["j"; 30], app));
     if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() && app.selected().is_some() {
         let started = Instant::now();
+        // From the top, so there is a row after it to land on.
+        app.select_row(0);
         let ticked = app.selected().map(|t| t.id.clone()).unwrap_or_default();
+        let at = app.selected_index();
+        let next = at.and_then(|i| app.visible_ids().get(i + 1).cloned());
         app.toggle_complete();
         let celebrated = app.celebrating(&ticked).is_some();
         let stays = app.visible_ids().contains(&ticked);
@@ -313,8 +317,9 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
         }
         app.expire_lingering();
         let leaves = !app.visible_ids().contains(&ticked);
+        let kept_place = next.is_some() && app.selected_task == next;
         report.push(format!(
-            "finished task stays at first: {stays}, gone after its seconds: {leaves}"
+            "finished task stays at first: {stays}, gone after its seconds: {leaves}, selection moves to the next row {kept_place}"
         ));
         app.set_status(&ticked, "open");
         app.selected_task = Some(ticked);

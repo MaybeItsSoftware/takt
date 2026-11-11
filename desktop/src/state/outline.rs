@@ -698,7 +698,23 @@ impl App {
             self.lingering.remove(id);
         }
         if self.prefs.hide_completed {
+            let at = self.selected_index();
             self.layout_rows();
+            self.keep_selection_in_place(at);
+        }
+    }
+
+    /// The selected row left the list: the selection stays where it was,
+    /// on the row that took its place (or the last, at the end), rather than
+    /// going nowhere and so back to the top.
+    fn keep_selection_in_place(&mut self, at: Option<usize>) {
+        if self.selected_index().is_some() {
+            return;
+        }
+        let Some(at) = at else { return };
+        let ids = self.visible_ids();
+        if let Some(id) = ids.get(at.min(ids.len().saturating_sub(1))) {
+            self.selected_task = Some(id.clone());
         }
     }
 
