@@ -297,7 +297,7 @@ impl App {
             (
                 "google-import-events",
                 "Google",
-                "Import the calendar's events as tasks",
+                "Sync events too, not just tasks",
                 on(settings.import_events),
             ),
             (

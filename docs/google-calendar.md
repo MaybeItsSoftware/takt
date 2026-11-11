@@ -91,7 +91,7 @@ date) is refused by the editor's own checks, and Takt's value is pushed back.
 ## Events made in Google
 
 Ignored by default: an event without Takt's private property and without a
-link is not a task. With **Import new events** on (the synced preference
+link is not a task, so by default only tasks sync. With **Sync events too, not just tasks** on (the synced preference
 `googleCalendar.importEvents`), a timed, non-cancelled event in the two-way
 calendar that ends no more than a day ago becomes a task in the Inbox — the
 title, a start at the event's start, an estimate of its length — and the

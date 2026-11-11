@@ -385,7 +385,9 @@ impl SettingRow {
             "google-calendar-choose" => {
                 "The Google calendar timed tasks go to, and that changes come back from."
             }
-            "google-import-events" => "Events added in the calendar become tasks.",
+            "google-import-events" => {
+                "Off (the default), only your timed tasks go to the calendar, and moving or renaming one there moves or renames the task. On, events you add in the calendar come in as tasks as well."
+            }
             "google-sync-now" => "Pass the calendar and tasks mirrors now.",
             "google-tasks-title-times" => {
                 "Google Tasks keeps a day but no time, so a task added there with \u{201c}14:00\u{201d} or \u{201c}14:00\u{2013}15:00\u{201d} in its title comes in scheduled for then, the range as its length."
