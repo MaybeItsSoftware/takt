@@ -91,7 +91,7 @@ So none of it is reachable only by something you already have to know.
 | `j` / `k` / `↑` / `↓` | Move the selection |
 | `Cmd+↑` / `Cmd+↓` | First / last task |
 | `Alt+↑` / `Alt+↓` | Move the task up / down (Zed's move line) — on Today, earlier or later in the day |
-| `h` `j` `k` `l` / arrows, `Tab` | On the matrix, nudge the selected task across its axes (`Shift` for a fine nudge), and `Tab` / `Shift+Tab` step between tasks — see [The matrix](#the-matrix) |
+| `h` `j` `k` `l` / arrows, `v`, `Tab` | On the matrix, move to the nearest task that way; `v` is move mode, where they nudge the selected task across its axes (`Shift` for a fine nudge); `Tab` / `Shift+Tab` step between tasks — see [The matrix](#the-matrix) |
 | `Alt+←` / `Alt+→` | Outdent / indent the task — out of, or under, the task above |
 | `Cmd+←` / `Cmd+→`, or `Shift+Alt+←` / `Shift+Alt+→` | Move the card, or the subtask row you are on, a board column left / right — a subtask moved past its parent's column becomes a card of its own there (in the outline `Cmd+←` / `Cmd+→` still fold and unfold everything) |
 | `Cmd+Shift+←` / `Cmd+Shift+→` | Move the board column you are in left / right, taking its cards with it |
@@ -785,21 +785,24 @@ other are drawn a little apart; where they are stored does not change.
 | --- | --- |
 | Drag a chip, or a card from the tray | Drop it anywhere on the plane: it sits exactly there |
 | Drag a chip onto the tray | Take it off the plane |
-| `h` / `l`, `←` / `→` | Nudge the selected chip more urgent / less urgent, a tenth of the way to the edge |
-| `k` / `j`, `↑` / `↓` | Nudge it more important / less important, the same |
-| `Shift` with any of those | A fine nudge, a fifth as far |
+| `h` `j` `k` `l` / arrows | The nearest task that way (nearest along it first, then off to the side); down from the lowest goes into the tray, and up from the tray comes back |
+| `v` | Move mode for the selected chip, which is tinted while it lasts; `v`, `Return` or `Esc` ends it |
+| `h` / `l`, `←` / `→` in move mode | Nudge it more urgent / less urgent, a tenth of the way to the edge |
+| `k` / `j`, `↑` / `↓` in move mode | Nudge it more important / less important, the same |
+| `Shift` with those, in move mode | A fine nudge, a fifth as far |
 | `Tab` / `Shift+Tab` | The next / previous task: quadrant by quadrant, each from the top, then the tray, wrapping round |
 | `Option+1`–`Option+4` | Place the selected task at the centre of a quadrant (1 do now, 2 schedule, 3 delegate, 4 eliminate), beside it when another task is there |
 | `Return` | A new task, at the centre of the selected task's quadrant — or in the tray when the selection is there |
 | Click / double click | Select / rename |
 
-On a task in the tray the arrows and `j`/`k` move the selection as they do
-everywhere else. With a chip selected `←` and `→` nudge it, so `]` and `[` open
-and leave a task here, and `Ctrl+1` goes back to the sidebar.
+On a task in the tray the arrows and `j`/`k` move along the tray as they do
+everywhere else. `←` and `→` with nothing further that way do what they do
+anywhere else.
 
-A point is stored as urgency and importance from −100 to 100, and never
-nearer an axis than 10: a drop on an axis lands just to the far side of it
-(zero counts as not urgent, or not important). The phones, the CLI and the MCP
+A point runs from −100 to 100 on each axis, and may sit on an axis: on the
+line counts as not urgent, or not important. It is stored ten further from
+zero (0 as −10, 1 as 11), so it is never mistaken for a placement made by
+quadrant. The phones, the CLI and the MCP
 server read only which side of each axis a task is on, so they still see its
 quadrant. A task placed by quadrant before — by an older Mac app, the phones,
 or `takt matrix` with values from −9 to 9 — is drawn inside its quadrant, the

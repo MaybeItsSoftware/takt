@@ -344,6 +344,9 @@ impl Takt {
         let active = self.app.region == Region::Tasks;
         let editing = matches!(&self.app.editing, Some(Editing::TaskTitle { task_id }) if *task_id == task.id);
         let ringed = selected && active;
+        // In move mode the chip is filled with the accent's tint and its
+        // title stays readable, so it is plain which one the keys carry.
+        let moving = ringed && self.app.matrix_moving;
         let dot = div()
             .flex_none()
             .size(px(DOT))
@@ -402,6 +405,7 @@ impl Takt {
                     .items_center()
                     .gap_1()
                     .when(selected, |d| d.bg(t.selected))
+                    .when(moving, |d| d.bg(t.accent.opacity(0.22)))
                     .child(dot)
                     .child(if editing {
                         self.field_inline(t, "Task").into_any_element()

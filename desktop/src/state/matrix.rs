@@ -90,6 +90,10 @@ pub fn to_fraction(urgency: i64, importance: i64) -> (f32, f32) {
 
 /// The quadrant a point is in, as the core reads it: 0 do now, 1 schedule,
 /// 2 delegate, 3 eliminate.
+fn motion_is_up(motion: &str) -> bool {
+    matches!(motion, "k" | "up")
+}
+
 pub fn quadrant_of(urgency: i64, importance: i64) -> usize {
     takt_core::board_rules::matrix_quadrant(Some(urgency as i32), Some(importance as i32))
         .unwrap_or(3) as usize
@@ -267,15 +271,35 @@ impl App {
     /// then runs as usual.
     pub fn matrix_key(&mut self, key: &str) -> bool {
         if self.view_mode != ViewMode::Matrix || self.region != Region::Tasks {
+            self.matrix_moving = false;
             return false;
         }
         match key {
             "tab" => {
+                self.matrix_moving = false;
                 self.step_matrix_selection(1);
                 return true;
             }
             "shift+tab" => {
+                self.matrix_moving = false;
                 self.step_matrix_selection(-1);
+                return true;
+            }
+            // Move mode: on a placed task, and off again.
+            "v" => {
+                if self.matrix_moving {
+                    self.stop_matrix_move();
+                } else if self.selected_matrix_point().is_some() {
+                    self.matrix_moving = true;
+                    self.message = Some(
+                        "Moving: the arrows or h j k l nudge it (Shift for small steps); v, Return or Esc when it is there"
+                            .into(),
+                    );
+                }
+                return true;
+            }
+            "enter" | "escape" if self.matrix_moving => {
+                self.stop_matrix_move();
                 return true;
             }
             _ => {}
@@ -292,8 +316,31 @@ impl App {
             _ => return false,
         };
         let Some((urgency, importance)) = self.selected_matrix_point() else {
+            // In the tray: up comes back onto the plane, the rest move
+            // along the tray as everywhere else.
+            if !fine && motion_is_up(motion) {
+                return self.select_nearest_point(None, (0, 1));
+            }
             return false;
         };
+        if !self.matrix_moving {
+            if fine {
+                return false;
+            }
+            if self.select_nearest_point(Some((urgency, importance)), (du, di)) {
+                return true;
+            }
+            // Below the lowest: into the tray.
+            if di < 0
+                && let Some(first) = self.board.unplaced.first()
+            {
+                self.selected_task = Some(first.id.clone());
+                return true;
+            }
+            // Nothing that way: left and right fall to what they do
+            // anywhere else.
+            return di != 0;
+        }
         let Some(id) = self.selected_task.clone() else {
             return false;
         };
@@ -310,6 +357,42 @@ impl App {
         };
         self.set_matrix_point(&id, urgency, importance);
         true
+    }
+
+    fn stop_matrix_move(&mut self) {
+        self.matrix_moving = false;
+        self.message = None;
+    }
+
+    /// The nearest placed task from `from` in direction `(du, di)` (urgency
+    /// up is left, importance up is up): along that way first, then off to
+    /// the side, counted double. From the tray (`None`), the lowest.
+    fn select_nearest_point(&mut self, from: Option<(i64, i64)>, (du, di): (i64, i64)) -> bool {
+        let selected = self.selected_task.clone();
+        let best = self
+            .board
+            .points
+            .iter()
+            .filter(|p| Some(&p.task.id) != selected.as_ref())
+            .filter_map(|p| {
+                let Some((u, i)) = from else {
+                    return Some((p.importance, p.task.id.clone()));
+                };
+                let (along, aside) = if du != 0 {
+                    ((p.urgency - u) * du, (p.importance - i).abs())
+                } else {
+                    ((p.importance - i) * di, (p.urgency - u).abs())
+                };
+                (along > 0).then(|| (along + 2 * aside, p.task.id.clone()))
+            })
+            .min_by_key(|(score, _)| *score);
+        match best {
+            Some((_, id)) => {
+                self.selected_task = Some(id);
+                true
+            }
+            None => false,
+        }
     }
 
     /// Tab / Shift+Tab: the next or previous task in the matrix's order,
@@ -392,9 +475,40 @@ impl App {
         // 31.5% across, 81.5% down: urgency 37, importance -63.
         self.drop_task_at_point(&id, 0.315, 0.815);
         let dropped = self.selected_matrix_point();
+        // Move mode carries the task; out of it the same keys move the
+        // selection.
+        self.matrix_key("v");
+        let moving = self.matrix_moving;
         self.matrix_key("l");
         self.matrix_key("shift+k");
+        self.matrix_key("enter");
         let held = self.selected_matrix_point();
+        let mut navigated = None;
+        let other = self
+            .board
+            .points
+            .iter()
+            .map(|p| p.task.id.clone())
+            .chain(self.board.unplaced.iter().map(|t| t.id.clone()))
+            .find(|other| *other != id);
+        let other_before = other
+            .as_ref()
+            .map(|o| self.placements.get(o).cloned().unwrap_or_default());
+        if let Some(other) = &other {
+            // 70% across, 20% down: less urgent, more important.
+            self.drop_task_at_point(other, 0.7, 0.2);
+            self.selected_task = Some(id.clone());
+            let here = self.selected_matrix_point();
+            self.matrix_key("l");
+            navigated = Some(
+                self.selected_task.as_deref() == Some(other.as_str())
+                    && self.selected_task.as_deref() != Some(id.as_str())
+                    && {
+                        self.selected_task = Some(id.clone());
+                        self.selected_matrix_point() == here
+                    },
+            );
+        }
         self.read_scope_into_rows();
         self.layout_board();
         let stored = self.placements.get(&id).map(|p| (p.urgency, p.importance));
@@ -409,8 +523,21 @@ impl App {
         self.drop_task_at_point(&id, 0.5, 0.5);
         let snapped = self.selected_matrix_point() == Some((0, 0));
         said.push(format!(
-            "matrix point: dropped at {dropped:?}, nudged to {held:?}, read back {read_back} in quadrant {quadrant:?}; centre sits on the axes {snapped}"
+            "matrix point: dropped at {dropped:?}, move mode {moving}, nudged to {held:?}, read back {read_back} in quadrant {quadrant:?}; centre sits on the axes {snapped}; l selects the task to the right {navigated:?}"
         ));
+        if let (Some(other), Some(before)) = (other, other_before) {
+            let (u, i) = (before.urgency, before.importance);
+            if self
+                .write(|store| {
+                    store
+                        .core
+                        .set_matrix_position(other.clone(), u, i, now_ms())
+                })
+                .is_some()
+            {
+                self.placements.insert(other, before);
+            }
+        }
         let (u, i) = (before.urgency, before.importance);
         let restored =
             self.write(|store| store.core.set_matrix_position(id.clone(), u, i, now_ms()));

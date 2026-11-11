@@ -331,6 +331,9 @@ pub struct App {
     pub history_top: Option<(String, bool)>,
     /// "Undid …" or "Redid …", shown while the history is as that left it.
     pub history_note: Option<(String, Option<(String, bool)>)>,
+    /// The matrix's move mode (`v`): the motions nudge the selected task
+    /// rather than moving the selection.
+    pub matrix_moving: bool,
     pub message: Option<String>,
     /// The `data_version` last read, to tell another process's write.
     pub seen_version: i64,
@@ -418,6 +421,7 @@ impl App {
             redo_label: None,
             history_top: None,
             history_note: None,
+            matrix_moving: false,
             message: None,
             seen_version,
             prefs,
