@@ -280,21 +280,21 @@ final class ThemeSpecificationTests: XCTestCase {
     XCTAssertEqual(label.trackingPoints, 1.5, accuracy: 0.0001)
   }
 
-  /// The default is set in the bundled Inter and Geist Mono, rounded and
-  /// roomy, and its palette is the one its seeds grow — apart from `raised`,
+  /// The default is set as the Mac app is, in IBM Plex Sans and Lilex with
+  /// Zed's structure, and its palette is the one its seeds grow — apart from `raised`,
   /// which it names so the dark card is a clear step above the page.
-  func testTheDefaultIsRoundedAndInTheHouseColours() {
+  func testTheDefaultIsSetAsTheMacAppAndInTheHouseColours() {
     let priority = BuiltInThemeSpecifications.priority
     XCTAssertEqual(priority.name, "Takt")
     let type = priority.structure.typography
-    XCTAssertEqual(type.body, ThemeFontFace(families: ["Inter"], design: .sans))
-    XCTAssertEqual(type.display, ThemeFontFace(families: ["Inter"], design: .sans))
-    XCTAssertEqual(type.mono, ThemeFontFace(families: ["Geist Mono"], design: .monospaced))
-    XCTAssertEqual(priority.structure.radius.panel, 12)
-    XCTAssertEqual(priority.structure.radius.row, 8)
-    XCTAssertEqual(priority.structure.radius.control, 8)
-    XCTAssertEqual(priority.structure.radius.shell, 18)
-    XCTAssertGreaterThan(priority.structure.spacing.xl, BuiltInThemeSpecifications.chalk.structure.spacing.xl)
+    XCTAssertEqual(type.body, ThemeFontFace(families: ["IBM Plex Sans"], design: .sans))
+    XCTAssertEqual(type.mono, ThemeFontFace(families: ["Lilex"], design: .monospaced))
+    // Zed's structure, the one the Mac draws, on every platform.
+    for platform in ThemePlatform.allCases {
+      XCTAssertEqual(
+        BuiltInThemeSpecifications.priority(for: platform).structure,
+        BuiltInThemeSpecifications.chalk(for: platform).structure, platform.rawValue)
+    }
     // The house colours, exactly: every role Zed names, with the same hex,
     // in both appearances — the default differs from Zed in structure only.
     let zed = BuiltInThemeSpecifications.chalk

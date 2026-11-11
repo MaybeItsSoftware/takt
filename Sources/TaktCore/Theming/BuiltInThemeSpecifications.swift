@@ -76,7 +76,7 @@ public enum BuiltInThemeSpecifications {
     all(for: platform).first { $0.identifier == identifier }
   }
 
-  /// Friendly, roomy and rounded, in the house colours: the default.
+  /// The Mac app's structure (IBM Plex Sans, square panels) in the house colours: the default.
   public static var priority: ThemeSpecification { priority(for: .macos) }
   /// Zed: IBM Plex Sans and Lilex, square panels, hairlines, warm paper and grape ink.
   public static var chalk: ThemeSpecification { chalk(for: .macos) }
@@ -107,8 +107,7 @@ public enum BuiltInThemeSpecifications {
     platformStructures[chalkIdentifier] ?? [:]
   }
 
-  /// The default's: Zed's type sizes on the phones, its own roomy spacing,
-  /// and corners rounder again in the hand.
+  /// The default's: the same as Zed's, so a phone on the default is set as the Mac is.
   public static var priorityPlatformStructures: [ThemePlatform: ThemeFile.Structure] {
     platformStructures[priorityIdentifier] ?? [:]
   }

@@ -294,9 +294,9 @@ final class ThemeFileTests: XCTestCase {
 
   func testPrioritysPerPlatformStructureIsTheDocumentedTable() {
     let table: [ThemePlatform: (bodySize: Double, radius: [Double], touchTarget: Double)] = [
-      .macos: (13, [12, 8, 8], 0),
-      .ios: (17, [14, 10, 10], 44),
-      .android: (16, [16, 12, 10], 48),
+      .macos: (13, [0, 0, 4], 0),
+      .ios: (17, [8, 0, 6], 44),
+      .android: (16, [8, 0, 6], 48),
     ]
     for (platform, row) in table {
       let structure = BuiltInThemeSpecifications.priority(for: platform).structure
@@ -352,10 +352,10 @@ final class ThemeFileTests: XCTestCase {
       XCTAssertEqual(theme.color(.paper, in: .dark).hexString, "#15131C", "one palette")
     }
     XCTAssertEqual(mac.structure.typography.bodySize, 13)
-    XCTAssertEqual(mac.structure.radius.panel, 12, "inherits the Mac's default")
+    XCTAssertEqual(mac.structure.radius.panel, 0, "inherits the Mac's default")
     XCTAssertEqual(ios.structure.typography.bodySize, 18)
     XCTAssertEqual(ios.structure.typography.scale, .proportioned(fromBody: 18))
-    XCTAssertEqual(ios.structure.radius.panel, 14, "inherits the iPhone's default")
+    XCTAssertEqual(ios.structure.radius.panel, 8, "inherits the iPhone's default")
     XCTAssertEqual(ios.structure.touchTarget, 44)
     XCTAssertEqual(ios.structure.spacing.md, BuiltInThemeSpecifications.priority(for: .ios).structure.spacing.md)
     XCTAssertEqual(android.structure.spacing.md, 18)
@@ -385,7 +385,7 @@ final class ThemeFileTests: XCTestCase {
     XCTAssertEqual(resolved.structure.radius.panel, 12)
     XCTAssertEqual(resolved.structure.border.emphasis, 3)
     XCTAssertEqual(
-      load(for: .macos, child, parent).themes.first { $0.identifier == "user.child" }?.structure.radius.panel, 12)
+      load(for: .macos, child, parent).themes.first { $0.identifier == "user.child" }?.structure.radius.panel, 0)
   }
 
   func testAPaletteUnderPlatformsIsAWarningAndIgnored() throws {
@@ -414,7 +414,7 @@ final class ThemeFileTests: XCTestCase {
         messages(outcome).contains("platforms.android.structure.radius.panel -2 should be zero or more"),
         "\(platform): \(messages(outcome))")
     }
-    XCTAssertEqual(load(for: .android, file).themes.first?.structure.radius.panel, 16)
+    XCTAssertEqual(load(for: .android, file).themes.first?.structure.radius.panel, 8)
   }
 
   func testATouchTargetIsDecodedAndAudited() throws {

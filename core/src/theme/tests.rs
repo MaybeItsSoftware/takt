@@ -198,7 +198,7 @@ fn a_bad_size_keeps_the_inherited_value_and_says_so() {
             "structure.typography.bodySize 0 should be above zero",
         ]
     );
-    assert_eq!(merged.structure.radius.panel, 12.0);
+    assert_eq!(merged.structure.radius.panel, 0.0);
 }
 
 // MARK: - Zed themes

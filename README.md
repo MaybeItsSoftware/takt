@@ -1179,8 +1179,8 @@ agent panel.
 ## Themes
 
 Pick a look in **Settings → Appearance**, from a gallery that draws each theme
-in its own colours and faces: **Takt**, the default — friendly, roomy and
-rounded, warm paper in the light and a deep slate in the dark — which follows
+in its own colours and faces: **Takt**, the default — set as the Mac app is, in IBM Plex
+Sans with square panels and hairlines, warm paper in the light and a deep slate in the dark — which follows
 your Light/Dark setting; **Zed** and **Zed Dark**; and **Grape**, the house design
 language — chalk paper, grape ink and the Arvo slab serif. Light, dark or
 system is chosen beside it.

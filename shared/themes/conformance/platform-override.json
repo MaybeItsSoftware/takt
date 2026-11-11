@@ -37,17 +37,17 @@
           },
           "radius" : {
             "control" : 2,
-            "panel" : 16,
+            "panel" : 8,
             "pill" : 9999,
-            "row" : 12,
-            "shell" : 18
+            "row" : 0,
+            "shell" : 20
           },
           "spacing" : {
-            "lg" : 20,
+            "lg" : 16,
             "md" : 18,
-            "sm" : 10,
-            "xl" : 28,
-            "xs" : 6,
+            "sm" : 8,
+            "xl" : 24,
+            "xs" : 4,
             "xxs" : 2
           },
           "touchTarget" : 52,
@@ -55,14 +55,14 @@
             "body" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "bodySize" : 16,
             "display" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "microLabel" : {
@@ -75,7 +75,7 @@
             "mono" : {
               "design" : "monospaced",
               "families" : [
-                "Geist Mono"
+                "Lilex"
               ]
             },
             "scale" : {
@@ -126,17 +126,17 @@
           },
           "radius" : {
             "control" : 2,
-            "panel" : 16,
+            "panel" : 8,
             "pill" : 9999,
-            "row" : 12,
-            "shell" : 18
+            "row" : 0,
+            "shell" : 20
           },
           "spacing" : {
-            "lg" : 20,
+            "lg" : 16,
             "md" : 18,
-            "sm" : 10,
-            "xl" : 28,
-            "xs" : 6,
+            "sm" : 8,
+            "xl" : 24,
+            "xs" : 4,
             "xxs" : 2
           },
           "touchTarget" : 52,
@@ -144,14 +144,14 @@
             "body" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "bodySize" : 16,
             "display" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "microLabel" : {
@@ -164,7 +164,7 @@
             "mono" : {
               "design" : "monospaced",
               "families" : [
-                "Geist Mono"
+                "Lilex"
               ]
             },
             "scale" : {
@@ -217,17 +217,17 @@
           },
           "radius" : {
             "control" : 2,
-            "panel" : 14,
+            "panel" : 8,
             "pill" : 9999,
-            "row" : 10,
-            "shell" : 18
+            "row" : 0,
+            "shell" : 20
           },
           "spacing" : {
-            "lg" : 20,
-            "md" : 14,
-            "sm" : 10,
-            "xl" : 28,
-            "xs" : 6,
+            "lg" : 16,
+            "md" : 12,
+            "sm" : 8,
+            "xl" : 24,
+            "xs" : 4,
             "xxs" : 2
           },
           "touchTarget" : 44,
@@ -235,14 +235,14 @@
             "body" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "bodySize" : 18,
             "display" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "microLabel" : {
@@ -255,7 +255,7 @@
             "mono" : {
               "design" : "monospaced",
               "families" : [
-                "Geist Mono"
+                "Lilex"
               ]
             },
             "scale" : {
@@ -306,17 +306,17 @@
           },
           "radius" : {
             "control" : 2,
-            "panel" : 14,
+            "panel" : 8,
             "pill" : 9999,
-            "row" : 10,
-            "shell" : 18
+            "row" : 0,
+            "shell" : 20
           },
           "spacing" : {
-            "lg" : 20,
-            "md" : 14,
-            "sm" : 10,
-            "xl" : 28,
-            "xs" : 6,
+            "lg" : 16,
+            "md" : 12,
+            "sm" : 8,
+            "xl" : 24,
+            "xs" : 4,
             "xxs" : 2
           },
           "touchTarget" : 44,
@@ -324,14 +324,14 @@
             "body" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "bodySize" : 18,
             "display" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "microLabel" : {
@@ -344,7 +344,7 @@
             "mono" : {
               "design" : "monospaced",
               "families" : [
-                "Geist Mono"
+                "Lilex"
               ]
             },
             "scale" : {
@@ -397,17 +397,17 @@
           },
           "radius" : {
             "control" : 2,
-            "panel" : 12,
+            "panel" : 0,
             "pill" : 9999,
-            "row" : 8,
-            "shell" : 18
+            "row" : 0,
+            "shell" : 20
           },
           "spacing" : {
-            "lg" : 20,
-            "md" : 14,
-            "sm" : 10,
-            "xl" : 28,
-            "xs" : 6,
+            "lg" : 16,
+            "md" : 12,
+            "sm" : 8,
+            "xl" : 24,
+            "xs" : 4,
             "xxs" : 2
           },
           "touchTarget" : 0,
@@ -415,19 +415,19 @@
             "body" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "bodySize" : 13,
             "display" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 11,
+              "size" : 12,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -435,15 +435,15 @@
             "mono" : {
               "design" : "monospaced",
               "families" : [
-                "Geist Mono"
+                "Lilex"
               ]
             },
             "scale" : {
               "body" : 13,
               "caption" : 12,
-              "display" : 30,
+              "display" : 28,
               "hero" : 64,
-              "title" : 16
+              "title" : 15
             }
           },
           "usesGradientsOnChrome" : false,
@@ -486,17 +486,17 @@
           },
           "radius" : {
             "control" : 2,
-            "panel" : 12,
+            "panel" : 0,
             "pill" : 9999,
-            "row" : 8,
-            "shell" : 18
+            "row" : 0,
+            "shell" : 20
           },
           "spacing" : {
-            "lg" : 20,
-            "md" : 14,
-            "sm" : 10,
-            "xl" : 28,
-            "xs" : 6,
+            "lg" : 16,
+            "md" : 12,
+            "sm" : 8,
+            "xl" : 24,
+            "xs" : 4,
             "xxs" : 2
           },
           "touchTarget" : 0,
@@ -504,19 +504,19 @@
             "body" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "bodySize" : 13,
             "display" : {
               "design" : "sans",
               "families" : [
-                "Inter"
+                "IBM Plex Sans"
               ]
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 11,
+              "size" : 12,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -524,15 +524,15 @@
             "mono" : {
               "design" : "monospaced",
               "families" : [
-                "Geist Mono"
+                "Lilex"
               ]
             },
             "scale" : {
               "body" : 13,
               "caption" : 12,
-              "display" : 30,
+              "display" : 28,
               "hero" : 64,
-              "title" : 16
+              "title" : 15
             }
           },
           "usesGradientsOnChrome" : false,

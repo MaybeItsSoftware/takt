@@ -4,9 +4,9 @@ Takt's look is a theme: a colour palette and a set of structural values
 (radii, borders, spacing, type) under a name. Three ship with every app — the
 Mac, the iPhone and Android:
 
-- **Takt**, the default. Friendly and roomy, the way a modern app is: Inter
-  with Geist Mono for numerals, 12px cards and 8px rows and controls, and a
-  more generous spacing scale, in the house colours: chalk paper (`#faf8f4`),
+- **Takt**, the default. Zed's structure, the one the Mac app draws: IBM Plex
+  Sans with Lilex for numerals, square panels and rows, 4px controls and the
+  editor spacing scale (the phones take Zed's phone sizes too), in the house colours: chalk paper (`#faf8f4`),
   grape ink (`#444054`) and an azure accent (`#007fff`), with dark the same
   grape pulled down (`#1c1a23`). It is grown from seeds, so it is the easiest
   one to make your own. Its identifier is still `native.theme.priority`, its old
@@ -247,7 +247,7 @@ All sizes are in points. Each group can be given in part.
 
 | Key | Meaning |
 | --- | --- |
-| `radius.panel` | Cards, panels, popovers and overlays. Zed sets 0, the way Zed draws them; Takt sets 12. |
+| `radius.panel` | Cards, panels, popovers and overlays. Zed and Takt set 0, the way Zed draws them; Grape sets 8. |
 | `radius.row` | A list row's selection and hover — sidebar, outline, Today, result lists. Rows run edge to edge of their pane, so the built-ins set 0 and a selection is a full-width band; raise it for inset, rounded selections. |
 | `radius.control` | Buttons, inputs, chips, tooltips. Should not exceed `panel`, unless `panel` is 0 — square panels with slightly rounded buttons is the built-in look. |
 | `radius.pill` | Genuinely round things: avatars, dots, toggle knobs. Keep it large (999 or more). |

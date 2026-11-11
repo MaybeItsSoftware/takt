@@ -282,11 +282,12 @@ fn seeded(
     table
 }
 
-/// Takt, the default: roomy and rounded, in the house colours. Grown from
+/// Takt, the default: the Mac app's structure (IBM Plex Sans and Lilex,
+/// square panels, hairlines, Zed's spacing) in the house colours. Grown from
 /// seeds like a theme file, with the house palette's hand-named neutrals over
-/// them, so it is Zed's colours on a roomier structure.
+/// them, so a phone left on the default is set as the Mac is.
 fn priority() -> CoreThemeSpecification {
-    let chalk = chalk_palette();
+    let house = chalk_palette();
     let seeds = |background: &str, foreground: &str| CoreThemeSeeds {
         background: Some(hex(background)),
         foreground: Some(hex(foreground)),
@@ -298,50 +299,14 @@ fn priority() -> CoreThemeSpecification {
     CoreThemeSpecification {
         identifier: PRIORITY_IDENTIFIER.into(),
         name: "Takt".into(),
-        summary: "The default. Roomy and rounded, in the house colours: chalk paper, grape ink and an azure accent."
+        summary: "The default. Set as the Mac app is, in IBM Plex Sans with square panels and hairlines, in the house colours: chalk paper, grape ink and an azure accent."
             .into(),
         locked_appearance: None,
         palette: CoreThemePalette {
-            light: seeded(&seeds("#faf8f4", "#444054"), CoreThemeAppearance::Light, &chalk.light),
-            dark: seeded(&seeds("#1c1a23", "#f5f4f7"), CoreThemeAppearance::Dark, &chalk.dark),
+            light: seeded(&seeds("#faf8f4", "#444054"), CoreThemeAppearance::Light, &house.light),
+            dark: seeded(&seeds("#1c1a23", "#f5f4f7"), CoreThemeAppearance::Dark, &house.dark),
         },
-        structure: CoreThemeStructure {
-            radius: CoreThemeRadius {
-                panel: 12.0,
-                row: 8.0,
-                control: 8.0,
-                pill: 9999.0,
-                shell: 18.0,
-            },
-            border: HAIRLINES,
-            // Half again the editor themes' scale at the top end: the pane
-            // gutter, the list gutter and a row's padding all come from here.
-            spacing: CoreThemeSpacing {
-                xxs: 2.0,
-                xs: 6.0,
-                sm: 10.0,
-                md: 14.0,
-                lg: 20.0,
-                xl: 28.0,
-            },
-            typography: CoreThemeTypography {
-                display: face("Inter", "sans"),
-                body: face("Inter", "sans"),
-                mono: face("Geist Mono", "monospaced"),
-                body_size: 13.0,
-                scale: CoreThemeTypeScale {
-                    caption: 12.0,
-                    body: 13.0,
-                    title: 16.0,
-                    display: 30.0,
-                    hero: 64.0,
-                },
-                micro_label: micro_label(11.0, "regular", 0.0, false),
-            },
-            touch_target: 0.0,
-            uses_shadows: false,
-            uses_gradients_on_chrome: false,
-        },
+        structure: chalk().structure,
     }
 }
 
@@ -437,36 +402,25 @@ pub fn platform_structure(
     if platform == CoreThemePlatform::Macos {
         return None;
     }
-    let ios = platform == CoreThemePlatform::Ios;
     match identifier {
         // 13pt is right at a desk and too small in the hand: the platform's
         // body size, panels and controls rounded a little, hit areas grown.
-        CHALK_IDENTIFIER | CHALK_DARK_IDENTIFIER | ONE_IDENTIFIER => Some(CoreThemeFileStructure {
-            radius: radius(8.0, 0.0, 6.0),
-            spacing: Some(CoreThemeFileSpacing {
-                xxs: Some(2.0),
-                xs: Some(4.0),
-                sm: Some(8.0),
-                md: Some(12.0),
-                lg: Some(16.0),
-                xl: Some(24.0),
-            }),
-            typography: phone_type(platform, true),
-            touch_target: touch_target(platform),
-            ..Default::default()
-        }),
-        // The same type as Zed's on the phones, its own roomy spacing, and
-        // corners rounder again in the hand.
-        PRIORITY_IDENTIFIER => Some(CoreThemeFileStructure {
-            radius: if ios {
-                radius(14.0, 10.0, 10.0)
-            } else {
-                radius(16.0, 12.0, 10.0)
-            },
-            typography: phone_type(platform, true),
-            touch_target: touch_target(platform),
-            ..Default::default()
-        }),
+        PRIORITY_IDENTIFIER | CHALK_IDENTIFIER | CHALK_DARK_IDENTIFIER | ONE_IDENTIFIER => {
+            Some(CoreThemeFileStructure {
+                radius: radius(8.0, 0.0, 6.0),
+                spacing: Some(CoreThemeFileSpacing {
+                    xxs: Some(2.0),
+                    xs: Some(4.0),
+                    sm: Some(8.0),
+                    md: Some(12.0),
+                    lg: Some(16.0),
+                    xl: Some(24.0),
+                }),
+                typography: phone_type(platform, true),
+                touch_target: touch_target(platform),
+                ..Default::default()
+            })
+        }
         // The Mac's radius scale; the micro-label stays 10pt.
         GRAPE_IDENTIFIER => Some(CoreThemeFileStructure {
             typography: phone_type(platform, false),

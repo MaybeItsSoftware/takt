@@ -276,9 +276,9 @@ class ThemeFileTest {
     @Test
     fun prioritysPerPlatformStructureIsTheDocumentedTable() {
         val table = mapOf(
-            ThemePlatform.MACOS to Triple(13.0, listOf(12.0, 8.0, 8.0), 0.0),
-            ThemePlatform.IOS to Triple(17.0, listOf(14.0, 10.0, 10.0), 44.0),
-            ThemePlatform.ANDROID to Triple(16.0, listOf(16.0, 12.0, 10.0), 48.0),
+            ThemePlatform.MACOS to Triple(13.0, listOf(0.0, 0.0, 4.0), 0.0),
+            ThemePlatform.IOS to Triple(17.0, listOf(8.0, 0.0, 6.0), 44.0),
+            ThemePlatform.ANDROID to Triple(16.0, listOf(8.0, 0.0, 6.0), 48.0),
         )
         for ((platform, row) in table) {
             val structure = BuiltInThemeSpecifications.priority(platform).structure
@@ -298,7 +298,7 @@ class ThemeFileTest {
     }
 
     @Test
-    fun priorityIsTheDefaultFirstAndSetInInter() {
+    fun priorityIsTheDefaultFirstAndSetInPlex() {
         for (platform in ThemePlatform.entries) {
             val all = BuiltInThemeSpecifications.all(platform)
             assertEquals(
@@ -309,9 +309,9 @@ class ThemeFileTest {
             assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, BuiltInThemeSpecifications.defaultTheme(platform).identifier)
         }
         val type = priority.structure.typography
-        assertEquals(ThemeFontFace(listOf("Inter"), ThemeFontDesign.SANS), type.body)
-        assertEquals(ThemeFontFace(listOf("Inter"), ThemeFontDesign.SANS), type.display)
-        assertEquals(ThemeFontFace(listOf("Geist Mono"), ThemeFontDesign.MONOSPACED), type.mono)
+        assertEquals(ThemeFontFace(listOf("IBM Plex Sans"), ThemeFontDesign.SANS), type.body)
+        assertEquals(ThemeFontFace(listOf("IBM Plex Sans"), ThemeFontDesign.SANS), type.display)
+        assertEquals(ThemeFontFace(listOf("Lilex"), ThemeFontDesign.MONOSPACED), type.mono)
         // A file that names no base extends Priority.
         val bare = load(source("bare.json", "{}")).themes.first()
         assertEquals(priority.palette, bare.palette)
@@ -462,7 +462,7 @@ class ThemeFileTest {
         val onMac = load(source("dusk.json", dusk), platform = ThemePlatform.MACOS).themes.first()
 
         assertEquals(18.0, onAndroid.structure.spacing.md, 0.0)
-        assertEquals(14.0, onIOS.structure.spacing.md, 0.0)
+        assertEquals(12.0, onIOS.structure.spacing.md, 0.0)
         assertEquals(2.0, onAndroid.structure.radius.control, 0.0)
         assertEquals(2.0, onMac.structure.radius.control, 0.0)
         assertEquals("Android keeps Chalk's Android body size", 16.0, onAndroid.structure.typography.bodySize, 0.0)

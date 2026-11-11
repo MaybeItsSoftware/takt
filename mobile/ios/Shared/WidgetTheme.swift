@@ -55,7 +55,7 @@ struct WidgetTheme: Codable, Equatable, Sendable {
       "ink": "#f5f4f7", "mutedText": "#b6b3bf", "dimText": "#6e6b7c",
       "primary": "#007fff", "success": "#4cc38e", "danger": "#d62246", "warning": "#ffbf00",
     ],
-    bodyFamily: "Inter", monoFamily: "Geist Mono", controlRadius: 10, hairline: 1)
+    bodyFamily: "IBM Plex Sans", monoFamily: "Lilex", controlRadius: 6, hairline: 1)
 }
 
 /// The colours, faces and radius a widget view draws with, read from the

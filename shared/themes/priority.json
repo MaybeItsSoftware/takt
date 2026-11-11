@@ -52,16 +52,12 @@
     "android" : {
       "structure" : {
         "radius" : {
-          "control" : 10,
-          "panel" : 16,
-          "row" : 12
+          "control" : 6,
+          "panel" : 8
         },
         "touchTarget" : 48,
         "typography" : {
           "bodySize" : 16,
-          "microLabel" : {
-            "size" : 12
-          },
           "scale" : {
             "body" : 16,
             "caption" : 12,
@@ -75,9 +71,8 @@
     "ios" : {
       "structure" : {
         "radius" : {
-          "control" : 10,
-          "panel" : 14,
-          "row" : 10
+          "control" : 6,
+          "panel" : 8
         },
         "touchTarget" : 44,
         "typography" : {
@@ -103,18 +98,18 @@
       "hairline" : 1
     },
     "radius" : {
-      "control" : 8,
-      "panel" : 12,
+      "control" : 4,
+      "panel" : 0,
       "pill" : 9999,
-      "row" : 8,
-      "shell" : 18
+      "row" : 0,
+      "shell" : 20
     },
     "spacing" : {
-      "lg" : 20,
-      "md" : 14,
-      "sm" : 10,
-      "xl" : 28,
-      "xs" : 6,
+      "lg" : 16,
+      "md" : 12,
+      "sm" : 8,
+      "xl" : 24,
+      "xs" : 4,
       "xxs" : 2
     },
     "touchTarget" : 0,
@@ -122,19 +117,19 @@
       "body" : {
         "design" : "sans",
         "families" : [
-          "Inter"
+          "IBM Plex Sans"
         ]
       },
       "bodySize" : 13,
       "display" : {
         "design" : "sans",
         "families" : [
-          "Inter"
+          "IBM Plex Sans"
         ]
       },
       "microLabel" : {
         "role" : "mutedText",
-        "size" : 11,
+        "size" : 12,
         "tracking" : 0,
         "uppercase" : false,
         "weight" : "regular"
@@ -142,19 +137,19 @@
       "mono" : {
         "design" : "monospaced",
         "families" : [
-          "Geist Mono"
+          "Lilex"
         ]
       },
       "scale" : {
         "body" : 13,
         "caption" : 12,
-        "display" : 30,
+        "display" : 28,
         "hero" : 64,
-        "title" : 16
+        "title" : 15
       }
     },
     "usesGradientsOnChrome" : false,
     "usesShadows" : false
   },
-  "summary" : "The default. Roomy and rounded, in the house colours: chalk paper, grape ink and an azure accent."
+  "summary" : "The default. Set as the Mac app is, in IBM Plex Sans with square panels and hairlines, in the house colours: chalk paper, grape ink and an azure accent."
 }
