@@ -291,6 +291,10 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             started.elapsed().as_secs_f64() * 1000.0,
             app.visible_ids().len()
         ));
+        if mode == "matrix" {
+            let write = std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some();
+            report.extend(app.matrix_smoke(write));
+        }
         if mode == "board" {
             let cards: Vec<_> = app.board.cards.iter().flatten().cloned().collect();
             let (mut rows, mut elsewhere, mut hints) = (0, 0, 0);

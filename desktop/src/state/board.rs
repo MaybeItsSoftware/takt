@@ -1,5 +1,6 @@
 //! The board and the matrix: the scope's cards laid out in the board's
-//! columns, or in the four quadrants of urgency and importance.
+//! columns, or at their points on the plane of urgency and importance
+//! (`matrix.rs`).
 //!
 //! Laid out from what the scope read already holds (`rows`, `placements`)
 //! and the columns the core resolves (`board_columns`), so switching between
@@ -18,12 +19,28 @@ pub struct Board {
     pub columns: Vec<BoardColumn>,
     /// Each drawn column's cards, in the order drawn.
     pub cards: Vec<Vec<TaskRow>>,
-    /// The matrix: do now, schedule, delegate, eliminate; then unplaced.
+    /// The matrix: every placed task at its point, quadrant by quadrant
+    /// (do now, schedule, delegate, eliminate), each from the top and then
+    /// from the urgent end.
+    pub points: Vec<MatrixPoint>,
+    /// The same tasks by quadrant, in that order.
     pub quadrants: Vec<Vec<TaskRow>>,
     pub unplaced: Vec<TaskRow>,
     /// The column with the keyboard.
     pub column: usize,
 }
+
+/// A task on the matrix's plane, at the point it is drawn: its stored one,
+/// or where a legacy quadrant placement reads (`matrix::arrange`).
+#[derive(Debug, Clone)]
+pub struct MatrixPoint {
+    pub task: TaskRow,
+    pub urgency: i64,
+    pub importance: i64,
+}
+
+/// A stored matrix place: urgency, importance and the old in-quadrant rank.
+type StoredPoint = (i64, i64, Option<i64>);
 
 pub const QUADRANT_TITLES: [&str; 4] = ["Do now", "Schedule", "Delegate", "Eliminate"];
 
@@ -100,7 +117,8 @@ impl App {
         let mut cards = self.cards();
         cards.extend(self.cross_column_cards(&cards, &overrides, &drawn));
         let mut by_column: Vec<Vec<TaskRow>> = vec![Vec::new(); drawn.len().max(1)];
-        let mut quadrants: Vec<Vec<(i64, TaskRow)>> = vec![Vec::new(); 4];
+        // Each placed task with its stored urgency, importance and old rank.
+        let mut placed: Vec<(TaskRow, StoredPoint)> = Vec::new();
         let mut unplaced = Vec::new();
         for task in cards {
             let placement = self.placements.get(&task.id).cloned().unwrap_or_default();
@@ -114,17 +132,34 @@ impl App {
             if let Some(column) = by_column.get_mut(index) {
                 column.push(task.clone());
             }
-            let quadrant = takt_core::board_rules::matrix_quadrant(
-                placement.urgency.map(|v| v as i32),
-                placement.importance.map(|v| v as i32),
-            );
-            match quadrant {
-                Some(q) => quadrants[q as usize].push((placement.rank.unwrap_or(i64::MAX), task)),
-                None => unplaced.push(task),
+            match (placement.urgency, placement.importance) {
+                (Some(urgency), Some(importance)) => {
+                    placed.push((task, (urgency, importance, placement.rank)))
+                }
+                _ => unplaced.push(task),
             }
         }
-        for quadrant in &mut quadrants {
-            quadrant.sort_by_key(|(rank, _)| *rank);
+        let stored: Vec<_> = placed.iter().map(|(_, stored)| *stored).collect();
+        let mut points: Vec<MatrixPoint> = placed
+            .into_iter()
+            .zip(super::matrix::arrange(&stored))
+            .map(|((task, _), (urgency, importance))| MatrixPoint {
+                task,
+                urgency,
+                importance,
+            })
+            .collect();
+        points.sort_by_key(|point| {
+            (
+                super::matrix::quadrant_of(point.urgency, point.importance),
+                -point.importance,
+                -point.urgency,
+            )
+        });
+        let mut quadrants: Vec<Vec<TaskRow>> = vec![Vec::new(); 4];
+        for point in &points {
+            quadrants[super::matrix::quadrant_of(point.urgency, point.importance)]
+                .push(point.task.clone());
         }
         let column = if self.board.key == key {
             self.board.column.min(drawn.len().saturating_sub(1))
@@ -136,10 +171,8 @@ impl App {
             layout,
             columns: drawn,
             cards: by_column,
-            quadrants: quadrants
-                .into_iter()
-                .map(|q| q.into_iter().map(|(_, task)| task).collect())
-                .collect(),
+            points,
+            quadrants,
             unplaced,
             column,
         };
@@ -225,7 +258,7 @@ impl App {
 
     /// The cards in reading order for the keys: the focused column's on the
     /// board, or the subtask rows of the card the selection is inside; on
-    /// the matrix, quadrant by quadrant then the unplaced.
+    /// the matrix, the plane's quadrant by quadrant then the unplaced.
     pub fn board_ids(&self) -> Vec<String> {
         match self.view_mode {
             ViewMode::Board => {
@@ -243,9 +276,9 @@ impl App {
             }
             ViewMode::Matrix => self
                 .board
-                .quadrants
+                .points
                 .iter()
-                .flatten()
+                .map(|point| &point.task)
                 .chain(self.board.unplaced.iter())
                 .map(|task| task.id.clone())
                 .collect(),
@@ -337,37 +370,7 @@ impl App {
         }
     }
 
-    /// `1`–`4` on the matrix: the selected card into a quadrant.
-    pub fn place_in_quadrant(&mut self, quadrant: usize) {
-        let Some(id) = self.selected_task.clone() else {
-            return;
-        };
-        let (urgency, importance) = match quadrant {
-            0 => (1, 1),
-            1 => (0, 1),
-            2 => (1, 0),
-            _ => (0, 0),
-        };
-        if self
-            .write(|store| {
-                store.core.set_matrix_position(
-                    id.clone(),
-                    Some(urgency),
-                    Some(importance),
-                    now_ms(),
-                )
-            })
-            .is_some()
-        {
-            let placement = self.placements.entry(id).or_default();
-            placement.urgency = Some(urgency);
-            placement.importance = Some(importance);
-            placement.rank = None;
-            self.layout_board();
-        }
-    }
-
-    fn read_scope_into_rows(&mut self) {
+    pub(super) fn read_scope_into_rows(&mut self) {
         self.all_rows = self.read_scope();
         self.layout_rows();
     }
@@ -377,14 +380,15 @@ impl App {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardPlace {
     Column(usize),
-    /// A matrix quadrant, or the unplaced cards.
+    /// A matrix quadrant (the new card lands at its centre), or the
+    /// unplaced cards.
     Quadrant(Option<usize>),
 }
 
 impl App {
     /// Enter on the board or the matrix: a draft card at the foot of the
-    /// focused column, or of the selected card's quadrant, in the selected
-    /// card's list (or the list on screen).
+    /// focused column, or at the centre of the selected card's quadrant, in
+    /// the selected card's list (or the list on screen).
     pub fn begin_new_card(&mut self) {
         let selected = self.selected().cloned();
         let Some(list_id) = selected

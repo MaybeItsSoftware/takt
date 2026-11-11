@@ -1,5 +1,5 @@
 //! Dropping a dragged task: before another row, into a list in the
-//! sidebar, into a board column or a matrix quadrant. Each is one undo
+//! sidebar, into a board column or onto the matrix's plane. Each is one undo
 //! step through the core, the same writes the keys make.
 
 use super::App;
@@ -55,10 +55,5 @@ impl App {
         }
         self.board.column = from;
         self.move_card_to_adjacent_column(column as i64 - from as i64);
-    }
-
-    pub fn drop_task_into_quadrant(&mut self, dragged: &str, quadrant: usize) {
-        self.selected_task = Some(dragged.to_string());
-        self.place_in_quadrant(quadrant);
     }
 }

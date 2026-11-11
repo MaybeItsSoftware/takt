@@ -91,6 +91,7 @@ So none of it is reachable only by something you already have to know.
 | `j` / `k` / `↑` / `↓` | Move the selection |
 | `Cmd+↑` / `Cmd+↓` | First / last task |
 | `Alt+↑` / `Alt+↓` | Move the task up / down (Zed's move line) — on Today, earlier or later in the day |
+| `h` `j` `k` `l` / arrows, `Tab` | On the matrix, nudge the selected task across its axes (`Shift` for a fine nudge), and `Tab` / `Shift+Tab` step between tasks — see [The matrix](#the-matrix) |
 | `Alt+←` / `Alt+→` | Outdent / indent the task — out of, or under, the task above |
 | `Cmd+←` / `Cmd+→`, or `Shift+Alt+←` / `Shift+Alt+→` | Move the card, or the subtask row you are on, a board column left / right — a subtask moved past its parent's column becomes a card of its own there (in the outline `Cmd+←` / `Cmd+→` still fold and unfold everything) |
 | `Cmd+Shift+←` / `Cmd+Shift+→` | Move the board column you are in left / right, taking its cards with it |
@@ -745,7 +746,7 @@ Due values understand natural language and times: `due today 14:30`, `due tomorr
 
 There is no typed-command family for the matrix or the board: the parser never
 grew one, and the keys (`Alt+1`–`Alt+4`, `Cmd+←` / `Cmd+→`) are the only way to
-place a task in a quadrant or move a card. The **View** and **Timer** families
+place a task on the matrix or move a card. The **View** and **Timer** families
 act on the Checkvist-side state the removed menu bar panel rendered. What they
 change no longer has a surface either, so they are doubly stranded — a workspace
 that has not finished migrating, reachable by nothing.
@@ -762,12 +763,48 @@ timeline is a tab in the bottom dock.
 | **Today** | `Cmd+T` | The day as a numbered list of cards — see [Today](#today) |
 | **Board** | `Cmd+1` | Columns of cards, dragged between and within |
 | **Outline** | `Cmd+2` | The list as a tree, indented, with each branch folding in place |
-| **Matrix** | `Cmd+3` | Eisenhower quadrants: urgent and not urgent across, important and not important down, with the unplaced tasks in a column beside them. Drag a task to the point in a quadrant it should sit at; `Option+1`–`Option+4` place the selection, and `Option+Up`/`Option+Down` move it within its quadrant |
+| **Matrix** | `Cmd+3` | The Eisenhower matrix as a plane with two axes — urgent to not urgent across, important to not important down — each task a dot at its own point, with the tasks not yet placed in a tray beneath. See [The matrix](#the-matrix) |
 | **Focus** | `Cmd+8` | Raises the floating focus panel — the day, or the block that is running |
 | **Timeline** | `Cmd+9` | The day as elapsed time rather than as a list |
 
 `Cmd+0` shows **Everything** — every active list at once, rather than the one
 the sidebar has selected.
+
+### The matrix
+
+The matrix is one plane, not four boxes. Its axes cross in the middle:
+**urgency** runs across, most urgent at the left edge, and **importance** runs
+down, most important at the top, so the four quadrants are where they always
+were — Do now top left, Schedule top right, Delegate bottom left, Eliminate
+bottom right — and their names sit faintly in the corners. Each placed task is
+a small chip: a dot at its exact point and its title beside it (to the left of
+the dot on the right-hand side of the plane). Two chips that would cover each
+other are drawn a little apart; where they are stored does not change.
+
+| Key | Action |
+| --- | --- |
+| Drag a chip, or a card from the tray | Drop it anywhere on the plane: it sits exactly there |
+| Drag a chip onto the tray | Take it off the plane |
+| `h` / `l`, `←` / `→` | Nudge the selected chip more urgent / less urgent, a tenth of the way to the edge |
+| `k` / `j`, `↑` / `↓` | Nudge it more important / less important, the same |
+| `Shift` with any of those | A fine nudge, a fifth as far |
+| `Tab` / `Shift+Tab` | The next / previous task: quadrant by quadrant, each from the top, then the tray, wrapping round |
+| `Option+1`–`Option+4` | Place the selected task at the centre of a quadrant (1 do now, 2 schedule, 3 delegate, 4 eliminate), beside it when another task is there |
+| `Return` | A new task, at the centre of the selected task's quadrant — or in the tray when the selection is there |
+| Click / double click | Select / rename |
+
+On a task in the tray the arrows and `j`/`k` move the selection as they do
+everywhere else. With a chip selected `←` and `→` nudge it, so `]` and `[` open
+and leave a task here, and `Ctrl+1` goes back to the sidebar.
+
+A point is stored as urgency and importance from −100 to 100, and never
+nearer an axis than 10: a drop on an axis lands just to the far side of it
+(zero counts as not urgent, or not important). The phones, the CLI and the MCP
+server read only which side of each axis a task is on, so they still see its
+quadrant. A task placed by quadrant before — by an older Mac app, the phones,
+or `takt matrix` with values from −9 to 9 — is drawn inside its quadrant, the
+old 1 and 0 at its centre, several on one spot spread on a small grid by the
+order they had; nudging or dragging it gives it a point of its own.
 
 ### Board columns
 

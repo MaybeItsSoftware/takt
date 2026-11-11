@@ -3,6 +3,8 @@ use super::*;
 use crate::state::board::{CardPlace, CardRow};
 use crate::state::columns::ColumnName;
 
+mod matrix;
+
 impl Takt {
     pub(super) fn centre(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let body = match self.app.view_mode {
@@ -617,129 +619,6 @@ impl Takt {
                         .child(format!("+{more} more")),
                 )
             })
-            .into_any_element()
-    }
-
-    pub(super) fn matrix(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
-        let hover = t.hover;
-        let quadrant =
-            |q: usize, this: &Self, cx: &mut Context<Self>| {
-                let cards = this.app.board.quadrants.get(q).cloned().unwrap_or_default();
-                div()
-                    .id(("quadrant", q))
-                    .drag_over::<DraggedTask>(move |style, _, _, _| style.bg(hover))
-                    .on_drop(cx.listener(move |this, drag: &DraggedTask, _, cx| {
-                        this.app.drop_task_into_quadrant(&drag.id, q);
-                        this.after_change(cx);
-                        cx.notify();
-                    }))
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .flex_col()
-                    .rounded(px(6.))
-                    .bg(t.surface)
-                    .border_1()
-                    .border_color(t.border_variant)
-                    .child(
-                        div()
-                            .px_2()
-                            .py_1()
-                            .flex()
-                            .justify_between()
-                            .border_b_1()
-                            .border_color(t.border_variant)
-                            .child(div().text_color(t.muted).child(QUADRANT_TITLES[q]))
-                            .child(
-                                div()
-                                    .text_size(px(11.))
-                                    .text_color(t.placeholder)
-                                    .child(format!("⌥{}  {}", q + 1, cards.len())),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .id(("quadrant-cards", q))
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                            .p_1()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .children(cards.iter().enumerate().map(|(ix, task)| {
-                                this.card(1_000_000 + q * 100_000 + ix, task, t, cx)
-                            }))
-                            .children(
-                                this.drafting(CardPlace::Quadrant(Some(q)))
-                                    .then(|| this.draft_card(t)),
-                            ),
-                    )
-            };
-        let unplaced = self.app.board.unplaced.clone();
-        div()
-            .flex_1()
-            .min_h_0()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .p_2()
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .gap_2()
-                    .child(quadrant(0, self, cx))
-                    .child(quadrant(1, self, cx)),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .gap_2()
-                    .child(quadrant(2, self, cx))
-                    .child(quadrant(3, self, cx)),
-            )
-            .child(
-                div()
-                    .id("unplaced")
-                    .h(px(120.))
-                    .flex_none()
-                    .flex()
-                    .flex_col()
-                    .rounded(px(6.))
-                    .border_1()
-                    .border_color(t.border_variant)
-                    .child(
-                        div()
-                            .px_2()
-                            .py_1()
-                            .text_color(t.muted)
-                            .child(format!("Not placed  {}", unplaced.len())),
-                    )
-                    .child(
-                        div()
-                            .id("unplaced-cards")
-                            .flex_1()
-                            .overflow_y_scroll()
-                            .p_1()
-                            .flex()
-                            .flex_wrap()
-                            .gap_1()
-                            .children(
-                                unplaced
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(ix, task)| self.card(9_000_000 + ix, task, t, cx)),
-                            )
-                            .children(
-                                self.drafting(CardPlace::Quadrant(None))
-                                    .then(|| self.draft_card(t)),
-                            ),
-                    ),
-            )
             .into_any_element()
     }
 

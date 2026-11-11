@@ -93,6 +93,10 @@ impl App {
 
     /// Runs the command bound to `key` on the surface with the keyboard.
     pub fn dispatch(&mut self, key: &str) -> bool {
+        // The matrix's plane nudges the task the motions are on.
+        if self.matrix_key(key) {
+            return true;
+        }
         let surface = self.surface();
         let Some(command) = self.bindings.command(key, surface).map(|c| c.id.clone()) else {
             return false;
