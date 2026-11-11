@@ -433,7 +433,7 @@ fn lists() -> Vec<Spec> {
             .also(Sidebar, &["shift+i"])
             .note("A symbol or an emoji, for a list, nested list or folder; a symbol for a filter list"),
         c("listArchive", "Archive the current list", "Lists", &["cmd+option+a"]),
-        c("listRestore", "Restore the last archived list", "Lists", &["cmd+shift+r"]),
+        c("listRestore", "Restore the last archived list", "Lists", &["cmd+option+shift+r"]),
         c("listComplete", "Complete or reopen the list", "Lists", &["cmd+shift+x"]),
         c("listDelete", "Delete the list or folder", "Lists", &["cmd+shift+delete"])
             .also(Sidebar, &["delete", "cmd+delete", "shift+d"])
@@ -488,9 +488,9 @@ fn window() -> Vec<Spec> {
             .note("⌘B toggles the left dock, as in Zed"),
         c("windowToggleInspectorPane", "Show or hide the inspector", "Window", &["cmd+ctrl+i"])
             .note("Same pane as i or sd on a task, without selecting one"),
-        c("windowToggleRightDock", "Show or hide the right dock", "Window", &["r", "cmd+option+b"])
-            .note("On whichever tab it was on, with the keyboard in it. ⌥⌘B is Zed's toggle right dock, and works from inside a field too"),
-        c("windowSyncNow", "Sync now", "Window", &["cmd+r"])
+        c("windowToggleRightDock", "Show or hide the right dock", "Window", &["cmd+r", "r", "cmd+option+b"])
+            .note("As ⌘B and ⌘J: shown on whichever tab it was on, with the keyboard in it; up without the keyboard, it takes it; from inside it, it goes away. ⌘R works from inside a field too; ⌥⌘B is Zed's toggle right dock"),
+        c("windowSyncNow", "Sync now", "Window", &["cmd+shift+r"])
             .note("Takt Sync, and Google when it is on, at once rather than on their next turn. Works from inside a field too"),
         c("windowToggleDoneRail", "Show or hide what you have finished", "Window", &["cmd+ctrl+d"])
             .note("The bottom dock's Done tab: opens it and takes the keyboard; again from inside it closes it"),

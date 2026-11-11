@@ -332,6 +332,16 @@ impl App {
         self.sidebar_cursor = None;
     }
 
+    /// A click on a sidebar row: it is chosen, and a folder opens or closes
+    /// as it is, as in Zed's project panel.
+    pub fn click_sidebar_row(&mut self, row: &SidebarRow) {
+        self.apply_sidebar_cursor(row);
+        if let RowKind::Folder(id) = &row.kind {
+            let open = self.prefs.expanded_folders.contains(id);
+            self.set_folder_expanded(id, !open);
+        }
+    }
+
     pub fn set_folder_expanded(&mut self, id: &str, expanded: bool) {
         if expanded {
             self.prefs.expanded_folders.insert(id.to_string());

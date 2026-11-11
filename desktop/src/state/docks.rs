@@ -21,17 +21,37 @@ pub fn tab_region(tab: &str) -> Option<Region> {
 }
 
 impl App {
+    /// `⌘B`, Zed's: the left dock, on the tab it was on, with the keyboard
+    /// in it; up already without the keyboard, it takes the keyboard; with
+    /// the keyboard, it goes away. Its tabs' own commands (`⌘⇧A`, the
+    /// sidebar's region key) go to one tab in particular.
     pub fn toggle_sidebar(&mut self) {
-        self.prefs.sidebar_visible = !self.prefs.sidebar_visible;
-        if !self.prefs.sidebar_visible && self.region == Region::Sidebar {
+        let focused = matches!(self.region, Region::Sidebar | Region::Agent);
+        if self.prefs.sidebar_visible && focused {
+            self.prefs.sidebar_visible = false;
             self.region = Region::Tasks;
+            if matches!(self.editing, Some(super::Editing::AgentMessage)) {
+                self.editing = None;
+            }
+            self.prefs.save();
+            return;
         }
-        self.prefs.save();
+        self.prefs.sidebar_visible = true;
+        if self.prefs.left_dock_tab == "agent" && !self.prefs.ai_off {
+            self.region = Region::Agent;
+            self.editing = Some(super::Editing::AgentMessage);
+            self.prefs.save();
+        } else {
+            self.prefs.left_dock_tab = "lists".into();
+            self.return_to_sidebar();
+        }
     }
 
-    /// `⌘R`: the right dock, on the tab it was on, with the keyboard in it.
+    /// `⌘R`, as `⌘B`: the right dock, on the tab it was on, with the
+    /// keyboard in it; it goes away only from inside it.
     pub fn toggle_right_dock(&mut self) {
-        if self.prefs.right_dock_visible {
+        let focused = matches!(self.region, Region::Inspector | Region::Conditions);
+        if self.prefs.right_dock_visible && focused {
             self.hide_right_dock();
         } else {
             let tab = self.prefs.right_dock_tab.clone();
@@ -76,9 +96,13 @@ impl App {
         }
     }
 
-    /// `⌘J`: the bottom dock, on the tab it was on.
+    /// `⌘J`, as `⌘B`: the bottom dock, on the tab it was on, with the
+    /// keyboard in it where the tab takes it; it goes away from inside it,
+    /// or at once on a tab that never takes the keyboard (Progress).
     pub fn toggle_bottom_dock(&mut self) {
-        if self.prefs.bottom_dock_visible {
+        let tab = &self.prefs.bottom_dock_tab;
+        let focused = tab_region(tab).is_none_or(|region| region == self.region);
+        if self.prefs.bottom_dock_visible && focused {
             self.hide_bottom_dock();
         } else {
             let tab = self.prefs.bottom_dock_tab.clone();

@@ -131,9 +131,7 @@ impl Takt {
     pub(super) fn left_dock(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let agent = self.app.prefs.left_dock_tab == "agent" && !self.app.prefs.ai_off;
         div()
-            .w(px(
-                self.app.prefs.sidebar_width.clamp(180., 420.) * if agent { 1.5 } else { 1. }
-            ))
+            .w(px(self.app.prefs.sidebar_width.clamp(180., 420.)))
             .flex_none()
             .h_full()
             .flex()
@@ -415,7 +413,7 @@ impl Takt {
                 })
             })
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.app.apply_sidebar_cursor(&target);
+                this.app.click_sidebar_row(&target);
                 this.app.region = Region::Sidebar;
                 this.after_change(cx);
                 cx.notify();

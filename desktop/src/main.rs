@@ -331,6 +331,57 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
         }
     }
     app.run("goOutline", None);
+    // ⌘B and ⌘R as Zed's: hidden, it opens with the keyboard; up without
+    // the keyboard, it takes it; with it, it goes away.
+    {
+        use state::Region;
+        let mut steps = Vec::new();
+        for (command, inside) in [
+            ("windowToggleSidebar", Region::Sidebar),
+            ("windowToggleRightDock", Region::Inspector),
+        ] {
+            let visible = |app: &state::App| match command {
+                "windowToggleSidebar" => app.prefs.sidebar_visible,
+                _ => app.prefs.right_dock_visible,
+            };
+            if command == "windowToggleSidebar" {
+                app.prefs.left_dock_tab = "lists".into();
+                app.prefs.sidebar_visible = false;
+            } else {
+                app.prefs.right_dock_tab = "inspector".into();
+                app.prefs.right_dock_visible = false;
+            }
+            app.region = Region::Tasks;
+            app.run(command, None);
+            let opened = visible(app) && app.region == inside;
+            app.region = Region::Tasks;
+            app.run(command, None);
+            let focused = visible(app) && app.region == inside;
+            app.run(command, None);
+            let away = !visible(app) && app.region == Region::Tasks;
+            steps.push(format!(
+                "{command} opens {opened}, focuses {focused}, closes {away}"
+            ));
+        }
+        app.prefs.sidebar_visible = true;
+        // A folder clicked opens, and again closes.
+        if let Some(row) = app
+            .sidebar_rows
+            .iter()
+            .find(|r| matches!(r.kind, state::sidebar::RowKind::Folder(_)))
+            .cloned()
+            && let state::sidebar::RowKind::Folder(id) = &row.kind
+        {
+            let before = app.prefs.expanded_folders.contains(id);
+            app.click_sidebar_row(&row);
+            let flipped = app.prefs.expanded_folders.contains(id) != before;
+            app.click_sidebar_row(&row);
+            let back = app.prefs.expanded_folders.contains(id) == before;
+            steps.push(format!("folder click opens and closes {}", flipped && back));
+        }
+        report.push(format!("docks: {}", steps.join(", ")));
+    }
+    app.run("goOutline", None);
     report.push(time("outline j", &vec!["j"; 30], app));
     if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() && app.selected().is_some() {
         let started = Instant::now();

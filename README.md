@@ -87,7 +87,7 @@ So none of it is reachable only by something you already have to know.
 | `Cmd+0` / `Cmd+E` / `gh` | Everything, across all active lists |
 | `Cmd+I` | The Inbox |
 | `Ctrl+1` / `Ctrl+2` / `Ctrl+3` | Focus the sidebar, the task surface, the inspector |
-| `Cmd+B` | Show or hide the sidebar (Zed's left dock) |
+| `Cmd+B` | The left dock (Zed's), on its tab — the sidebar or the agent — with the keyboard in it; up already, it takes the keyboard; from inside it, it goes away. Its tabs' own keys (`Cmd+Shift+A` for the agent) go to one tab. Both tabs are the same width |
 | `j` / `k` / `↑` / `↓` | Move the selection |
 | `Cmd+↑` / `Cmd+↓` | First / last task |
 | `Alt+↑` / `Alt+↓` | Move the task up / down (Zed's move line) — on Today, earlier or later in the day |
@@ -139,9 +139,9 @@ So none of it is reachable only by something you already have to know.
 | `Cmd+P` / `gl` | Go to a list — opened empty, it lists the ones you were in most recently first. Every list and nested list, matched by the letters you type (`wsr` finds "Write the spring report"), with its folder beside it. Clicking the list's name at the top of the pane opens it too |
 | `Cmd+Ctrl+I` / `Cmd+Ctrl+D` | The right dock on its Inspector tab / the bottom dock on its Done tab, or put it away |
 | `Cmd+Shift+A` | The left dock's Agent tab — your Claude Code or Codex, each change it makes shown with an Undo |
-| `Cmd+J` | The bottom dock — Progress, Done and Timeline — on the tab it was on, with the keyboard in it on Done or Timeline, or put it away (Zed's bottom dock) |
-| `Cmd+R` | Sync now: Takt Sync, and Google when it is connected and on, straight away rather than on their next turn; works from inside a field |
-| `r` or `Cmd+Alt+B` / `Cmd+Alt+Y` | The right dock, on the tab it was on and with the keyboard in it, or put it away / close all docks (Zed's) |
+| `Cmd+J` | The bottom dock — Progress, Done and Timeline — as `Cmd+B` does the left: on the tab it was on, with the keyboard in it on Done or Timeline; up already, it takes the keyboard; from inside it (or on Progress, which never takes it), it goes away (Zed's bottom dock) |
+| `Cmd+R`, `r` or `Cmd+Alt+B` / `Cmd+Alt+Y` | The right dock — Inspector and Conditions — as `Cmd+B` does the left, or close all docks (Zed's); `Cmd+R` works from inside a field |
+| `Cmd+Shift+R` | Sync now: Takt Sync, and Google when it is connected and on, straight away rather than on their next turn; works from inside a field |
 | `Cmd+Shift+{` / `Cmd+Shift+}`, or `[` / `]` | In a dock, its previous / next tab — Inspector and Conditions on the right, Done and Timeline below — with the keyboard brought along (Zed's previous / next tab; on a task pane the same chords change list). `Ctrl+Tab` leaves it for the next region |
 | `oo` / `Cmd+Alt+I` | List settings |
 | `Cmd+Z` / `Cmd+Shift+Z`, or `Ctrl+Z` / `Ctrl+Shift+Z`, or `uu` | Undo / redo |
@@ -429,7 +429,7 @@ dock under them — so none of it is reachable only by a key you have to already
 | `Cmd+9` | The day's timeline |
 | `Cmd+0` | Everything, across all active lists |
 | `Ctrl+1` / `Ctrl+2` / `Ctrl+3` | Focus the sidebar, the task surface, the inspector |
-| `Cmd+B` | Show or hide the sidebar (Zed's left dock) |
+| `Cmd+B` | The left dock (Zed's), on its tab — the sidebar or the agent — with the keyboard in it; up already, it takes the keyboard; from inside it, it goes away. Its tabs' own keys (`Cmd+Shift+A` for the agent) go to one tab. Both tabs are the same width |
 | `Up` / `Down` (or `j` / `k`) | Move between cards, and through the subtasks of an open one |
 | `Right` / `l` | Open a card to show its subtasks, then step into them — on one with none, go to the inspector |
 | `Left` / `h` | Fold an open card, or step from a subtask up to its card — at the top of the day, back to the list in the sidebar |
