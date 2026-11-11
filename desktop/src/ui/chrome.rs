@@ -375,15 +375,17 @@ impl Takt {
             })
             .when(current, |d| d.bg(t.selected))
             .when(!current, |d| d.hover(|d| d.bg(t.hover)))
-            // Zed's indent guides: a hairline under each ancestor's icon.
+            // Zed's indent guides: a hairline under each ancestor's icon,
+            // through the row's own 1px border (which an absolute child
+            // sits inside), so a level's line runs on unbroken.
             .children((0..row.depth).map(|level| {
                 div()
                     .absolute()
-                    .top_0()
-                    .bottom_0()
+                    .top(px(-1.))
+                    .bottom(px(-1.))
                     .left(px(SIDEBAR_INSET + level as f32 * SIDEBAR_INDENT + 7.5))
                     .w(px(1.))
-                    .bg(t.border_variant)
+                    .bg(t.indent_guide)
             }))
             .when_some(
                 match &target.kind {
@@ -694,7 +696,7 @@ impl Takt {
             .flex()
             .items_center()
             .justify_between()
-            .bg(t.chrome)
+            .bg(t.status_bar)
             .border_t_1()
             .border_color(t.border)
             .text_size(px(11.))

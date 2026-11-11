@@ -2,7 +2,7 @@
 //! Zed's default themes, One Dark and One Light, so the app reads as Zed
 //! does. Components only touch these roles.
 
-use crate::state::library::Theme;
+use crate::state::library::{Theme, ZedChrome};
 use gpui::{Hsla, Rgba, WindowAppearance, rgb, rgba};
 use takt_core::theme::model::{CoreThemeAppearance, CoreThemeColor, CoreThemeSpecification};
 
@@ -14,6 +14,17 @@ fn colour(c: CoreThemeColor) -> Hsla {
         a: c.alpha as f32,
     }
     .into()
+}
+
+/// `top` laid over an opaque `bottom`, as Zed draws a translucent colour.
+fn over(top: CoreThemeColor, bottom: CoreThemeColor) -> CoreThemeColor {
+    let a = top.alpha;
+    CoreThemeColor {
+        red: top.red * a + bottom.red * (1. - a),
+        green: top.green * a + bottom.green * (1. - a),
+        blue: top.blue * a + bottom.blue * (1. - a),
+        alpha: 1.,
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -36,12 +47,21 @@ pub struct Tokens {
     pub error: Hsla,
     pub success: Hsla,
     pub warning: Hsla,
+    /// The status bar along the foot (Zed's `status_bar.background`).
+    pub status_bar: Hsla,
+    /// The hairlines under a tree's levels (Zed's `panel.indent_guide`).
+    pub indent_guide: Hsla,
 }
 
 impl Tokens {
     /// The tokens of the theme in force, in the appearance asked for
     /// (`system` follows the window's).
-    pub fn of(theme: &Theme, appearance: WindowAppearance, wanted: &str) -> Self {
+    pub fn of(
+        theme: &Theme,
+        chrome: ZedChrome,
+        appearance: WindowAppearance,
+        wanted: &str,
+    ) -> Self {
         let dark = match wanted {
             "light" => false,
             "dark" => true,
@@ -64,16 +84,34 @@ impl Tokens {
                     None if dark => CoreThemeAppearance::Dark,
                     None => CoreThemeAppearance::Light,
                 };
-                Self::from_spec(spec, appearance)
+                Self::from_spec(spec, chrome, appearance)
             }
         }
     }
 
-    fn from_spec(spec: &CoreThemeSpecification, appearance: CoreThemeAppearance) -> Self {
+    fn from_spec(
+        spec: &CoreThemeSpecification,
+        chrome: ZedChrome,
+        appearance: CoreThemeAppearance,
+    ) -> Self {
+        use takt_core::theme::color::mix;
         let role = |name: &str| colour(spec.palette.color(name, appearance));
         let paper = spec.palette.color("paper", appearance);
         let primary = spec.palette.color("primary", appearance);
-        let selected = takt_core::theme::color::mix(&paper, &primary, 0.16);
+        let selected = mix(&paper, &primary, 0.16);
+        let panel = spec.palette.color("altRow", appearance);
+        let ink = spec.palette.color("ink", appearance);
+        // A theme that names no guide gets a quiet one, as Zed draws it:
+        // a little of the text in the panel, not the theme's coloured
+        // border.
+        let guide = chrome
+            .indent_guide
+            .map(|g| over(g, panel))
+            .unwrap_or_else(|| mix(&panel, &ink, 0.14));
+        let status_bar = chrome
+            .status_bar
+            .map(|s| colour(over(s, panel)))
+            .unwrap_or_else(|| role("well"));
         Tokens {
             background: role("paper"),
             surface: role("altRow"),
@@ -89,6 +127,8 @@ impl Tokens {
             error: role("danger"),
             success: role("success"),
             warning: role("warning"),
+            status_bar,
+            indent_guide: colour(guide),
         }
     }
 
@@ -108,6 +148,8 @@ impl Tokens {
             error: rgb(0xd07277).into(),
             success: rgb(0xa1c181).into(),
             warning: rgb(0xdec184).into(),
+            status_bar: rgb(0x3b414d).into(),
+            indent_guide: rgb(0x363c46).into(),
         }
     }
 
@@ -127,6 +169,8 @@ impl Tokens {
             error: rgb(0xd36151).into(),
             success: rgb(0x669f59).into(),
             warning: rgb(0xa48819).into(),
+            status_bar: rgb(0xdcdcdd).into(),
+            indent_guide: rgb(0xdfdfe0).into(),
         }
     }
 }

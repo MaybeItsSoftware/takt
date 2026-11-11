@@ -89,9 +89,56 @@ impl Theme {
     }
 }
 
+/// What a Zed theme says about Zed's own chrome that Takt's theme format
+/// has no role for: kept here, by the identifier its variant loaded as, so
+/// the Mac draws it as Zed does.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ZedChrome {
+    /// `status_bar.background`.
+    pub status_bar: Option<takt_core::theme::model::CoreThemeColor>,
+    /// `panel.indent_guide`.
+    pub indent_guide: Option<takt_core::theme::model::CoreThemeColor>,
+}
+
+/// Each variant in Zed's themes folder by its name, with the chrome colours
+/// it states.
+fn zed_chrome_by_name(dir: &std::path::Path) -> std::collections::HashMap<String, ZedChrome> {
+    let mut found = std::collections::HashMap::new();
+    for source in theme_sources(dir) {
+        let Ok(root) = serde_json::from_slice::<serde_json::Value>(&source.data) else {
+            continue;
+        };
+        let Some(variants) = root.get("themes").and_then(|t| t.as_array()) else {
+            continue;
+        };
+        for variant in variants {
+            let Some(name) = variant.get("name").and_then(|n| n.as_str()) else {
+                continue;
+            };
+            let style = variant.get("style");
+            let read = |key: &str| {
+                style
+                    .and_then(|s| s.get(key))
+                    .and_then(|v| v.as_str())
+                    .and_then(takt_core::theme::color::from_hex)
+            };
+            found.insert(
+                name.to_string(),
+                ZedChrome {
+                    status_bar: read("status_bar.background"),
+                    indent_guide: read("panel.indent_guide"),
+                },
+            );
+        }
+    }
+    found
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Library {
     pub themes: Vec<Theme>,
+    /// Zed's chrome colours for the themes read from Zed's folder.
+    pub zed_chrome: std::collections::HashMap<String, ZedChrome>,
     pub keymap_issues: Vec<String>,
     pub theme_issues: Vec<String>,
 }
@@ -170,6 +217,24 @@ impl App {
                 }
             }
         }
+        let by_name = zed_themes_dir()
+            .map(|dir| zed_chrome_by_name(&dir))
+            .unwrap_or_default();
+        self.library.zed_chrome = themes
+            .iter()
+            .filter_map(|theme| match theme {
+                Theme::Spec(spec)
+                    if spec
+                        .identifier
+                        .starts_with(takt_core::theme::zed::IDENTIFIER_PREFIX) =>
+                {
+                    by_name
+                        .get(&spec.name)
+                        .map(|chrome| (spec.identifier.clone(), *chrome))
+                }
+                _ => None,
+            })
+            .collect();
         self.library.themes = themes;
         self.library.theme_issues = issues;
     }
@@ -197,6 +262,15 @@ impl App {
         self.share_theme_choice();
         self.prefs.theme_shared = true;
         self.prefs.save();
+    }
+
+    /// The chrome colours the theme in force states in Zed's format, if any.
+    pub fn theme_chrome(&self) -> ZedChrome {
+        self.library
+            .zed_chrome
+            .get(&self.prefs.theme)
+            .copied()
+            .unwrap_or_default()
     }
 
     pub fn theme(&self) -> Theme {
@@ -265,5 +339,32 @@ impl App {
             }
             Err(error) => self.message = Some(error.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zed_chrome_is_read_by_variant_name() {
+        let dir = std::env::temp_dir().join(format!("takt-zed-chrome-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("Paper.json"),
+            r##"{"name":"Paper","themes":[
+                {"name":"Paper - Contrast light","appearance":"light",
+                 "style":{"status_bar.background":"#0fbda8","border.variant":"#6547b8"}},
+                {"name":"Paper - Guides","style":{"panel.indent_guide":"#d7d2bcff"}}]}"##,
+        )
+        .unwrap();
+        let found = zed_chrome_by_name(&dir);
+        let paper = found["Paper - Contrast light"];
+        let teal = paper.status_bar.unwrap();
+        assert!((teal.green - 0xbd as f64 / 255.).abs() < 0.01);
+        assert_eq!(paper.indent_guide, None);
+        assert!(found["Paper - Guides"].indent_guide.is_some());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
