@@ -369,7 +369,7 @@ impl Takt {
             .when(editing, |d| d.w(px(CHIP_MAX_W)))
             .rounded(px(4.))
             .border_1()
-            .border_color(if ringed { t.accent } else { t.border_variant })
+            .border_color(if ringed { t.focus } else { t.border_variant })
             .bg(t.background)
             .text_size(px(12.))
             .whitespace_nowrap()

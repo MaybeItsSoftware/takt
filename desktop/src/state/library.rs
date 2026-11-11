@@ -98,6 +98,12 @@ pub struct ZedChrome {
     pub status_bar: Option<takt_core::theme::model::CoreThemeColor>,
     /// `panel.indent_guide`.
     pub indent_guide: Option<takt_core::theme::model::CoreThemeColor>,
+    /// `ghost_element.selected`, else `element.selected`: a selected row.
+    pub selected: Option<takt_core::theme::model::CoreThemeColor>,
+    /// `panel.focused_border`, else `border.focused`: the keyboard's row.
+    pub focus: Option<takt_core::theme::model::CoreThemeColor>,
+    /// `icon`: an icon at rest.
+    pub icon: Option<takt_core::theme::model::CoreThemeColor>,
 }
 
 /// Each variant in Zed's themes folder by its name, with the chrome colours
@@ -127,6 +133,9 @@ fn zed_chrome_by_name(dir: &std::path::Path) -> std::collections::HashMap<String
                 ZedChrome {
                     status_bar: read("status_bar.background"),
                     indent_guide: read("panel.indent_guide"),
+                    selected: read("ghost_element.selected").or_else(|| read("element.selected")),
+                    focus: read("panel.focused_border").or_else(|| read("border.focused")),
+                    icon: read("icon"),
                 },
             );
         }
@@ -355,8 +364,11 @@ mod tests {
             dir.join("Paper.json"),
             r##"{"name":"Paper","themes":[
                 {"name":"Paper - Contrast light","appearance":"light",
-                 "style":{"status_bar.background":"#0fbda8","border.variant":"#6547b8"}},
-                {"name":"Paper - Guides","style":{"panel.indent_guide":"#d7d2bcff"}}]}"##,
+                 "style":{"status_bar.background":"#0fbda8","border.variant":"#6547b8",
+                   "ghost_element.selected":"#dad6ca77","panel.focused_border":"#cecbbf",
+                   "border.focused":"#e5e2d4"}},
+                {"name":"Paper - Guides","style":{"panel.indent_guide":"#d7d2bcff",
+                   "element.selected":"#dad6caff","border.focused":"#e5e2d4"}}]}"##,
         )
         .unwrap();
         let found = zed_chrome_by_name(&dir);
@@ -365,6 +377,14 @@ mod tests {
         assert!((teal.green - 0xbd as f64 / 255.).abs() < 0.01);
         assert_eq!(paper.indent_guide, None);
         assert!(found["Paper - Guides"].indent_guide.is_some());
+        // A selection and the keyboard's outline as Zed draws them, falling
+        // back to the element and the general focus colour.
+        let selected = paper.selected.unwrap();
+        assert!((selected.alpha - 0x77 as f64 / 255.).abs() < 0.01);
+        assert!((paper.focus.unwrap().red - 0xce as f64 / 255.).abs() < 0.01);
+        let guides = found["Paper - Guides"];
+        assert!((guides.selected.unwrap().alpha - 1.).abs() < 0.01);
+        assert!((guides.focus.unwrap().red - 0xe5 as f64 / 255.).abs() < 0.01);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

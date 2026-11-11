@@ -119,7 +119,7 @@ impl Takt {
             .rounded(px(4.))
             .border_1()
             .border_color(if selected && active {
-                t.accent
+                t.focus
             } else {
                 gpui::transparent_black()
             })
@@ -252,7 +252,7 @@ impl Takt {
                     .rounded(px(6.))
                     .bg(t.surface)
                     .border_1()
-                    .border_color(if focused { t.accent } else { t.border_variant })
+                    .border_color(if focused { t.focus } else { t.border_variant })
                     .child(
                         div()
                             .px_2()
@@ -418,7 +418,7 @@ impl Takt {
             .bg(t.background)
             .border_1()
             .border_color(if (selected || holds_cursor) && active {
-                t.accent
+                t.focus
             } else {
                 t.border_variant
             })
@@ -712,7 +712,7 @@ impl Takt {
             .rounded(px(4.))
             .border_1()
             .border_color(if selected && active {
-                t.accent
+                t.focus
             } else {
                 gpui::transparent_black()
             })

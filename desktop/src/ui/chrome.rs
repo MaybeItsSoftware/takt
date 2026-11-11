@@ -370,7 +370,7 @@ impl Takt {
             .gap(px(8.))
             .border_1()
             .border_color(if cursor {
-                t.accent
+                t.focus
             } else {
                 gpui::transparent_black()
             })
@@ -473,7 +473,11 @@ impl Takt {
                 },
                 t,
             ))
-            .child(super::icons::icon(icon, 15.).text_color(if lit { t.accent } else { t.muted }))
+            .child(super::icons::icon(icon, 15.).text_color(if lit {
+                t.accent
+            } else {
+                t.status_icon
+            }))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 click(this, cx);
                 this.after_change(cx);
@@ -694,7 +698,7 @@ impl Takt {
             .border_t_1()
             .border_color(t.border)
             .text_size(px(11.))
-            .text_color(t.muted)
+            .text_color(t.status_text)
             .child(div().flex().items_center().children(left_icons))
             .child(
                 div()
@@ -741,7 +745,7 @@ impl Takt {
                     .id("status-history")
                     .px_1()
                     .rounded(px(4.))
-                    .text_color(t.muted)
+                    .text_color(t.status_text)
                     .hover(|d| d.bg(t.hover))
                     .tooltip(super::widgets::tip(
                         "History: choose a step to go back to it",

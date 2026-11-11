@@ -95,7 +95,7 @@ impl Takt {
                 .rounded(px(4.))
                 .border_1()
                 .border_color(if on && focused {
-                    t.accent
+                    t.focus
                 } else if on {
                     t.muted
                 } else {
@@ -311,7 +311,7 @@ impl Takt {
                     .rounded_full()
                     .border_1()
                     .border_color(if on || stacks_focus {
-                        t.accent
+                        t.focus
                     } else {
                         t.border
                     })

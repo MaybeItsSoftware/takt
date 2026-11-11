@@ -51,6 +51,13 @@ pub struct Tokens {
     pub status_bar: Hsla,
     /// The hairlines under a tree's levels (Zed's `panel.indent_guide`).
     pub indent_guide: Hsla,
+    /// The outline round the row the keyboard is on (Zed's
+    /// `panel.focused_border`); the accent where a theme names none.
+    pub focus: Hsla,
+    /// Words and resting icons on the status bar: the text colour where the
+    /// theme paints the bar, as Zed does, else muted.
+    pub status_text: Hsla,
+    pub status_icon: Hsla,
 }
 
 impl Tokens {
@@ -98,7 +105,9 @@ impl Tokens {
         let role = |name: &str| colour(spec.palette.color(name, appearance));
         let paper = spec.palette.color("paper", appearance);
         let primary = spec.palette.color("primary", appearance);
-        let selected = mix(&paper, &primary, 0.16);
+        let selected = chrome
+            .selected
+            .unwrap_or_else(|| mix(&paper, &primary, 0.16));
         let panel = spec.palette.color("altRow", appearance);
         let ink = spec.palette.color("ink", appearance);
         // A theme that names no guide gets a quiet one, as Zed draws it:
@@ -112,6 +121,16 @@ impl Tokens {
             .status_bar
             .map(|s| colour(over(s, panel)))
             .unwrap_or_else(|| role("well"));
+        let painted = chrome.status_bar.is_some();
+        let status_text = if painted {
+            role("ink")
+        } else {
+            role("mutedText")
+        };
+        let status_icon = match chrome.icon {
+            Some(icon) if painted => colour(icon),
+            _ => status_text,
+        };
         Tokens {
             background: role("paper"),
             surface: role("altRow"),
@@ -129,6 +148,9 @@ impl Tokens {
             warning: role("warning"),
             status_bar,
             indent_guide: colour(guide),
+            focus: chrome.focus.map(colour).unwrap_or_else(|| role("primary")),
+            status_text,
+            status_icon,
         }
     }
 
@@ -150,6 +172,9 @@ impl Tokens {
             warning: rgb(0xdec184).into(),
             status_bar: rgb(0x3b414d).into(),
             indent_guide: rgb(0x363c46).into(),
+            focus: rgb(0x74ade8).into(),
+            status_text: rgb(0xa9afbc).into(),
+            status_icon: rgb(0xa9afbc).into(),
         }
     }
 
@@ -171,6 +196,9 @@ impl Tokens {
             warning: rgb(0xa48819).into(),
             status_bar: rgb(0xdcdcdd).into(),
             indent_guide: rgb(0xdfdfe0).into(),
+            focus: rgb(0x5c78e2).into(),
+            status_text: rgb(0x58585a).into(),
+            status_icon: rgb(0x58585a).into(),
         }
     }
 }

@@ -61,7 +61,7 @@ impl Takt {
             .flex_col()
             .bg(t.surface)
             .border_t_1()
-            .border_color(if focused { t.accent } else { t.border })
+            .border_color(if focused { t.focus } else { t.border })
             .child(match tab.as_str() {
                 "timeline" => self.timeline_pane(t, cx).into_any_element(),
                 "progress" => self.progress_pane(t).into_any_element(),
@@ -104,7 +104,7 @@ impl Takt {
                     .rounded(px(4.))
                     .border_1()
                     .border_color(if cursor {
-                        t.accent
+                        t.focus
                     } else {
                         gpui::transparent_black()
                     })
@@ -242,7 +242,7 @@ impl Takt {
                                 .rounded(px(4.))
                                 .border_1()
                                 .border_color(if ringed && !open {
-                                    t.accent
+                                    t.focus
                                 } else {
                                     gpui::transparent_black()
                                 })
@@ -453,7 +453,7 @@ impl Takt {
                     .rounded(px(4.))
                     .border_1()
                     .border_color(if here && active {
-                        t.accent
+                        t.focus
                     } else {
                         gpui::transparent_black()
                     })
@@ -647,7 +647,7 @@ impl Takt {
                             .rounded(px(4.))
                             .border_1()
                             .border_color(if here && active {
-                                t.accent
+                                t.focus
                             } else {
                                 gpui::transparent_black()
                             })

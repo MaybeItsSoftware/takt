@@ -102,7 +102,7 @@ impl Takt {
                             .rounded(px(10.))
                             .border_1()
                             .border_color(if here {
-                                t.accent
+                                t.focus
                             } else {
                                 gpui::transparent_black()
                             })
@@ -481,7 +481,7 @@ fn button(
         .rounded(px(6.))
         .border_1()
         .border_color(if here {
-            t.accent
+            t.focus
         } else {
             match tone {
                 Tone::Plain => t.border,
@@ -516,7 +516,7 @@ fn link(
         .rounded(px(4.))
         .border_1()
         .border_color(if here {
-            t.accent
+            t.focus
         } else {
             gpui::transparent_black()
         })

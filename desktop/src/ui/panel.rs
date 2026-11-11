@@ -743,7 +743,7 @@ impl Render for FocusPanel {
                 .rounded(px(4.))
                 .border_1()
                 .border_color(if here {
-                    t.accent
+                    t.focus
                 } else {
                     gpui::transparent_black()
                 })
@@ -1061,7 +1061,7 @@ impl Render for FocusPanel {
                                     .rounded(px(4.))
                                     .border_1()
                                     .border_color(if choice == selected {
-                                        t.accent
+                                        t.focus
                                     } else {
                                         t.border_variant
                                     })
