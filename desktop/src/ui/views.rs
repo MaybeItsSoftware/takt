@@ -212,11 +212,10 @@ impl Takt {
                 scrolls.resize_with(board.columns.len(), gpui::ScrollHandle::new);
             }
         }
-        div()
+        let columns = div()
             .id("board")
             .relative()
-            .flex_1()
-            .min_h_0()
+            .size_full()
             .flex()
             .gap(px(board_links::GUTTER))
             .p_2()
@@ -332,7 +331,18 @@ impl Takt {
                             .child(self.field_inline(t, "New column")),
                     )
                 },
-            )
+            );
+        // The links' lines over the columns sit outside the scrolling row:
+        // inside it, a layer the row's size counts as content, and gpui
+        // adds the row's padding to that, so a board that fits could still
+        // be scrolled sideways by the padding.
+        div()
+            .relative()
+            .flex_1()
+            .min_h_0()
+            .min_w_0()
+            .flex()
+            .child(columns)
             .child(board_links::overlay(&self.board_links, focus, t.accent))
             .into_any_element()
     }
