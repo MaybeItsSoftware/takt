@@ -177,6 +177,23 @@ impl App {
         }
     }
 
+    /// `⌘R`: Takt Sync and Google at once, each only when it is set up,
+    /// saying so when neither is.
+    pub fn sync_everything_now(&mut self) {
+        let takt = self.sync.signed_in();
+        let google = self.any_google_plugin_on() && google::connected();
+        if takt {
+            self.sync.sync_now();
+        }
+        if google {
+            self.google_now();
+        }
+        if !takt && !google {
+            self.message =
+                Some("Nothing to sync: sign in on Settings ▸ Sync, or connect Google.".into());
+        }
+    }
+
     pub(super) fn google_now(&mut self) {
         *lock(&self.google.config) = self.google_config();
         if let Some(wake) = &self.google.wake {

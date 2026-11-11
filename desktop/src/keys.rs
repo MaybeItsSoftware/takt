@@ -140,7 +140,7 @@ pub fn is_sequence(key: &str) -> bool {
 }
 
 /// The `Anywhere` commands still live on a surface that owns the keyboard.
-pub const REACHABLE_FROM_FULL_PANE_SCREENS: [&str; 26] = [
+pub const REACHABLE_FROM_FULL_PANE_SCREENS: [&str; 27] = [
     "goToday",
     "goBoard",
     "goOutline",
@@ -161,6 +161,7 @@ pub const REACHABLE_FROM_FULL_PANE_SCREENS: [&str; 26] = [
     "windowToggleAgentPanel",
     "windowToggleProgressDock",
     "windowCloseAllDocks",
+    "windowSyncNow",
     "focusFinish",
     "focusStop",
     "goSidebarRegion",
@@ -170,7 +171,7 @@ pub const REACHABLE_FROM_FULL_PANE_SCREENS: [&str; 26] = [
 ];
 
 /// Commands whose chord still works with the caret in a text field.
-pub const REACHABLE_FROM_TEXT_FIELD: [&str; 30] = [
+pub const REACHABLE_FROM_TEXT_FIELD: [&str; 31] = [
     "goToday",
     "goBoard",
     "goOutline",
@@ -198,6 +199,7 @@ pub const REACHABLE_FROM_TEXT_FIELD: [&str; 30] = [
     "windowCloseAllDocks",
     "windowDockNextTab",
     "windowDockPreviousTab",
+    "windowSyncNow",
     "focusFinish",
     "focusStop",
     "focusSetAvailable",

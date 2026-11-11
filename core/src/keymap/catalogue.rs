@@ -488,8 +488,10 @@ fn window() -> Vec<Spec> {
             .note("⌘B toggles the left dock, as in Zed"),
         c("windowToggleInspectorPane", "Show or hide the inspector", "Window", &["cmd+ctrl+i"])
             .note("Same pane as i or sd on a task, without selecting one"),
-        c("windowToggleRightDock", "Show or hide the right dock", "Window", &["cmd+r", "r", "cmd+option+b"])
-            .note("On whichever tab it was on, with the keyboard in it. ⌘R works from inside a field too; ⌥⌘B is Zed's toggle right dock"),
+        c("windowToggleRightDock", "Show or hide the right dock", "Window", &["r", "cmd+option+b"])
+            .note("On whichever tab it was on, with the keyboard in it. ⌥⌘B is Zed's toggle right dock, and works from inside a field too"),
+        c("windowSyncNow", "Sync now", "Window", &["cmd+r"])
+            .note("Takt Sync, and Google when it is on, at once rather than on their next turn. Works from inside a field too"),
         c("windowToggleDoneRail", "Show or hide what you have finished", "Window", &["cmd+ctrl+d"])
             .note("The bottom dock's Done tab: opens it and takes the keyboard; again from inside it closes it"),
         c("windowToggleAgentPanel", "Show or hide the agent panel", "Window", &["cmd+shift+a", "cmd+ctrl+a"])

@@ -78,12 +78,12 @@ final class WorkspaceCommandDispatchTests: XCTestCase {
     XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "]", on: .today)?.id, .planEnterTask)
   }
 
-  /// ⌘R shows and hides the right dock from every pane, the dock's own tabs
-  /// included; renaming the list is F2 and ⇧R in the sidebar, and F2 stays
-  /// the task's rename on a task pane.
-  func testCommandRTogglesTheRightDockFromEveryPane() {
+  /// ⌘R syncs from every pane, the dock's own tabs included (r and ⌥⌘B
+  /// still show the right dock); renaming the list is F2 and ⇧R in the
+  /// sidebar, and F2 stays the task's rename on a task pane.
+  func testCommandRSyncsFromEveryPane() {
     for surface in Self.planningPanes + [.sidebar, .inspector, .done, .timeline] {
-      XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "cmd+r", on: surface)?.id, .windowToggleRightDock)
+      XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "cmd+r", on: surface)?.id, .windowSyncNow)
     }
     XCTAssertTrue(WorkspaceCommandCatalog.reachesIntoTextField("cmd+r", on: .inspector))
     XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "f2", on: .sidebar)?.id, .listRename)

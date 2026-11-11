@@ -37,7 +37,7 @@ extension WorkspaceCommandCatalog {
     .goSearch, .goCommandPalette, .goKeyboardReference,
     .windowUndo, .windowRedo, .windowToggleSidebar, .windowToggleInspectorPane,
     .windowToggleRightDock, .windowToggleDoneRail, .windowToggleAgentPanel, .windowToggleProgressDock,
-    .windowCloseAllDocks,
+    .windowCloseAllDocks, .windowSyncNow,
     // A running block can be ended from anywhere, the timeline included.
     .focusFinish, .focusStop,
     // The timeline sits in the right dock beside the work, so the keys that
@@ -60,6 +60,8 @@ extension WorkspaceCommandCatalog {
     .windowCloseAllDocks,
     // ⌘{ and ⌘} in the inspector, whose keyboard is nearly always in a field.
     .windowDockNextTab, .windowDockPreviousTab,
+    // ⌘R syncs, as a reload does in a browser: no reason to stop typing.
+    .windowSyncNow,
     // Ending a block is not something to put the typing down for first.
     .focusFinish, .focusStop,
     // ⌥⌘8, beside ⌘8: saying where you are is part of opening the panel.

@@ -56,6 +56,7 @@ public enum WorkspaceCommandID: String, CaseIterable, Sendable {
 
   // Window
   case windowUndo, windowRedo, windowToggleSidebar, windowToggleInspectorPane, windowToggleRightDock
+  case windowSyncNow
   case windowToggleDoneRail, windowToggleAgentPanel, windowToggleProgressDock, windowOpenKeymap, windowReloadKeymap
   case windowShowDiagnostics, windowOpenThemesFolder, windowReloadThemes, windowExportTheme
   case windowUseClaudeCode, windowUseCodex
