@@ -64,7 +64,7 @@ impl Takt {
     /// The account at the top right, as Zed shows yours: the picture the
     /// sign-in gave, else an initial, else a figure; a click opens its menu.
     fn account_button(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {
-        const SIZE: f32 = 22.;
+        const SIZE: f32 = 16.;
         let signed_in = self.app.sync.signed_in();
         let picture = signed_in
             .then(|| self.app.sync.avatar_url())
@@ -88,7 +88,7 @@ impl Takt {
                 .justify_center()
                 .bg(t.accent)
                 .text_color(t.background)
-                .text_size(px(11.))
+                .text_size(px(9.))
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(letter)
                 .into_any_element(),
@@ -101,7 +101,7 @@ impl Takt {
                 .border_1()
                 .border_color(t.border)
                 .text_color(t.muted)
-                .child(super::icons::icon("user", 13.))
+                .child(super::icons::icon("user", 10.))
                 .into_any_element(),
         };
         div()
@@ -299,7 +299,8 @@ impl Takt {
                 )
                 .track_scroll(self.sidebar_scroll.clone())
                 .flex_1()
-                .py_1(),
+                // The first row against the title bar, as Zed's project panel.
+                .pb_1(),
             )
     }
 
