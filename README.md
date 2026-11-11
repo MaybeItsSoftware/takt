@@ -127,7 +127,7 @@ So none of it is reachable only by something you already have to know.
 | `nm` / `Cmd+Ctrl+M` | Open the notes in the **Markdown editor** (the Markdown editor plugin): the notes the size of the window, the text on the left and the Markdown drawn on the right (`Cmd+E` cycles split / text / preview). On a task linked to an Obsidian note, `Cmd+Shift+O` chooses whether the notes are *additional* to the note (the default: Takt's own notes, the note drawn read-only beside them, `Ctrl+Tab`) or *the same as* it (the editor edits the `.md` file in the vault). `Cmd+S` saves, `Esc` or `Cmd+Return` saves and returns, and `Cmd+Ctrl+M` from inside the inspector's notes field carries what you typed in. A change made on disk while you type is never written over unasked. See [the Markdown editor](docs/markdown-editor.md) |
 | `pl` / `Cmd+Ctrl+L` | Link…: find a note or folder in your Obsidian vaults or a Drive file linked before, choose "Choose files from Google Drive…" to pick files in Google's own picker in the browser (only the files you pick are shared with Takt), or paste any address — `↑` `↓` choose, `Return` links, `Tab` narrows to Obsidian or Drive. The picker is as tall as its rows, and a line under it says what you can type and which sources are switched off. Rows with links show a small link mark; see [Links](docs/links.md) |
 | `]` / `[` | Open the task's subtasks / leave them |
-| `→` / `←` | In the outline, show a task's subtasks and step into them / hide them and step out — without opening the task. Elsewhere, open and leave it. At the top level of a list, `←` goes back to the list in the sidebar |
+| `→` / `←` | In the outline, show a task's subtasks and step into them / hide them and step out — without opening the task. Elsewhere, open and leave it. At the top level of a list, `←` goes back to the list in the sidebar — opening the sidebar if it was closed, and closing it again once the keyboard leaves it |
 | `za` / `Cmd+←` / `Cmd+→` | Fold or unfold the task you are on (outline or board) / fold / unfold the whole outline |
 | `.` / `,` | Grow the task you are on to show its subtasks / shrink it (on a task with none, folds the one it sits under) — in the outline and on a board card or subtask row |
 | `l` / `h` | On the board, step into the card's subtask rows / back out onto the card (`Esc` too). Inside, `↑`/`↓` walk the rows and Space, `ee`, the inspector and folding act on the row you are on |
@@ -554,7 +554,8 @@ the status bar's indicator and the tab show it in the warning colour, with
   are** is one row: `←`/`→` step through the places, from *Anywhere*, since
   you are in one place at a time. The other conditions combine: `Space` (or
   a click) turns one on or off, and `→`/`←` turn it on and off too. `c`
-  clears them all. **Free time** is how long you have: `←`/`→` give or take
+  clears them all. On a row with nothing to change, `←` goes back to the
+  tasks. **Free time** is how long you have: `←`/`→` give or take
   a quarter of an hour, and typing a number anywhere in the tab sets it —
   `45`, `1h30`, `17:00`, `5pm`, then `Return` (an empty field is no limit);
   a task whose estimate does not fit waits. With a time set, **Only what I

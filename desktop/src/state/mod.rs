@@ -334,6 +334,9 @@ pub struct App {
     /// The matrix's move mode (`v`): the motions nudge the selected task
     /// rather than moving the selection.
     pub matrix_moving: bool,
+    /// The sidebar was opened only because `←` went into it from the
+    /// tasks; it closes again when the keyboard leaves it.
+    pub sidebar_peek: bool,
     pub message: Option<String>,
     /// The `data_version` last read, to tell another process's write.
     pub seen_version: i64,
@@ -422,6 +425,7 @@ impl App {
             history_top: None,
             history_note: None,
             matrix_moving: false,
+            sidebar_peek: false,
             message: None,
             seen_version,
             prefs,

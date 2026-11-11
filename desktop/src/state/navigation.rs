@@ -156,6 +156,9 @@ impl App {
             entered: Some(entered),
         } = self.scope.clone()
         else {
+            // Nothing left to leave: the sidebar, opened for the visit if
+            // it was closed.
+            self.peek_into_sidebar();
             return;
         };
         let parent = self
@@ -251,6 +254,30 @@ impl App {
     }
 
     // MARK: Regions
+
+    /// `←` from the tasks with nothing to leave: the keyboard goes to the
+    /// sidebar, which opens for it if it was closed and closes again when
+    /// the keyboard leaves ([`App::end_sidebar_peek`]).
+    pub fn peek_into_sidebar(&mut self) {
+        if !self.prefs.sidebar_visible {
+            self.prefs.sidebar_visible = true;
+            self.sidebar_peek = true;
+        }
+        if self.prefs.left_dock_tab == "agent" {
+            self.prefs.left_dock_tab = "lists".into();
+        }
+        self.return_to_sidebar();
+    }
+
+    /// The sidebar opened for a visit closes once the keyboard is
+    /// elsewhere.
+    pub fn end_sidebar_peek(&mut self) {
+        if self.sidebar_peek && self.region != Region::Sidebar {
+            self.sidebar_peek = false;
+            self.prefs.sidebar_visible = false;
+            self.prefs.save();
+        }
+    }
 
     pub fn focus_region(&mut self, region: Region) {
         if region == Region::Agent && self.prefs.ai_off {

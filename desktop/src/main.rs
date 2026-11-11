@@ -383,6 +383,28 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
             let back = app.prefs.expanded_folders.contains(id) == before;
             steps.push(format!("folder click opens and closes {}", flipped && back));
         }
+        // ← with nothing to leave: into the sidebar, opened for the visit
+        // when it was closed, and closed again on the way out.
+        {
+            use state::Region;
+            app.run("goOutline", None);
+            app.prefs.sidebar_visible = false;
+            app.region = Region::Tasks;
+            if let state::Scope::List { list_id, .. } = app.scope.clone() {
+                app.scope = state::Scope::List {
+                    list_id,
+                    entered: None,
+                };
+            }
+            app.run("planLeaveTask", Some("left"));
+            let opened = app.prefs.sidebar_visible && app.region == Region::Sidebar;
+            app.run("goTaskRegion", None);
+            let closed = !app.prefs.sidebar_visible && !app.sidebar_peek;
+            app.prefs.sidebar_visible = true;
+            steps.push(format!(
+                "left into a closed sidebar opens it {opened}, leaving closes it {closed}"
+            ));
+        }
         report.push(format!("docks: {}", steps.join(", ")));
     }
     // The status bar's history: the last thing done, what ⌘Z undid, and a

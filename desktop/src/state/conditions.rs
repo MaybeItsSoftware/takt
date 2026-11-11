@@ -543,6 +543,8 @@ impl App {
             Row::DayStartHour => {
                 self.save_day_start(|d| d.hour = (d.hour + by as i32).rem_euclid(24))
             }
+            // Nothing to adjust here: `←` goes back to the tasks.
+            _ if by < 0 => self.region = Region::Tasks,
             _ => {}
         }
     }

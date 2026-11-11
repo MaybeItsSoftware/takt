@@ -116,6 +116,11 @@ impl App {
     /// Runs a command by catalogue id; `key` is the press that asked, which
     /// motions read (`j` or `k`, which digit).
     pub fn run(&mut self, id: &str, key: Option<&str>) {
+        self.run_command(id, key);
+        self.end_sidebar_peek();
+    }
+
+    fn run_command(&mut self, id: &str, key: Option<&str>) {
         if self.prefs.ai_off && AI_COMMANDS.contains(&id) {
             self.message = Some("AI is switched off in Settings.".into());
             return;

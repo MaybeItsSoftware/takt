@@ -1401,6 +1401,8 @@ impl Takt {
     /// After anything changed: rank the day if it went stale, and keep the
     /// selection and the sidebar cursor on screen.
     fn after_change(&mut self, cx: &mut Context<Self>) {
+        // A click away from a sidebar opened for a visit closes it.
+        self.app.end_sidebar_peek();
         self.rank_today(cx);
         if let Some(index) = self.main_row_index() {
             self.main_scroll

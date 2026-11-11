@@ -26,6 +26,8 @@ impl App {
     /// the keyboard, it goes away. Its tabs' own commands (`⌘⇧A`, the
     /// sidebar's region key) go to one tab in particular.
     pub fn toggle_sidebar(&mut self) {
+        // ⌘B makes the sidebar's being open your own choice again.
+        self.sidebar_peek = false;
         let focused = matches!(self.region, Region::Sidebar | Region::Agent);
         if self.prefs.sidebar_visible && focused {
             self.prefs.sidebar_visible = false;
