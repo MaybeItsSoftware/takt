@@ -206,7 +206,9 @@ impl App {
             "taskComplete" => self.toggle_complete(),
             "taskInvalidate" => self.toggle_invalidate(),
             "taskDelete" => self.ask_to_delete(),
-            "taskRename" | "taskRenameAppend" | "taskRenameInsert" => self.begin_rename(id),
+            "taskRename" | "taskRenameAppend" | "taskRenameInsert" | "taskReplace" => {
+                self.begin_rename(id)
+            }
             "taskEditDue" | "taskEditStart" | "taskEditRecurrence" | "taskEditTags" => {
                 self.begin_typed_edit(id)
             }
@@ -534,6 +536,7 @@ impl App {
         self.edit_cursor = match id {
             "taskRenameInsert" => EditCursor::Start,
             "taskRenameAppend" => EditCursor::End,
+            "taskReplace" => EditCursor::Empty,
             _ => EditCursor::SelectAll,
         };
         self.editing = Some(Editing::TaskTitle { task_id: task.id });
@@ -884,6 +887,8 @@ pub enum EditCursor {
     SelectAll,
     Start,
     End,
+    /// Vim's R: the field opens empty, so what is typed replaces the title.
+    Empty,
 }
 
 /// Local midnight, `days` from today, in milliseconds.
@@ -927,6 +932,7 @@ pub const PORTED: &[&str] = &[
     "taskRename",
     "taskRenameAppend",
     "taskRenameInsert",
+    "taskReplace",
     "taskDueToday",
     "taskDueTomorrow",
     "taskClearDue",

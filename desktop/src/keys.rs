@@ -206,7 +206,7 @@ pub const REACHABLE_FROM_TEXT_FIELD: [&str; 31] = [
 ];
 
 /// Bare keys a region takes from `Anywhere`.
-const REGION_BARE_KEYS: [&str; 6] = ["/", "?", "i", "r", "escape", "enter"];
+const REGION_BARE_KEYS: [&str; 5] = ["/", "?", "i", "escape", "enter"];
 
 fn inherits(command: &CommandEntry, key: &str, surface: CommandSurface) -> bool {
     use CommandSurface::*;

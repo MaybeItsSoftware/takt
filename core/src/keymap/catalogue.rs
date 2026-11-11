@@ -142,6 +142,8 @@ fn task() -> Vec<Spec> {
             .note("Like vim's a: the cursor lands after the last character"),
         c("taskRenameInsert", "Edit the title, typing at the start", "Task", &["ei"])
             .note("Like vim's i: the cursor lands before the first character"),
+        c("taskReplace", "Replace the title", "Task", &["r", "shift+r"])
+            .note("Like vim's R in Zed: the title is cleared and what you type replaces it. Esc keeps the old one"),
         c("taskEditDue", "Edit the due date", "Task", &["dd", "cmd+d"]),
         c("taskEditNotes", "Edit the notes", "Task", &["nn", "cmd+ctrl+n"]),
         // The Markdown editor plugin, on the Mac. `n` started only `nn`.
@@ -488,7 +490,7 @@ fn window() -> Vec<Spec> {
             .note("⌘B toggles the left dock, as in Zed"),
         c("windowToggleInspectorPane", "Show or hide the inspector", "Window", &["cmd+ctrl+i"])
             .note("Same pane as i or sd on a task, without selecting one"),
-        c("windowToggleRightDock", "Show or hide the right dock", "Window", &["cmd+r", "r", "cmd+option+b"])
+        c("windowToggleRightDock", "Show or hide the right dock", "Window", &["cmd+r", "cmd+option+b"])
             .note("As ⌘B and ⌘J: shown on whichever tab it was on, with the keyboard in it; up without the keyboard, it takes it; from inside it, it goes away. ⌘R works from inside a field too; ⌥⌘B is Zed's toggle right dock"),
         c("windowSyncNow", "Sync now", "Window", &["cmd+shift+r"])
             .note("Takt Sync, and Google when it is on, at once rather than on their next turn. Works from inside a field too"),

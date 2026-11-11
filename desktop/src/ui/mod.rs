@@ -1320,6 +1320,7 @@ impl Takt {
                     EditCursor::SelectAll => TextField::selecting_all(&title),
                     EditCursor::Start => TextField::at_start(&title),
                     EditCursor::End => TextField::new(&title),
+                    EditCursor::Empty => TextField::new(""),
                 }
             }
             Some(Editing::SidebarName { row_id }) => {

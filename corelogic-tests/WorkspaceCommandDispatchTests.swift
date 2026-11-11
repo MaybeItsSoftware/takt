@@ -126,7 +126,7 @@ final class WorkspaceCommandDispatchTests: XCTestCase {
   func testTheTimelineLetsTheRegionKeysThrough() {
     let expected: [String: WorkspaceCommandID] = [
       "ctrl+tab": .goCycleRegion, "ctrl+shift+tab": .goCycleRegion, "ctrl+1": .goSidebarRegion,
-      "ctrl+2": .goTaskRegion, "ctrl+3": .goInspectorRegion, "r": .windowToggleRightDock,
+      "ctrl+2": .goTaskRegion, "ctrl+3": .goInspectorRegion, "cmd+r": .windowToggleRightDock,
       "escape": .timelineClose,
     ]
     for (key, id) in expected {
@@ -154,7 +154,7 @@ final class WorkspaceCommandDispatchTests: XCTestCase {
     }
     // A bare key that acts on the selected task does not reach through it.
     XCTAssertNil(WorkspaceCommandCatalog.command(forKey: "x", on: .conditions))
-    XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "r", on: .conditions)?.id, .windowToggleRightDock)
+    XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "cmd+r", on: .conditions)?.id, .windowToggleRightDock)
     // ⌥⌘8 and `ga` from inside the tab are the toggle that put it away.
     XCTAssertEqual(WorkspaceCommandCatalog.command(forKey: "ga", on: .conditions)?.id, .focusSetAvailable)
   }

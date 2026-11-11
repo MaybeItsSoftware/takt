@@ -69,6 +69,7 @@ public enum FocusPanelKeys {
     .motionGoToNumber: .numberJump, .taskComplete: .complete,
     .todayStart: .start, .taskStartFocus: .start,
     .taskRename: .edit(.title), .taskRenameAppend: .edit(.title), .taskRenameInsert: .edit(.title),
+    .taskReplace: .edit(.title),
     .taskEditDue: .edit(.due), .taskEditStart: .edit(.start), .taskEditEstimate: .edit(.estimate),
     .taskEditNotes: .edit(.notes), .taskEditTags: .edit(.tags), .taskEditRecurrence: .edit(.recurrence),
     .taskClearPriority: .priority(0), .taskSendToBack: .priority(-1), .taskConditions: .conditions,

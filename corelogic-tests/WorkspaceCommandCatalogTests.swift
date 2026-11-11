@@ -399,6 +399,9 @@ final class WorkspaceCommandCollisionTests: XCTestCase {
       // task where it stands, as the outline's do, rather than entering and
       // leaving it.
       "today:right", "today:left", "today:gf",
+      // R is the task's replace everywhere else; in the sidebar and on the
+      // Conditions tab ⇧R renames the row the cursor is on.
+      "sidebar:shift+r", "conditions:shift+r",
     ]
     XCTAssertEqual(
       overrides, expected,

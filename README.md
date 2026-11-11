@@ -141,7 +141,7 @@ So none of it is reachable only by something you already have to know.
 | `Cmd+Ctrl+I` / `Cmd+Ctrl+D` | The right dock on its Inspector tab / the bottom dock on its Done tab, or put it away |
 | `Cmd+Shift+A` | The left dock's Agent tab — your Claude Code or Codex, each change it makes shown with an Undo |
 | `Cmd+J` | The bottom dock — Progress, Done and Timeline — as `Cmd+B` does the left: on the tab it was on, with the keyboard in it on Done or Timeline; up already, it takes the keyboard; from inside it (or on Progress, which never takes it), it goes away (Zed's bottom dock) |
-| `Cmd+R`, `r` or `Cmd+Alt+B` / `Cmd+Alt+Y` | The right dock — Inspector and Conditions — as `Cmd+B` does the left, or close all docks (Zed's); `Cmd+R` works from inside a field |
+| `Cmd+R` or `Cmd+Alt+B` / `Cmd+Alt+Y` | The right dock — Inspector and Conditions — as `Cmd+B` does the left, or close all docks (Zed's); `Cmd+R` works from inside a field |
 | `Cmd+Shift+R` | Sync now: Takt Sync, and Google when it is connected and on, straight away rather than on their next turn; works from inside a field |
 | `Cmd+Shift+{` / `Cmd+Shift+}`, or `[` / `]` | In a dock, its previous / next tab — Inspector and Conditions on the right, Done and Timeline below — with the keyboard brought along (Zed's previous / next tab; on a task pane the same chords change list). `Ctrl+Tab` leaves it for the next region |
 | `oo` / `Cmd+Alt+I` | List settings |
@@ -280,7 +280,7 @@ caret, as `⌥⌫` does, rather than the whole line.
 The same endings work when you **edit a title in place**. In the outline,
 `F2`, `ee` or a click on the task already selected turns its title into a field
 in the row, as in Checkvist; `ea` starts typing at the end of the title and `ei`
-at the start, as vim's `a` and `i` do: type ` @fri !2` after the title and Return, and the
+at the start, as vim's `a` and `i` do, and `r` or `Shift+R` clears it so what you type replaces it, as vim's `R` does in Zed: type ` @fri !2` after the title and Return, and the
 title stays as it was while the due day and priority change (` ^mon` moves its start). Tags are added to
 the ones the task has. Escape puts the title back; clicking away saves.
 
@@ -619,7 +619,7 @@ the status bar's indicator and the tab show it in the warning colour, with
   conditions are apart, under a folded **Archived** heading at the foot: `z`
   or `Return` on it shows them.
 - `↑`/`↓` (or `j`/`k`) walk every half with one cursor; `Esc` or `←` hands
-  the keyboard back to the work and leaves the dock open, `r` puts it away.
+  the keyboard back to the work and leaves the dock open, `Cmd+R` puts it away.
 - **In the inspector**: the Conditions row's **Add condition** does
   what `cc` does with the mouse, its conditions under their category
   headings — **New condition…** at the foot of its menu makes one (with a
