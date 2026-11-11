@@ -111,7 +111,7 @@ impl Takt {
             .h(px(ROW_HEIGHT))
             .flex_1()
             .min_w_0()
-            .pl(px(8.))
+            .pl(px(6.))
             .pr_3()
             .flex()
             .items_center()
@@ -156,6 +156,22 @@ impl Takt {
                 }
                 cx.notify();
             }))
+            .child(if editing {
+                self.field_inline(t, "Task").into_any_element()
+            } else {
+                title_greyed(&row.task, self.app.is_greyed(&row.task.id), t).into_any_element()
+            })
+            .children(detail_chips(&self.app, &row.task, t))
+            .children(task_chips(&row.task, counted, t));
+        // The indent, the fold arrow and the status mark are outside the
+        // row, so the selection and hover box starts at the title rather
+        // than around the blank space before it.
+        div()
+            .h(px(ROW_HEIGHT))
+            .mx_1()
+            .pl(px(2. + row.depth as f32 * 18.))
+            .flex()
+            .items_center()
             .child(
                 div()
                     .w(px(10.))
@@ -164,21 +180,8 @@ impl Takt {
                     .text_color(t.placeholder)
                     .child(disclosure),
             )
+            .child(div().w(px(4.)).flex_none())
             .child(check(&row.task, t))
-            .child(if editing {
-                self.field_inline(t, "Task").into_any_element()
-            } else {
-                title_greyed(&row.task, self.app.is_greyed(&row.task.id), t).into_any_element()
-            })
-            .children(detail_chips(&self.app, &row.task, t))
-            .children(task_chips(&row.task, counted, t));
-        // The indent is outside the row, so the selection and hover box
-        // starts where the task does rather than at the pane's edge.
-        div()
-            .h(px(ROW_HEIGHT))
-            .mx_1()
-            .pl(px(row.depth as f32 * 18.))
-            .flex()
             .child(super::celebrate::celebrate(
                 element,
                 &row.task.id,

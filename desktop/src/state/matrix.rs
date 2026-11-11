@@ -4,19 +4,22 @@
 //! The point is stored in `task_metadata.matrixUrgency` and
 //! `matrixImportance`, which every other client reads only by sign (the
 //! core's `matrix_quadrant`: above zero is urgent, or important). The Mac
-//! writes a precise scale of -100..=100 and never a magnitude under
-//! [`EDGE`], so a stored magnitude of [`EDGE`] or more is a precise point.
-//! Anything smaller was written by quadrant — the old Mac's 1 and 0, the
-//! CLI's -9..=9 — and is read as a point inside its quadrant
-//! ([`precise`]), spread apart where several land on one ([`arrange`]).
+//! keeps a precise scale of -100..=100, a point on an axis included, and
+//! stores it moved [`EDGE`] away from zero ([`stored`]): 0 as -10, 1 as 11.
+//! So a stored magnitude of [`EDGE`] or more is a precise point, and its
+//! sign is still the side the core reads it on (a point on the line counts
+//! as not urgent, or not important, as the core's 0 does). Anything smaller
+//! was written by quadrant — the old Mac's 1 and 0, the CLI's -9..=9 — and
+//! is read as a point inside its quadrant ([`precise`]), spread apart where
+//! several land on one ([`arrange`]).
 
 use super::store::now_ms;
 use super::{App, Region, ViewMode};
 
 /// The scale's ends.
 pub const SCALE: i64 = 100;
-/// The smallest magnitude a precise point is written with: nearer the
-/// axis than this snaps out to it, on the side it is on.
+/// How far from zero a precise point is stored, so it is never taken for
+/// one written by quadrant.
 pub const EDGE: i64 = 10;
 /// A nudge: `h`/`j`/`k`/`l` and the arrows.
 pub const STEP: i64 = 10;
@@ -30,8 +33,11 @@ pub const CENTRE: i64 = 50;
 /// positive half outwards, 0 at the centre of the negative half, -1–-9 from
 /// there outwards. So the old Mac's 1 and 0 sit at their quadrant's centre.
 pub fn precise(stored: i64) -> i64 {
-    if stored.abs() >= EDGE {
-        return stored.clamp(-SCALE, SCALE);
+    if stored >= EDGE {
+        return (stored - EDGE).min(SCALE);
+    }
+    if stored <= -EDGE {
+        return (stored + EDGE).max(-SCALE);
     }
     if stored > 0 {
         CENTRE + (stored - 1) * 6
@@ -48,32 +54,25 @@ pub fn is_legacy(stored: i64) -> bool {
     stored.abs() < EDGE
 }
 
-/// A coordinate to write: on the scale, and never nearer the axis than
-/// [`EDGE`]. Zero is on the negative side, as the core reads it.
-pub fn snap(value: i64) -> i64 {
+/// A point on the scale as it is stored: [`EDGE`] further from zero, on
+/// the side the core reads it on; on the line (0) is the negative side.
+pub fn stored(value: i64) -> i64 {
     let value = value.clamp(-SCALE, SCALE);
-    if value.abs() >= EDGE {
-        value
-    } else if value > 0 {
-        EDGE
+    if value > 0 {
+        value + EDGE
     } else {
-        -EDGE
+        value - EDGE
     }
 }
 
-/// `value` moved `by`: a move that would land nearer the axis than [`EDGE`]
-/// crosses it, to [`EDGE`] on the far side, so a nudge never sticks there.
+/// A coordinate to write: on the scale. On an axis is allowed.
+pub fn snap(value: i64) -> i64 {
+    value.clamp(-SCALE, SCALE)
+}
+
+/// `value` moved `by`, kept on the scale; it may stop on the axis.
 pub fn nudge(value: i64, by: i64) -> i64 {
-    let moved = (value + by).clamp(-SCALE, SCALE);
-    if moved.abs() >= EDGE {
-        moved
-    } else if by > 0 {
-        EDGE
-    } else if by < 0 {
-        -EDGE
-    } else {
-        snap(moved)
-    }
+    (value + by).clamp(-SCALE, SCALE)
 }
 
 /// A point on the plane, `0.0..=1.0` from the left and from the top, as
@@ -106,12 +105,13 @@ pub fn centre_of(quadrant: usize) -> (i64, i64) {
     }
 }
 
-/// `value` kept on `side`'s side of the axis, at least [`EDGE`] from it.
+/// `value` kept in `side`'s quadrant half: above the axis, or on or below
+/// it, as the core counts them.
 fn keep_side(value: i64, side: i64) -> i64 {
     if side > 0 {
-        value.clamp(EDGE, SCALE)
+        value.clamp(1, SCALE)
     } else {
-        value.clamp(-SCALE, -EDGE)
+        value.clamp(-SCALE, 0)
     }
 }
 
@@ -202,16 +202,16 @@ impl App {
             .write(|store| {
                 store.core.set_matrix_position(
                     task.clone(),
-                    Some(urgency),
-                    Some(importance),
+                    Some(stored(urgency)),
+                    Some(stored(importance)),
                     now_ms(),
                 )
             })
             .is_some()
         {
             let placement = self.placements.entry(task.clone()).or_default();
-            placement.urgency = Some(urgency);
-            placement.importance = Some(importance);
+            placement.urgency = Some(stored(urgency));
+            placement.importance = Some(stored(importance));
             placement.rank = None;
             self.selected_task = Some(task);
             self.layout_board();
@@ -398,18 +398,18 @@ impl App {
         self.read_scope_into_rows();
         self.layout_board();
         let stored = self.placements.get(&id).map(|p| (p.urgency, p.importance));
-        let read_back = stored == Some((Some(27), Some(-61)))
+        let read_back = stored == Some((Some(37), Some(-71)))
             && self.selected_matrix_point() == Some((27, -61));
         let quadrant = self
             .board
             .quadrants
             .iter()
             .position(|tasks| tasks.iter().any(|t| t.id == id));
-        // The centre of the plane snaps out to the far side of both axes.
+        // The centre of the plane is on both axes, and stays there.
         self.drop_task_at_point(&id, 0.5, 0.5);
-        let snapped = self.selected_matrix_point() == Some((-EDGE, -EDGE));
+        let snapped = self.selected_matrix_point() == Some((0, 0));
         said.push(format!(
-            "matrix point: dropped at {dropped:?}, nudged to {held:?}, read back {read_back} in quadrant {quadrant:?}; centre snaps to the edge {snapped}"
+            "matrix point: dropped at {dropped:?}, nudged to {held:?}, read back {read_back} in quadrant {quadrant:?}; centre sits on the axes {snapped}"
         ));
         let (u, i) = (before.urgency, before.importance);
         let restored =
@@ -436,53 +436,48 @@ mod tests {
         assert_eq!(precise(5), 74);
         for v in -9..=9 {
             let p = precise(v);
-            assert!(p.abs() >= EDGE && p.abs() <= SCALE, "{v} -> {p}");
+            assert!(p != 0 && p.abs() <= SCALE, "{v} -> {p}");
             assert_eq!(p > 0, v > 0, "{v} keeps its side");
         }
     }
 
     #[test]
-    fn precise_values_are_read_as_stored() {
-        for v in [10, -10, 37, -63, 100, -100] {
-            assert_eq!(precise(v), v);
+    fn precise_points_survive_being_stored() {
+        for v in -100..=100 {
+            let s = stored(v);
+            assert!(!is_legacy(s), "{v} is stored as a precise value");
+            assert_eq!(precise(s), v);
+            // The core reads the side by sign: the line is the negative side.
+            assert_eq!(s > 0, v > 0);
         }
+        assert_eq!(stored(0), -10);
+        assert_eq!(stored(1), 11);
         assert_eq!(precise(250), 100);
         assert_eq!(precise(-250), -100);
     }
 
     #[test]
-    fn snapping_keeps_clear_of_the_axis() {
-        assert_eq!(snap(0), -10);
-        assert_eq!(snap(3), 10);
-        assert_eq!(snap(-9), -10);
-        assert_eq!(snap(10), 10);
-        assert_eq!(snap(55), 55);
+    fn a_point_may_sit_on_an_axis() {
+        assert_eq!(snap(0), 0);
         assert_eq!(snap(140), 100);
         assert_eq!(snap(-140), -100);
-        for v in -120..=120 {
-            assert!(!is_legacy(snap(v)), "{v} snaps to a precise value");
-        }
-    }
-
-    #[test]
-    fn nudges_cross_the_axis_rather_than_stick() {
-        assert_eq!(nudge(10, -10), -10);
-        assert_eq!(nudge(-10, 10), 10);
-        assert_eq!(nudge(10, -2), -10);
-        assert_eq!(nudge(-10, 2), 10);
-        assert_eq!(nudge(12, -2), 10);
+        assert_eq!(nudge(10, -10), 0);
+        assert_eq!(nudge(0, 2), 2);
         assert_eq!(nudge(95, 10), 100);
         assert_eq!(nudge(-95, -10), -100);
+        assert_eq!(from_fraction(0.5, 0.5), (0, 0));
     }
 
     #[test]
     fn quadrants_match_the_cores_reading() {
         for u in -100..=100 {
-            for i in [-100, -10, 10, 100] {
-                let (su, si) = (snap(u), snap(i));
-                let core =
-                    takt_core::board_rules::matrix_quadrant(Some(su as i32), Some(si as i32));
-                assert_eq!(core, Some(quadrant_of(su, si) as u32));
+            for i in [-100, -1, 0, 1, 100] {
+                // What the phones and the CLI read from what is stored.
+                let core = takt_core::board_rules::matrix_quadrant(
+                    Some(stored(u) as i32),
+                    Some(stored(i) as i32),
+                );
+                assert_eq!(core, Some(quadrant_of(u, i) as u32));
             }
         }
         // The orientation: urgent left, important top.
@@ -494,7 +489,7 @@ mod tests {
         assert_eq!(from_fraction(0.75, 0.25), (-50, 50));
         assert_eq!(from_fraction(0.25, 0.75), (50, -50));
         assert_eq!(from_fraction(0.0, 1.0), (100, -100));
-        assert_eq!(from_fraction(0.5, 0.5), (-10, -10));
+        assert_eq!(from_fraction(0.5, 0.5), (0, 0));
         assert_eq!(to_fraction(50, 50), (0.25, 0.25));
         assert_eq!(to_fraction(-100, -100), (1.0, 1.0));
     }
@@ -508,7 +503,7 @@ mod tests {
             (1, 1, None),
             (1, 1, Some(0)),
             (1, 1, Some(1)),
-            (50, 50, None),
+            (stored(50), stored(50), None),
             (0, 0, None),
         ];
         let points = arrange(&stored);
@@ -530,8 +525,8 @@ mod tests {
     fn a_crowded_legacy_spot_still_keeps_its_side() {
         let stored: Vec<_> = (0..200).map(|n| (9, -9, Some(n))).collect();
         for (u, i) in arrange(&stored) {
-            assert!((EDGE..=SCALE).contains(&u));
-            assert!((-SCALE..=-EDGE).contains(&i));
+            assert!((1..=SCALE).contains(&u));
+            assert!((-SCALE..=0).contains(&i));
         }
     }
 
