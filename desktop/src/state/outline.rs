@@ -648,7 +648,10 @@ impl App {
         });
         if let Some(label) = label {
             let verb = if redo { "Redid" } else { "Undid" };
-            self.message = label.map(|label| format!("{verb} {label}"));
+            // Said on the right of the status bar, where the history is, and
+            // kept there until something else happens.
+            self.history_note =
+                label.map(|label| (format!("{verb} {label}"), self.history_top.clone()));
             self.lingering.clear();
             self.reload_sidebar();
             self.reload_rows();

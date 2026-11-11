@@ -158,7 +158,10 @@ pub fn window_closed(cx: &mut GpuiApp) {
     });
     if !open {
         takt.update(cx, |this, _| this.main = None);
-        crate::platform::set_regular(false);
+        // Out of the Dock only with the menu bar item there to come back by.
+        if takt.read(cx).app.prefs.show_menu_bar_item {
+            crate::platform::set_regular(false);
+        }
     }
     // The panel put away shrinks back to the pill.
     takt.update(cx, |this, cx| this.sync_pill(cx));

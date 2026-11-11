@@ -229,7 +229,8 @@ pub enum Control {
     Shortcut(String),
 }
 
-const SWITCHES: [&str; 17] = [
+const SWITCHES: [&str; 18] = [
+    "menu-bar",
     "sync-self-hosted",
     "google-own-client",
     "ai-on",
@@ -325,6 +326,9 @@ impl SettingRow {
             }
             "quick-capture-list" => "The list a task typed into quick capture is filed in.",
             "launch-at-login" => "Start Takt when you log in, in the menu bar.",
+            "menu-bar" => {
+                "Takt's item in the menu bar: the running block, and a menu of what is next. Off, Takt stays in the Dock while its windows are closed, so its icon brings it back."
+            }
             "focus-score" => "When a focus block ends, ask how it went.",
             "focus-notify" => "A notification as a focus block or break ends.",
             "focus-sound" => "A sound with that notification.",
@@ -493,6 +497,12 @@ impl App {
                 "General",
                 "Open at login",
                 on(p.launch_at_login),
+            ),
+            row(
+                "menu-bar",
+                "General",
+                "Show in the menu bar",
+                on(p.show_menu_bar_item),
             ),
             row(
                 "focus-score",
@@ -1078,6 +1088,15 @@ impl App {
                     Err(error) => self.message = Some(error),
                 }
                 return self.open_overlay(Overlay::Settings);
+            }
+            "menu-bar" => {
+                p.show_menu_bar_item = !p.show_menu_bar_item;
+                // Off, the Dock is the way back, so the app is a regular one
+                // at once; on, it goes back to the menu bar when its last
+                // window closes, as before.
+                if !p.show_menu_bar_item {
+                    crate::platform::set_regular(true);
+                }
             }
             "focus-score" => p.scores_each_block = !p.scores_each_block,
             "focus-notify" => p.focus_notifications = !p.focus_notifications,

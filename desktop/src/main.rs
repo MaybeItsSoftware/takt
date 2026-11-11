@@ -381,6 +381,43 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
         }
         report.push(format!("docks: {}", steps.join(", ")));
     }
+    // The status bar's history: the last thing done, what ⌘Z undid, and a
+    // step chosen from the list going back to it.
+    if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some()
+        && let Some(id) = app.selected().map(|t| t.id.clone())
+    {
+        let title = app.selected().map(|t| t.title.clone()).unwrap_or_default();
+        app.write(|store| {
+            store.core.update_task(
+                id.clone(),
+                format!("{title} (smoke)"),
+                String::new(),
+                None,
+                None,
+                state::store::now_ms(),
+                "UTC".into(),
+            )
+        });
+        let done = app.history_status();
+        app.undo(false);
+        let undid = app.history_status();
+        let restored = app.selected().map(|t| t.title.clone()) == Some(title.clone());
+        app.undo(true);
+        let redid = app.history_status();
+        app.open_history_menu(0., 0.);
+        let listed = app
+            .context_menu
+            .as_ref()
+            .map(|m| m.items().count())
+            .unwrap_or(0);
+        app.context_menu = None;
+        // Choosing the step below the newest takes the newest back.
+        app.pick_from_menu("history:1");
+        let back = app.selected().map(|t| t.title.clone()) == Some(title.clone());
+        report.push(format!(
+            "history: done {done:?}, undid {undid:?} (title back {restored}), redid {redid:?}, menu {listed} items, step back {back}"
+        ));
+    }
     app.run("goOutline", None);
     report.push(time("outline j", &vec!["j"; 30], app));
     if std::env::var_os("TAKT_DESKTOP_SMOKE_WRITE").is_some() && app.selected().is_some() {

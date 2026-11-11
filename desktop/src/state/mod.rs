@@ -34,6 +34,7 @@ pub mod library;
 pub mod links;
 pub mod log_edit;
 pub mod markdown;
+pub mod matrix;
 pub mod mcp_clients;
 pub mod menubar;
 pub mod navigation;
@@ -325,6 +326,11 @@ pub struct App {
     // The chrome.
     pub undo_label: Option<String>,
     pub redo_label: Option<String>,
+    /// The journal's newest step, by id and whether it is undone: what the
+    /// status bar's history note is checked against.
+    pub history_top: Option<(String, bool)>,
+    /// "Undid …" or "Redid …", shown while the history is as that left it.
+    pub history_note: Option<(String, Option<(String, bool)>)>,
     pub message: Option<String>,
     /// The `data_version` last read, to tell another process's write.
     pub seen_version: i64,
@@ -410,6 +416,8 @@ impl App {
             generation: 0,
             undo_label: None,
             redo_label: None,
+            history_top: None,
+            history_note: None,
             message: None,
             seen_version,
             prefs,
@@ -584,6 +592,22 @@ impl App {
     pub fn refresh_history(&mut self) {
         self.undo_label = self.store.core.undoable_label().ok().flatten();
         self.redo_label = self.store.core.redoable_label().ok().flatten();
+        self.history_top = self
+            .store
+            .core
+            .undo_history(1)
+            .ok()
+            .and_then(|steps| steps.into_iter().next())
+            .map(|step| (step.id, step.is_undone));
+    }
+
+    /// The status bar's note on the history: what ⌘Z or ⇧⌘Z just did while
+    /// nothing has happened since, else the most recent thing done.
+    pub fn history_status(&self) -> Option<String> {
+        match &self.history_note {
+            Some((note, top)) if *top == self.history_top => Some(note.clone()),
+            _ => self.undo_label.clone(),
+        }
     }
 
     /// Polled about once a second: another process (the CLI, the MCP

@@ -39,6 +39,9 @@ pub struct Prefs {
     /// The list quick capture lands in; the inbox when none.
     pub quick_capture_list: Option<String>,
     pub launch_at_login: bool,
+    /// Takt's item in the menu bar. Off, the app stays in the Dock while
+    /// its windows are closed, so there is still a way back to it.
+    pub show_menu_bar_item: bool,
     pub scores_each_block: bool,
     pub focus_notifications: bool,
     pub focus_sound: bool,
@@ -133,6 +136,7 @@ impl Default for Prefs {
             confirm_delete: true,
             quick_capture_list: None,
             launch_at_login: false,
+            show_menu_bar_item: true,
             scores_each_block: true,
             focus_notifications: true,
             focus_sound: true,

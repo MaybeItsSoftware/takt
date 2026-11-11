@@ -50,7 +50,7 @@ impl App {
     /// The item and its menu as things stand.
     pub fn status_snapshot(&self) -> Snapshot {
         let mut snapshot = Snapshot {
-            visible: true,
+            visible: self.prefs.show_menu_bar_item,
             tooltip: "Open Takt".into(),
             ..Default::default()
         };

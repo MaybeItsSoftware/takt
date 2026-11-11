@@ -666,17 +666,10 @@ impl Takt {
                 Region::Timeline => "Timeline".into(),
             }
         };
-        let right = [
-            self.app
-                .undo_label
-                .as_ref()
-                .map(|label| format!("⌘Z {label}")),
-            self.last_key_ms.map(|ms| format!("{ms:.2} ms")),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join("   ");
+        // The history, as Zed's status bar keeps one quiet line: what was
+        // just undone or redone, else the last thing done. A click lists
+        // the steps to go back to.
+        let history = self.app.history_status().unwrap_or_default();
         let focus = self.app.focus_status();
         // What is syncing now, if anything, beside a spinner.
         let takt_syncing = matches!(self.app.sync.status().phase, crate::sync::Phase::Syncing);
@@ -742,7 +735,29 @@ impl Takt {
                         .child(said),
                 )
             })
-            .child(div().font_family(MONO_FONT).child(right))
+            .child(
+                div()
+                    .id("status-history")
+                    .px_1()
+                    .rounded(px(4.))
+                    .text_color(t.muted)
+                    .hover(|d| d.bg(t.hover))
+                    .tooltip(super::widgets::tip(
+                        "History: choose a step to go back to it",
+                        t,
+                    ))
+                    .child(if history.is_empty() {
+                        "No history".to_string()
+                    } else {
+                        history
+                    })
+                    .on_click(cx.listener(|this, e: &ClickEvent, _, cx| {
+                        let at = e.position();
+                        this.app.open_history_menu(f32::from(at.x), f32::from(at.y));
+                        this.after_change(cx);
+                        cx.notify();
+                    })),
+            )
             .child(div().flex().items_center().children(right_icons))
     }
 

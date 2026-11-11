@@ -278,6 +278,69 @@ impl App {
         });
     }
 
+    /// The status bar's history clicked: the journal's steps, newest first.
+    /// Choosing one undoes what came after it, or redoes up to it when it
+    /// was undone.
+    pub fn open_history_menu(&mut self, x: f32, y: f32) {
+        let steps = self.store.core.undo_history(30).unwrap_or_default();
+        let mut entries = vec![MenuEntry::Item(MenuItem {
+            title: if steps.is_empty() {
+                "Nothing to undo yet".into()
+            } else {
+                "History — choose a step to go back to it".into()
+            },
+            action: "history:none".into(),
+            keys: String::new(),
+            destructive: false,
+        })];
+        if !steps.is_empty() {
+            entries.push(MenuEntry::Divider);
+        }
+        let newest_done = steps.iter().position(|s| !s.is_undone);
+        for (ix, step) in steps.iter().enumerate() {
+            entries.push(MenuEntry::Item(MenuItem {
+                title: if step.is_undone {
+                    format!("{}  (undone)", step.label)
+                } else {
+                    step.label.clone()
+                },
+                action: format!("history:{ix}"),
+                keys: if Some(ix) == newest_done {
+                    "⌘Z".into()
+                } else {
+                    String::new()
+                },
+                destructive: false,
+            }));
+        }
+        self.context_menu = Some(ContextMenu {
+            x,
+            y,
+            entries,
+            index: None,
+        });
+    }
+
+    /// Back or forward through the journal to step `ix` of the history as
+    /// the menu listed it (newest first).
+    fn go_to_history_step(&mut self, ix: usize) {
+        let steps = self.store.core.undo_history(30).unwrap_or_default();
+        let Some(step) = steps.get(ix) else { return };
+        if step.is_undone {
+            // Redo the undone steps from the oldest up to and including it.
+            let count = steps[..=ix].iter().filter(|s| s.is_undone).count();
+            for _ in 0..count {
+                self.undo(true);
+            }
+        } else {
+            // Undo the done steps newer than it.
+            let count = steps[..ix].iter().filter(|s| !s.is_undone).count();
+            for _ in 0..count {
+                self.undo(false);
+            }
+        }
+    }
+
     fn task_links(&self, task_id: &str) -> Vec<String> {
         self.store
             .core
@@ -299,7 +362,14 @@ impl App {
                 self.sync.sign_out();
                 return;
             }
+            "history:none" => return,
             _ => {}
+        }
+        if let Some(ix) = action.strip_prefix("history:") {
+            if let Ok(ix) = ix.parse::<usize>() {
+                self.go_to_history_step(ix);
+            }
+            return;
         }
         if let Some(ix) = action.strip_prefix("open-link:") {
             let links = self

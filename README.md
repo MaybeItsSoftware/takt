@@ -1084,7 +1084,10 @@ what has been done.
   or a passing message; on the right, the running block and its clock (click to
   return to it), today's time logged, points and tasks done (the week's in the
   tooltip; click for the timeline), what is available now (click for the
-  Conditions tab), Google Tasks sync, and at the right edge
+  Conditions tab), Google Tasks sync, the history — what `Cmd+Z` or
+  `Cmd+Shift+Z` just undid or redid ("Undid Edit Task"), else the last thing
+  done; click it for the list of steps, and choose one to go back to it (or,
+  for a step undone, forward to it) — and at the right edge
   the right dock's Inspector toggle — each toggle on the side its
   pane opens on.
 
@@ -1106,7 +1109,9 @@ Takt** in the menu bar, or with the global hotkey. It is resizable, remembers it
 frame, and `Esc` leaves it alone.
 
 **A Dock icon appears while the window is open** and goes again when you close
-it. That is what buys you `Cmd-Tab`, `Cmd-W`, `Cmd-Q` and — the one you notice
+it — unless **Show in the menu bar** (Settings ▸ General, on by default) is
+off: then there is no menu bar item, and the Dock icon stays while the window
+is closed, so it is still the way back. That is what buys you `Cmd-Tab`, `Cmd-W`, `Cmd-Q` and — the one you notice
 if it is missing — an Edit menu, without which copy and paste do nothing in
 the quick-add field.
 
