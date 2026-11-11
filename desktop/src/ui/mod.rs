@@ -48,6 +48,25 @@ const UI_FONT: &str = "IBM Plex Sans";
 const MONO_FONT: &str = "Lilex";
 const ROW_HEIGHT: f32 = 26.;
 const TITLE_BAR_HEIGHT: f32 = 34.;
+/// How narrow and how wide the side docks may be dragged.
+const SIDEBAR_MIN: f32 = 180.;
+const SIDEBAR_MAX: f32 = 520.;
+const RIGHT_DOCK_MIN: f32 = 240.;
+const RIGHT_DOCK_MAX: f32 = 640.;
+
+/// A side dock's inner edge being dragged; nothing is drawn under the
+/// pointer.
+#[derive(Clone, Copy)]
+pub(super) enum DockEdge {
+    Left,
+    Right,
+}
+
+impl gpui::Render for DockEdge {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
 /// The sidebar's rows, as Zed's project panel spaces them.
 const SIDEBAR_INSET: f32 = 10.;
 const SIDEBAR_INDENT: f32 = 20.;
@@ -1620,6 +1639,31 @@ impl Render for Takt {
             .key_context("Takt")
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
+            // A side dock's edge, dragged: the width follows the pointer
+            // wherever it goes, and is kept once it is let go.
+            .on_drag_move(
+                cx.listener(|this, e: &gpui::DragMoveEvent<DockEdge>, window, cx| {
+                    let x = f32::from(e.event.position.x);
+                    let edge = *e.drag(cx);
+                    let p = &mut this.app.prefs;
+                    let (width, wanted) = match edge {
+                        DockEdge::Left => (&mut p.sidebar_width, x.clamp(SIDEBAR_MIN, SIDEBAR_MAX)),
+                        DockEdge::Right => (
+                            &mut p.right_dock_width,
+                            (f32::from(window.viewport_size().width) - x)
+                                .clamp(RIGHT_DOCK_MIN, RIGHT_DOCK_MAX),
+                        ),
+                    };
+                    if (*width - wanted).abs() >= 0.5 {
+                        *width = wanted;
+                        cx.notify();
+                    }
+                }),
+            )
+            .on_drop(cx.listener(|this, _: &DockEdge, _, cx| {
+                this.app.prefs.save();
+                cx.notify();
+            }))
             .size_full()
             .flex()
             .flex_col()

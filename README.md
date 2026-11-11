@@ -1102,7 +1102,9 @@ the bottom.
   key hints are in the reference (`Cmd+/`) and the palette (`Cmd+K`).
 The docks split by job: the left one is for getting about, the right one
 helps you finish the task in front of you, and the bottom one keeps track of
-what has been done.
+what has been done. The side docks resize by dragging their inner edge, as
+Zed's do (the sidebar from 180 to 520 points, the right dock from 240 to 640);
+the width is remembered, and a double click on the edge puts it back.
 
 - **Right dock** — the inspector and the conditions, as tabs of one resizable
   column, in a tab bar: the showing tab in ink with a rule under it and a close

@@ -35,8 +35,30 @@ impl Takt {
         let tab = self.app.prefs.right_dock_tab.clone();
         // The highlighted row inside says the pane has the keyboard; its
         // edge stays a plain hairline.
+        // Its left edge drags to resize it, as the sidebar's right edge does.
+        let edge = div()
+            .id("right-dock-edge")
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left_0()
+            .w(px(5.))
+            .cursor_col_resize()
+            .on_drag(super::DockEdge::Right, |edge, _, _, cx| cx.new(|_| *edge))
+            .on_click(cx.listener(|this, e: &ClickEvent, _, cx| {
+                if e.click_count() >= 2 {
+                    this.app.prefs.right_dock_width = 320.;
+                    this.app.prefs.save();
+                    cx.notify();
+                }
+            }));
         div()
-            .w(px(self.app.prefs.right_dock_width.clamp(240., 520.)))
+            .relative()
+            .w(px(self
+                .app
+                .prefs
+                .right_dock_width
+                .clamp(super::RIGHT_DOCK_MIN, super::RIGHT_DOCK_MAX)))
             .flex_none()
             .h_full()
             .flex()
@@ -49,6 +71,7 @@ impl Takt {
             } else {
                 self.inspector_pane(t, stops, cx).into_any_element()
             })
+            .child(edge)
     }
 
     pub(super) fn bottom_dock(&self, t: Tokens, cx: &mut Context<Self>) -> impl IntoElement {

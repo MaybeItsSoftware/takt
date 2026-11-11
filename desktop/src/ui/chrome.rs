@@ -130,8 +130,31 @@ impl Takt {
 
     pub(super) fn left_dock(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let agent = self.app.prefs.left_dock_tab == "agent" && !self.app.prefs.ai_off;
+        // Its right edge drags to resize it, as Zed's docks do; a double
+        // click puts it back to the width it starts at.
+        let edge = div()
+            .id("sidebar-edge")
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .right_0()
+            .w(px(5.))
+            .cursor_col_resize()
+            .on_drag(super::DockEdge::Left, |edge, _, _, cx| cx.new(|_| *edge))
+            .on_click(cx.listener(|this, e: &ClickEvent, _, cx| {
+                if e.click_count() >= 2 {
+                    this.app.prefs.sidebar_width = 240.;
+                    this.app.prefs.save();
+                    cx.notify();
+                }
+            }));
         div()
-            .w(px(self.app.prefs.sidebar_width.clamp(180., 420.)))
+            .relative()
+            .w(px(self
+                .app
+                .prefs
+                .sidebar_width
+                .clamp(super::SIDEBAR_MIN, super::SIDEBAR_MAX)))
             .flex_none()
             .h_full()
             .flex()
@@ -146,6 +169,7 @@ impl Takt {
             } else {
                 self.sidebar(t, cx).into_any_element()
             })
+            .child(edge)
             .into_any_element()
     }
 
