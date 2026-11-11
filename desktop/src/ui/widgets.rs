@@ -103,7 +103,8 @@ pub(super) fn field_text<V: EntityInputHandler>(
 
 pub(super) fn check(task: &TaskRow, t: Tokens) -> impl IntoElement {
     let (glyph, colour): (&str, Hsla) = match task.status.as_str() {
-        "completed" => ("●", t.success),
+        // The struck-through title says it is done; no mark beside it.
+        "completed" => ("", t.success),
         "cancelled" => ("✕", t.placeholder),
         _ if task.item_kind.as_deref() == Some("list") => ("≡", t.muted),
         _ => ("", t.muted),

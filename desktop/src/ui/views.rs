@@ -39,7 +39,22 @@ impl Takt {
         }
         let counts = self.app.child_counts();
         let active = self.app.region == Region::Tasks;
-        uniform_list(
+        // What the rows are, over them, as the Today view titles its own:
+        // the list's name and how many are open.
+        let open = self
+            .app
+            .rows
+            .iter()
+            .filter(|row| row.task.status == "open")
+            .count();
+        let heading = div()
+            .px_3()
+            .pt_2()
+            .pb_1()
+            .text_size(px(11.))
+            .text_color(t.placeholder)
+            .child(format!("{} · {open}", self.app.scope_title()));
+        let list = uniform_list(
             "outline",
             display.len(),
             cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
@@ -59,8 +74,15 @@ impl Takt {
         )
         .track_scroll(self.main_scroll.clone())
         .flex_1()
-        .py_1()
-        .into_any_element()
+        .pb_1();
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(heading)
+            .child(list)
+            .into_any_element()
     }
 
     pub(super) fn outline_row(
@@ -85,8 +107,9 @@ impl Takt {
         let element = div()
             .id(("outline-row", ix))
             .h(px(ROW_HEIGHT))
-            .mx_1()
-            .pl(px(8. + row.depth as f32 * 18.))
+            .flex_1()
+            .min_w_0()
+            .pl(px(8.))
             .pr_3()
             .flex()
             .items_center()
@@ -147,7 +170,20 @@ impl Takt {
             })
             .children(detail_chips(&self.app, &row.task, t))
             .children(task_chips(&row.task, counted, t));
-        super::celebrate::celebrate(element, &row.task.id, celebrating, t)
+        // The indent is outside the row, so the selection and hover box
+        // starts where the task does rather than at the pane's edge.
+        div()
+            .h(px(ROW_HEIGHT))
+            .mx_1()
+            .pl(px(row.depth as f32 * 18.))
+            .flex()
+            .child(super::celebrate::celebrate(
+                element,
+                &row.task.id,
+                celebrating,
+                t,
+            ))
+            .into_any_element()
     }
 
     pub(super) fn board(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
@@ -181,6 +217,12 @@ impl Takt {
             .p_2()
             .overflow_x_scroll()
             .track_scroll(&self.board_scroll)
+            // Sideways only from a sideways swipe: gpui would otherwise turn
+            // scrolling down into scrolling across.
+            .map(|mut d| {
+                d.style().restrict_scroll_to_axis = Some(true);
+                d
+            })
             .children(board.columns.iter().enumerate().map(|(column_ix, column)| {
                 let cards = board.cards.get(column_ix).cloned().unwrap_or_default();
                 let focused = column_ix == board.column && active;
