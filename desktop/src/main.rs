@@ -119,21 +119,45 @@ fn main() {
                             );
                             // Again with one real Esc in the window, as a
                             // person presses it: still one main window.
-                            takt.update(cx, |this, cx| {
-                                this.open_settings_page();
-                                this.open_requested_windows(cx);
-                            });
+                            // TAKT_DESKTOP_SMOKE_SETTINGS_ALONE: with the main window
+                            // closed first, as when Takt lives in the menu bar.
+                            if std::env::var_os("TAKT_DESKTOP_SMOKE_SETTINGS_ALONE").is_some()
+                                && let Some(main) = takt.read(cx).main_window_handle()
+                            {
+                                let _ = cx.update_window(main.into(), |_, window, _| {
+                                    window.remove_window()
+                                });
+                            }
+                            // Twice, as ⌘, arrives by the menu's key and the
+                            // window's both: still one settings window.
+                            let before = cx.windows().len();
+                            for _ in 0..2 {
+                                takt.update(cx, |this, cx| {
+                                    this.open_settings_page();
+                                    this.open_requested_windows(cx);
+                                });
+                            }
                             let takt = takt.clone();
                             cx.spawn(async move |cx| {
                                 cx.background_executor()
                                     .timer(Duration::from_millis(400))
                                     .await;
                                 let _ = cx.update(|cx| {
+                                    println!(
+                                        "smoke settings opened twice: {} new window(s)",
+                                        cx.windows().len() as isize - before as isize
+                                    );
+                                });
+                                let _ = cx.update(|cx| {
                                     let handle = takt.read(cx).settings_window_handle();
                                     if let Some(handle) = handle {
                                         let _ = cx.update_window(handle.into(), |_, window, cx| {
+                                            // TAKT_DESKTOP_SMOKE_SETTINGS_KEY: the key
+                                            // that closes it, Esc unless named (cmd-w).
+                                            let key = std::env::var("TAKT_DESKTOP_SMOKE_SETTINGS_KEY")
+                                                .unwrap_or_else(|_| "escape".into());
                                             window.dispatch_keystroke(
-                                                gpui::Keystroke::parse("escape").expect("a key"),
+                                                gpui::Keystroke::parse(&key).expect("a key"),
                                                 cx,
                                             );
                                         });
@@ -149,8 +173,14 @@ fn main() {
                                         .iter()
                                         .filter(|w| Some(w.window_id()) == main)
                                         .count();
+                                    for w in cx.windows() {
+                                        let size = w
+                                            .update(cx, |_, window, _| window.bounds().size)
+                                            .ok();
+                                        println!("smoke window left: {:?} {size:?}", w.window_id());
+                                    }
                                     println!(
-                                        "smoke settings esc: {} windows after ({} main, settings gone {}), settings page {}",
+                                        "smoke settings close key: {} windows after ({} main, settings gone {}), settings page {}",
                                         cx.windows().len(),
                                         mains,
                                         takt.read(cx).settings_gone(cx),

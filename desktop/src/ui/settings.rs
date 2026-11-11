@@ -120,10 +120,17 @@ impl Takt {
                 }
             }
             (true, None) => {
+                if self.settings_opening {
+                    return;
+                }
+                self.settings_opening = true;
                 // Once this update ends: the window's first draw reads this
                 // entity.
                 let takt = cx.entity();
-                cx.defer(move |cx| open_window(&takt, cx));
+                cx.defer(move |cx| {
+                    open_window(&takt, cx);
+                    takt.update(cx, |this, _| this.settings_opening = false);
+                });
             }
             (false, Some(handle)) => {
                 self.settings_window = None;
@@ -538,6 +545,10 @@ impl Takt {
 
     pub fn main_window_id(&self) -> Option<gpui::WindowId> {
         self.main.map(|m| m.window_id())
+    }
+
+    pub fn main_window_handle(&self) -> Option<gpui::WindowHandle<Takt>> {
+        self.main
     }
 
     pub fn settings_window_handle(&self) -> Option<gpui::WindowHandle<Takt>> {

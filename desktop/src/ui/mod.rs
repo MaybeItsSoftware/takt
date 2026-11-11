@@ -95,6 +95,10 @@ pub struct Takt {
     /// The settings window closed but not yet gone: it keeps drawing the
     /// settings page, never the main window's, until it is removed.
     settings_closing: Option<gpui::WindowId>,
+    /// A settings window is on its way: asked for, not yet open. ⌘, comes
+    /// by two routes (the menu's key and the window's), and a second must
+    /// not open a second window, which would draw the main view.
+    settings_opening: bool,
     /// The settings window is the one in front: sheets and pickers come
     /// up there rather than in the main window.
     settings_active: bool,
@@ -205,6 +209,7 @@ impl Takt {
             main: None,
             settings_window: None,
             settings_closing: None,
+            settings_opening: false,
             settings_active: false,
             settings_wanted_front: false,
             platform_live: false,
