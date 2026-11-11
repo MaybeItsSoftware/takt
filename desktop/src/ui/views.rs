@@ -699,11 +699,13 @@ impl Takt {
             .explanation
             .clone()
             .unwrap_or_else(|| reason_title(&row.reason).into());
-        div()
+        let element = div()
             .id(("day-row", ix))
             .h(px(ROW_HEIGHT + 4.))
-            .mx_1()
-            .px_2()
+            .flex_1()
+            .min_w_0()
+            .pl(px(6.))
+            .pr_2()
             .flex()
             .items_center()
             .gap_2()
@@ -743,7 +745,6 @@ impl Takt {
                 this.app.region = Region::Tasks;
                 cx.notify();
             }))
-            .child(check(&row.task, t))
             .child(title_greyed(&row.task, self.app.is_greyed(&row.task.id), t))
             .children(detail_chips(&self.app, &row.task, t))
             .child(
@@ -751,7 +752,17 @@ impl Takt {
                     .text_size(px(11.))
                     .text_color(t.placeholder)
                     .child(format!("{list} · {reason}")),
-            )
+            );
+        // As an outline row at the top level: the status mark sits outside
+        // the box, so the selection starts at the title, level with a list's.
+        div()
+            .h(px(ROW_HEIGHT + 4.))
+            .mx_1()
+            .pl(px(2. + 10. + 4.))
+            .flex()
+            .items_center()
+            .child(check(&row.task, t))
+            .child(element)
             .into_any_element()
     }
 }
