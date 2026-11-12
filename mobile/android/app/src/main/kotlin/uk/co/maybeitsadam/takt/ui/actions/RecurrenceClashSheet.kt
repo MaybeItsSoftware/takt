@@ -37,10 +37,10 @@ fun RecurrenceClashSheet(pending: PendingRecurrenceClash, onChoose: (RecurrenceC
     ModalBottomSheet(
         onDismissRequest = { onChoose(RecurrenceClashChoice.CANCEL) },
         sheetState = sheet,
-        containerColor = colors.paper,
+        containerColor = TaktTheme.colors.altRow,
         contentColor = colors.ink,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = Metrics.cardRadius, topEnd = Metrics.cardRadius),
+        shape = Metrics.sheetTop,
         dragHandle = { SheetHandle() },
         modifier = Modifier.testTag("recurrence_clash"),
     ) {

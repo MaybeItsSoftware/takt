@@ -367,7 +367,7 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
             ) { data ->
                 Snackbar(
                     snackbarData = data,
-                    shape = Metrics.control,
+                    shape = Metrics.popover,
                     containerColor = TaktTheme.colors.ink,
                     contentColor = TaktTheme.colors.paper,
                     actionColor = if (TaktTheme.colors.isDark) TaktTheme.colors.primary else TaktTheme.colors.dimText,
@@ -380,9 +380,9 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
                 ModalBottomSheet(
                     onDismissRequest = container.inspector::close,
                     sheetState = sheetState,
-                    containerColor = TaktTheme.colors.paper,
+                    containerColor = TaktTheme.colors.altRow,
                     tonalElevation = 0.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = Metrics.cardRadius, topEnd = Metrics.cardRadius),
+                    shape = Metrics.sheetTop,
                     dragHandle = { SheetHandle() },
                 ) {
                     TaskInspector(taskId = taskId, asSheet = true, onClose = container.inspector::close)
@@ -435,27 +435,30 @@ private fun AppNavHost(nav: NavHostController) {
     }
 }
 
-/** The quick-add button: a square-ish 6dp azure tile, flat. */
+/**
+ * The quick-add button: a 44dp square of the accent at the popover radius,
+ * flat, with no shadow (Compose grows its hit area to 48).
+ */
 @Composable
 private fun QuickAddFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
-            .size(52.dp)
-            .clip(Metrics.control)
+            .size(44.dp)
+            .clip(Metrics.popover)
             .background(TaktTheme.colors.primary)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = "Add a task" }
             .testTag("quick_add_fab"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Filled.Add, null, tint = TaktTheme.colors.onAccent)
+        Icon(Icons.Filled.Add, null, tint = TaktTheme.colors.onAccent, modifier = Modifier.size(20.dp))
     }
 }
 
-/** The bottom sheet's grabber: a short dim rule. */
+/** The bottom sheet's grabber: a short rule in the border colour, quiet as the Mac's chrome. */
 @Composable
 fun SheetHandle() {
-    Box(Modifier.fillMaxWidth().padding(vertical = Metrics.sm + Metrics.xxs), contentAlignment = Alignment.Center) {
-        Box(Modifier.width(36.dp).height(4.dp).clip(Metrics.control).background(TaktTheme.colors.dimText))
+    Box(Modifier.fillMaxWidth().padding(vertical = Metrics.sm), contentAlignment = Alignment.Center) {
+        Box(Modifier.width(32.dp).height(3.dp).clip(Metrics.pill).background(TaktTheme.colors.border))
     }
 }

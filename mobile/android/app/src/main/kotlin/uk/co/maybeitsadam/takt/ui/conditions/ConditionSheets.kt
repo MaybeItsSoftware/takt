@@ -294,9 +294,9 @@ private fun ConditionPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.paper,
+        containerColor = TaktTheme.colors.altRow,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = Metrics.cardRadius, topEnd = Metrics.cardRadius),
+        shape = Metrics.sheetTop,
         dragHandle = { SheetHandle() },
         modifier = Modifier.testTag(tag),
     ) {

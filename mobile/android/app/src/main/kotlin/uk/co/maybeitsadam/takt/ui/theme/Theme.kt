@@ -1,5 +1,6 @@
 package uk.co.maybeitsadam.takt.ui.theme
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
@@ -132,6 +133,20 @@ data class ThemeRadii(val panel: Dp, val row: Dp, val control: Dp, val pill: Dp,
     val rowShape = RoundedCornerShape(row)
     val controlShape = RoundedCornerShape(control)
     val pillShape = RoundedCornerShape(pill)
+
+    /**
+     * The Mac's three steps, grown from the control radius as it grows them
+     * from 4: 4 for rows, cards, buttons and fields ([item]); 6 for board
+     * columns, menus, tooltips, popovers and settings controls ([popover]);
+     * 8 for dialogs and sheets ([sheet]).
+     */
+    val item: Dp = control
+    val popover: Dp = control + 2.dp
+    val sheet: Dp = control + 4.dp
+    val itemShape = RoundedCornerShape(item)
+    val popoverShape = RoundedCornerShape(popover)
+    val sheetShape = RoundedCornerShape(sheet)
+    val sheetTopShape = RoundedCornerShape(topStart = sheet, topEnd = sheet)
 }
 
 @Immutable
@@ -164,6 +179,13 @@ data class TaktType(
     val bodyStrong: TextStyle,
     /** `scale.caption`. Secondary lines and captions. */
     val small: TextStyle,
+    /**
+     * The Mac's 11 against its 13 body, on this body: a task's chips, counts,
+     * status words and list section headings.
+     */
+    val secondary: TextStyle,
+    /** [secondary] in the mono face: done/total, keys in a menu. */
+    val monoSecondary: TextStyle,
     /** The theme's micro-label, minus its colour: section headers, column heads, tabs. */
     val label: TextStyle,
     /** The theme's mono face at caption size: times, counts and keys beside body text. */
@@ -240,6 +262,8 @@ class ResolvedTheme(
             body = style(fonts.body, FontWeight.Normal, scale.body),
             bodyStrong = style(fonts.body, FontWeight.Medium, scale.body),
             small = style(fonts.body, FontWeight.Normal, scale.caption),
+            secondary = style(fonts.body, FontWeight.Normal, scale.body * SECONDARY_RATIO),
+            monoSecondary = style(fonts.mono, FontWeight.Normal, scale.body * SECONDARY_RATIO),
             label = microLabel.style,
             mono = style(fonts.mono, FontWeight.Normal, scale.caption),
             monoSmall = style(fonts.mono, FontWeight.Normal, kotlin.math.round(scale.caption * MONO_SMALL_RATIO)),
@@ -254,12 +278,14 @@ class ResolvedTheme(
 
     val colorScheme: ColorScheme = colors.toColorScheme()
 
+    // Stock components take the Mac's steps: menus and chips the control
+    // radius, popovers 6, dialogs and sheets 8.
     val shapes = Shapes(
         extraSmall = radii.controlShape,
         small = radii.controlShape,
-        medium = radii.panelShape,
-        large = radii.panelShape,
-        extraLarge = radii.panelShape,
+        medium = radii.popoverShape,
+        large = radii.sheetShape,
+        extraLarge = radii.sheetShape,
     )
 
     val materialTypography: Typography = Typography().let { base ->
@@ -282,6 +308,9 @@ class ResolvedTheme(
         private const val HEADLINE_RATIO = 1.2
         private const val MONO_TITLE_RATIO = 1.1
         private const val MINIMUM_FIELD_SIZE = 16.0
+
+        /** The Mac's secondary text (11) over its body (13). */
+        private const val SECONDARY_RATIO = 11.0 / 13.0
 
         private fun lineHeight(size: Double): TextUnit = kotlin.math.round(size * LEADING).sp
 
@@ -355,29 +384,74 @@ object Metrics {
     val emphasis: Dp @Composable @ReadOnlyComposable get() = TaktTheme.borders.emphasis
     val focusRing: Dp @Composable @ReadOnlyComposable get() = TaktTheme.borders.focusRing
 
-    /** `radius.panel`: cards, panels, sheets and popovers. */
-    val cardRadius: Dp @Composable @ReadOnlyComposable get() = TaktTheme.radii.panel
+    /** `radius.panel`: a whole pane's edge (0 in Zed One, as the Mac's panes are square). */
+    val panelRadius: Dp @Composable @ReadOnlyComposable get() = TaktTheme.radii.panel
 
-    /** `radius.control`: buttons, inputs, chips. */
+    /** `radius.control`: inputs, chips and key hints. */
     val controlRadius: Dp @Composable @ReadOnlyComposable get() = TaktTheme.radii.control
-    val card: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.panelShape
+
+    /** The Mac's 4: rows, cards, buttons, tabs, key hints, inline fields. */
+    val cardRadius: Dp @Composable @ReadOnlyComposable get() = TaktTheme.radii.item
+    val card: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.itemShape
     val control: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.controlShape
 
-    /** `radius.row`: a list row's selection and hover. */
-    val row: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.rowShape
+    /** A list row's selection and press, at the Mac's 4. */
+    val row: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.itemShape
 
-    /** `radius.pill`: genuinely round things only. */
+    /** The Mac's 6: board columns, menus, tooltips, popovers and settings controls. */
+    val popover: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.popoverShape
+
+    /** The Mac's 8: dialogs and sheets. */
+    val sheet: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.sheetShape
+    val sheetTop: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.sheetTopShape
+
+    /** `radius.pill`: genuinely round things only (dots, switch knobs). */
     val pill: RoundedCornerShape @Composable @ReadOnlyComposable get() = TaktTheme.radii.pillShape
 
     /** The theme's minimum hit area. */
     val touchTarget: Dp @Composable @ReadOnlyComposable get() = TaktTheme.touchTarget
 
-    // Layout, not theme.
+    // Layout, not theme: the Mac's measures, each scaled by [MAC] onto the
+    // phone's larger body (15 against the Mac's 13).
+
+    /** One Mac pixel on the phone: its 13 body against this 15. */
+    const val MAC: Float = 15f / 13f
+
+    /**
+     * A row as a finger needs it. The Mac's is 26 (30dp here); a phone row
+     * is the touch target, painting nothing but its selection and hairlines,
+     * so a tap never lands between two.
+     */
     val rowHeight: Dp = 48.dp
 
-    /** Indent per outline level; a phone runs out of width four levels down. */
+    /** The Mac's 26-high row, painted: a selection's fill, a board card's line. */
+    val paintedRow: Dp = 30.dp
+
+    /** Indent per outline level, as the Mac's 18. */
     val indent: Dp = 18.dp
-    val headerHeight: Dp = 52.dp
+
+    /** The Mac's 10-wide disclosure triangle and 12-wide status mark. */
+    val disclosure: Dp = 12.dp
+    val statusMark: Dp = 14.dp
+
+    /** The title bar: the Mac's 34. */
+    val headerHeight: Dp = 40.dp
+
+    /** The status bar: the Mac's 30. */
+    val statusBarHeight: Dp = 34.dp
+
+    /** A button, segmented control or field in a row: the Mac's 26. */
+    val controlHeight: Dp = 30.dp
+
+    /** A settings row: the Mac's 38. */
+    val settingsRowHeight: Dp = 44.dp
+
+    /** A menu item: the Mac's 24, painted; its hit area grows to the touch target. */
+    val menuItemHeight: Dp = 28.dp
+
+    /** An icon in a bar: the Mac's 14–16. */
+    val barIcon: Dp = 18.dp
+
     /** The sidebar, as a phone's drawer and a wide window's dock. */
     val sidebarWidth: Dp = 288.dp
     val inspectorWidth: Dp = 380.dp
@@ -411,8 +485,11 @@ fun TaktTheme(theme: ResolvedTheme, content: @Composable () -> Unit) {
             colorScheme = theme.colorScheme,
             typography = theme.materialTypography,
             shapes = theme.shapes,
-            content = content,
-        )
+        ) {
+            // A press is the Mac's hover fill, not a ripple.
+            val press = remember(theme.colors.hover) { PressFill(theme.colors.hover) }
+            CompositionLocalProvider(LocalIndication provides press, content = content)
+        }
     }
 }
 

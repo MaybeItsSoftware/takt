@@ -77,9 +77,19 @@ private fun localTable(values: Map<String, CoreThemeColor>): Map<ThemeColorRole,
         .sortedBy { it.first.ordinal }
         .toMap(LinkedHashMap())
 
-internal val ThemePalette.core: CoreThemePalette get() = CoreThemePalette(coreTable(light), coreTable(dark))
+private fun coreChrome(values: Map<ThemeChromeRole, ThemeColorValue>): Map<String, CoreThemeColor> =
+    values.entries.associate { it.key.raw to it.value.core }
 
-internal fun CoreThemePalette.local() = ThemePalette(localTable(light), localTable(dark))
+private fun localChrome(values: Map<String, CoreThemeColor>): Map<ThemeChromeRole, ThemeColorValue> =
+    values.entries.mapNotNull { (key, value) -> ThemeChromeRole.of(key)?.let { it to ThemeColorValue.of(value) } }
+        .sortedBy { it.first.ordinal }
+        .toMap(LinkedHashMap())
+
+internal val ThemePalette.core: CoreThemePalette
+    get() = CoreThemePalette(coreTable(light) + coreChrome(chromeLight), coreTable(dark) + coreChrome(chromeDark))
+
+internal fun CoreThemePalette.local() =
+    ThemePalette(localTable(light), localTable(dark), localChrome(light), localChrome(dark))
 
 internal val ThemeFontFace.core: CoreThemeFontFace get() = CoreThemeFontFace(families, design.raw)
 

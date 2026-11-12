@@ -96,9 +96,9 @@ fun HistorySheet(onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = TaktTheme.colors.paper,
+        containerColor = TaktTheme.colors.altRow,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = Metrics.cardRadius, topEnd = Metrics.cardRadius),
+        shape = Metrics.sheetTop,
         dragHandle = { SheetHandle() },
         modifier = Modifier.testTag("history_sheet"),
     ) {

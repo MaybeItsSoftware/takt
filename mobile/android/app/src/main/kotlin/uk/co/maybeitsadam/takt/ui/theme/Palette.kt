@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import uk.co.maybeitsadam.takt.core.theme.ThemeAppearance
+import uk.co.maybeitsadam.takt.core.theme.ThemeChromeRole
 import uk.co.maybeitsadam.takt.core.theme.ThemeColorRole
 import uk.co.maybeitsadam.takt.core.theme.ThemeColorValue
 import uk.co.maybeitsadam.takt.core.theme.ThemeSpecification
@@ -39,6 +40,16 @@ data class ThemeColors(
     val mediaScrim: Color,
     /** Text on [mediaScrim]. Theme-invariant. */
     val mediaScrimInk: Color,
+    /** Zed's chrome, resolved by the core (stated by the theme, else derived): the selected row's fill. */
+    val selected: Color,
+    /** The hairline under each level of a tree, in the sidebar. */
+    val indentGuide: Color,
+    /** The status bar's ground; its words are [ink]. */
+    val statusBar: Color,
+    /** The 1dp outline round the row the inspector is showing, and the keyboard's. */
+    val focus: Color,
+    /** An icon at rest. */
+    val icon: Color,
     val isDark: Boolean,
 ) {
     /**
@@ -77,6 +88,7 @@ data class ThemeColors(
         /** The theme's colours in one appearance. */
         fun of(spec: ThemeSpecification, appearance: ThemeAppearance): ThemeColors {
             fun c(role: ThemeColorRole) = spec.color(role, appearance).compose
+            fun chrome(role: ThemeChromeRole) = spec.palette.chrome(role, appearance).compose
             return ThemeColors(
                 paper = c(ThemeColorRole.PAPER),
                 raised = c(ThemeColorRole.RAISED),
@@ -99,6 +111,11 @@ data class ThemeColors(
                 mediaLetterbox = c(ThemeColorRole.MEDIA_LETTERBOX),
                 mediaScrim = c(ThemeColorRole.MEDIA_SCRIM),
                 mediaScrimInk = c(ThemeColorRole.MEDIA_SCRIM_INK),
+                selected = chrome(ThemeChromeRole.SELECTED),
+                indentGuide = chrome(ThemeChromeRole.INDENT_GUIDE),
+                statusBar = chrome(ThemeChromeRole.STATUS_BAR),
+                focus = chrome(ThemeChromeRole.FOCUS),
+                icon = chrome(ThemeChromeRole.ICON),
                 isDark = appearance == ThemeAppearance.DARK,
             )
         }

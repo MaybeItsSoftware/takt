@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +40,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.Color
 import uk.co.maybeitsadam.takt.ui.components.Hairline
@@ -259,15 +263,15 @@ fun Sidebar(selectedKey: String?, onDone: () -> Unit, modifier: Modifier = Modif
     }
     Column(modifier.fillMaxSize().background(colors.altRow)) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = Metrics.headerHeight).padding(start = Metrics.lg, end = Metrics.xxs),
+            Modifier.fillMaxWidth().heightIn(min = Metrics.headerHeight).padding(start = Metrics.md, end = Metrics.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Takt", style = TaktTheme.type.bodyStrong, color = colors.ink, modifier = Modifier.weight(1f))
+            Text("Takt", style = TaktTheme.type.body, color = colors.ink, modifier = Modifier.weight(1f))
             IconAction(PIcons.Folder, "New folder", onClick = { dialog = ListsDialog.NewFolder(null) })
             IconAction(Icons.Filled.Add, "New list", onClick = { dialog = ListsDialog.NewList(null) })
         }
         Hairline()
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("sidebar")) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("sidebar"), contentPadding = PaddingValues(vertical = Metrics.xs)) {
             item(key = SidebarKeys.TODAY, contentType = "place") {
                 TreeLine(
                     title = "Today", icon = PIcons.Today, depth = 0, count = null,
@@ -395,6 +399,13 @@ private fun TreeRowView(
     }
 }
 
+/**
+ * A sidebar row as the Mac's: a 16dp icon in the icon colour 12 in (and 20
+ * more a level), the title in ink, the count dim at the secondary size; the
+ * current place on the selection's fill. Each ancestor level draws Zed's
+ * indent guide, a hairline under its icon, so a level's line runs on
+ * unbroken. A folder shows open or shut by its icon, as Zed's does.
+ */
 @Composable
 private fun TreeLine(
     title: String,
@@ -409,36 +420,43 @@ private fun TreeLine(
     onLongClick: (() -> Unit)? = null,
 ) {
     val colors = TaktTheme.colors
+    val guide = colors.indentGuide
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (selected) colors.primary.copy(alpha = 0.10f) else Color.Transparent)
+            .background(if (selected) colors.selected else Color.Transparent)
             .heightIn(min = Metrics.touchTarget)
+            .drawBehind {
+                val inset = SIDEBAR_INSET.toPx()
+                val step = SIDEBAR_INDENT.toPx()
+                val half = SIDEBAR_ICON.toPx() / 2f
+                for (level in 0 until depth) {
+                    val x = inset + level * step + half
+                    drawLine(guide, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
+                }
+            }
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = onLongClick?.let { "$title actions" })
-            .padding(start = Metrics.md + Metrics.indent * depth, end = Metrics.lg)
+            .padding(start = SIDEBAR_INSET + SIDEBAR_INDENT * depth, end = Metrics.md)
             .semantics {
                 if (disclosure != null) contentDescription = if (disclosure) "Collapse $title" else "Expand $title"
             },
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
     ) {
-        if (disclosure != null) {
-            Icon(
-                if (disclosure) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
-                tint = colors.mutedText, modifier = Modifier.size(18.dp),
-            )
-        } else {
-            Spacer(Modifier.width(18.dp))
-        }
-        Spacer(Modifier.width(Metrics.xs))
-        Icon(icon, null, tint = if (selected) colors.primary else colors.mutedText, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(Metrics.md))
+        val shown = if (icon == PIcons.Folder && disclosure == true) ListIcons.FolderOpen else icon
+        Icon(shown, null, tint = colors.icon, modifier = Modifier.size(SIDEBAR_ICON))
         Text(
-            title, style = TaktTheme.type.body, color = if (muted) colors.mutedText else colors.ink,
+            title, style = TaktTheme.type.body, color = if (muted) colors.dimText else colors.ink,
             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
         )
-        if (count != null && count > 0) MonoText(count.toString(), color = colors.dimText)
+        if (count != null && count > 0) Text(count.toString(), style = TaktTheme.type.secondary, color = colors.dimText, maxLines = 1)
     }
 }
+
+/** The Mac's sidebar measures: its 10 inset and 20 a level, and a 16 icon. */
+private val SIDEBAR_INSET = 12.dp
+private val SIDEBAR_INDENT = 20.dp
+private val SIDEBAR_ICON = 16.dp
 
 @Composable
 private fun ListMenu(row: TreeRow.ListRow, isShared: Boolean, vm: ListsViewModel, show: (ListsDialog) -> Unit, close: () -> Unit) {

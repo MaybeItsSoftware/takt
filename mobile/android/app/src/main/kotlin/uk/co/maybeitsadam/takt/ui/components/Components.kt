@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,13 +27,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import uk.co.maybeitsadam.takt.ui.theme.PIcons
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +40,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -102,9 +100,10 @@ fun VerticalHairline(modifier: Modifier = Modifier, color: Color = TaktTheme.col
 }
 
 /**
- * The header band every screen starts with: one height across panes, a title,
- * an optional muted subtitle, trailing actions, and a hairline beneath. It
- * pads itself below the status bar, so screens draw edge to edge.
+ * The header band every screen starts with, as the Mac's title bar: one line
+ * on the well, 40dp (the Mac's 34), the place in ink, a dim note beside it,
+ * trailing tools, and a border hairline beneath. It pads itself below the
+ * status bar, painting the well under it too, so screens draw edge to edge.
  */
 @Composable
 fun TaktTopBar(
@@ -123,29 +122,28 @@ fun TaktTopBar(
     Column(
         modifier
             .fillMaxWidth()
-            .background(TaktTheme.colors.paper)
+            .background(TaktTheme.colors.well)
             .then(if (insetStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top)) else Modifier),
     ) {
-        // One line, as the Mac's title bar: the place, a muted note beside it, then its tools.
         Row(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = Metrics.headerHeight)
-                .padding(start = if (navigation == null && openSidebar == null) Metrics.lg else Metrics.xxs, end = Metrics.xxs),
+                .padding(start = if (navigation == null && openSidebar == null) Metrics.md else Metrics.xxs, end = Metrics.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             when {
                 navigation != null -> navigation()
-                openSidebar != null -> IconAction(PIcons.Sidebar, "Lists", tint = TaktTheme.colors.ink, onClick = openSidebar, modifier = Modifier.testTag("open_sidebar"))
+                openSidebar != null -> IconAction(PIcons.Sidebar, "Lists", tint = TaktTheme.colors.icon, onClick = openSidebar, modifier = Modifier.testTag("open_sidebar"))
             }
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    title, style = TaktTheme.type.bodyStrong, color = TaktTheme.colors.ink,
+                    title, style = TaktTheme.type.body, color = TaktTheme.colors.ink,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
                 if (subtitle != null) {
                     Spacer(Modifier.width(Metrics.sm))
-                    Text(subtitle, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             actions()
@@ -177,23 +175,30 @@ fun HistoryActions(compact: Boolean = false) {
     IconAction(PIcons.History, "History", onClick = { shell.showHistory() })
 }
 
-/** A 48dp icon button with no fill: the toolbar's only button style. */
+/**
+ * An icon button with no fill, as the Mac's bar buttons: an 18dp icon in a
+ * 40dp square at the item radius, the press its hover fill. Compose grows
+ * the hit area of anything under 48dp to 48 where nothing else claims the
+ * touch, so the bar keeps the Mac's height without a smaller target.
+ */
 @Composable
 fun IconAction(
     icon: ImageVector,
     contentDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    tint: Color = TaktTheme.colors.mutedText,
+    tint: Color = TaktTheme.colors.icon,
     onClick: () -> Unit,
 ) {
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.size(Metrics.touchTarget),
-        colors = IconButtonDefaults.iconButtonColors(contentColor = tint, disabledContentColor = TaktTheme.colors.dimText),
+    Box(
+        modifier
+            .size(Metrics.headerHeight)
+            .clip(Metrics.card)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = if (enabled) tint else TaktTheme.colors.dimText, modifier = Modifier.size(Metrics.barIcon))
     }
 }
 
@@ -204,7 +209,11 @@ fun SettingsAction() {
     IconAction(Icons.Filled.Settings, "Settings", onClick = { shell.navigator.openSettings() })
 }
 
-/** A sentence-case muted label over a section, with an optional trailing control. */
+/**
+ * A list's section heading, as the Mac's: secondary size, dim, sentence case,
+ * "Title · n", no rule; 12 in from the side, 12 above and 4 below. An
+ * optional control sits at the end.
+ */
 @Composable
 fun SectionHeader(
     text: String,
@@ -213,21 +222,59 @@ fun SectionHeader(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier.fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = Metrics.lg),
+        modifier
+            .fillMaxWidth()
+            .padding(start = Metrics.md, end = if (trailing == null) Metrics.md else Metrics.xs, top = Metrics.md, bottom = Metrics.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, style = TaktTheme.type.label, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f, fill = false))
-        if (detail != null) {
-            Spacer(Modifier.width(Metrics.sm))
-            Text(detail, style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText)
-        }
-        Spacer(Modifier.weight(1f))
+        Text(
+            if (detail == null) text else "$text · $detail",
+            style = TaktTheme.type.secondary,
+            color = TaktTheme.colors.dimText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
         trailing?.invoke()
     }
 }
 
 /**
- * A squarish 6dp tag: tinted fill, border and text of one hue, never a capsule.
+ * The micro-label: the theme's small bold capitals, in its role (the Mac's
+ * 10 bold, dim). Settings group headings and matrix quadrant titles.
+ */
+@Composable
+fun MicroLabel(text: String, modifier: Modifier = Modifier, color: Color? = null) {
+    val label = TaktTheme.microLabel
+    Text(
+        if (label.uppercase) text.uppercase() else text,
+        style = label.style,
+        color = color ?: TaktTheme.colors.role(label.role),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
+/**
+ * A task's chip as the Mac draws one: bare secondary-size text in one hue,
+ * no box (blocked, ⌛ who, #tag, ↻, P1, a due day, done/total, ¶).
+ */
+@Composable
+fun Chip(text: String, color: Color, modifier: Modifier = Modifier, mono: Boolean = false) {
+    Text(
+        text,
+        style = if (mono) TaktTheme.type.monoSecondary else TaktTheme.type.secondary,
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier,
+    )
+}
+
+/**
+ * A squarish tag at the item radius: tinted fill, border and text of one
+ * hue, never a capsule.
  * [selected] fills it a little more; [onClick] makes it a 48dp-tall target.
  */
 @Composable
@@ -240,7 +287,7 @@ fun Tag(
     leading: ImageVector? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val shape = Metrics.control
+    val shape = Metrics.card
     val fill = if (selected) color.copy(alpha = 0.18f) else color.copy(alpha = 0.08f)
     val border = if (selected) color.copy(alpha = 0.7f) else color.copy(alpha = 0.35f)
     val content = @Composable {
@@ -254,7 +301,7 @@ fun Tag(
             horizontalArrangement = Arrangement.spacedBy(Metrics.xs),
         ) {
             if (leading != null) Icon(leading, null, tint = color, modifier = Modifier.size(14.dp))
-            Text(text, style = if (mono) TaktTheme.type.monoSmall.copy(fontSize = TaktTheme.type.small.fontSize) else TaktTheme.type.small, color = if (color == TaktTheme.colors.mutedText) TaktTheme.colors.ink else color, maxLines = 1)
+            Text(text, style = if (mono) TaktTheme.type.monoSecondary else TaktTheme.type.secondary, color = if (color == TaktTheme.colors.mutedText) TaktTheme.colors.ink else color, maxLines = 1)
         }
     }
     if (onClick == null) {
@@ -270,7 +317,12 @@ fun Tag(
     }
 }
 
-/** A flat button: filled primary for the main action, bordered otherwise. 6dp, 48dp tall, no elevation. */
+/**
+ * A button as the Mac's: 30dp (its 26) at the popover radius, a hairline
+ * border on the panel fill, the press its hover. The main action is the
+ * selection's fill with an accent border; a destructive one is set in the
+ * danger hue. Under 48dp, its hit area is grown by Compose, not painted.
+ */
 @Composable
 fun PButton(
     text: String,
@@ -285,29 +337,64 @@ fun PButton(
     val colors = TaktTheme.colors
     val accent = if (destructive) colors.danger else colors.primary
     val fill = when {
-        !enabled -> colors.well
-        primary -> accent
-        else -> colors.raised
+        !enabled -> colors.altRow
+        primary -> colors.selected
+        else -> colors.altRow
     }
     val textColor = when {
         !enabled -> colors.dimText
-        primary -> colors.onAccent
         destructive -> colors.danger
         else -> colors.ink
     }
     Row(
         modifier
-            .heightIn(min = Metrics.touchTarget)
-            .clip(Metrics.control)
+            .heightIn(min = Metrics.controlHeight)
+            .clip(Metrics.popover)
             .background(fill)
-            .border(BorderStroke(Metrics.hairline, if (primary && enabled) accent else colors.inputBorder), Metrics.control)
+            .border(BorderStroke(Metrics.hairline, if (primary && enabled) accent else colors.border), Metrics.popover)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Metrics.xs + Metrics.xxs, Alignment.CenterHorizontally),
     ) {
-        if (icon != null) Icon(icon, null, tint = textColor, modifier = Modifier.size(18.dp))
-        Text(text, style = TaktTheme.type.bodyStrong.copy(fontSize = TaktTheme.type.small.fontSize.times(1.05f)), color = textColor, maxLines = 1)
+        if (icon != null) Icon(icon, null, tint = if (enabled && !destructive) colors.icon else textColor, modifier = Modifier.size(16.dp))
+        Text(text, style = TaktTheme.type.small, color = textColor, maxLines = 1)
+    }
+}
+
+/**
+ * A switch as the Mac's settings draw one, a little larger: a 34×20 track
+ * and a 14dp knob. On is the accent with a paper knob; off is the hover fill
+ * in a border outline with a muted knob. Only the knob and track are round.
+ */
+@Composable
+fun PSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val colors = TaktTheme.colors
+    val track = if (checked) colors.primary else colors.hover
+    val edge = if (checked) colors.primary else colors.border
+    val knob = if (checked) colors.paper else colors.mutedText
+    val clickable = if (onCheckedChange != null) {
+        Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
+    } else {
+        Modifier
+    }
+    Box(
+        modifier
+            .then(clickable)
+            .alpha(if (enabled) 1f else TaktTheme.DISABLED_ALPHA)
+            .size(width = 34.dp, height = 20.dp)
+            .clip(Metrics.pill)
+            .background(track)
+            .border(BorderStroke(Metrics.hairline, edge), Metrics.pill)
+            .padding(3.dp),
+        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(14.dp).clip(Metrics.pill).background(knob))
     }
 }
 
@@ -326,17 +413,19 @@ fun EmptyState(title: String, modifier: Modifier = Modifier, detail: String? = n
 }
 
 /**
- * The task's tick: [TaskBox] — a hairline square, never a circle — inside a
- * 48dp target. The painted box is 20dp.
+ * The task's status mark with its action: the Mac's glyph ([TaskBox]) in a
+ * strip as tall as the row and [width] wide, so the mark stays small and the
+ * title stays near the edge while a finger still finds it.
  */
 @Composable
 fun TaskCheck(
     status: TaskStatus,
     modifier: Modifier = Modifier,
     isList: Boolean = false,
-    size: Dp = 20.dp,
+    size: Dp = Metrics.statusMark,
     /** The task's title, so the action reads "Complete Write report" to TalkBack and tests. */
     label: String? = null,
+    width: Dp = 28.dp,
     onToggle: () -> Unit,
 ) {
     val verb = when (status) {
@@ -348,9 +437,9 @@ fun TaskCheck(
     val haptics = LocalHapticFeedback.current
     Box(
         modifier
-            .size(Metrics.touchTarget)
-            .clip(Metrics.control)
-            .clickable(role = Role.Checkbox) {
+            .width(width)
+            .heightIn(min = Metrics.touchTarget)
+            .clickable(role = Role.Checkbox, indication = null, interactionSource = null) {
                 haptics.performHapticFeedback(if (status == TaskStatus.OPEN) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                 onToggle()
             }
@@ -362,33 +451,25 @@ fun TaskCheck(
 }
 
 /**
- * A task's completion box without its action: a hairline square at the
- * control radius scaled down to the box (never round), empty when open; done
- * is the box tinted emerald with its border and a check, cancelled the same in
- * raspberry with a cross. A list's open box holds the outline glyph, so a list
- * still reads as a list beside its tasks.
+ * A task's status mark without its action, as the Mac draws it: a glyph,
+ * not a checkbox. Cancelled is ✕ and a list ≡; a finished task has no mark
+ * (its title is struck through instead). An open task, which on the Mac has
+ * none either, gets a 12dp hairline square at radius 2 in the dim text, the
+ * one affordance a phone without a keyboard needs to finish it.
  */
 @Composable
-fun TaskBox(status: TaskStatus, isList: Boolean = false, size: Dp = 20.dp) {
+fun TaskBox(status: TaskStatus, isList: Boolean = false, size: Dp = Metrics.statusMark) {
     val colors = TaktTheme.colors
-    val shape = RoundedCornerShape(minOf(Metrics.controlRadius, size / 4))
-    val hue = when (status) {
-        TaskStatus.OPEN -> null
-        TaskStatus.COMPLETED -> colors.success
-        TaskStatus.CANCELLED -> colors.danger
-    }
-    Box(
-        Modifier
-            .size(size)
-            .clip(shape)
-            .background(hue?.copy(alpha = 0.10f) ?: Color.Transparent)
-            .border(BorderStroke(if (hue == null) 1.5.dp else Metrics.hairline.coerceAtLeast(1.dp), hue?.copy(alpha = 0.4f) ?: colors.inputBorder), shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        when (status) {
-            TaskStatus.OPEN -> if (isList) Icon(PIcons.Outline, null, tint = colors.mutedText, modifier = Modifier.size(size * 0.6f))
-            TaskStatus.COMPLETED -> Icon(Icons.Filled.Check, null, tint = colors.success, modifier = Modifier.size(size * 0.7f))
-            TaskStatus.CANCELLED -> Icon(Icons.Filled.Close, null, tint = colors.danger, modifier = Modifier.size(size * 0.7f))
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        when {
+            status == TaskStatus.CANCELLED -> Text("✕", style = TaktTheme.type.secondary, color = colors.dimText, maxLines = 1)
+            status == TaskStatus.COMPLETED -> Unit
+            isList -> Text("≡", style = TaktTheme.type.secondary, color = colors.mutedText, maxLines = 1)
+            else -> Box(
+                Modifier
+                    .size(size * (12f / 14f))
+                    .border(BorderStroke(1.dp, colors.dimText), RoundedCornerShape(2.dp)),
+            )
         }
     }
 }
@@ -402,14 +483,19 @@ fun priorityColor(priority: Int?): Color = when (priority) {
     else -> TaktTheme.colors.mutedText
 }
 
-/** A raised card: white on paper, a hairline border, 8dp corners, no shadow. */
+/**
+ * A card as the Mac's board draws one: the paper on its panel, a muted
+ * hairline, the item radius, no shadow; selected, the selection's fill with
+ * the focus outline.
+ */
 @Composable
 fun Card(modifier: Modifier = Modifier, selected: Boolean = false, content: @Composable () -> Unit) {
+    val colors = TaktTheme.colors
     Box(
         modifier
             .clip(Metrics.card)
-            .background(TaktTheme.colors.raised)
-            .border(BorderStroke(Metrics.hairline, if (selected) TaktTheme.colors.primary else TaktTheme.colors.border), Metrics.card),
+            .background(if (selected) colors.selected else colors.paper)
+            .border(BorderStroke(Metrics.hairline, if (selected) colors.focus else colors.borderMuted), Metrics.card),
     ) { content() }
 }
 

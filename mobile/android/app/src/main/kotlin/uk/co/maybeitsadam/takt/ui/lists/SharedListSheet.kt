@@ -91,10 +91,10 @@ internal fun SharedListSheet(listId: String, listName: String, onDismiss: () -> 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = colors.paper,
+        containerColor = TaktTheme.colors.altRow,
         contentColor = colors.ink,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = Metrics.cardRadius, topEnd = Metrics.cardRadius),
+        shape = Metrics.sheetTop,
         dragHandle = { SheetHandle() },
         modifier = Modifier.testTag("shared_list_sheet"),
     ) {
@@ -221,10 +221,10 @@ internal fun JoinListSheet(initial: String, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = colors.paper,
+        containerColor = TaktTheme.colors.altRow,
         contentColor = colors.ink,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = Metrics.cardRadius, topEnd = Metrics.cardRadius),
+        shape = Metrics.sheetTop,
         dragHandle = { SheetHandle() },
         modifier = Modifier.testTag("join_list_sheet"),
     ) {

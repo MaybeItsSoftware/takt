@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,12 +26,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MenuDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,10 +43,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import uk.co.maybeitsadam.takt.ui.components.Hairline
+import uk.co.maybeitsadam.takt.ui.components.MicroLabel
+import uk.co.maybeitsadam.takt.ui.components.PSwitch
+import uk.co.maybeitsadam.takt.ui.lists.PMenu
+import uk.co.maybeitsadam.takt.ui.lists.PMenuItem
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 import uk.co.maybeitsadam.takt.ui.theme.Metrics
 
-/** A block of the inspector: a sentence-case muted label, its controls, a hairline under it. */
+/** A block of the inspector, as a Mac settings group: a micro-label, its controls, a muted hairline under it. */
 @Composable
 fun InspectorSection(
     label: String,
@@ -63,34 +65,35 @@ fun InspectorSection(
             verticalArrangement = Arrangement.spacedBy(Metrics.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = TaktTheme.type.label, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f))
+                MicroLabel(label, Modifier.weight(1f))
                 if (action != null) {
                     action()
                 } else if (detail != null) {
-                    Text(detail, style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText)
+                    Text(detail, style = TaktTheme.type.monoSecondary, color = TaktTheme.colors.dimText)
                 }
             }
             content()
         }
-        Hairline()
+        Hairline(color = TaktTheme.colors.borderMuted)
     }
 }
 
 /** A sub-label inside a section: smaller, still muted, still sentence case. */
 @Composable
 fun FieldLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, modifier = modifier)
+    Text(text, style = TaktTheme.type.secondary, color = TaktTheme.colors.mutedText, modifier = modifier)
 }
 
 /** A line of explanation under a control. */
 @Composable
 fun Hint(text: String, modifier: Modifier = Modifier, color: Color = TaktTheme.colors.dimText) {
-    Text(text, style = TaktTheme.type.small, color = color, modifier = modifier)
+    Text(text, style = TaktTheme.type.secondary, color = color, modifier = modifier)
 }
 
 /**
- * The app's text field: raised fill, a 6dp hairline border that turns azure
- * when focused and raspberry on an error, 48dp tall. No Material underline.
+ * The app's text field, as the Mac's inline field: the paper in a hairline at
+ * the item radius that takes the focus outline when focused and the danger
+ * hue on an error, 48dp tall. No Material underline.
  */
 @Composable
 fun ChalkField(
@@ -114,8 +117,8 @@ fun ChalkField(
     val focused by interaction.collectIsFocusedAsState()
     val borderColor = when {
         isError -> colors.danger
-        focused -> colors.primary
-        else -> colors.inputBorder
+        focused -> colors.focus
+        else -> colors.border
     }
     BasicTextField(
         value = value,
@@ -135,10 +138,10 @@ fun ChalkField(
             Row(
                 Modifier
                     .heightIn(min = Metrics.touchTarget)
-                    .clip(Metrics.control)
-                    .background(colors.raised)
-                    .border(BorderStroke(Metrics.hairline, borderColor), Metrics.control)
-                    .padding(horizontal = Metrics.md, vertical = Metrics.sm + Metrics.xxs),
+                    .clip(Metrics.card)
+                    .background(colors.paper)
+                    .border(BorderStroke(Metrics.hairline, borderColor), Metrics.card)
+                    .padding(horizontal = Metrics.sm + Metrics.xxs, vertical = Metrics.sm + Metrics.xxs),
                 verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
             ) {
@@ -176,24 +179,10 @@ fun SwitchRow(
     ) {
         Column(Modifier.weight(1f).padding(vertical = Metrics.xs)) {
             Text(label, style = TaktTheme.type.body, color = if (enabled) colors.ink else colors.dimText)
-            if (detail != null) Text(detail, style = TaktTheme.type.small, color = colors.mutedText)
+            if (detail != null) Text(detail, style = TaktTheme.type.secondary, color = colors.mutedText)
         }
         Spacer(Modifier.width(Metrics.sm))
-        Switch(
-            checked = checked,
-            onCheckedChange = null,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = colors.onAccent,
-                checkedTrackColor = colors.primary,
-                checkedBorderColor = colors.primary,
-                uncheckedThumbColor = colors.mutedText,
-                uncheckedTrackColor = colors.well,
-                uncheckedBorderColor = colors.inputBorder,
-                disabledCheckedTrackColor = colors.well,
-                disabledUncheckedTrackColor = colors.well,
-            ),
-        )
+        PSwitch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -201,8 +190,10 @@ fun SwitchRow(
 data class Segment<T>(val label: String, val value: T, val tint: Color? = null, val description: String? = null)
 
 /**
- * A row of joined segments with hairline dividers. The selected one takes a
- * tinted fill and border of its own hue (azure unless the option says).
+ * A row of joined segments with hairline dividers, as the Mac's settings
+ * control: 30dp (its 26) at the popover radius on the panel fill. The
+ * selected one takes the selection's fill, or a tint of its own hue when the
+ * option names one.
  */
 @Composable
 fun <T> Segmented(
@@ -216,26 +207,32 @@ fun <T> Segmented(
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = Metrics.touchTarget)
-            .clip(Metrics.control)
-            .border(BorderStroke(Metrics.hairline, colors.inputBorder), Metrics.control),
+            .height(IntrinsicSize.Min)
+            .heightIn(min = Metrics.controlHeight + Metrics.xs)
+            .clip(Metrics.popover)
+            .border(BorderStroke(Metrics.hairline, colors.border), Metrics.popover),
     ) {
         options.forEachIndexed { index, option ->
-            if (index > 0) Box(Modifier.width(Metrics.hairline).heightIn(min = Metrics.touchTarget).background(colors.inputBorder))
+            if (index > 0) Box(Modifier.width(Metrics.hairline).fillMaxHeight().background(colors.border))
             val isSelected = option.value == selected
-            val tint = option.tint ?: colors.primary
             Box(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = Metrics.touchTarget)
-                    .background(if (isSelected) tint.copy(alpha = 0.14f) else colors.raised)
+                    .fillMaxHeight()
+                    .background(
+                        when {
+                            isSelected && option.tint != null -> option.tint.copy(alpha = 0.14f)
+                            isSelected -> colors.selected
+                            else -> colors.altRow
+                        },
+                    )
                     .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(option.value) })
                     .then(if (option.description != null) Modifier.semantics { contentDescription = option.description } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     option.label,
-                    style = if (mono) TaktTheme.type.mono else TaktTheme.type.small,
+                    style = if (mono) TaktTheme.type.monoSecondary else TaktTheme.type.small,
                     color = when {
                         isSelected && option.tint != null -> option.tint
                         isSelected -> colors.ink
@@ -264,66 +261,53 @@ fun MenuField(
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = Metrics.touchTarget)
-                .clip(Metrics.control)
-                .background(colors.raised)
-                .border(BorderStroke(Metrics.hairline, if (expanded) colors.primary else colors.inputBorder), Metrics.control)
+                .heightIn(min = Metrics.controlHeight + Metrics.xs)
+                .clip(Metrics.popover)
+                .background(colors.altRow)
+                .border(BorderStroke(Metrics.hairline, if (expanded) colors.focus else colors.border), Metrics.popover)
                 .clickable(role = Role.DropdownList) { onExpandedChange(!expanded) }
                 .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)
                 .padding(horizontal = Metrics.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
         ) {
-            if (leading != null) Icon(leading, null, tint = colors.mutedText, modifier = Modifier.size(18.dp))
+            if (leading != null) Icon(leading, null, tint = colors.icon, modifier = Modifier.size(16.dp))
             Text(text, style = TaktTheme.type.body, color = colors.ink, maxLines = 1, modifier = Modifier.weight(1f))
             Icon(
                 androidx.compose.material.icons.Icons.Filled.KeyboardArrowDown, null,
-                tint = colors.mutedText, modifier = Modifier.size(20.dp),
+                tint = colors.icon, modifier = Modifier.size(16.dp),
             )
         }
         ChalkMenu(expanded = expanded, onDismiss = { onExpandedChange(false) }, content = menu)
     }
 }
 
-/** A dropdown with no shadow: raised fill, a hairline border, 8dp corners. */
+/** A dropdown as the Mac's: [PMenu]'s panel fill, hairline and popover radius. */
 @Composable
 fun ChalkMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        shape = Metrics.card,
-        containerColor = TaktTheme.colors.raised,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        border = BorderStroke(Metrics.hairline, TaktTheme.colors.border),
-        content = content,
-    )
+    PMenu(expanded = expanded, onDismiss = onDismiss, content = content)
 }
 
+/** One choice in a [ChalkMenu]; the one in force takes the selection's fill. */
 @Composable
 fun ChalkMenuItem(text: String, onClick: () -> Unit, selected: Boolean = false, modifier: Modifier = Modifier) {
-    DropdownMenuItem(
-        text = { Text(text, style = if (selected) TaktTheme.type.bodyStrong else TaktTheme.type.body) },
-        onClick = onClick,
-        modifier = modifier,
-        colors = MenuDefaults.itemColors(textColor = if (selected) TaktTheme.colors.primary else TaktTheme.colors.ink),
-    )
+    PMenuItem(text, selected = selected, modifier = modifier, onClick = onClick)
 }
 
-/** A small square button for steppers: 48dp target, 6dp hairline box. */
+/** A small square button for steppers, as the Mac's button: a hairline box at the popover radius on the panel fill. */
 @Composable
 fun StepButton(icon: ImageVector, description: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     val colors = TaktTheme.colors
     Box(
         modifier
-            .size(Metrics.touchTarget)
-            .clip(Metrics.control)
-            .border(BorderStroke(Metrics.hairline, colors.inputBorder), Metrics.control)
-            .background(colors.raised)
+            .size(Metrics.headerHeight)
+            .clip(Metrics.popover)
+            .border(BorderStroke(Metrics.hairline, colors.border), Metrics.popover)
+            .background(colors.altRow)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = if (enabled) colors.ink else colors.dimText, modifier = Modifier.size(18.dp))
+        Icon(icon, null, tint = if (enabled) colors.icon else colors.dimText, modifier = Modifier.size(16.dp))
     }
 }

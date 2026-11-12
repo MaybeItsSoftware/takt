@@ -66,10 +66,11 @@ fun QualityPrompt(
     ModalBottomSheet(
         onDismissRequest = onCancel,
         sheetState = sheet,
-        containerColor = colors.paper,
+        containerColor = TaktTheme.colors.altRow,
         contentColor = colors.ink,
         tonalElevation = 0.dp,
-        shape = Metrics.card,
+        shape = Metrics.sheetTop,
+        dragHandle = { uk.co.maybeitsadam.takt.ui.SheetHandle() },
         modifier = Modifier.testTag("quality_prompt"),
     ) {
         Column(

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
@@ -24,9 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -47,6 +46,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,10 +70,14 @@ internal object ListIcons {
     val Everything by lazy { PIcons.icon("Everything", "M3,3h18v4H3zM3,10h18v4H3zM3,17h18v4H3z") }
     val Filter by lazy { PIcons.icon("Filter", "M10,18h4v-2h-4v2zM3,6v2h18V6H3zM6,13h12v-2H6v2z") }
     val Nested by lazy { PIcons.icon("Nested", "M4,5h2v2H4zM9,5h11v2H9zM8,11h2v2H8zM13,11h7v2h-7zM8,17h2v2H8zM13,17h7v2h-7z") }
+    val FolderOpen by lazy { PIcons.icon("FolderOpen", "M20,6h-8l-2,-2H4c-1.1,0 -1.99,0.9 -1.99,2L2,18c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V8c0,-1.1 -0.9,-2 -2,-2zM20,18H4V8h16v10z") }
     val Restore by lazy { PIcons.icon("Restore", "M13,3c-4.97,0 -9,4.03 -9,9H1l4,4 4,-4H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9z") }
 }
 
-/** A flat dropdown: raised fill, a hairline, 8dp corners, no elevation. */
+/**
+ * A flat dropdown as the Mac's context menu: the panel fill, a hairline, the
+ * popover radius (6), 4 of padding, no elevation.
+ */
 @Composable
 internal fun PMenu(
     expanded: Boolean,
@@ -85,15 +89,22 @@ internal fun PMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         offset = offset,
-        shape = Metrics.card,
-        containerColor = TaktTheme.colors.raised,
+        shape = Metrics.popover,
+        containerColor = TaktTheme.colors.altRow,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         border = BorderStroke(Metrics.hairline, TaktTheme.colors.border),
-        content = content,
-    )
+    ) {
+        Column(Modifier.padding(horizontal = Metrics.xs)) { content() }
+    }
 }
 
+/**
+ * A menu item as the Mac's: a row at the item radius, its press the hover
+ * fill; an icon in the icon colour, the words in ink (danger when
+ * destructive), and a key or note on the right in the mono face, dim, at
+ * the secondary size. Tall as the touch target, since items stack.
+ */
 @Composable
 internal fun PMenuItem(
     text: String,
@@ -101,26 +112,45 @@ internal fun PMenuItem(
     destructive: Boolean = false,
     enabled: Boolean = true,
     trailing: String? = null,
+    selected: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val color = if (destructive) TaktTheme.colors.danger else TaktTheme.colors.ink
-    DropdownMenuItem(
-        text = { Text(text, style = TaktTheme.type.body, color = if (enabled) color else TaktTheme.colors.dimText) },
-        onClick = onClick,
-        enabled = enabled,
-        leadingIcon = icon?.let { { Icon(it, null, tint = if (destructive) TaktTheme.colors.danger else TaktTheme.colors.mutedText, modifier = Modifier.size(18.dp)) } },
-        trailingIcon = trailing?.let { { Text(it, style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText) } },
-        colors = MenuDefaults.itemColors(),
-        modifier = Modifier.heightIn(min = Metrics.touchTarget),
-    )
+    val colors = TaktTheme.colors
+    val color = when {
+        !enabled -> colors.dimText
+        destructive -> colors.danger
+        else -> colors.ink
+    }
+    Row(
+        modifier
+            .widthIn(min = 180.dp)
+            .heightIn(min = Metrics.touchTarget)
+            .clip(Metrics.card)
+            .background(if (selected) colors.selected else Color.Transparent)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Metrics.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
+    ) {
+        if (icon != null) Icon(icon, null, tint = if (destructive) colors.danger else colors.icon, modifier = Modifier.size(16.dp))
+        Text(text, style = TaktTheme.type.body, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (trailing != null) {
+            Spacer(Modifier.weight(1f))
+            Text(trailing, style = TaktTheme.type.monoSecondary, color = colors.dimText, maxLines = 1)
+        }
+    }
 }
 
 @Composable
 internal fun PMenuDivider() {
-    Hairline(Modifier.padding(vertical = Metrics.xs))
+    Hairline(Modifier.padding(vertical = Metrics.xs), color = TaktTheme.colors.borderMuted)
 }
 
-/** A small flat dialog: raised card, hairline, title, body, buttons on the right. */
+/**
+ * A small flat dialog as the Mac's sheets: the panel fill, a hairline, the
+ * sheet radius (8), 16 of padding and 12 between; the title at 17.
+ */
 @Composable
 internal fun PDialog(
     title: String,
@@ -131,20 +161,24 @@ internal fun PDialog(
     BasicAlertDialog(onDismissRequest = onDismiss) {
         Column(
             Modifier
-                .clip(Metrics.card)
-                .background(TaktTheme.colors.raised)
-                .border(BorderStroke(Metrics.hairline, TaktTheme.colors.border), Metrics.card)
+                .clip(Metrics.sheet)
+                .background(TaktTheme.colors.altRow)
+                .border(BorderStroke(Metrics.hairline, TaktTheme.colors.border), Metrics.sheet)
                 .padding(Metrics.lg),
             verticalArrangement = Arrangement.spacedBy(Metrics.md),
         ) {
-            Text(title, style = TaktTheme.type.heading, color = TaktTheme.colors.ink)
+            Text(title, style = TaktTheme.type.title.copy(fontWeight = FontWeight.Medium), color = TaktTheme.colors.ink)
             body()
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Metrics.sm, Alignment.End)) { buttons() }
         }
     }
 }
 
-/** A single-line field in the house style: 16sp (no iOS-style zoom on Android either), 6dp, hairline. */
+/**
+ * A single-line field as the Mac's inline field: the paper in a hairline at
+ * the item radius; 16sp (no iOS-style zoom on Android either), and as tall
+ * as a finger needs.
+ */
 @Composable
 internal fun PTextField(
     value: String,
@@ -168,10 +202,10 @@ internal fun PTextField(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = Metrics.touchTarget)
-                    .clip(Metrics.control)
+                    .clip(Metrics.card)
                     .background(TaktTheme.colors.paper)
-                    .border(BorderStroke(Metrics.hairline, TaktTheme.colors.inputBorder), Metrics.control)
-                    .padding(horizontal = Metrics.md),
+                    .border(BorderStroke(Metrics.hairline, TaktTheme.colors.border), Metrics.card)
+                    .padding(horizontal = Metrics.sm + Metrics.xxs),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (value.isEmpty()) Text(placeholder, style = TaktTheme.type.field, color = TaktTheme.colors.dimText)
@@ -297,12 +331,12 @@ internal fun ChoiceSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = state,
-        containerColor = TaktTheme.colors.raised,
+        containerColor = TaktTheme.colors.altRow,
         tonalElevation = 0.dp,
-        shape = Metrics.card,
+        shape = Metrics.sheetTop,
     ) {
         Column(Modifier.navigationBarsPadding().imePadding()) {
-            Text(title, style = TaktTheme.type.heading, color = TaktTheme.colors.ink, modifier = Modifier.padding(horizontal = Metrics.lg, vertical = Metrics.sm))
+            Text(title, style = TaktTheme.type.title.copy(fontWeight = FontWeight.Medium), color = TaktTheme.colors.ink, modifier = Modifier.padding(horizontal = Metrics.lg, vertical = Metrics.sm))
             Hairline()
             leading?.invoke()
             LazyColumn(Modifier.fillMaxWidth().testTag("choice_sheet")) {
@@ -310,17 +344,20 @@ internal fun ChoiceSheet(
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = Metrics.xs)
                             .heightIn(min = Metrics.touchTarget)
+                            .clip(Metrics.card)
+                            .background(if (choice.isCurrent) TaktTheme.colors.selected else Color.Transparent)
                             .clickable(enabled = !choice.isCurrent, role = Role.Button) {
                                 onChoose(choice)
                                 onDismiss()
                             }
-                            .padding(start = Metrics.lg + Metrics.indent * choice.depth, end = Metrics.lg),
+                            .padding(start = Metrics.md + Metrics.indent * choice.depth, end = Metrics.md),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (choice.icon != null) {
-                            Icon(choice.icon, null, tint = choice.tint ?: TaktTheme.colors.mutedText, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(Metrics.md))
+                            Icon(choice.icon, null, tint = choice.tint ?: TaktTheme.colors.icon, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(Metrics.sm))
                         }
                         Column(Modifier.weight(1f)) {
                             Text(
@@ -328,9 +365,9 @@ internal fun ChoiceSheet(
                                 color = if (choice.isCurrent) TaktTheme.colors.dimText else TaktTheme.colors.ink,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
-                            if (choice.detail != null) Text(choice.detail, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1)
+                            if (choice.detail != null) Text(choice.detail, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, maxLines = 1)
                         }
-                        if (choice.isCurrent) Text("Current", style = TaktTheme.type.small, color = TaktTheme.colors.dimText)
+                        if (choice.isCurrent) Text("Current", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText)
                     }
                 }
             }

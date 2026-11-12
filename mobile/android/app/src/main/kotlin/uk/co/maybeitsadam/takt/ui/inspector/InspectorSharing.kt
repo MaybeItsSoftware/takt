@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,13 +52,13 @@ internal fun SharingSection(vm: TaskInspectorViewModel, task: WorkspaceTask) {
                     style = TaktTheme.type.body, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Nobody: anyone in the list") }, onClick = {
+            ChalkMenu(menu, onDismiss = { menu = false }) {
+                ChalkMenuItem("Nobody: anyone in the list", onClick = {
                     menu = false
                     vm.assign(null) { refresh++ }
                 })
                 for (member in shared.members) {
-                    DropdownMenuItem(text = { Text(if (member.you) "Me" else member.email ?: "Someone") }, onClick = {
+                    ChalkMenuItem(if (member.you) "Me" else member.email ?: "Someone", onClick = {
                         menu = false
                         vm.assign(member.accountId) { refresh++ }
                     })

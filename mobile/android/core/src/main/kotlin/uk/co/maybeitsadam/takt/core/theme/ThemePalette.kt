@@ -2,6 +2,9 @@ package uk.co.maybeitsadam.takt.core.theme
 
 // Port of Sources/TaktCore/Theming/ThemePalette.swift.
 
+import uniffi.takt_core.themeChromeColor
+import uniffi.takt_core.themeStatesRole
+
 enum class ThemeAppearance(val raw: String) {
     LIGHT("light"),
     DARK("dark");
@@ -61,11 +64,42 @@ enum class ThemeColorRole(val raw: String) {
     }
 }
 
-/** A role → colour table for each appearance. */
+/**
+ * Zed's chrome, which a theme may state and need not: the selected row, the
+ * hairlines under a tree's levels, the status bar, the outline round the
+ * keyboard's row and an icon at rest. The core derives one a theme leaves out
+ * (`CoreThemePalette::chrome`), as Zed draws a theme that names none.
+ */
+enum class ThemeChromeRole(val raw: String) {
+    SELECTED("selected"),
+    INDENT_GUIDE("indentGuide"),
+    STATUS_BAR("statusBar"),
+    FOCUS("focus"),
+    ICON("icon");
+
+    companion object {
+        fun of(raw: String?): ThemeChromeRole? = entries.firstOrNull { it.raw == raw }
+    }
+}
+
+/**
+ * A role → colour table for each appearance, plus whichever chrome roles the
+ * theme states ([chromeLight], [chromeDark]); [chrome] resolves those through
+ * the core, deriving the rest.
+ */
 data class ThemePalette(
     val light: Map<ThemeColorRole, ThemeColorValue>,
     val dark: Map<ThemeColorRole, ThemeColorValue>,
+    val chromeLight: Map<ThemeChromeRole, ThemeColorValue> = emptyMap(),
+    val chromeDark: Map<ThemeChromeRole, ThemeColorValue> = emptyMap(),
 ) {
+    /** A chrome role, opaque: as the theme states it, else derived by the core from the other roles. */
+    fun chrome(role: ThemeChromeRole, appearance: ThemeAppearance): ThemeColorValue =
+        ThemeColorValue.of(themeChromeColor(core, role.raw, appearance.core))
+
+    /** Whether the theme states [role] itself, rather than leaving it to be derived. */
+    fun states(role: ThemeChromeRole): Boolean = themeStatesRole(core, role.raw)
+
     /**
      * The role's colour in an appearance: that table, then the other one (a
      * reported error, but not unpainted), then debug magenta.
