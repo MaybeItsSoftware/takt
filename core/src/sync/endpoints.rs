@@ -163,6 +163,27 @@ pub fn sync_normalised_url(typed: String, dropping_suffixes: Vec<String>) -> Opt
     Some(address.text(false))
 }
 
+/// Where the hosted server used to be: on Railway as Takt, and before that as
+/// Priority. Each answers 404 to everything now.
+const LEGACY_HOSTED_SERVERS: [&str; 2] = [
+    "https://takt-sync.up.railway.app",
+    "https://priority-sync.up.railway.app",
+];
+
+/// `server`, or `hosted` when `server` is one of the hosted server's old
+/// addresses, so a device that signed in there follows it to its new one.
+/// Read without a trailing slash and whatever the scheme's or host's case.
+#[uniffi::export]
+pub fn sync_current_server(server: String, hosted: String) -> String {
+    let trimmed = server.trim();
+    let normalised = sync_normalised_url(trimmed.into(), vec![]);
+    let legacy = normalised.as_deref().is_some_and(|url| {
+        let https = url.replacen("http://", "https://", 1);
+        LEGACY_HOSTED_SERVERS.contains(&https.as_str())
+    });
+    if legacy { hosted } else { trimmed.into() }
+}
+
 /// The endpoints as typed under "Use a different server". A blank server is
 /// `hosted`'s; a blank Supabase URL *and* key are `hosted`'s project.
 /// Anything else that can't be used comes back as a problem to show.
@@ -244,6 +265,30 @@ mod tests {
     }
 
     // SyncEndpointsTests.testBlankFieldsAreTaktsOwn, SyncEndpointsTest.blankFieldsAreTaktsOwn
+    #[test]
+    fn the_hosted_servers_old_addresses_follow_it() {
+        let hosted = "https://api.takt.maybeitssoftware.co.uk".to_string();
+        for old in [
+            "https://takt-sync.up.railway.app",
+            "https://takt-sync.up.railway.app/",
+            "HTTPS://Priority-Sync.up.railway.app",
+            "http://priority-sync.up.railway.app",
+        ] {
+            assert_eq!(
+                sync_current_server(old.into(), hosted.clone()),
+                hosted,
+                "{old}"
+            );
+        }
+        for kept in [
+            "https://sync.example.com",
+            "https://takt-sync.up.railway.app.example.com",
+            "",
+        ] {
+            assert_eq!(sync_current_server(kept.into(), hosted.clone()), kept);
+        }
+    }
+
     #[test]
     fn blank_fields_are_takts_own() {
         assert_eq!(endpoints("", "", ""), hosted());

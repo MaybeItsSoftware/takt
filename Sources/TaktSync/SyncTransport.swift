@@ -7,14 +7,14 @@ import TaktWorkspace
 // the server's own structs from `takt-sync-rules`): a push body arrives here
 // made, and a pulled page leaves as the server sent it.
 
-/// Where both apps sync unless told otherwise: the hosted server on Railway,
+/// Where both apps sync unless told otherwise: the hosted server on Google Cloud Run,
 /// and the Supabase project whose accounts it trusts. A self-hosted server
 /// goes in the field under "Use a different server"; it has to trust the same
 /// Supabase project, since that is who the apps sign in with.
 public enum SyncServer {
   public static let defaultURL = URL(string: "https://api.takt.maybeitssoftware.co.uk")!
 
-  /// Where the default was before: the hosted server on Railway, and before that
+  /// Where the default was before: the hosted server on Google Cloud Run, and before that
   /// under Priority. A device signed in there is moved along to the new domain.
   public static let legacyDefaultURLs = [
     URL(string: "https://takt-sync.up.railway.app")!,

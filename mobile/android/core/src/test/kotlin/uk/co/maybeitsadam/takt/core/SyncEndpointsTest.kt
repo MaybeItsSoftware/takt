@@ -15,6 +15,14 @@ class SyncEndpointsTest {
         SyncEndpoints.resolve(server, project, key, hosted)
 
     @Test
+    fun theHostedServersOldAddressesFollowIt() {
+        val now = "https://api.takt.maybeitssoftware.co.uk"
+        assertEquals(now, SyncEndpoints.currentServer("https://takt-sync.up.railway.app", now))
+        assertEquals(now, SyncEndpoints.currentServer("https://priority-sync.up.railway.app/", now))
+        assertEquals("https://sync.example.com", SyncEndpoints.currentServer("https://sync.example.com", now))
+    }
+
+    @Test
     fun blankFieldsAreTaktsOwn() {
         assertEquals(hosted, resolve())
         assertEquals(hosted, resolve(" ", " \n", ""))

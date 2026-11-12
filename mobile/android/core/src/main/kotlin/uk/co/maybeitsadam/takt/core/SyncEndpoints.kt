@@ -2,6 +2,7 @@ package uk.co.maybeitsadam.takt.core
 
 import kotlinx.serialization.Serializable
 import uniffi.takt_core.SyncEndpointsRecord
+import uniffi.takt_core.syncCurrentServer
 import uniffi.takt_core.syncNormalisedUrl
 import uniffi.takt_core.syncResolveEndpoints
 
@@ -43,6 +44,13 @@ data class SyncEndpoints(
                 ?: throw InvalidSyncEndpoints(resolution.problem ?: "Those addresses can't be used.")
             return SyncEndpoints(resolved.serverUrl, resolved.supabaseUrl, resolved.supabaseKey)
         }
+
+        /**
+         * [server], or [hosted] when [server] is one of the hosted server's
+         * old addresses on Railway (which answer 404 to everything now), so a
+         * device that signed in there follows it to its new one.
+         */
+        fun currentServer(server: String, hosted: String): String = syncCurrentServer(server, hosted)
 
         /**
          * [typed] as an http(s) address: `https://` added when it has no

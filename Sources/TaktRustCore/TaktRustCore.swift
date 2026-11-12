@@ -32445,6 +32445,20 @@ public func hlcTick(clock: String?, deviceId: String, wallMs: Int64) -> String? 
 })
 }
 /**
+ * `server`, or `hosted` when `server` is one of the hosted server's old
+ * addresses, so a device that signed in there follows it to its new one.
+ * Read without a trailing slash and whatever the scheme's or host's case.
+ */
+public func syncCurrentServer(server: String, hosted: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_sync_current_server(
+        FfiConverterString.lower(server),
+        FfiConverterString.lower(hosted),uniffiCallStatus
+    )
+})
+}
+/**
  * A server address as typed: trimmed, and given `https://` when it has no
  * scheme. Nothing when it still isn't an http(s) address with a host.
  * `SyncServer.url(from:)`.
@@ -33571,6 +33585,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_func_hlc_tick() != 54173) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_sync_current_server() != 30631) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_func_sync_http_url() != 40341) {

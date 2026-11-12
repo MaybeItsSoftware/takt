@@ -173,6 +173,7 @@ class SyncController(private val container: AppContainer) {
                 val session = container.awaitSession()
                 val store = SyncStore(session.repository.database)
                 migrateFromDeviceTokens(store)
+                withContext(Dispatchers.IO) { followHostedServer() }
                 _endpoints.value = withContext(Dispatchers.IO) { savedEndpoints() }
                 accounts.ready()
                 val saved = withContext(Dispatchers.IO) { runCatching { credentialStore.load() }.getOrNull() }
@@ -213,6 +214,35 @@ class SyncController(private val container: AppContainer) {
             credentialStore.saveSignedOut(SignedOutHint(legacy.email, legacy.serverURL, expired = true))
         }
         store.endSync()
+    }
+
+    /**
+     * A device that signed in while the hosted server was on Railway kept that
+     * address, which now answers 404 to everything. Move what was kept (the
+     * account, the signed-out prefill and any chosen endpoints) to where the
+     * hosted server is now, as the Mac and iPhone do.
+     */
+    private fun followHostedServer() {
+        val hosted = hostedEndpoints.serverURL
+        fun current(server: String) = SyncEndpoints.currentServer(server, hosted)
+        runCatching {
+            credentialStore.load()?.let { saved ->
+                val server = current(saved.serverURL)
+                if (server != saved.serverURL) credentialStore.save(saved.copy(serverURL = server))
+            }
+            credentialStore.loadSignedOut()?.let { hint ->
+                val server = hint.serverURL?.let(::current)
+                if (server != hint.serverURL) credentialStore.saveSignedOut(hint.copy(serverURL = server))
+            }
+            credentialStore.endpoints?.let { chosen ->
+                val moved = chosen.copy(serverURL = current(chosen.serverURL))
+                if (moved != chosen) credentialStore.endpoints = moved.takeIf { it != hostedEndpoints }
+            }
+            credentialStore.pendingServer?.let { pending ->
+                val server = current(pending)
+                if (server != pending) credentialStore.pendingServer = server
+            }
+        }.onFailure { Log.w(TAG, "Couldn't move the sync server's old address along", it) }
     }
 
     /**
@@ -507,7 +537,7 @@ class SyncController(private val container: AppContainer) {
     }
 
     private fun transport(credentials: SyncCredentials) =
-        OkHttpSyncTransport(credentials.serverURL, credentials.deviceId, accounts.tokens)
+        OkHttpSyncTransport(currentServer(credentials.serverURL), credentials.deviceId, accounts.tokens)
 
     /** Fetches the account and its devices. Returns the error to show, or null. */
     suspend fun refreshAccount(): String? {
@@ -614,7 +644,7 @@ class SyncController(private val container: AppContainer) {
         val engine = SyncEngine(store, transport(credentials), credentials.deviceId)
         val endpoints = _endpoints.value
         val realtime = credentials.accountId?.let { account ->
-            SyncRealtime(credentials.serverURL, endpoints.supabaseURL, endpoints.supabaseKey, account, accounts.tokens)
+            SyncRealtime(currentServer(credentials.serverURL), endpoints.supabaseURL, endpoints.supabaseKey, account, accounts.tokens)
         }
         val scheduler = SyncScheduler(engine, scope, realtime = realtime)
         scheduler.watchLocalWrites(store)
@@ -680,6 +710,9 @@ class SyncController(private val container: AppContainer) {
 
         fun parseExpiry(text: String): Instant? =
             runCatching { Instant.parse(text) }.getOrNull() ?: runCatching { OffsetDateTime.parse(text).toInstant() }.getOrNull()
+
+        /** [server], unless it is one of the hosted server's old addresses. */
+        fun currentServer(server: String): String = SyncEndpoints.currentServer(server, hostedEndpoints.serverURL)
 
         fun hostOf(serverURL: String): String = runCatching { java.net.URI(serverURL).host }.getOrNull() ?: serverURL
 

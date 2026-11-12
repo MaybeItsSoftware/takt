@@ -1005,6 +1005,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_func_hlc_tick(
     ): Int
+    external fun uniffi_takt_core_checksum_func_sync_current_server(
+    ): Int
     external fun uniffi_takt_core_checksum_func_sync_http_url(
     ): Int
     external fun uniffi_takt_core_checksum_func_sync_normalised_url(
@@ -2499,6 +2501,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_hlc_tick(`clock`: RustBuffer.ByValue,`deviceId`: RustBuffer.ByValue,`wallMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_sync_current_server(`server`: RustBuffer.ByValue,`hosted`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_sync_http_url(`typed`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_sync_normalised_url(`typed`: RustBuffer.ByValue,`droppingSuffixes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -3223,6 +3227,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_hlc_tick() and 0xFFFF) != 54173) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_sync_current_server() and 0xFFFF) != 30631) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_sync_http_url() and 0xFFFF) != 40341) {
@@ -36401,6 +36408,23 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
         FfiConverterOptionalString.lower(`clock`),
         FfiConverterString.lower(`deviceId`),
         FfiConverterLong.lower(`wallMs`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * `server`, or `hosted` when `server` is one of the hosted server's old
+         * addresses, so a device that signed in there follows it to its new one.
+         * Read without a trailing slash and whatever the scheme's or host's case.
+         */ fun `syncCurrentServer`(`server`: kotlin.String, `hosted`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_sync_current_server(
+    
+        
+        FfiConverterString.lower(`server`),
+        FfiConverterString.lower(`hosted`),_status)
 }
     )
     }
