@@ -82,67 +82,148 @@ struct Tag: View {
       if let systemImage { Image(systemName: systemImage).imageScale(.small) }
       Text(text).lineLimit(1)
     }
-    .font(mono ? theme.type.numeral : theme.type.footnote)
+    .font(mono ? theme.type.secondaryMono : theme.type.secondary)
     .foregroundStyle(hue)
     .padding(.horizontal, 5)
     .padding(.vertical, 1)
-    .background(RoundedRectangle(cornerRadius: theme.radius.tag).fill(hue.opacity(0.10)))
-    .overlay(RoundedRectangle(cornerRadius: theme.radius.tag).strokeBorder(hue.opacity(0.35), lineWidth: theme.hairline))
+    .background(RoundedRectangle(cornerRadius: theme.mac.radiusRow).fill(hue.opacity(0.10)))
+    .overlay(RoundedRectangle(cornerRadius: theme.mac.radiusRow).strokeBorder(hue.opacity(0.35), lineWidth: 1))
   }
 
   private var hue: Color { tint ?? theme.muted }
 }
 
-/// The themed checkbox: a hairline square at the control radius scaled down
-/// to the box — never a circle — empty when open. Done is the box tinted
-/// emerald with its border and a check; cancelled is a well with a minus. A
-/// list's open box holds a list glyph, so it still reads as a list beside its
-/// tasks. Drawn rather than a stock toggle so it follows the palette.
+/// A task's status mark, drawn as the Mac draws it (`widgets::check`): a
+/// glyph in a 12px column, not a checkbox. A cancelled task's is ✕ in dim
+/// text, a list's ≡ in muted; a completed task's is blank, because its
+/// struck-through title already says so. An open task's is blank on the Mac
+/// too; a phone has no hover to find the tap that completes it, so it draws
+/// a hairline square in dim text instead — the one concession.
 struct TaskCheckbox: View {
   @Environment(\.theme) private var theme
   let status: TaskStatus
   var isList = false
-  var size: CGFloat = 20
+  /// The column's width; the glyph sits in it at the secondary size.
+  var size: CGFloat?
+  /// An open task's square. Off where the row itself completes the task.
+  var showsBox = true
 
   var body: some View {
-    let shape = RoundedRectangle(cornerRadius: min(theme.radius.control, size / 4), style: .continuous)
+    let width = size ?? theme.mac.mark
     ZStack {
-      shape.fill(fill)
-      shape.strokeBorder(stroke, lineWidth: 1.25)
       switch status {
-      case .completed:
-        Image(systemName: "checkmark").font(.system(size: size * 0.55, weight: .bold)).foregroundStyle(theme.success)
       case .cancelled:
-        Image(systemName: "minus").font(.system(size: size * 0.55, weight: .bold)).foregroundStyle(theme.muted)
-      case .open:
-        if isList {
-          Image(systemName: "list.bullet").font(.system(size: size * 0.5, weight: .semibold)).foregroundStyle(theme.muted)
-        }
+        Text("✕").font(theme.type.secondary).foregroundStyle(theme.dim)
+      case .open where isList:
+        Text("≡").font(theme.type.secondary).foregroundStyle(theme.muted)
+      case .open where showsBox:
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+          .strokeBorder(theme.dim, lineWidth: 1)
+          .frame(width: 12, height: 12)
+      default:
+        Color.clear
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: width, height: width)
     .accessibilityHidden(true)
-  }
-
-  private var fill: Color {
-    switch status {
-    case .completed: theme.success.opacity(0.10)
-    case .cancelled: theme.well
-    case .open: Color.clear
-    }
-  }
-
-  private var stroke: Color {
-    switch status {
-    case .completed: theme.success.opacity(0.40)
-    case .cancelled: theme.inputBorder
-    case .open: theme.inputBorder
-    }
   }
 }
 
-/// A flat toggle: a hairline track that fills with primary when on. The
-/// inspector's switches, in the theme rather than the system's green.
+/// A chip as the Mac sets one beside a title: plain secondary-size text in
+/// its colour, no box (`widgets::detail_chips`).
+struct Chip: View {
+  @Environment(\.theme) private var theme
+  let text: String
+  var tint: Color?
+  var mono = false
+
+  var body: some View {
+    Text(text)
+      .font(mono ? theme.type.secondaryMono : theme.type.secondary)
+      .foregroundStyle(tint ?? theme.muted)
+      .lineLimit(1)
+      .fixedSize()
+  }
+}
+
+/// A list's section heading as the Mac draws one: "Title · n" at the
+/// secondary size in dim text, sentence case, no rule.
+struct SectionHeading: View {
+  @Environment(\.theme) private var theme
+  let title: String
+  var count: Int?
+  var trailing: String?
+
+  init(_ title: String, count: Int? = nil, trailing: String? = nil) {
+    self.title = title
+    self.count = count
+    self.trailing = trailing
+  }
+
+  var body: some View {
+    HStack(spacing: theme.space.xs) {
+      Text(text).lineLimit(1)
+      Spacer(minLength: 0)
+      if let trailing { Text(trailing).lineLimit(1) }
+    }
+    .font(theme.type.secondary)
+    .foregroundStyle(theme.dim)
+    .textCase(nil)
+    .padding(.horizontal, theme.mac(12))
+    .padding(.top, theme.mac(12))
+    .padding(.bottom, theme.mac(4))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityAddTraits(.isHeader)
+  }
+
+  private var text: String {
+    guard let count else { return title }
+    return "\(title) · \(count)"
+  }
+}
+
+/// The Mac's 10px bold capitals in dim text, over a settings group or a
+/// matrix quadrant.
+struct GroupLabel: View {
+  @Environment(\.theme) private var theme
+  let text: String
+  init(_ text: String) { self.text = text }
+
+  var body: some View {
+    Text(text.uppercased())
+      .font(theme.type.groupLabel)
+      .foregroundStyle(theme.dim)
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityAddTraits(.isHeader)
+  }
+}
+
+extension View {
+  /// A row's selection as the Mac draws it: the `selected` fill at radius 4,
+  /// and a 1px `focus` edge where the row has the keyboard — on the phone,
+  /// the row the inspector is showing.
+  func rowSelection(_ isSelected: Bool, focused: Bool = false) -> some View {
+    modifier(RowSelection(isSelected: isSelected, isFocused: focused))
+  }
+}
+
+private struct RowSelection: ViewModifier {
+  @Environment(\.theme) private var theme
+  let isSelected: Bool
+  let isFocused: Bool
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: theme.mac.radiusRow, style: .continuous)
+    content
+      .background(shape.fill(isSelected ? theme.selected : .clear))
+      .overlay(shape.strokeBorder(isSelected && isFocused ? theme.focus : .clear, lineWidth: 1))
+  }
+}
+
+/// A switch as the Mac's settings draw one: a 34×20 track with a 14 knob.
+/// On, the accent fills it and the knob is paper; off, it is the hover fill
+/// in a border, its knob muted.
 struct ThemedToggleStyle: ToggleStyle {
   @Environment(\.theme) private var theme
   func makeBody(configuration: Configuration) -> some View {
@@ -154,15 +235,7 @@ struct ThemedToggleStyle: ToggleStyle {
           .font(theme.type.body)
           .foregroundStyle(theme.ink)
         Spacer(minLength: theme.space.sm)
-        ZStack(alignment: configuration.isOn ? .trailing : .leading) {
-          RoundedRectangle(cornerRadius: min(11, theme.radius.pill), style: .continuous)
-            .fill(configuration.isOn ? theme.primary : theme.well)
-            .overlay(RoundedRectangle(cornerRadius: min(11, theme.radius.pill)).strokeBorder(configuration.isOn ? theme.primary : theme.inputBorder, lineWidth: theme.hairline))
-            .frame(width: 40, height: 22)
-          Circle().fill(theme.raised).frame(width: 16, height: 16).padding(3)
-            .overlay(Circle().strokeBorder(theme.inputBorder, lineWidth: theme.hairline).padding(3))
-        }
-        .animation(.snappy(duration: 0.18), value: configuration.isOn)
+        ThemedSwitch(isOn: configuration.isOn)
       }
       .contentShape(HitArea(minimum: theme.touchTarget))
     }
@@ -172,29 +245,53 @@ struct ThemedToggleStyle: ToggleStyle {
   }
 }
 
+/// The switch's painted part, for a row that lays its own label out.
+struct ThemedSwitch: View {
+  @Environment(\.theme) private var theme
+  let isOn: Bool
+
+  var body: some View {
+    ZStack(alignment: isOn ? .trailing : .leading) {
+      Capsule(style: .continuous)
+        .fill(isOn ? theme.primary : theme.hover)
+        .overlay(Capsule(style: .continuous).strokeBorder(isOn ? theme.primary : theme.border, lineWidth: 1))
+        .frame(width: 34, height: 20)
+      Circle().fill(isOn ? theme.paper : theme.muted).frame(width: 14, height: 14).padding(3)
+    }
+    .animation(.snappy(duration: 0.18), value: isOn)
+    .accessibilityHidden(true)
+  }
+}
+
 /// The frame every themed control sits in: a hairline at the control radius
 /// on the raised surface.
 struct ControlFrame: ViewModifier {
   @Environment(\.theme) private var theme
   var expands = true
   func body(content: Content) -> some View {
-    let shape = RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous)
+    let shape = RoundedRectangle(cornerRadius: theme.mac.radiusRow, style: .continuous)
     content
       .font(theme.type.body)
       .foregroundStyle(theme.ink)
-      .padding(.horizontal, theme.space.sm + 2)
-      .padding(.vertical, theme.space.sm)
+      .padding(.horizontal, theme.mac(8))
+      .padding(.vertical, theme.mac(4))
+      .frame(minHeight: theme.mac.control)
       .frame(maxWidth: expands ? .infinity : nil, alignment: .leading)
-      .background(shape.fill(theme.raised))
-      .overlay(shape.strokeBorder(theme.inputBorder, lineWidth: theme.hairline))
+      .background(shape.fill(theme.paper))
+      .overlay(shape.strokeBorder(theme.border, lineWidth: 1))
   }
 }
 
 extension View {
   func controlFrame(expands: Bool = true) -> some View { modifier(ControlFrame(expands: expands)) }
 
-  /// A raised, bordered panel — the card the house style layers on paper.
+  /// A bordered card as the Mac's board draws one: paper at radius 4 in the
+  /// muted border; selected, the `selected` fill in the focus colour.
   func cardSurface(selected: Bool = false) -> some View { modifier(CardSurface(selected: selected)) }
+
+  /// A panel at the menu radius: the alternate row fill in a border — a
+  /// board column, a popover, a settings control's box.
+  func panelSurface(radius: CGFloat? = nil) -> some View { modifier(PanelSurface(radius: radius)) }
 
   /// Paper behind a whole screen, including under the safe areas.
   func paperBackground() -> some View { modifier(PaperBackground()) }
@@ -205,12 +302,22 @@ private struct CardSurface: ViewModifier {
   let selected: Bool
 
   func body(content: Content) -> some View {
-    let shape = RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
+    let shape = RoundedRectangle(cornerRadius: theme.mac.radiusRow, style: .continuous)
     content
-      .background(shape.fill(theme.raised))
-      .overlay(
-        shape.strokeBorder(
-          selected ? theme.primary : theme.border, lineWidth: selected ? theme.emphasis * 0.75 : theme.hairline))
+      .background(shape.fill(selected ? theme.selected : theme.paper))
+      .overlay(shape.strokeBorder(selected ? theme.focus : theme.borderMuted, lineWidth: 1))
+  }
+}
+
+private struct PanelSurface: ViewModifier {
+  @Environment(\.theme) private var theme
+  let radius: CGFloat?
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: radius ?? theme.mac.radiusMenu, style: .continuous)
+    content
+      .background(shape.fill(theme.altRow))
+      .overlay(shape.strokeBorder(theme.border, lineWidth: 1))
   }
 }
 
@@ -222,7 +329,9 @@ private struct PaperBackground: ViewModifier {
   }
 }
 
-/// A themed button: primary filled, or quiet bordered.
+/// A button as the Mac draws one: 26px high at radius 6 in a 1px border,
+/// on the alternate row fill, the hover fill while pressed. The primary one
+/// is accent-bordered on the selection fill; a danger one is the error hue.
 struct ThemedButtonStyle: ButtonStyle {
   @Environment(\.theme) private var theme
   enum Kind { case primary, quiet, danger }
@@ -230,22 +339,20 @@ struct ThemedButtonStyle: ButtonStyle {
   var compact = false
 
   func makeBody(configuration: Configuration) -> some View {
-    let shape = RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous)
+    let shape = RoundedRectangle(cornerRadius: theme.mac.radiusMenu, style: .continuous)
     configuration.label
-      .font(compact ? theme.type.caption.weight(.medium) : theme.type.callout.weight(.medium))
+      .font(compact ? theme.type.secondaryMedium : theme.type.callout.weight(.medium))
       .foregroundStyle(foreground)
-      .padding(.horizontal, compact ? theme.space.sm : theme.space.md)
-      .padding(.vertical, compact ? 5 : theme.space.sm)
-      .frame(minHeight: compact ? 30 : 38)
-      .background(shape.fill(background))
-      .overlay(shape.strokeBorder(border, lineWidth: theme.hairline))
-      .opacity(configuration.isPressed ? 0.7 : 1)
+      .padding(.horizontal, compact ? theme.mac(8) : theme.mac(12))
+      .frame(minHeight: compact ? theme.mac(22) : theme.mac.control)
+      .background(shape.fill(configuration.isPressed ? theme.hover : background))
+      .overlay(shape.strokeBorder(border, lineWidth: 1))
       .contentShape(HitArea(minimum: theme.touchTarget))
   }
 
   private var foreground: Color {
     switch kind {
-    case .primary: theme.onAccent
+    case .primary: theme.primary
     case .quiet: theme.ink
     case .danger: theme.danger
     }
@@ -253,16 +360,16 @@ struct ThemedButtonStyle: ButtonStyle {
 
   private var background: Color {
     switch kind {
-    case .primary: theme.primary
-    case .quiet: theme.raised
-    case .danger: theme.danger.opacity(0.08)
+    case .primary: theme.selected
+    case .quiet: theme.altRow
+    case .danger: theme.danger.opacity(0.10)
     }
   }
 
   private var border: Color {
     switch kind {
     case .primary: theme.primary
-    case .quiet: theme.inputBorder
+    case .quiet: theme.border
     case .danger: theme.danger.opacity(0.4)
     }
   }
@@ -278,11 +385,11 @@ struct EmptyState: View {
   var body: some View {
     VStack(spacing: theme.space.sm) {
       Image(systemName: systemImage)
-        .font(theme.type.glyph(28, .light))
+        .font(theme.type.glyph(24.5, .light))
         .foregroundStyle(theme.dim)
-      Text(title).font(theme.type.bodyMedium).foregroundStyle(theme.ink)
+      Text(title).font(theme.type.body).foregroundStyle(theme.muted)
       if let message {
-        Text(message).font(theme.type.caption).foregroundStyle(theme.muted).multilineTextAlignment(.center)
+        Text(message).font(theme.type.secondary).foregroundStyle(theme.dim).multilineTextAlignment(.center)
       }
     }
     .padding(theme.space.xl)

@@ -144,7 +144,7 @@ private struct ThemeRow: View {
         }
         Spacer(minLength: theme.space.sm)
         if isSelected {
-          Image(systemName: "checkmark").font(theme.type.glyph(15, .semibold)).foregroundStyle(theme.primary)
+          Image(systemName: "checkmark").font(theme.type.glyph(13, .semibold)).foregroundStyle(theme.primary)
         }
       }
       .frame(minHeight: theme.touchTarget)

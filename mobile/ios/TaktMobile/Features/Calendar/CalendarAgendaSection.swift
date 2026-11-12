@@ -47,7 +47,7 @@ private struct CalendarAgendaRow: View {
           CalendarSwatch(hex: colorHex).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 }
         } else {
           Image(systemName: item.isDone ? "checkmark.square" : "square")
-            .font(theme.type.glyph(13))
+            .font(theme.type.glyph(11.5))
             .foregroundStyle(theme.muted)
         }
         Text(item.title)

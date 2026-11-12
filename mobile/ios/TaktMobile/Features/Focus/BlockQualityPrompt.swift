@@ -145,7 +145,7 @@ struct BlockQualityPrompt: View {
       VStack(alignment: .leading, spacing: theme.space.xxs) {
         Text("This block").font(theme.type.caption).foregroundStyle(theme.muted)
         Text("\(FocusPoints.formatted(points)) pts")
-          .font(theme.type.mono(28, .medium, relativeTo: .title))
+          .font(theme.type.mono(24.5, .medium, relativeTo: .title))
           .foregroundStyle(theme.primary)
           .contentTransition(.numericText())
           .animation(.snappy, value: points)

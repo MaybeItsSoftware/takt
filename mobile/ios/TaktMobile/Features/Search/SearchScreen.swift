@@ -109,7 +109,7 @@ struct SearchScreen: View {
     Button(action: action) {
       HStack(spacing: theme.space.md) {
         Image(systemName: symbol)
-          .font(theme.type.glyph(14))
+          .font(theme.type.glyph(12.5))
           .foregroundStyle(tint ?? theme.muted)
           .frame(width: 20)
         VStack(alignment: .leading, spacing: 0) {
@@ -176,7 +176,7 @@ struct SearchScreen: View {
             Text(snippet).font(theme.type.caption).foregroundStyle(theme.muted).lineLimit(2)
           }
           HStack(spacing: theme.space.xs) {
-            Image(systemName: "list.bullet").font(theme.type.glyph(10))
+            Image(systemName: "list.bullet").font(theme.type.glyph(9))
             Text(result.list.name)
             if isBlocked {
               Text("Blocked").foregroundStyle(theme.dim)

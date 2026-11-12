@@ -189,7 +189,7 @@ private struct HabitFormBody: View {
   private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
       Image(systemName: symbol)
-        .font(theme.type.glyph(14, .semibold))
+        .font(theme.type.glyph(12.5, .semibold))
         .frame(width: theme.touchTarget, height: theme.touchTarget)
     }
     .buttonStyle(ThemedButtonStyle())

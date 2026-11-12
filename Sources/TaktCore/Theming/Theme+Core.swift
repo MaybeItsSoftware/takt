@@ -63,10 +63,14 @@ extension ThemeIssueSeverity {
 
 extension ThemePalette {
   var core: CoreThemePalette {
-    func table(_ values: [ThemeColorRole: ThemeColorValue]) -> [String: CoreThemeColor] {
-      Dictionary(uniqueKeysWithValues: values.map { ($0.key.rawValue, $0.value.core) })
+    func table(
+      _ values: [ThemeColorRole: ThemeColorValue], _ chrome: [ThemeChromeRole: ThemeColorValue]
+    ) -> [String: CoreThemeColor] {
+      var table = Dictionary(uniqueKeysWithValues: values.map { ($0.key.rawValue, $0.value.core) })
+      for (role, value) in chrome { table[role.rawValue] = value.core }
+      return table
     }
-    return CoreThemePalette(light: table(light), dark: table(dark))
+    return CoreThemePalette(light: table(light, chromeLight), dark: table(dark, chromeDark))
   }
 
   init(_ core: CoreThemePalette) {
@@ -76,7 +80,27 @@ extension ThemePalette {
           ThemeColorRole(rawValue: key).map { ($0, ThemeColorValue(value)) }
         })
     }
-    self.init(light: table(core.light), dark: table(core.dark))
+    func chrome(_ values: [String: CoreThemeColor]) -> [ThemeChromeRole: ThemeColorValue] {
+      Dictionary(
+        uniqueKeysWithValues: values.compactMap { key, value in
+          ThemeChromeRole(rawValue: key).map { ($0, ThemeColorValue(value)) }
+        })
+    }
+    self.init(
+      light: table(core.light), dark: table(core.dark), chromeLight: chrome(core.light),
+      chromeDark: chrome(core.dark))
+  }
+
+  /// A chrome role, opaque: as the theme states it, else derived the way Zed
+  /// draws a theme that names none. The Rust core's `theme_chrome_color`.
+  public func chrome(_ role: ThemeChromeRole, in appearance: ThemeAppearance) -> ThemeColorValue {
+    ThemeColorValue(themeChromeColor(palette: core, role: role.rawValue, appearance: appearance.core))
+  }
+
+  /// Whether the theme states `role` itself rather than leaving it derived:
+  /// a painted status bar, say, sets its words in ink.
+  public func states(_ role: ThemeChromeRole) -> Bool {
+    themeStatesRole(palette: core, role: role.rawValue)
   }
 }
 

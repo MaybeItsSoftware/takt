@@ -141,7 +141,7 @@ struct WaitingSection: View {
   private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
       Image(systemName: symbol)
-        .font(theme.type.glyph(13, .semibold))
+        .font(theme.type.glyph(11.5, .semibold))
         .frame(width: 24, height: 20)
     }
     .buttonStyle(ThemedButtonStyle(kind: .quiet, compact: true))

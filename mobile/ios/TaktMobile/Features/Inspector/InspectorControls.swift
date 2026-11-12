@@ -110,7 +110,7 @@ struct ThemedMenuLabel: View {
     HStack {
       Text(title).lineLimit(1)
       Spacer(minLength: theme.space.xs)
-      Image(systemName: systemImage).font(theme.type.glyph(11, .semibold)).foregroundStyle(theme.muted)
+      Image(systemName: systemImage).font(theme.type.glyph(9.5, .semibold)).foregroundStyle(theme.muted)
     }
     .controlFrame()
     .contentShape(Rectangle())

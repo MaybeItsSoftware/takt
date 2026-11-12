@@ -359,46 +359,69 @@ enum AppearanceChoice: String, CaseIterable, Identifiable {
 enum ThemeChrome {
   static func apply(_ theme: Theme) {
     let type = theme.type
-    let paper = theme.uiColor(.paper)
+    let well = theme.uiColor(.well)
     let border = theme.uiColor(.border)
     let ink = theme.uiColor(.ink)
-    let muted = theme.uiColor(.mutedText)
     let primary = theme.uiColor(.primary)
+    let icon = theme.uiChrome(.icon)
+    let statusBar = theme.uiChrome(.statusBar)
+    let statusText = theme.statesStatusBar ? ink : theme.uiColor(.mutedText)
     let body = theme.structure.typography.scale.body
+    let secondary = theme.mac(11)
 
+    // The title bar: the well, a border under it, the title in medium body.
     let navigation = UINavigationBarAppearance()
     navigation.configureWithOpaqueBackground()
-    navigation.backgroundColor = paper
+    navigation.backgroundColor = well
     navigation.shadowColor = border
-    navigation.titleTextAttributes = [.font: type.uiFont(body, weight: .semibold), .foregroundColor: ink]
+    navigation.shadowImage = nil
+    navigation.titleTextAttributes = [.font: type.uiFont(body, weight: .medium), .foregroundColor: ink]
     navigation.largeTitleTextAttributes = [
-      .font: type.uiFont(theme.structure.typography.scale.display - 4, weight: .semibold), .foregroundColor: ink,
+      .font: type.uiFont(theme.structure.typography.scale.display - 4, weight: .medium), .foregroundColor: ink,
     ]
     let button = UIBarButtonItemAppearance()
-    button.normal.titleTextAttributes = [.font: type.uiFont(body - 1)]
+    button.normal.titleTextAttributes = [.font: type.uiFont(body), .foregroundColor: ink]
     navigation.buttonAppearance = button
+    navigation.doneButtonAppearance = button
+    navigation.backButtonAppearance = button
     UINavigationBar.appearance().standardAppearance = navigation
     UINavigationBar.appearance().scrollEdgeAppearance = navigation
     UINavigationBar.appearance().compactAppearance = navigation
+    UINavigationBar.appearance().compactScrollEdgeAppearance = navigation
+    UINavigationBar.appearance().tintColor = icon
 
-    let tabLabel = (theme.structure.typography.scale.caption - 2).rounded()
+    // The status bar: its own fill, a border over it, secondary words; the
+    // tab in front in the accent, the rest as icons at rest.
     let tab = UITabBarAppearance()
     tab.configureWithOpaqueBackground()
-    tab.backgroundColor = paper
+    tab.backgroundColor = statusBar
     tab.shadowColor = border
+    tab.shadowImage = nil
     for item in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
-      item.normal.titleTextAttributes = [.font: type.uiFont(tabLabel), .foregroundColor: muted]
-      item.normal.iconColor = muted
-      item.selected.titleTextAttributes = [.font: type.uiFont(tabLabel, weight: .medium), .foregroundColor: primary]
+      item.normal.titleTextAttributes = [.font: type.uiFont(secondary), .foregroundColor: statusText]
+      item.normal.iconColor = icon
+      item.selected.titleTextAttributes = [.font: type.uiFont(secondary, weight: .medium), .foregroundColor: primary]
       item.selected.iconColor = primary
     }
     UITabBar.appearance().standardAppearance = tab
     UITabBar.appearance().scrollEdgeAppearance = tab
 
-    let segment = theme.structure.typography.scale.caption
-    UISegmentedControl.appearance().setTitleTextAttributes([.font: type.uiFont(segment)], for: .normal)
+    let toolbar = UIToolbarAppearance()
+    toolbar.configureWithOpaqueBackground()
+    toolbar.backgroundColor = statusBar
+    toolbar.shadowColor = border
+    UIToolbar.appearance().standardAppearance = toolbar
+    UIToolbar.appearance().scrollEdgeAppearance = toolbar
+    UIToolbar.appearance().compactAppearance = toolbar
+
+    // Segments are the Mac's tabs: secondary words, the chosen one on the
+    // selection fill.
     UISegmentedControl.appearance().setTitleTextAttributes(
-      [.font: type.uiFont(segment, weight: .medium)], for: .selected)
+      [.font: type.uiFont(secondary), .foregroundColor: theme.uiColor(.mutedText)], for: .normal)
+    UISegmentedControl.appearance().setTitleTextAttributes(
+      [.font: type.uiFont(secondary, weight: .medium), .foregroundColor: ink], for: .selected)
+    UISegmentedControl.appearance().selectedSegmentTintColor = theme.uiChrome(.selected)
+    UISegmentedControl.appearance().backgroundColor = theme.uiColor(.altRow)
   }
 
   /// Appearance proxies only dress views created after they are set, so a

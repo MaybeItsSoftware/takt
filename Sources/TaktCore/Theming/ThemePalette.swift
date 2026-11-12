@@ -88,10 +88,19 @@ public enum ThemeColorRole: String, CaseIterable, Sendable, Codable {
 public struct ThemePalette: Equatable, Sendable {
   public let light: [ThemeColorRole: ThemeColorValue]
   public let dark: [ThemeColorRole: ThemeColorValue]
+  /// The chrome roles the theme states, per appearance. Read them through
+  /// `chrome(_:in:)`, which derives the ones left out.
+  public let chromeLight: [ThemeChromeRole: ThemeColorValue]
+  public let chromeDark: [ThemeChromeRole: ThemeColorValue]
 
-  public init(light: [ThemeColorRole: ThemeColorValue], dark: [ThemeColorRole: ThemeColorValue]) {
+  public init(
+    light: [ThemeColorRole: ThemeColorValue], dark: [ThemeColorRole: ThemeColorValue],
+    chromeLight: [ThemeChromeRole: ThemeColorValue] = [:], chromeDark: [ThemeChromeRole: ThemeColorValue] = [:]
+  ) {
     self.light = light
     self.dark = dark
+    self.chromeLight = chromeLight
+    self.chromeDark = chromeDark
   }
 
   /// Resolution is total, and in this order:
@@ -125,4 +134,16 @@ public struct ThemePalette: Equatable, Sendable {
       }
       .sorted { $0.rawValue < $1.rawValue }
   }
+}
+
+/// Zed's chrome, which a theme may state and need not: the selected row, the
+/// hairlines under a tree's levels, the status bar, the outline round the row
+/// that has the keyboard, and an icon at rest. A role a theme leaves out is
+/// derived from the others by the Rust core (`CoreThemePalette::chrome`).
+public enum ThemeChromeRole: String, CaseIterable, Sendable, Codable {
+  case selected
+  case indentGuide
+  case statusBar
+  case focus
+  case icon
 }

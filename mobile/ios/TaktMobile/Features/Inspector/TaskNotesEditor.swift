@@ -55,7 +55,7 @@ struct TaskNotesEditor: View {
           Spacer()
           if wordCount > 0 {
             Text("\(wordCount) \(wordCount == 1 ? "word" : "words")")
-              .font(theme.type.mono(12))
+              .font(theme.type.mono(10.5))
               .foregroundStyle(theme.dim)
           }
         }

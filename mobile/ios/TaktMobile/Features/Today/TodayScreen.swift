@@ -356,7 +356,7 @@ struct DayCardRow<Menu: View>: View, Equatable {
       if card.isPlanned {
         // The list drags a planned card on a long press; the handle says so.
         Image(systemName: "line.3.horizontal")
-          .font(theme.type.glyph(13))
+          .font(theme.type.glyph(11.5))
           .foregroundStyle(theme.dim)
           .frame(width: 32, height: theme.touchTarget)
           .accessibilityHidden(true)
@@ -398,7 +398,7 @@ struct DayCardRow<Menu: View>: View, Equatable {
       cost.padding(.leading, theme.space.sm)
       SwiftUI.Menu(content: menu) {
         Image(systemName: "ellipsis")
-          .font(theme.type.glyph(14))
+          .font(theme.type.glyph(12.5))
           .foregroundStyle(theme.muted)
           .frame(width: 36, height: theme.touchTarget)
           .contentShape(Rectangle())
@@ -408,7 +408,7 @@ struct DayCardRow<Menu: View>: View, Equatable {
       .accessibilityIdentifier("today.options.\(card.title)")
       Button(action: onStart) {
         Image(systemName: "play.fill")
-          .font(theme.type.glyph(13))
+          .font(theme.type.glyph(11.5))
           .foregroundStyle(theme.primary)
           .frame(width: 36, height: theme.touchTarget)
           .contentShape(Rectangle())
@@ -511,7 +511,7 @@ struct RunningDayCard: View {
   private func control(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
     Button(action: action) {
       Image(systemName: symbol)
-        .font(theme.type.glyph(14))
+        .font(theme.type.glyph(12.5))
         .foregroundStyle(theme.ink)
         .frame(width: 44, height: 36)
         .overlay(RoundedRectangle(cornerRadius: theme.radius.control).strokeBorder(theme.inputBorder, lineWidth: theme.stroke))
@@ -554,7 +554,7 @@ struct DailyRow: View {
       .accessibilityIdentifier("today.daily.\(daily.title)")
       Button(action: onOpen) {
         Image(systemName: "ellipsis")
-          .font(theme.type.glyph(14))
+          .font(theme.type.glyph(12.5))
           .foregroundStyle(theme.muted)
           .frame(width: 36, height: theme.touchTarget)
           .contentShape(Rectangle())

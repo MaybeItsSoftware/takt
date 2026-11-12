@@ -72,7 +72,7 @@ struct QuickAddSheet: View {
 
   private var field: some View {
     TextField("What needs doing?", text: $quickAdd.text, axis: .vertical)
-      .font(theme.type.sans(18, relativeTo: .body))
+      .font(theme.type.sans(16, relativeTo: .body))
       .lineLimit(1...4)
       .focused($fieldFocused)
       .submitLabel(.next)

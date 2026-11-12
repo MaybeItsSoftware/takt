@@ -107,7 +107,7 @@ struct TaskInspector: View {
         .buttonStyle(.plain)
         .accessibilityLabel(task.status == .open ? "Complete" : "Reopen")
         TextField("Title", text: binding(\.title), axis: .vertical)
-          .font(theme.type.sans(20, .medium, relativeTo: .title3))
+          .font(theme.type.sans(17.5, .medium, relativeTo: .title3))
           .foregroundStyle(task.status == .open ? theme.ink : theme.muted)
           .focused($focused, equals: .title)
           .submitLabel(.done)

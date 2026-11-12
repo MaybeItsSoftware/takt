@@ -518,7 +518,7 @@ private struct FocusRungRow: View {
         }
         Spacer(minLength: theme.space.sm)
         if rung.candidate.isDailyDueToday {
-          Image(systemName: "repeat").font(theme.type.glyph(11)).foregroundStyle(theme.purple)
+          Image(systemName: "repeat").font(theme.type.glyph(9.5)).foregroundStyle(theme.purple)
             .accessibilityLabel("Daily")
         }
         if let remaining = rung.candidate.remainingSeconds, remaining > 0 {

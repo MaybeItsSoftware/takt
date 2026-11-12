@@ -344,7 +344,7 @@ struct BoardCardView: View {
     if hasBadges {
       HStack(spacing: theme.space.xs) {
         if card.isPlanned {
-          Image(systemName: "sun.max").font(theme.type.glyph(12)).foregroundStyle(theme.warning)
+          Image(systemName: "sun.max").font(theme.type.glyph(10.5)).foregroundStyle(theme.warning)
         }
         if let waiting { WaitingBadgeView(badge: waiting) }
         if let estimate = card.estimateSeconds, estimate > 0 {
@@ -423,7 +423,7 @@ struct BoardCardView: View {
       withAnimation(.snappy(duration: 0.2)) { board.toggleFold(id) }
     } label: {
       Image(systemName: "chevron.right")
-        .font(theme.type.glyph(11, .semibold))
+        .font(theme.type.glyph(9.5, .semibold))
         .foregroundStyle(theme.muted)
         .rotationEffect(.degrees(folded ? 0 : 90))
         .frame(width: 28, height: 28)

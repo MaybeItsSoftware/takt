@@ -371,7 +371,7 @@ struct OutlineRowView: View, Equatable {
         withAnimation(.snappy(duration: 0.2)) { onFold() }
       } label: {
         Image(systemName: "chevron.right")
-          .font(theme.type.glyph(11, .semibold))
+          .font(theme.type.glyph(9.5, .semibold))
           .foregroundStyle(theme.muted)
           .rotationEffect(.degrees(row.isFolded ? 0 : 90))
           .frame(width: 22, height: 40)
@@ -392,12 +392,12 @@ struct OutlineRowView: View, Equatable {
         Text(starts).font(theme.type.numeral).foregroundStyle(theme.warning).lineLimit(1)
       }
       if row.isPlanned {
-        Image(systemName: "sun.max").font(theme.type.glyph(12)).foregroundStyle(theme.warning)
+        Image(systemName: "sun.max").font(theme.type.glyph(10.5)).foregroundStyle(theme.warning)
           .accessibilityLabel("Planned for today")
       }
       if let waiting { WaitingBadgeView(badge: waiting) }
       if row.hasNotes {
-        Image(systemName: "note.text").font(theme.type.glyph(11)).foregroundStyle(theme.dim)
+        Image(systemName: "note.text").font(theme.type.glyph(9.5)).foregroundStyle(theme.dim)
       }
       if let estimate = row.estimateSeconds, estimate > 0 {
         Text(Format.duration(estimate)).font(theme.type.numeral).foregroundStyle(theme.muted)
@@ -406,7 +406,7 @@ struct OutlineRowView: View, Equatable {
         Tag(text: Format.due(due), tint: dueTint(due), mono: false)
       }
       if row.isList {
-        Image(systemName: "list.bullet").font(theme.type.glyph(11)).foregroundStyle(theme.muted)
+        Image(systemName: "list.bullet").font(theme.type.glyph(9.5)).foregroundStyle(theme.muted)
       }
     }
   }

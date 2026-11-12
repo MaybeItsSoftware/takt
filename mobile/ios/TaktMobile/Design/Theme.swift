@@ -31,9 +31,16 @@ struct Theme {
   let emphasis: CGFloat
   /// The focus ring, drawn in `primary`.
   let focusRing: CGFloat
+  /// The Mac's measurements, scaled to the phone's type.
+  let mac: MacMetrics
+  /// The theme paints its own status bar, so words on it are set in ink
+  /// rather than muted text (Zed's rule).
+  let statesStatusBar: Bool
 
   private let colors: [ThemeColorRole: Color]
   private let uiColors: [ThemeColorRole: UIColor]
+  private let chromeColors: [ThemeChromeRole: Color]
+  private let chromeUIColors: [ThemeChromeRole: UIColor]
 
   /// `specification` must already be resolved for `.ios` — the built-ins
   /// through `BuiltInThemeSpecifications.all(for: .ios)`, files through
@@ -60,6 +67,14 @@ struct Theme {
     }
     self.uiColors = uiColors
     colors = uiColors.mapValues { Color(uiColor: $0) }
+    var chromeUIColors: [ThemeChromeRole: UIColor] = [:]
+    for role in ThemeChromeRole.allCases {
+      chromeUIColors[role] = Self.dynamic(role, of: specification)
+    }
+    self.chromeUIColors = chromeUIColors
+    chromeColors = chromeUIColors.mapValues { Color(uiColor: $0) }
+    statesStatusBar = specification.palette.states(.statusBar)
+    mac = MacMetrics(body: structure.typography.scale.body)
   }
 
   /// The default theme, as the iPhone draws it: what the environment holds
@@ -79,6 +94,8 @@ struct Theme {
 
   func color(_ role: ThemeColorRole) -> Color { colors[role] ?? .clear }
   func uiColor(_ role: ThemeColorRole) -> UIColor { uiColors[role] ?? .clear }
+  func chrome(_ role: ThemeChromeRole) -> Color { chromeColors[role] ?? .clear }
+  func uiChrome(_ role: ThemeChromeRole) -> UIColor { chromeUIColors[role] ?? .clear }
 
   // MARK: Roles
 
@@ -104,6 +121,21 @@ struct Theme {
   /// checkbox). Theme-invariant, like the media roles it is read from.
   var onAccent: Color { color(.mediaScrimInk) }
 
+  // MARK: Chrome — Zed's, stated by the theme or derived by the core
+
+  /// The selected row's fill.
+  var selected: Color { chrome(.selected) }
+  /// The hairlines under a tree's levels.
+  var indentGuide: Color { chrome(.indentGuide) }
+  /// The status bar's fill — on the phone, the tab bar's.
+  var statusBar: Color { chrome(.statusBar) }
+  /// The outline round the row that has the keyboard (the inspector's row).
+  var focus: Color { chrome(.focus) }
+  /// An icon at rest.
+  var icon: Color { chrome(.icon) }
+  /// Words on the status bar: ink on a painted one, else muted.
+  var statusBarText: Color { statesStatusBar ? ink : muted }
+
   private static func dynamic(_ role: ThemeColorRole, of specification: ThemeSpecification) -> UIColor {
     // Media roles are read from the light table whatever is in force.
     let invariant = ThemeColorRole.themeInvariant.contains(role)
@@ -115,7 +147,55 @@ struct Theme {
     }
   }
 
+  private static func dynamic(_ role: ThemeChromeRole, of specification: ThemeSpecification) -> UIColor {
+    let light = specification.palette.chrome(role, in: .light)
+    let dark = specification.palette.chrome(role, in: .dark)
+    return UIColor { traits in
+      let value = traits.userInterfaceStyle == .dark ? dark : light
+      return UIColor(red: value.red, green: value.green, blue: value.blue, alpha: value.alpha)
+    }
+  }
+
   // MARK: Structure
+
+  /// The Mac app's measurements (desktop/src/ui), scaled by the phone's body
+  /// against the Mac's 13: a 26px row is a 30pt row here. Painted sizes only;
+  /// a hit area is still the touch target.
+  struct MacMetrics: Equatable {
+    /// Phone points per Mac pixel.
+    let k: CGFloat
+
+    init(body: CGFloat) { k = max(0.5, body / 13) }
+
+    /// A Mac size in phone points, to the half point.
+    func callAsFunction(_ px: CGFloat) -> CGFloat { (px * k * 2).rounded() / 2 }
+
+    /// A row: the outline's, the sidebar's, a menu's.
+    var row: CGFloat { self(26) }
+    /// A control: a button, a dropdown, a field.
+    var control: CGFloat { self(26) }
+    /// A settings row's least height.
+    var settingsRow: CGFloat { self(38) }
+    /// A menu item.
+    var menuItem: CGFloat { self(24) }
+    /// The title bar, which the navigation bar stands for.
+    var titleBar: CGFloat { self(34) }
+    /// The status bar, which the tab bar stands for.
+    var statusBar: CGFloat { self(30) }
+    /// One outline level.
+    var indent: CGFloat { self(18) }
+    /// The fold arrow's column.
+    var disclosure: CGFloat { self(10) }
+    /// The status mark's column.
+    var mark: CGFloat { self(12) }
+
+    /// Rows, cards, buttons, tabs, key hints, inline fields.
+    let radiusRow: CGFloat = 4
+    /// Board columns, menus, tooltips, settings controls, popovers.
+    let radiusMenu: CGFloat = 6
+    /// Dialogs and palettes.
+    let radiusDialog: CGFloat = 8
+  }
 
   struct Radii: Equatable {
     /// Cards, panels, popovers and sheets' inner panels.
@@ -167,8 +247,9 @@ extension Theme {
   /// scale itself; `callout` and `footnote` sit a step either side. Every font
   /// is relative to a Dynamic Type text style, so the interface still follows
   /// the user's text size. `sans(_:)`, `mono(_:)` and `glyph(_:)` are for the
-  /// few sizes that belong to one layout: they are stated against Chalk's
-  /// 17pt body and scale with the theme's.
+  /// few sizes that belong to one layout: they are stated against the
+  /// phone's 15pt body and scale with the theme's. `secondary` and
+  /// `groupLabel` are the Mac's 11 and 10, at the phone's scale.
   struct TypeSet: Equatable {
     let body: Font
     let bodyMedium: Font
@@ -182,17 +263,28 @@ extension Theme {
     let display: Font
     let hero: Font
     let microLabel: MicroLabel
+    /// The Mac's 11px secondary text — chips, counts, status lines, section
+    /// headings — at the phone's scale.
+    let secondary: Font
+    let secondaryMedium: Font
+    let secondaryMono: Font
+    /// The Mac's 10px bold capitals over a settings group or a matrix
+    /// quadrant.
+    let groupLabel: Font
     let scale: ThemeTypeScale
 
     private let bodyFace: ResolvedFace
     private let displayFace: ResolvedFace
     private let monoFace: ResolvedFace
-    /// The theme's body size against Chalk's on the iPhone.
+    /// The theme's body size against the reference.
     private let factor: CGFloat
 
-    /// The iPhone's body size in Chalk, which layout-specific sizes are
-    /// stated against.
-    static let referenceBody: CGFloat = 17
+    /// The iPhone's body size in the default theme, which layout-specific
+    /// sizes are stated against.
+    static let referenceBody: CGFloat = 15
+    /// The Mac's body, which its secondary and label sizes are stated
+    /// against.
+    static let macBody: CGFloat = 13
 
     init(_ typography: ThemeTypography) {
       let scale = typography.scale
@@ -209,26 +301,32 @@ extension Theme {
       footnote = bodyFace.font(scale.caption - 1, .regular, .footnote)
       // Pane headings, big numbers and the focus timer are the scale's
       // title, display and hero, as stated.
-      title = displayFace.font(scale.title, .semibold, .title3)
-      largeTitle = displayFace.font(scale.display, .semibold, .largeTitle)
+      title = displayFace.font(scale.title, .medium, .title3)
+      largeTitle = displayFace.font(scale.display, .medium, .largeTitle)
       numeral = monoFace.font(scale.caption, .regular, .caption)
       numeralBody = monoFace.font(callout, .regular, .body)
       display = monoFace.font(scale.display, .medium, .largeTitle)
       hero = monoFace.font(scale.hero, .medium, .largeTitle)
       microLabel = MicroLabel(typography.microLabel, face: bodyFace)
+      let k = scale.body / Self.macBody
+      let secondarySize = ((11 * k) * 2).rounded() / 2
+      secondary = bodyFace.font(secondarySize, .regular, .footnote)
+      secondaryMedium = bodyFace.font(secondarySize, .medium, .footnote)
+      secondaryMono = monoFace.font(secondarySize, .regular, .footnote)
+      groupLabel = bodyFace.font(((10 * k) * 2).rounded() / 2, .bold, .caption2)
     }
 
-    /// The body face at a size stated against Chalk's 17pt body.
+    /// The body face at a size stated against the 15pt body.
     func sans(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
       bodyFace.font(size * factor, weight, style)
     }
 
-    /// The mono face at a size stated against Chalk's 17pt body.
+    /// The mono face at a size stated against the 15pt body.
     func mono(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
       monoFace.font(size * factor, weight, style)
     }
 
-    /// An SF Symbol at a size stated against Chalk's 17pt body.
+    /// An SF Symbol at a size stated against the 15pt body.
     func glyph(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
       .system(size: size * factor, weight: weight)
     }
@@ -385,8 +483,7 @@ extension EnvironmentValues {
 
 /// Sizes that belong to one layout rather than to the theme.
 enum Metrics {
-  /// Indent per outline level. Narrower than the Mac's, because a phone runs
-  /// out of width four levels down.
+  /// Indent per outline level: the Mac's 18.
   static let indent: CGFloat = 18
 }
 

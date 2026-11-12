@@ -238,7 +238,7 @@ struct AddButton: View {
       }
     } label: {
       Image(systemName: "plus")
-        .font(theme.type.glyph(20, .semibold))
+        .font(theme.type.glyph(17.5, .semibold))
         .foregroundStyle(theme.onAccent)
         .frame(width: 52, height: 52)
         .background(theme.primary, in: RoundedRectangle(cornerRadius: theme.radius.control))
