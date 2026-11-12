@@ -58,6 +58,8 @@ import uk.co.maybeitsadam.takt.data.workspace.ConditionGroups
 import uk.co.maybeitsadam.takt.ui.SheetHandle
 import uk.co.maybeitsadam.takt.ui.components.Hairline
 import uk.co.maybeitsadam.takt.ui.components.MonoText
+import uk.co.maybeitsadam.takt.ui.components.Disclosure
+import androidx.compose.runtime.key
 import uk.co.maybeitsadam.takt.ui.components.SectionHeader
 import uk.co.maybeitsadam.takt.ui.components.Tag
 import uk.co.maybeitsadam.takt.ui.inspector.ChalkField
@@ -73,45 +75,93 @@ fun conditionsViewModel(): ConditionsViewModel {
 }
 
 /**
- * Where you are, from Today: one row saying what holds now — "Home · Laptop",
- * or that nothing does — that opens the sheet to change it. Absent when no
- * open task needs a condition and none is on, because then the answer
- * changes nothing.
+ * Where you are, from Today: a drop-down whose line says what holds now —
+ * "Home · Laptop", or that nothing does — and which opens below into the
+ * conditions to tick, in place. Searching every condition, or making one,
+ * is a row at its foot that opens the sheet. Absent when no open task needs
+ * a condition and none is on, because then the answer changes nothing.
  */
 @Composable
 fun NowConditionsBar(modifier: Modifier = Modifier) {
     val vm = conditionsViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
-    var open by rememberSaveable { mutableStateOf(false) }
-    if (open) NowConditionsSheet(onDismiss = { open = false })
+    var sheet by rememberSaveable { mutableStateOf(false) }
+    if (sheet) NowConditionsSheet(onDismiss = { sheet = false })
     if (!state.isLoaded || state.available.isEmpty()) return
     val colors = TaktTheme.colors
     val summary = ConditionPicker.nowSummary(state.conditions, state.held)
+    val list = remember(state) {
+        ConditionPicker.list(
+            offered = state.available,
+            searchable = state.conditions.filter { !it.isArchived || it.id in state.selected },
+            all = state.conditions,
+            query = "",
+            isOn = { it in state.held },
+            exclusiveRadio = true,
+        )
+    }
     Column(modifier) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = Metrics.touchTarget)
-                .clickable(role = Role.Button, onClick = { open = true })
-                .semantics { contentDescription = "Where you are: ${summary ?: "nothing said"}. Change" }
-                .padding(horizontal = Metrics.lg)
-                .testTag("today_conditions"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
+        Disclosure(
+            key = "today.conditions",
+            tag = "today_conditions",
+            header = {
+                Icon(Icons.Filled.LocationOn, null, tint = if (summary != null) colors.primary else colors.mutedText, modifier = Modifier.size(18.dp))
+                Text(
+                    summary ?: "Say where you are",
+                    style = TaktTheme.type.body,
+                    color = if (summary != null) colors.ink else colors.mutedText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).semantics { contentDescription = "Where you are: ${summary ?: "nothing said"}" },
+                )
+                if (state.isStale) Tag("Still true?", color = colors.warning)
+            },
         ) {
-            Icon(Icons.Filled.LocationOn, null, tint = if (summary != null) colors.primary else colors.mutedText, modifier = Modifier.size(18.dp))
-            Text(
-                summary ?: "Say where you are",
-                style = TaktTheme.type.body,
-                color = if (summary != null) colors.ink else colors.mutedText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+            Hairline(color = colors.borderMuted)
+            ConditionRowsInline(
+                list,
+                detail = { row -> state.note(row.condition.id) },
+                count = { row -> state.usage[row.condition.id] },
+                onToggle = { row -> vm.toggleNow(row.condition) },
             )
-            if (state.isStale) Tag("Still true?", color = colors.warning)
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.mutedText, modifier = Modifier.size(20.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Metrics.lg, vertical = Metrics.sm),
+                horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Tag("Search or add…", color = colors.primary, onClick = { sheet = true }, modifier = Modifier.testTag("now_conditions_more"))
+                if (state.selected.isNotEmpty() || state.off.isNotEmpty()) {
+                    Tag("Clear", color = colors.mutedText, onClick = vm::clearNow, modifier = Modifier.testTag("now_conditions_clear_inline"))
+                }
+            }
         }
         Hairline()
+    }
+}
+
+/**
+ * A picker's rows laid straight into the page rather than a lazy list, for
+ * the drop-downs that open in place: a heading per category, a whole-width
+ * toggle per condition.
+ */
+@Composable
+internal fun ConditionRowsInline(
+    list: ConditionPickerList,
+    onToggle: (ConditionPickerRow) -> Unit,
+    detail: (ConditionPickerRow) -> String? = { null },
+    count: (ConditionPickerRow) -> Int? = { null },
+    label: (ConditionPickerRow) -> String = { it.condition.name },
+    action: (@Composable (ConditionPickerRow) -> Unit)? = null,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        for (section in list.sections) {
+            if (section.title != null) SectionHeader(section.title)
+            for (row in section.rows) {
+                key(row.condition.id) {
+                    ConditionRow(row, label(row), detail(row), count(row), action, onToggle = { onToggle(row) })
+                }
+            }
+        }
     }
 }
 
@@ -261,6 +311,53 @@ fun TaskConditionsSheet(
             vm.createCondition(name) { made -> toggle(made.id) }
         },
         onDismiss = onDismiss,
+    )
+}
+
+/**
+ * The conditions a task needs, as ticks laid into the inspector's drop-down:
+ * the same rows, toggles and "Not" as [TaskConditionsSheet], without the
+ * search, which stays in the sheet.
+ */
+@Composable
+fun TaskConditionsInline(
+    groups: List<List<String>>?,
+    onGroupsChange: ((List<List<String>>?) -> List<List<String>>?) -> Unit,
+) {
+    val vm = conditionsViewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+    val offeredConditions = remember(state.conditions, groups) {
+        state.conditions.filter { !it.isArchived || RequirementToggle.requires(it.id, groups) }
+    }
+    val list = remember(offeredConditions, state.conditions, groups) {
+        ConditionPicker.list(
+            offered = ConditionGroups.all(offeredConditions),
+            searchable = offeredConditions,
+            all = state.conditions,
+            query = "",
+            isOn = { RequirementToggle.requires(it, groups) },
+            exclusiveRadio = false,
+        )
+    }
+    fun negated(id: String) = RequirementToggle.requirement(id, groups)?.isNegated == true
+    ConditionRowsInline(
+        list,
+        onToggle = { row ->
+            val places = state.conditions.filter { it.isLocation }.map { it.id }.toSet()
+            onGroupsChange { current -> RequirementToggle.toggling(row.condition.id, current, places) }
+        },
+        detail = { row -> ConditionPicker.alternatives(row.condition.id, groups, state::name)?.let { "or $it" } },
+        label = { row -> if (negated(row.condition.id)) "not ${row.condition.name}" else row.condition.name },
+        action = { row ->
+            val on = negated(row.condition.id)
+            Tag(
+                "Not",
+                color = if (on) TaktTheme.colors.primary else TaktTheme.colors.mutedText,
+                selected = on,
+                onClick = { onGroupsChange { current -> RequirementToggle.negating(row.condition.id, current) } },
+                modifier = Modifier.semantics { contentDescription = if (on) "Needed not to hold: tap to remove" else "Need it not to hold" },
+            )
+        },
     )
 }
 

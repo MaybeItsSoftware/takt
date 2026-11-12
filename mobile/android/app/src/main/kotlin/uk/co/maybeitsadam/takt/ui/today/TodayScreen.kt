@@ -59,6 +59,7 @@ import uk.co.maybeitsadam.takt.ui.conditions.NowConditionsBar
 import uk.co.maybeitsadam.takt.ui.components.EmptyState
 import uk.co.maybeitsadam.takt.ui.components.Format
 import uk.co.maybeitsadam.takt.ui.components.Hairline
+import uk.co.maybeitsadam.takt.ui.components.Disclosure
 import uk.co.maybeitsadam.takt.ui.components.IconAction
 import uk.co.maybeitsadam.takt.ui.components.MonoText
 import uk.co.maybeitsadam.takt.ui.components.PButton
@@ -306,40 +307,47 @@ private fun DayHeader(day: DayState) {
     val ticking = day.session?.isTicking == true
     val now by rememberTicker(active = true, periodMillis = if (ticking) 30_000 else 60_000)
     val forecast = remember(day.cards, day.session, now) { DayShaping.forecast(day.cards, day.session, now) }
-    Column(Modifier.fillMaxWidth().padding(horizontal = Metrics.lg, vertical = Metrics.md), verticalArrangement = Arrangement.spacedBy(Metrics.sm)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val finish = forecast.finishAt
-            Text(
-                if (finish != null) "done by ${Format.time(finish)}" else if (forecast.estimatedSeconds > 0) "All estimates spent" else "No finish time",
-                style = TaktTheme.type.mono.copy(fontSize = TaktTheme.type.heading.fontSize),
-                color = if (finish != null) TaktTheme.colors.primary else TaktTheme.colors.mutedText,
-                modifier = Modifier.weight(1f).testTag("today_forecast"),
-            )
-            MonoText(forecast.spentText, color = TaktTheme.colors.ink, modifier = Modifier.testTag("today_tally"))
-        }
-        val fraction = if (forecast.estimatedSeconds > 0) minOf(1f, forecast.loggedSeconds.toFloat() / forecast.estimatedSeconds) else 0f
-        Box(Modifier.fillMaxWidth().height(4.dp).background(TaktTheme.colors.well)) {
-            Box(Modifier.fillMaxWidth(fraction).height(4.dp).background(TaktTheme.colors.primary))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MonoText(
-                "est ${DayForecast.hoursAndMinutes(forecast.estimatedSeconds)} · logged ${DayForecast.hoursAndMinutes(forecast.loggedSeconds)}",
-                style = TaktTheme.type.monoSmall,
-                modifier = Modifier.weight(1f),
-            )
-            Text(forecast.remainingText, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1)
-        }
-        val progress = day.workProgress
-        if (progress.week.seconds > 0 || progress.week.completed > 0) {
-            Row {
-                Text(
-                    if (progress.today.completed == 1) "1 done today" else "${progress.today.completed} done today",
-                    style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f),
-                )
+    // A drop-down: the finish time and the tally on one line, the bar and
+    // the counts under it when it is opened.
+    Disclosure(key = "today.forecast", tag = "today_forecast_toggle", header = {
+        val finish = forecast.finishAt
+        Text(
+            if (finish != null) "done by ${Format.time(finish)}" else if (forecast.estimatedSeconds > 0) "All estimates spent" else "No finish time",
+            style = TaktTheme.type.mono.copy(fontSize = TaktTheme.type.heading.fontSize),
+            color = if (finish != null) TaktTheme.colors.primary else TaktTheme.colors.mutedText,
+            maxLines = 1,
+            modifier = Modifier.weight(1f).testTag("today_forecast"),
+        )
+        MonoText(forecast.spentText, color = TaktTheme.colors.ink, modifier = Modifier.testTag("today_tally"))
+    }) {
+        Column(
+            Modifier.fillMaxWidth().padding(start = Metrics.lg, end = Metrics.lg, bottom = Metrics.md),
+            verticalArrangement = Arrangement.spacedBy(Metrics.sm),
+        ) {
+            val fraction = if (forecast.estimatedSeconds > 0) minOf(1f, forecast.loggedSeconds.toFloat() / forecast.estimatedSeconds) else 0f
+            Box(Modifier.fillMaxWidth().height(4.dp).background(TaktTheme.colors.well)) {
+                Box(Modifier.fillMaxWidth(fraction).height(4.dp).background(TaktTheme.colors.primary))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 MonoText(
-                    "${Format.duration(progress.today.seconds)} today · ${Format.duration(progress.week.seconds)} this week",
+                    "est ${DayForecast.hoursAndMinutes(forecast.estimatedSeconds)} · logged ${DayForecast.hoursAndMinutes(forecast.loggedSeconds)}",
                     style = TaktTheme.type.monoSmall,
+                    modifier = Modifier.weight(1f),
                 )
+                Text(forecast.remainingText, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1)
+            }
+            val progress = day.workProgress
+            if (progress.week.seconds > 0 || progress.week.completed > 0) {
+                Row {
+                    Text(
+                        if (progress.today.completed == 1) "1 done today" else "${progress.today.completed} done today",
+                        style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f),
+                    )
+                    MonoText(
+                        "${Format.duration(progress.today.seconds)} today · ${Format.duration(progress.week.seconds)} this week",
+                        style = TaktTheme.type.monoSmall,
+                    )
+                }
             }
         }
     }

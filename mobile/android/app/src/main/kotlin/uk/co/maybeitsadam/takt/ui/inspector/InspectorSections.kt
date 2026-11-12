@@ -1,5 +1,10 @@
 package uk.co.maybeitsadam.takt.ui.inspector
 
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.text.style.TextOverflow
+import uk.co.maybeitsadam.takt.ui.components.Disclosure
+import uk.co.maybeitsadam.takt.ui.conditions.TaskConditionsInline
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.clickable
@@ -270,23 +275,45 @@ private fun WhenSection(
         if (startError != null) Hint(startError, color = TaktTheme.colors.danger)
         else Hint("It stays out of Next up until then.")
         Spacer(Modifier.size(Metrics.xs))
-        FieldLabel("Due")
-        ChalkDateField(
-            label = "Due",
-            date = DueEditing.day(values, zone),
-            time = values.dueAt?.let { DateFieldMath.time(it, zone) },
-            today = today,
-            onDate = { date -> edit { DueEditing.setDay(it, date, zone) } },
-            onTime = { time -> edit { DueEditing.setTime(it, time, zone) } },
-            testTag = "inspector_due",
-        )
-        if (mode != DueMode.NONE) {
-            SwitchRow(
-                "At a set time",
-                checked = mode == DueMode.TIME,
-                onCheckedChange = { exact -> edit { DueEditing.setExact(it, exact, zone, today) } },
-                detail = if (mode == DueMode.TIME) "Due at an exact time" else "Due any time that day, wherever you are",
-            )
+        // Due is a drop-down: its line says when, and it opens below into
+        // the date and whether it is at a set time.
+        val dueDay = DueEditing.day(values, zone)
+        val dueSummary = when {
+            dueDay == null -> "Not set"
+            mode == DueMode.TIME && values.dueAt != null -> "${Format.day(dueDay, today)}, ${Format.time(values.dueAt!!, zone)}"
+            else -> Format.day(dueDay, today)
+        }
+        Disclosure(
+            key = "inspector.due",
+            tag = "inspector_due_toggle",
+            headerPadding = PaddingValues(0.dp),
+            header = {
+                FieldLabel("Due", Modifier.weight(1f))
+                Text(
+                    dueSummary, style = TaktTheme.type.body,
+                    color = if (dueDay == null) TaktTheme.colors.mutedText else TaktTheme.colors.ink, maxLines = 1,
+                )
+            },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Metrics.sm)) {
+                ChalkDateField(
+                    label = "Due",
+                    date = dueDay,
+                    time = values.dueAt?.let { DateFieldMath.time(it, zone) },
+                    today = today,
+                    onDate = { date -> edit { DueEditing.setDay(it, date, zone) } },
+                    onTime = { time -> edit { DueEditing.setTime(it, time, zone) } },
+                    testTag = "inspector_due",
+                )
+                if (mode != DueMode.NONE) {
+                    SwitchRow(
+                        "At a set time",
+                        checked = mode == DueMode.TIME,
+                        onCheckedChange = { exact -> edit { DueEditing.setExact(it, exact, zone, today) } },
+                        detail = if (mode == DueMode.TIME) "Due at an exact time" else "Due any time that day, wherever you are",
+                    )
+                }
+            }
         }
     }
 }
@@ -474,62 +501,87 @@ private fun ConditionsSection(
     val colors = TaktTheme.colors
     val groups = values.requirementGroups.orEmpty()
     InspectorSection("Conditions", detail = if (groups.isEmpty()) null else "${groups.size} needed") {
-        if (groups.isEmpty()) Hint("Anytime, anywhere. Add a condition to hold it back until you're somewhere or have something.")
-        groups.forEachIndexed { index, group ->
-            var menuOpen by remember { mutableStateOf(false) }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(Metrics.xs),
-                verticalArrangement = Arrangement.spacedBy(Metrics.xs),
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(if (index == 0) "Needs" else "and", style = TaktTheme.type.small, color = colors.mutedText)
-                group.forEachIndexed { position, id ->
-                    if (position > 0) Text("or", style = TaktTheme.type.small, color = colors.mutedText)
-                    val name = TaskRequirement.label(id, around::conditionName)
-                    Tag(
-                        name,
-                        color = colors.categoricalPurple,
-                        leading = Icons.Filled.Close,
-                        onClick = { edit { it.copy(requirementGroups = RequirementGroups.remove(it.requirementGroups, index, id)) } },
-                        modifier = Modifier.semantics { contentDescription = "Remove condition $name" },
-                    )
-                }
-                val alternatives = RequirementGroups.candidatesForGroup(group, around.conditions, { it.id }, { it.isArchived })
-                if (alternatives.isNotEmpty()) {
-                    Box {
-                        Tag("Or…", color = colors.primary, onClick = { menuOpen = true })
-                        ChalkMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
-                            for (condition in alternatives) {
-                                ChalkMenuItem(condition.name, onClick = {
-                                    menuOpen = false
-                                    edit { it.copy(requirementGroups = RequirementGroups.addAlternative(it.requirementGroups, index, condition.id)) }
-                                })
+        // A drop-down, as Due is: its line says what the task needs, and it
+        // opens below into the groups and every condition to tick.
+        val needs = groups.joinToString(" and ") { group ->
+            group.joinToString(" or ") { TaskRequirement.label(it, around::conditionName) }
+        }
+        Disclosure(
+            key = "inspector.conditions",
+            tag = "inspector_conditions_toggle",
+            headerPadding = PaddingValues(0.dp),
+            header = {
+                FieldLabel("Needs", Modifier.weight(1f))
+                Text(
+                    needs.ifEmpty { "Anytime, anywhere" }, style = TaktTheme.type.body,
+                    color = if (needs.isEmpty()) colors.mutedText else colors.ink,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(2f, fill = false),
+                )
+            },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Metrics.sm)) {
+                if (groups.isEmpty()) Hint("Anytime, anywhere. Add a condition to hold it back until you're somewhere or have something.")
+                groups.forEachIndexed { index, group ->
+                    var menuOpen by remember { mutableStateOf(false) }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Metrics.xs),
+                        verticalArrangement = Arrangement.spacedBy(Metrics.xs),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(if (index == 0) "Needs" else "and", style = TaktTheme.type.small, color = colors.mutedText)
+                        group.forEachIndexed { position, id ->
+                            if (position > 0) Text("or", style = TaktTheme.type.small, color = colors.mutedText)
+                            val name = TaskRequirement.label(id, around::conditionName)
+                            Tag(
+                                name,
+                                color = colors.categoricalPurple,
+                                leading = Icons.Filled.Close,
+                                onClick = { edit { it.copy(requirementGroups = RequirementGroups.remove(it.requirementGroups, index, id)) } },
+                                modifier = Modifier.semantics { contentDescription = "Remove condition $name" },
+                            )
+                        }
+                        val alternatives = RequirementGroups.candidatesForGroup(group, around.conditions, { it.id }, { it.isArchived })
+                        if (alternatives.isNotEmpty()) {
+                            Box {
+                                Tag("Or…", color = colors.primary, onClick = { menuOpen = true })
+                                ChalkMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
+                                    for (condition in alternatives) {
+                                        ChalkMenuItem(condition.name, onClick = {
+                                            menuOpen = false
+                                            edit { it.copy(requirementGroups = RequirementGroups.addAlternative(it.requirementGroups, index, condition.id)) }
+                                        })
+                                    }
+                                }
                             }
                         }
+                        Tag(
+                            "Remove group",
+                            color = colors.mutedText,
+                            onClick = { edit { it.copy(requirementGroups = RequirementGroups.removeGroup(it.requirementGroups, index)) } },
+                        )
                     }
                 }
-                Tag(
-                    "Remove group",
-                    color = colors.mutedText,
-                    onClick = { edit { it.copy(requirementGroups = RequirementGroups.removeGroup(it.requirementGroups, index)) } },
+                TaskConditionsInline(
+                    groups = values.requirementGroups,
+                    onGroupsChange = { change -> edit { it.copy(requirementGroups = change(it.requirementGroups)) } },
                 )
+                // Every condition in one sheet, ticked under its category, searched,
+                // and made there when it does not exist yet: the Mac's `cc` picker.
+                var picking by rememberSaveable { mutableStateOf(false) }
+                PButton(
+                    "Search or add a condition…",
+                    icon = Icons.Filled.Search,
+                    modifier = Modifier.fillMaxWidth().testTag("inspector_conditions"),
+                    onClick = { picking = true },
+                )
+                if (picking) {
+                    TaskConditionsSheet(
+                        groups = values.requirementGroups,
+                        onGroupsChange = { change -> edit { it.copy(requirementGroups = change(it.requirementGroups)) } },
+                        onDismiss = { picking = false },
+                    )
+                }
             }
-        }
-        // Every condition in one sheet, ticked under its category, searched,
-        // and made there when it does not exist yet: the Mac's `cc` picker.
-        var picking by rememberSaveable { mutableStateOf(false) }
-        PButton(
-            if (groups.isEmpty()) "Choose conditions" else "Change conditions",
-            icon = Icons.Filled.Add,
-            modifier = Modifier.fillMaxWidth().testTag("inspector_conditions"),
-            onClick = { picking = true },
-        )
-        if (picking) {
-            TaskConditionsSheet(
-                groups = values.requirementGroups,
-                onGroupsChange = { change -> edit { it.copy(requirementGroups = change(it.requirementGroups)) } },
-                onDismiss = { picking = false },
-            )
         }
         Hint("Every group must be met; any condition within a group will do.")
 
