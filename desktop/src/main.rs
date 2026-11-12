@@ -103,6 +103,12 @@ fn main() {
                         // After the deferred open: the window, then Esc in it.
                         let takt = cx.entity();
                         cx.defer(move |cx| {
+                            // ⌘, again with settings up, from outside any
+                            // window (the menu's route): once aborted Takt.
+                            takt.update(cx, |this, cx| {
+                                this.open_settings_page();
+                                this.open_requested_windows(cx);
+                            });
                             let handle = takt.read(cx).settings_window_handle();
                             let windows = cx.windows().len();
                             let closed = handle.and_then(|handle| {

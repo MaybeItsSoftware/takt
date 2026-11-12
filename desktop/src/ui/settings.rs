@@ -115,8 +115,14 @@ impl Takt {
         let front = std::mem::take(&mut self.settings_wanted_front);
         match (wanted, self.settings_window) {
             (true, Some(handle)) => {
+                // Deferred: ⌘, pressed in the settings window arrives
+                // while that window and this entity are mid-update, and
+                // updating either again from here aborts.
                 if front {
-                    let _ = handle.update(cx, |_, window, _| window.activate_window());
+                    cx.defer(move |cx| {
+                        let _ = cx
+                            .update_window(handle.into(), |_, window, _| window.activate_window());
+                    });
                 }
             }
             (true, None) => {
@@ -524,6 +530,13 @@ impl Takt {
         cx: &mut Context<Self>,
     ) -> String {
         let in_window = self.is_settings_window(window);
+        // ⌘, again with settings up, from inside its own window: once
+        // aborted Takt.
+        let again = gpui::KeyDownEvent {
+            keystroke: gpui::Keystroke::parse("cmd-,").expect("a key"),
+            is_held: false,
+        };
+        self.key_down(&again, window, cx);
         for _ in 0..2 {
             let event = gpui::KeyDownEvent {
                 keystroke: gpui::Keystroke::parse("escape").expect("a key"),
@@ -1425,7 +1438,18 @@ fn control(control: Control, open: bool, recording: bool, t: Tokens) -> AnyEleme
 
 /// Opens the settings window onto `takt`, in front, with the keyboard.
 fn open_window(takt: &gpui::Entity<Takt>, cx: &mut gpui::App) {
-    let bounds = gpui::Bounds::centered(None, gpui::size(px(960.), px(680.)), cx);
+    // Over the main window, on its display, so it opens where Takt is.
+    let size = gpui::size(px(960.), px(680.));
+    let main = takt.read(cx).main_window_handle().and_then(|main| {
+        cx.update_window(main.into(), |_, window, cx| {
+            (window.bounds(), window.display(cx).map(|d| d.id()))
+        })
+        .ok()
+    });
+    let (bounds, display_id) = match main {
+        Some((at, display)) => (gpui::Bounds::centered_at(at.center(), size), display),
+        None => (gpui::Bounds::centered(None, size, cx), None),
+    };
     let root = takt.clone();
     let Ok(handle) = cx.open_window(
         gpui::WindowOptions {
@@ -1436,6 +1460,7 @@ fn open_window(takt: &gpui::Entity<Takt>, cx: &mut gpui::App) {
                 traffic_light_position: Some(gpui::point(px(14.), px(14.))),
             }),
             window_min_size: Some(gpui::size(px(640.), px(420.))),
+            display_id,
             ..Default::default()
         },
         move |_, _| root,
@@ -1448,6 +1473,9 @@ fn open_window(takt: &gpui::Entity<Takt>, cx: &mut gpui::App) {
         this.settings_active = true;
     });
     let _ = handle.update(cx, |_, window, cx| {
+        if let Some(ns_window) = crate::platform::window_move::ns_window(window) {
+            crate::platform::window_move::follow_active_space(ns_window);
+        }
         window.focus(&focus);
         cx.observe_window_activation(window, |this, window, cx| {
             this.settings_active = window.is_window_active();

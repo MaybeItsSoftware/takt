@@ -66,3 +66,14 @@ pub fn no_animation(ns_window: usize) {
         let _: () = msg_send![ns_window as *mut Object, setAnimationBehavior: none];
     }
 }
+
+/// The window comes to whichever desktop (Space) is in front when it is
+/// shown or brought forward, rather than switching to the one it was
+/// opened on, and may sit over a full-screen window there.
+pub fn follow_active_space(ns_window: usize) {
+    // NSWindowCollectionBehaviorMoveToActiveSpace | FullScreenAuxiliary.
+    let behavior: u64 = (1 << 1) | (1 << 8);
+    unsafe {
+        let _: () = msg_send![ns_window as *mut Object, setCollectionBehavior: behavior];
+    }
+}
