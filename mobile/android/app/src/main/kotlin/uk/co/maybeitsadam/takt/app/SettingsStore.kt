@@ -1,5 +1,6 @@
 package uk.co.maybeitsadam.takt.app
 
+import uk.co.maybeitsadam.takt.ui.components.CardStyle
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
@@ -52,6 +53,11 @@ class SettingsStore(context: Context) {
 
     suspend fun setScoresEachFocusBlock(enabled: Boolean) = putString(SCORES_EACH_FOCUS_BLOCK, enabled.toString())
 
+    /** How rows are framed on this device ([CardStyle]); every task a card unless chosen otherwise. */
+    val cardStyle: Flow<CardStyle> = string(CARD_STYLE).map { CardStyle.of(it) }
+
+    suspend fun setCardStyle(style: CardStyle) = putString(CARD_STYLE, style.raw)
+
     fun string(key: String): Flow<String?> = store.data.map { it[stringPreferencesKey(key)] }.distinctUntilChanged()
 
     suspend fun putString(key: String, value: String?) {
@@ -76,6 +82,7 @@ class SettingsStore(context: Context) {
         fun key(name: String): Preferences.Key<String> = stringPreferencesKey(name)
 
         const val CELEBRATION = "celebrationStyle"
+        const val CARD_STYLE = "cardStyle"
         const val SCORES_EACH_FOCUS_BLOCK = "scoresEachFocusBlock"
     }
 }

@@ -53,6 +53,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
+import uk.co.maybeitsadam.takt.ui.components.CardStyle
+import uk.co.maybeitsadam.takt.ui.components.LocalCardStyle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -282,7 +284,8 @@ fun AppShell(container: AppContainer, pendingIntent: Intent?, onIntentHandled: (
                 openSidebar = if (layout.isWide) null else ({ drawerScope.launch { drawer.open() } }),
             )
         }
-        CompositionLocalProvider(LocalShell provides shell, LocalCommandRegistry provides registry) {
+        val cardStyle by container.settings.cardStyle.collectAsStateWithLifecycle(CardStyle.DEFAULT)
+        CompositionLocalProvider(LocalShell provides shell, LocalCommandRegistry provides registry, LocalCardStyle provides cardStyle) {
             val backStack by nav.currentBackStackEntryAsState()
             val destination = backStack?.destination
             val currentTab = Tab.entries.firstOrNull { tab -> destination?.hasRoute(tab.route::class) == true }

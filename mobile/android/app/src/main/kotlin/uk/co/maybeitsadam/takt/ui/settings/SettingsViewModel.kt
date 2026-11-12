@@ -1,5 +1,6 @@
 package uk.co.maybeitsadam.takt.ui.settings
 
+import uk.co.maybeitsadam.takt.ui.components.CardStyle
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
@@ -70,6 +71,11 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun setTypography(override: ThemeTypographyOverride) = viewModelScope.launch { container.themes.setTypography(override) }
 
     fun setCelebration(style: CelebrationStyle) = viewModelScope.launch { settings.setCelebrationStyle(style) }
+
+    val cardStyle: StateFlow<CardStyle> =
+        settings.cardStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CardStyle.DEFAULT)
+
+    fun setCardStyle(style: CardStyle) = viewModelScope.launch { settings.setCardStyle(style) }
 
     val scoresEachFocusBlock: StateFlow<Boolean> = container.scoresEachFocusBlock
 

@@ -1,5 +1,15 @@
 package uk.co.maybeitsadam.takt.ui.lists
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.itemsIndexed
+import uk.co.maybeitsadam.takt.ui.components.CardStyle
+import uk.co.maybeitsadam.takt.ui.components.LocalCardStyle
+import uk.co.maybeitsadam.takt.ui.components.RowPlace
+import uk.co.maybeitsadam.takt.ui.components.isSectionPanel
+import uk.co.maybeitsadam.takt.ui.components.rowFill
+import uk.co.maybeitsadam.takt.ui.components.rowFrame
+import uk.co.maybeitsadam.takt.ui.components.sectionHeaderFrame
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -92,7 +102,8 @@ internal fun OutlinePane(vm: ListViewModel, actions: TaskActions, modifier: Modi
 
     LaunchedEffect(scrollTo, shape) {
         val id = scrollTo ?: return@LaunchedEffect
-        val index = shape.entries.indexOfFirst { it.key == id }
+        // One past the entry's own index: the spacer above the rows is item 0.
+        val index = shape.entries.indexOfFirst { it.key == id }.let { if (it >= 0) it + 1 else it }
         if (index >= 0) {
             val visible = listState.layoutInfo.visibleItemsInfo
             val shown = visible.any { it.index == index && it.offset >= 0 && it.offset + it.size <= listState.layoutInfo.viewportEndOffset }
@@ -133,11 +144,18 @@ internal fun OutlinePane(vm: ListViewModel, actions: TaskActions, modifier: Modi
             }
             return@Box
         }
+        // A section runs between list headers; its rows and blocked labels
+        // are the slices of one panel when sections are cards.
+        val places = remember(shape.entries) { outlinePlaces(shape.entries) }
         LazyColumn(Modifier.fillMaxSize().testTag("outline_list").imePadding(), state = listState) {
-            items(shape.entries, key = { it.key }, contentType = { it.contentType }) { entry ->
+            item(key = "top", contentType = "top") { Spacer(Modifier.height(Metrics.xs)) }
+            itemsIndexed(shape.entries, key = { _, entry -> entry.key }, contentType = { _, entry -> entry.contentType }) { index, entry ->
                 when (entry) {
-                    is OutlineEntry.Header -> ListHeaderRow(entry) { navigator.openList(entry.listId) }
-                    is OutlineEntry.BlockedLabel -> BlockedLabelRow(entry, Modifier.animateItem())
+                    is OutlineEntry.Header -> ListHeaderRow(entry, hasRows = places[index + 1] != null) { navigator.openList(entry.listId) }
+                    is OutlineEntry.BlockedLabel -> BlockedLabelRow(
+                        entry,
+                        Modifier.animateItem().then(if (isSectionPanel) Modifier.rowFrame(places[index] ?: RowPlace.ALONE) else Modifier),
+                    )
                     is OutlineEntry.Task -> {
                         val row = entry.row
                         val isDragging = drag.id == row.id
@@ -170,7 +188,8 @@ internal fun OutlinePane(vm: ListViewModel, actions: TaskActions, modifier: Modi
                                 )
                             },
                             modifier = Modifier
-                                .then(if (isDragging) Modifier.zIndex(1f).graphicsLayer { translationY = drag.offset.floatValue } else Modifier.animateItem()),
+                                .then(if (isDragging) Modifier.zIndex(1f).graphicsLayer { translationY = drag.offset.floatValue } else Modifier.animateItem())
+                                .rowFrame(places[index] ?: RowPlace.ALONE, selected = row.id == selected),
                         )
                     }
                 }
@@ -178,6 +197,23 @@ internal fun OutlinePane(vm: ListViewModel, actions: TaskActions, modifier: Modi
             item(key = "add", contentType = "add") { AddField(vm, focusAfter = focus) }
         }
     }
+}
+
+/** Each body entry's place in the run of rows between list headers; null for a header. */
+internal fun outlinePlaces(entries: List<OutlineEntry>): Map<Int, RowPlace> {
+    val places = HashMap<Int, RowPlace>()
+    var start = 0
+    fun close(end: Int) {
+        for (i in start until end) places[i] = RowPlace(first = i == start, last = i == end - 1)
+    }
+    entries.forEachIndexed { i, entry ->
+        if (entry is OutlineEntry.Header) {
+            close(i)
+            start = i + 1
+        }
+    }
+    close(entries.size)
+    return places
 }
 
 /** Where the dragged row's centre now sits among the drawn rows, and the move that makes. */
@@ -202,11 +238,12 @@ private fun finishDrag(vm: ListViewModel, rows: List<OutlineRow>, id: String, dr
 }
 
 @Composable
-private fun ListHeaderRow(header: OutlineEntry.Header, onOpen: () -> Unit) {
+private fun ListHeaderRow(header: OutlineEntry.Header, hasRows: Boolean, onOpen: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(TaktTheme.colors.paper)
+            .sectionHeaderFrame(hasRows)
+            .background(if (isSectionPanel) TaktTheme.colors.altRow else TaktTheme.colors.paper)
             .heightIn(min = 40.dp)
             .clickable(onClick = onOpen)
             .padding(horizontal = Metrics.lg)
@@ -216,7 +253,7 @@ private fun ListHeaderRow(header: OutlineEntry.Header, onOpen: () -> Unit) {
         Text(header.name, style = TaktTheme.type.label, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f))
         MonoText(header.count.toString(), style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText)
     }
-    Hairline(color = TaktTheme.colors.borderMuted)
+    if (LocalCardStyle.current == CardStyle.TASK_CARDS) Hairline(color = TaktTheme.colors.borderMuted)
 }
 
 /** The label over a sibling group's blocked tail, its text in the title column of the rows it heads. */
@@ -225,7 +262,7 @@ private fun BlockedLabelRow(label: OutlineEntry.BlockedLabel, modifier: Modifier
     BlockedDivider(
         isBuried = label.isBuried,
         modifier = modifier
-            .background(TaktTheme.colors.paper)
+            .background(rowFill)
             .padding(
                 start = Metrics.xs + Metrics.indent * label.depth + 32.dp + Metrics.touchTarget,
                 end = Metrics.lg,
@@ -262,7 +299,7 @@ private fun OutlineRowView(
         // The Mac's row: [indent][▸][mark][title, truncated][chips], the
         // selection a box at radius 4 in the selection colour with the focus
         // outline. The row is a finger tall; only the selection is painted.
-        Box(Modifier.background(colors.paper)) {
+        Box(Modifier.background(rowFill)) {
             Row(
                 Modifier
                     .fillMaxWidth()

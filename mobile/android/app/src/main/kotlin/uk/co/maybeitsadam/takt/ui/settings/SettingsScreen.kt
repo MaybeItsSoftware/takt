@@ -1,5 +1,6 @@
 package uk.co.maybeitsadam.takt.ui.settings
 
+import uk.co.maybeitsadam.takt.ui.components.CardStyle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -102,6 +103,7 @@ fun SettingsScreen() {
         ) {
             ThemeSection(model)
             TypeSection(model)
+            CardStyleSection(model)
             CelebrationSection(model)
             FocusSection(model)
             ReminderSection(shell.container.reminders)
@@ -152,6 +154,17 @@ internal fun ChoiceRow(title: String, selected: Boolean, detail: String? = null,
             if (detail != null) Text(detail, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText)
         }
         RadioRing(selected)
+    }
+}
+
+@Composable
+private fun CardStyleSection(model: SettingsViewModel) {
+    val style by model.cardStyle.collectAsStateWithLifecycle()
+    Section("Rows", footer = "How Today and a list's outline frame their rows, on this device.") {
+        CardStyle.entries.forEachIndexed { index, option ->
+            if (index > 0) Hairline(color = TaktTheme.colors.borderMuted)
+            ChoiceRow(option.title, option == style, detail = option.detail, tag = "settings_cards_${option.raw}") { model.setCardStyle(option) }
+        }
     }
 }
 

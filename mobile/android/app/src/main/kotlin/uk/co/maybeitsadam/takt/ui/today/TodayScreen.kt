@@ -60,6 +60,10 @@ import uk.co.maybeitsadam.takt.ui.components.EmptyState
 import uk.co.maybeitsadam.takt.ui.components.Format
 import uk.co.maybeitsadam.takt.ui.components.Hairline
 import uk.co.maybeitsadam.takt.ui.components.Disclosure
+import uk.co.maybeitsadam.takt.ui.components.RowPlace
+import uk.co.maybeitsadam.takt.ui.components.rowFill
+import uk.co.maybeitsadam.takt.ui.components.rowFrame
+import uk.co.maybeitsadam.takt.ui.components.sectionHeaderFrame
 import uk.co.maybeitsadam.takt.ui.components.IconAction
 import uk.co.maybeitsadam.takt.ui.components.MonoText
 import uk.co.maybeitsadam.takt.ui.components.PButton
@@ -154,7 +158,7 @@ fun TodayScreen() {
             item(key = "calendar", contentType = "calendar") { CalendarAgenda(container.calendar, onOpenTask = container.inspector::open) }
             for ((kind, sectionCards) in sections) {
                 item(key = "section-${kind.name}", contentType = "section") {
-                    SectionHeader(kind.title, detail = sectionCards.count { it.id !in leavingCards }.toString())
+                    SectionHeader(kind.title, Modifier.sectionHeaderFrame(), detail = sectionCards.count { it.id !in leavingCards }.toString())
                 }
                 val cards = if (kind == DaySectionKind.PLANNED && drag.order != null) {
                     val byId = sectionCards.associateBy { it.id }
@@ -169,7 +173,7 @@ fun TodayScreen() {
                         Modifier.zIndex(1f).graphicsLayer { translationY = drag.offset }
                     } else {
                         Modifier.animateItem()
-                    }
+                    }.rowFrame(RowPlace.of(cards.indexOf(card), cards.size), selected = card.isRunning)
                     if (card.isRunning && day.session != null) {
                         RunningDayCard(
                             card = card,
@@ -222,7 +226,7 @@ fun TodayScreen() {
             }
             if (dailies.isNotEmpty()) {
                 item(key = "section-dailies", contentType = "section") {
-                    SectionHeader("Dailies", detail = dailies.count { it.id !in leavingDailies }.toString())
+                    SectionHeader("Dailies", Modifier.sectionHeaderFrame(), detail = dailies.count { it.id !in leavingDailies }.toString())
                 }
                 items(dailies, key = { "daily-${it.id}" }, contentType = { "daily" }) { daily ->
                     val index = dailies.indexOf(daily)
@@ -230,7 +234,7 @@ fun TodayScreen() {
                     SwipeRow(
                         start = if (isLeaving) null else SwipeAction("Log today", Icons.Filled.Check, TaktTheme.colors.success) { finish(daily, index) },
                         end = null,
-                        modifier = Modifier.animateItem(),
+                        modifier = Modifier.animateItem().rowFrame(RowPlace.of(index, dailies.size)),
                     ) {
                         DailyRow(
                             daily,
@@ -372,7 +376,7 @@ private fun DayCardRow(
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    Column(modifier.background(if (isDragging) TaktTheme.colors.raised else TaktTheme.colors.paper)) {
+    Column(modifier.background(if (isDragging) TaktTheme.colors.raised else rowFill)) {
         // No check circle: tapping the row finishes it, crossed out and then
         // gone; play starts a block on it; the options sit just before play
         // and the drag handle on the leading edge.
@@ -573,7 +577,7 @@ private fun RunningDayCard(
 @Composable
 private fun DailyRow(daily: DayDaily, isLeaving: Boolean, onToggle: () -> Unit, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val crossed = isLeaving || daily.isDone
-    Column(modifier.background(TaktTheme.colors.paper)) {
+    Column(modifier.background(rowFill)) {
         Row(
             Modifier
                 .fillMaxWidth()
