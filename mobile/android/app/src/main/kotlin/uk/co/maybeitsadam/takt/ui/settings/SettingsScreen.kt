@@ -1,5 +1,9 @@
 package uk.co.maybeitsadam.takt.ui.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import uk.co.maybeitsadam.takt.ui.components.CardStyle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -86,39 +90,111 @@ import uk.co.maybeitsadam.takt.ui.theme.Metrics
 import uk.co.maybeitsadam.takt.ui.theme.PIcons
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 
-/** Theme, celebrations, sync and about. */
+/**
+ * Settings: a short index of pages, each opening in place under the same top
+ * bar, whose groups are bordered cards under micro-labels — the Mac's
+ * settings window rather than one long scroll of every option.
+ */
 @Composable
 fun SettingsScreen() {
     val shell = LocalShell.current
     val model = viewModel { SettingsViewModel(shell.container) }
+    var pageName by rememberSaveable { mutableStateOf<String?>(null) }
+    val page = SettingsPage.entries.firstOrNull { it.name == pageName }
+    BackHandler(enabled = page != null) { pageName = null }
     Column(Modifier.fillMaxSize().background(TaktTheme.colors.paper)) {
         TaktTopBar(
-            "Settings",
+            page?.title ?: "Settings",
             showHistory = false,
-            navigation = { IconAction(Icons.AutoMirrored.Filled.ArrowBack, "Back") { shell.navigator.back() } },
+            navigation = {
+                IconAction(Icons.AutoMirrored.Filled.ArrowBack, "Back") {
+                    if (page != null) pageName = null else shell.navigator.back()
+                }
+            },
         )
+        Hairline()
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(Metrics.lg).testTag("settings"),
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = Metrics.lg, vertical = Metrics.lg)
+                .testTag(if (page == null) "settings" else "settings_page_${page.name.lowercase()}"),
             verticalArrangement = Arrangement.spacedBy(Metrics.xl),
         ) {
-            ThemeSection(model)
-            TypeSection(model)
-            CardStyleSection(model)
-            CelebrationSection(model)
-            FocusSection(model)
-            ReminderSection(shell.container.reminders)
-            SyncSection(shell.container.sync)
-            CalendarSection(shell.container.calendar)
-            DataSection(model)
-            AboutSection(model)
+            when (page) {
+                null -> SettingsIndex(model, shell.container.sync) { pageName = it.name }
+                SettingsPage.APPEARANCE -> {
+                    ThemeSection(model)
+                    TypeSection(model)
+                    CardStyleSection(model)
+                    CelebrationSection(model)
+                }
+                SettingsPage.FOCUS -> {
+                    FocusSection(model)
+                    ReminderSection(shell.container.reminders)
+                }
+                SettingsPage.SYNC -> SyncSection(shell.container.sync)
+                SettingsPage.CALENDAR -> CalendarSection(shell.container.calendar)
+                SettingsPage.DATA -> DataSection(model)
+                SettingsPage.ABOUT -> AboutSection(model)
+            }
+        }
+    }
+}
+
+/** The pages Settings opens onto, in the index's order. */
+internal enum class SettingsPage(val title: String, val detail: String) {
+    APPEARANCE("Appearance", "Theme, type, rows, completing a task"),
+    FOCUS("Focus and reminders", "Focus points, reminders"),
+    SYNC("Sync and account", "Signing in, devices, Takt Sync"),
+    CALENDAR("Calendar", "Google Calendar, what Today shows"),
+    DATA("Your data", "Export as Markdown or JSON"),
+    ABOUT("About", "Version, licences"),
+}
+
+@Composable
+private fun SettingsIndex(model: SettingsViewModel, sync: SyncController, open: (SettingsPage) -> Unit) {
+    val themes by model.themes.collectAsStateWithLifecycle()
+    val credentials by sync.credentials.collectAsStateWithLifecycle()
+    val now = remember { model.versionName() }
+    fun summary(page: SettingsPage): String = when (page) {
+        SettingsPage.APPEARANCE -> "${themes.themeSpecification.name} · ${page.detail.substringAfter(", ")}"
+        SettingsPage.SYNC -> credentials?.email?.let { "Signed in as $it" } ?: if (credentials != null) "Signed in" else "Not signed in"
+        SettingsPage.ABOUT -> "Version $now"
+        else -> page.detail
+    }
+    SettingsRows {
+        SettingsPage.entries.forEachIndexed { index, page ->
+            if (index > 0) Hairline(color = TaktTheme.colors.borderMuted)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .clickable(role = Role.Button, onClickLabel = "Open ${page.title}") { open(page) }
+                    .testTag("settings_section_${page.name.lowercase()}")
+                    .padding(start = Metrics.md, end = Metrics.sm, top = Metrics.sm, bottom = Metrics.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(page.title, style = TaktTheme.type.body, color = TaktTheme.colors.ink)
+                    Text(
+                        summary(page), style = TaktTheme.type.small, color = TaktTheme.colors.mutedText,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                    tint = TaktTheme.colors.dimText, modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
 internal fun Section(title: String, footer: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    // The Mac's settings group: a micro-label, then the rows flat on the
-    // paper between two hairlines, no raised card.
+    // A settings group: a micro-label, then its rows in one bordered card.
     Column(verticalArrangement = Arrangement.spacedBy(Metrics.sm)) {
         MicroLabel(title, color = TaktTheme.colors.dimText)
         SettingsRows(content)
@@ -126,13 +202,18 @@ internal fun Section(title: String, footer: String? = null, content: @Composable
     }
 }
 
-/** A settings group's rows, flat between a hairline above and below. */
+/** A settings group's rows, in one card: the raised fill inside a hairline at the popover radius. */
 @Composable
 internal fun SettingsRows(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Hairline()
+    val shape = TaktTheme.radii.popoverShape
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(TaktTheme.colors.raised, shape)
+            .border(BorderStroke(Metrics.hairline, TaktTheme.colors.border), shape),
+    ) {
         content()
-        Hairline()
     }
 }
 
