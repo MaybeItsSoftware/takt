@@ -159,12 +159,7 @@ impl FocusPill {
 impl Render for FocusPill {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let app = &self.takt.read(cx).app;
-        let t = Tokens::of(
-            &app.theme(),
-            app.theme_chrome(),
-            window.appearance(),
-            &app.prefs.appearance,
-        );
+        let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         let now = crate::state::store::now_ms();
         let session = app.focus_session.clone();
         let (clock, over) = session

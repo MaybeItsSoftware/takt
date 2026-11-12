@@ -377,11 +377,13 @@ variant's identifier), and the phones' **Import** takes them. A theme can
 
 Zed reads `~/.config/zed/themes/*.json` (`$XDG_CONFIG_HOME/zed/themes` where
 that is set). The Mac app reads that folder as well, read-only, so the themes
-you have in Zed are in Takt's picker too, marked "Zed theme". Nothing there is
-written, synced or reported beyond what stops a file loading; a file in Takt's
-own folder with the same identifier wins. To take one of them to your phone,
-copy the file into Takt's folder. `TAKT_ZED_THEMES` points the app at another
-folder, or, set empty, at none.
+you have in Zed are in Takt's picker too. Nothing there is written or reported
+beyond what stops a file loading; a file in Takt's own folder with the same
+identifier wins. Each file that loads, from either folder, is stored in the
+workspace as a synced theme, so the iPhone and Android list it too — every
+variant of a Zed family. A file that leaves the folder keeps its synced copy,
+since a phone may be using it; remove it from a phone's theme settings.
+`TAKT_ZED_THEMES` points the app at another folder, or, set empty, at none.
 
 ## Across the Mac, iPhone and Android
 

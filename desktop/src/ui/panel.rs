@@ -720,12 +720,7 @@ fn hint(keys: &str, label: &str, t: Tokens) -> AnyElement {
 impl Render for FocusPanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let app = &self.takt.read(cx).app;
-        let t = Tokens::of(
-            &app.theme(),
-            app.theme_chrome(),
-            window.appearance(),
-            &app.prefs.appearance,
-        );
+        let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         let status = app.focus_status();
         let running = app.focus_session.is_some();
         let prompt = app.focus_prompt.clone();

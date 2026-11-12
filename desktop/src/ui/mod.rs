@@ -1614,7 +1614,6 @@ impl Render for Takt {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Tokens::of(
             &self.app.theme(),
-            self.app.theme_chrome(),
             window.appearance(),
             &self.app.prefs.appearance,
         );

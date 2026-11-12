@@ -61,93 +61,32 @@ const KEYMAP_TEMPLATE: &str = r#"// Your own keys, laid over Takt's. The keyboar
 []
 "#;
 
-/// Zed One's identifier, the core's built-in of the same pair: what this
-/// app's own Zed theme is stored and synced as.
-pub const ONE: &str = "native.theme.one";
+/// Zed One's identifier: the default, the core's built-in drawn from Zed's
+/// own One Dark and One Light.
+pub const ONE: &str = takt_core::theme::builtins::DEFAULT_IDENTIFIER;
 
-/// A theme the picker offers: Zed's own pair, or a specification the core
-/// resolved from a built-in or a file.
+/// A theme the picker offers: a specification the core resolved from a
+/// built-in, a synced row or a file.
 #[derive(Debug, Clone)]
-pub enum Theme {
-    Zed,
-    Spec(Box<CoreThemeSpecification>),
-}
+pub struct Theme(pub Box<CoreThemeSpecification>);
 
 impl Theme {
     pub fn id(&self) -> String {
-        match self {
-            Theme::Zed => ONE.into(),
-            Theme::Spec(spec) => spec.identifier.clone(),
-        }
+        self.0.identifier.clone()
     }
 
     pub fn name(&self) -> String {
-        match self {
-            Theme::Zed => "Zed One (One Dark, One Light)".into(),
-            Theme::Spec(spec) => spec.name.clone(),
-        }
+        self.0.name.clone()
     }
-}
 
-/// What a Zed theme says about Zed's own chrome that Takt's theme format
-/// has no role for: kept here, by the identifier its variant loaded as, so
-/// the Mac draws it as Zed does.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct ZedChrome {
-    /// `status_bar.background`.
-    pub status_bar: Option<takt_core::theme::model::CoreThemeColor>,
-    /// `panel.indent_guide`.
-    pub indent_guide: Option<takt_core::theme::model::CoreThemeColor>,
-    /// `ghost_element.selected`, else `element.selected`: a selected row.
-    pub selected: Option<takt_core::theme::model::CoreThemeColor>,
-    /// `panel.focused_border`, else `border.focused`: the keyboard's row.
-    pub focus: Option<takt_core::theme::model::CoreThemeColor>,
-    /// `icon`: an icon at rest.
-    pub icon: Option<takt_core::theme::model::CoreThemeColor>,
-}
-
-/// Each variant in Zed's themes folder by its name, with the chrome colours
-/// it states.
-fn zed_chrome_by_name(dir: &std::path::Path) -> std::collections::HashMap<String, ZedChrome> {
-    let mut found = std::collections::HashMap::new();
-    for source in theme_sources(dir) {
-        let Ok(root) = serde_json::from_slice::<serde_json::Value>(&source.data) else {
-            continue;
-        };
-        let Some(variants) = root.get("themes").and_then(|t| t.as_array()) else {
-            continue;
-        };
-        for variant in variants {
-            let Some(name) = variant.get("name").and_then(|n| n.as_str()) else {
-                continue;
-            };
-            let style = variant.get("style");
-            let read = |key: &str| {
-                style
-                    .and_then(|s| s.get(key))
-                    .and_then(|v| v.as_str())
-                    .and_then(takt_core::theme::color::from_hex)
-            };
-            found.insert(
-                name.to_string(),
-                ZedChrome {
-                    status_bar: read("status_bar.background"),
-                    indent_guide: read("panel.indent_guide"),
-                    selected: read("ghost_element.selected").or_else(|| read("element.selected")),
-                    focus: read("panel.focused_border").or_else(|| read("border.focused")),
-                    icon: read("icon"),
-                },
-            );
-        }
+    pub fn spec(&self) -> &CoreThemeSpecification {
+        &self.0
     }
-    found
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Library {
     pub themes: Vec<Theme>,
-    /// Zed's chrome colours for the themes read from Zed's folder.
-    pub zed_chrome: std::collections::HashMap<String, ZedChrome>,
     pub keymap_issues: Vec<String>,
     pub theme_issues: Vec<String>,
 }
@@ -172,10 +111,11 @@ impl App {
         self.library.keymap_issues = issues;
     }
 
-    /// The built-in themes, every theme in Zed's themes folder, and every
-    /// `.json` in Takt's own. A Zed theme family gives one theme per
-    /// variant (the core reads Zed's format); a theme in Takt's folder wins
-    /// over one of the same identifier in Zed's.
+    /// The built-in themes, the synced ones, every theme in Zed's themes
+    /// folder, and every `.json` in Takt's own. A Zed theme family gives one
+    /// theme per variant (the core reads Zed's format); a later source wins
+    /// over an earlier one of the same identifier. Each file that loads from
+    /// either folder is stored as a synced row, so the phones list it too.
     pub fn reload_themes(&mut self) {
         let built_ins = takt_core::theme::theme_builtins(CoreThemePlatform::Macos);
         let load = |sources: Vec<CoreThemeFileSource>| {
@@ -183,28 +123,43 @@ impl App {
                 sources,
                 CoreThemePlatform::Macos,
                 Some(built_ins.clone()),
-                built_ins.first().cloned(),
+                None,
             )
         };
-        let zed = zed_themes_dir()
-            .map(|dir| load(theme_sources(&dir)))
-            .unwrap_or_default();
-        let own = load(theme_sources(&themes_dir()));
-        // Zed One is the core's too, for the phones; here it is drawn from
-        // Zed's own tokens, so the core's copy is not listed twice.
-        let mut themes = vec![Theme::Zed];
-        themes.extend(
-            built_ins
-                .iter()
-                .filter(|s| s.identifier != ONE)
-                .cloned()
-                .map(|s| Theme::Spec(Box::new(s))),
+        let rows = self.store.core.themes().unwrap_or_default();
+        let synced = load(
+            rows.iter()
+                .map(|row| CoreThemeFileSource {
+                    name: format!("{}.json", row.id),
+                    data: row.json.clone().into_bytes(),
+                })
+                .collect(),
         );
+        let zed_sources = zed_themes_dir()
+            .map(|dir| theme_sources(&dir))
+            .unwrap_or_default();
+        let own_sources = theme_sources(&themes_dir());
+        let zed = load(zed_sources.clone());
+        let own = load(own_sources.clone());
+        self.share_theme_files(&zed, &zed_sources, &built_ins);
+        self.share_theme_files(&own, &own_sources, &built_ins);
+
+        let mut themes: Vec<Theme> = built_ins
+            .iter()
+            .cloned()
+            .map(|s| Theme(Box::new(s)))
+            .collect();
+        // Zed One, the default, leads the list.
+        if let Some(at) = themes.iter().position(|t| t.id() == ONE) {
+            let one = themes.remove(at);
+            themes.insert(0, one);
+        }
         let mut issues = Vec::new();
-        for (folder, outcomes) in [("Zed themes/", zed), ("", own)] {
+        for (folder, outcomes) in [("synced/", synced), ("Zed themes/", zed), ("", own)] {
             for outcome in outcomes {
-                // Zed's folder is Zed's to keep tidy: only what stops a
-                // theme there loading is worth saying.
+                // Zed's folder is Zed's to keep tidy, and a synced row was
+                // checked where it was made: only what stops a theme there
+                // loading is worth saying.
                 let errors_only = !folder.is_empty();
                 for issue in &outcome.issues {
                     if errors_only && issue.severity != CoreThemeIssueSeverity::Error {
@@ -215,7 +170,7 @@ impl App {
                 match outcome.specification {
                     Some(spec) => {
                         themes.retain(|t| t.id() != spec.identifier);
-                        themes.push(Theme::Spec(Box::new(spec)));
+                        themes.push(Theme(Box::new(spec)));
                     }
                     None if errors_only => {}
                     None => issues.push(format!(
@@ -226,26 +181,42 @@ impl App {
                 }
             }
         }
-        let by_name = zed_themes_dir()
-            .map(|dir| zed_chrome_by_name(&dir))
-            .unwrap_or_default();
-        self.library.zed_chrome = themes
-            .iter()
-            .filter_map(|theme| match theme {
-                Theme::Spec(spec)
-                    if spec
-                        .identifier
-                        .starts_with(takt_core::theme::zed::IDENTIFIER_PREFIX) =>
-                {
-                    by_name
-                        .get(&spec.name)
-                        .map(|chrome| (spec.identifier.clone(), *chrome))
-                }
-                _ => None,
-            })
-            .collect();
         self.library.themes = themes;
         self.library.theme_issues = issues;
+    }
+
+    /// Stores each file that loaded as a synced row under the identifier a
+    /// phone would give it on import, unless it already says the same. A
+    /// file that leaves the folder keeps its row: a phone may be using it.
+    fn share_theme_files(
+        &mut self,
+        outcomes: &[takt_core::theme::merge::CoreThemeFileOutcome],
+        sources: &[CoreThemeFileSource],
+        built_ins: &[CoreThemeSpecification],
+    ) {
+        if std::env::var_os("TAKT_DESKTOP_PREFS").is_some() {
+            return;
+        }
+        let loaded: std::collections::HashSet<&str> = outcomes
+            .iter()
+            .filter(|o| o.specification.is_some())
+            .map(|o| o.source.as_str())
+            .collect();
+        let now = super::store::now_ms();
+        for source in sources.iter().filter(|s| loaded.contains(s.name.as_str())) {
+            let Ok(json) = String::from_utf8(source.data.clone()) else {
+                continue;
+            };
+            let decoded = takt_core::theme::theme_decode(source.data.clone(), source.name.clone());
+            let Some(file) = decoded.file else { continue };
+            let id = takt_core::theme::theme_identifier(file, source.name.clone());
+            if built_ins.iter().any(|b| b.identifier == id) {
+                continue;
+            }
+            if let Err(error) = self.store.core.upsert_theme(id, json, now) {
+                self.message = Some(format!("A theme didn't sync: {error}"));
+            }
+        }
     }
 
     /// Writes the theme in force to the synced `theme.selected`, so the
@@ -273,22 +244,18 @@ impl App {
         self.prefs.save();
     }
 
-    /// The chrome colours the theme in force states in Zed's format, if any.
-    pub fn theme_chrome(&self) -> ZedChrome {
-        self.library
-            .zed_chrome
-            .get(&self.prefs.theme)
-            .copied()
-            .unwrap_or_default()
-    }
-
     pub fn theme(&self) -> Theme {
         self.library
             .themes
             .iter()
             .find(|t| t.id() == self.prefs.theme)
+            .or_else(|| self.library.themes.iter().find(|t| t.id() == ONE))
             .cloned()
-            .unwrap_or(Theme::Zed)
+            .unwrap_or_else(|| {
+                Theme(Box::new(
+                    takt_core::theme::builtins::default_theme(CoreThemePlatform::Macos).clone(),
+                ))
+            })
     }
 
     pub fn open_keymap_file(&mut self) {
@@ -309,13 +276,7 @@ impl App {
     /// A complete, editable copy of the theme in force, in the themes
     /// folder, put in force.
     pub fn export_theme(&mut self) {
-        let spec = match self.theme() {
-            Theme::Spec(spec) => *spec,
-            Theme::Zed => {
-                self.message = Some("Zed's themes are built in; pick another to export.".into());
-                return;
-            }
-        };
+        let spec = *self.theme().0;
         let mut copy = spec.clone();
         let stem = format!(
             "{}-copy",
@@ -348,43 +309,5 @@ impl App {
             }
             Err(error) => self.message = Some(error.to_string()),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn zed_chrome_is_read_by_variant_name() {
-        let dir = std::env::temp_dir().join(format!("takt-zed-chrome-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("Paper.json"),
-            r##"{"name":"Paper","themes":[
-                {"name":"Paper - Contrast light","appearance":"light",
-                 "style":{"status_bar.background":"#0fbda8","border.variant":"#6547b8",
-                   "ghost_element.selected":"#dad6ca77","panel.focused_border":"#cecbbf",
-                   "border.focused":"#e5e2d4"}},
-                {"name":"Paper - Guides","style":{"panel.indent_guide":"#d7d2bcff",
-                   "element.selected":"#dad6caff","border.focused":"#e5e2d4"}}]}"##,
-        )
-        .unwrap();
-        let found = zed_chrome_by_name(&dir);
-        let paper = found["Paper - Contrast light"];
-        let teal = paper.status_bar.unwrap();
-        assert!((teal.green - 0xbd as f64 / 255.).abs() < 0.01);
-        assert_eq!(paper.indent_guide, None);
-        assert!(found["Paper - Guides"].indent_guide.is_some());
-        // A selection and the keyboard's outline as Zed draws them, falling
-        // back to the element and the general focus colour.
-        let selected = paper.selected.unwrap();
-        assert!((selected.alpha - 0x77 as f64 / 255.).abs() < 0.01);
-        assert!((paper.focus.unwrap().red - 0xce as f64 / 255.).abs() < 0.01);
-        let guides = found["Paper - Guides"];
-        assert!((guides.selected.unwrap().alpha - 1.).abs() < 0.01);
-        assert!((guides.focus.unwrap().red - 0xe5 as f64 / 255.).abs() < 0.01);
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }
