@@ -89,8 +89,8 @@ pub(super) struct MenuView {
 }
 
 impl Takt {
-    /// ⌘,: the page, its search empty, where it was left. The window
-    /// follows in `open_requested_windows`.
+    /// ⌘,: the page, its search empty, where it was left, in the main
+    /// window, which `open_requested_windows` brings forward.
     pub fn open_settings_page(&mut self) {
         if self.app.settings_page.is_none() {
             self.settings_field = TextField::default();
@@ -100,49 +100,12 @@ impl Takt {
         self.settings_wanted_front = true;
     }
 
-    pub(super) fn is_settings_window(&self, window: &gpui::Window) -> bool {
-        let id = window.window_handle().window_id();
-        self.settings_closing == Some(id)
-            || self
-                .settings_window
-                .is_some_and(|handle| handle.window_id() == id)
-    }
-
-    /// The window kept to the state: opened (or brought forward) while the
-    /// page is open, closed once it isn't.
+    /// The page is drawn in the main window: ⌘, from the menu bar item
+    /// brings that window forward, opening it if it was closed.
     pub(super) fn sync_settings_window(&mut self, cx: &mut Context<Self>) {
-        let wanted = self.app.settings_page.is_some();
         let front = std::mem::take(&mut self.settings_wanted_front);
-        match (wanted, self.settings_window) {
-            (true, Some(handle)) => {
-                if front {
-                    let _ = handle.update(cx, |_, window, _| window.activate_window());
-                }
-            }
-            (true, None) => {
-                if self.settings_opening {
-                    return;
-                }
-                self.settings_opening = true;
-                // Once this update ends: the window's first draw reads this
-                // entity.
-                let takt = cx.entity();
-                cx.defer(move |cx| {
-                    open_window(&takt, cx);
-                    takt.update(cx, |this, _| this.settings_opening = false);
-                });
-            }
-            (false, Some(handle)) => {
-                self.settings_window = None;
-                self.settings_active = false;
-                self.settings_closing = Some(handle.window_id());
-                let takt = cx.entity();
-                cx.defer(move |cx| {
-                    let _ = cx.update_window(handle.into(), |_, window, _| window.remove_window());
-                    takt.update(cx, |this, _| this.settings_closing = None);
-                });
-            }
-            (false, None) => {}
+        if front && self.app.settings_page.is_some() {
+            self.show_main_window(cx);
         }
     }
 
@@ -476,10 +439,7 @@ impl Takt {
                 cx.background_executor()
                     .timer(Duration::from_millis(wait))
                     .await;
-                let handle = this
-                    .update(cx, |this, _| this.settings_window)
-                    .ok()
-                    .flatten();
+                let handle = this.update(cx, |this, _| this.main).ok().flatten();
                 if let Some(handle) = handle {
                     let _ = handle.update(cx, |_, window, _| {
                         window.resize(gpui::size(px(width), px(height)))
@@ -523,7 +483,7 @@ impl Takt {
         window: &mut gpui::Window,
         cx: &mut Context<Self>,
     ) -> String {
-        let in_window = self.is_settings_window(window);
+        let in_window = self.app.settings_page.is_some();
         for _ in 0..2 {
             let event = gpui::KeyDownEvent {
                 keystroke: gpui::Keystroke::parse("escape").expect("a key"),
@@ -533,14 +493,13 @@ impl Takt {
         }
         format!(
             "window up {in_window}, closed by esc {}",
-            self.app.settings_page.is_none() && self.settings_window.is_none()
+            self.app.settings_page.is_none()
         )
     }
 
-    /// For the smoke run: no settings window, closing or open, is left.
-    pub fn settings_gone(&self, cx: &gpui::App) -> bool {
-        let ids: Vec<_> = cx.windows().iter().map(|w| w.window_id()).collect();
-        self.settings_window.is_none() && self.settings_closing.is_none_or(|id| !ids.contains(&id))
+    /// For the smoke run: the settings page is put away.
+    pub fn settings_gone(&self) -> bool {
+        self.app.settings_page.is_none()
     }
 
     pub fn main_window_id(&self) -> Option<gpui::WindowId> {
@@ -549,10 +508,6 @@ impl Takt {
 
     pub fn main_window_handle(&self) -> Option<gpui::WindowHandle<Takt>> {
         self.main
-    }
-
-    pub fn settings_window_handle(&self) -> Option<gpui::WindowHandle<Takt>> {
-        self.settings_window
     }
 
     /// The search changed: what it finds, from the top.
@@ -660,7 +615,7 @@ impl Takt {
             .border_r_1()
             .border_color(t.border)
             .child(
-                div().px_2().pb_2().pt(px(40.)).child(
+                div().px_2().pb_2().pt_2().child(
                     div()
                         .h(px(30.))
                         .px_2()
@@ -925,7 +880,7 @@ impl Takt {
             .child(
                 div()
                     .px_8()
-                    .pt(px(40.))
+                    .pt(px(24.))
                     .flex()
                     .items_center()
                     .justify_between()
@@ -1421,42 +1376,6 @@ fn control(control: Control, open: bool, recording: bool, t: Tokens) -> AnyEleme
             .into_any_element()
         }
     }
-}
-
-/// Opens the settings window onto `takt`, in front, with the keyboard.
-fn open_window(takt: &gpui::Entity<Takt>, cx: &mut gpui::App) {
-    let bounds = gpui::Bounds::centered(None, gpui::size(px(960.), px(680.)), cx);
-    let root = takt.clone();
-    let Ok(handle) = cx.open_window(
-        gpui::WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
-            titlebar: Some(gpui::TitlebarOptions {
-                title: Some("Settings".into()),
-                appears_transparent: true,
-                traffic_light_position: Some(gpui::point(px(14.), px(14.))),
-            }),
-            window_min_size: Some(gpui::size(px(640.), px(420.))),
-            ..Default::default()
-        },
-        move |_, _| root,
-    ) else {
-        return;
-    };
-    let focus = takt.read(cx).focus.clone();
-    takt.update(cx, |this, _| {
-        this.settings_window = Some(handle);
-        this.settings_active = true;
-    });
-    let _ = handle.update(cx, |_, window, cx| {
-        window.focus(&focus);
-        cx.observe_window_activation(window, |this, window, cx| {
-            this.settings_active = window.is_window_active();
-            cx.notify();
-        })
-        .detach();
-    });
-    cx.activate(true);
-    takt.update(cx, |_, cx| cx.notify());
 }
 
 /// The digit 1–9 a chord is on, whatever the modifiers made of it.
