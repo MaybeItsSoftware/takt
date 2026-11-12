@@ -14,20 +14,11 @@ struct MatrixView: View {
 
   var body: some View {
     ScrollView {
-      VStack(spacing: theme.space.md) {
-        Grid(horizontalSpacing: theme.space.sm, verticalSpacing: theme.space.sm) {
-          GridRow {
-            MatrixCellView(cell: .doNow, matrix: matrix, tint: theme.danger)
-            MatrixCellView(cell: .schedule, matrix: matrix, tint: theme.primary)
-          }
-          GridRow {
-            MatrixCellView(cell: .delegate, matrix: matrix, tint: theme.warning)
-            MatrixCellView(cell: .eliminate, matrix: matrix, tint: theme.dim)
-          }
-        }
+      VStack(spacing: theme.mac(8)) {
+        plane
         MatrixTrayView(matrix: matrix)
       }
-      .padding(theme.space.lg)
+      .padding(theme.mac(8))
     }
     .background(theme.paper)
     .task(id: QueryKey(revision: model.revision, scope: matrix.scope)) {
@@ -35,53 +26,117 @@ struct MatrixView: View {
     }
     .accessibilityIdentifier("matrix")
   }
+
+  /// The Mac's one plane: a bordered field split by the two axes, each
+  /// quadrant named in a micro-label at its outer corner, the axes' ends
+  /// named in muted secondary text where they meet the edge.
+  private var plane: some View {
+    Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+      GridRow {
+        MatrixCellView(cell: .doNow, matrix: matrix, number: 1, alignment: .topLeading)
+        MatrixCellView(cell: .schedule, matrix: matrix, number: 2, alignment: .topTrailing)
+      }
+      GridRow {
+        MatrixCellView(cell: .delegate, matrix: matrix, number: 3, alignment: .bottomLeading)
+        MatrixCellView(cell: .eliminate, matrix: matrix, number: 4, alignment: .bottomTrailing)
+      }
+    }
+    .overlay {
+      // The axes, through the middle.
+      ZStack {
+        Rectangle().fill(theme.border).frame(width: 1)
+        Rectangle().fill(theme.border).frame(height: 1)
+      }
+      .allowsHitTesting(false)
+    }
+    .overlay {
+      GeometryReader { proxy in
+        let mid = proxy.size.height / 2
+        let centre = proxy.size.width / 2
+        Group {
+          axisLabel("Urgent").position(x: 0, y: 0).offset(x: theme.mac(6), y: mid - theme.mac(3))
+          axisLabel("Not urgent", trailing: true).position(x: proxy.size.width, y: 0)
+            .offset(x: -theme.mac(6), y: mid - theme.mac(3))
+          axisLabel("Important").position(x: centre, y: 0).offset(x: theme.mac(6), y: theme.mac(4))
+          axisLabel("Not important").position(x: centre, y: proxy.size.height)
+            .offset(x: theme.mac(6), y: -theme.mac(4))
+        }
+        .allowsHitTesting(false)
+      }
+    }
+    .background(RoundedRectangle(cornerRadius: theme.mac.radiusMenu).fill(theme.paper))
+    .clipShape(RoundedRectangle(cornerRadius: theme.mac.radiusMenu))
+    .overlay(RoundedRectangle(cornerRadius: theme.mac.radiusMenu).strokeBorder(theme.borderMuted, lineWidth: 1))
+  }
+
+  /// An axis end's name, anchored by its leading (or trailing) edge and its
+  /// foot (or head) so it sits beside the hairline it names.
+  private func axisLabel(_ text: String, trailing: Bool = false) -> some View {
+    Text(text)
+      .font(theme.type.secondary)
+      .foregroundStyle(theme.muted)
+      .fixedSize()
+      .alignmentGuide(HorizontalAlignment.center) { trailing ? $0[.trailing] : $0[.leading] }
+      .alignmentGuide(VerticalAlignment.center) { $0[.bottom] }
+  }
 }
 
-/// One quadrant: its name in its hue, and its cards.
+/// One quadrant of the plane: its micro-label in the outer corner, and its
+/// tasks as the Mac's chips — a dot and the title in a bordered box at
+/// radius 4.
 struct MatrixCellView: View {
   @Environment(\.theme) private var theme
   @Environment(WorkspaceModel.self) private var model
   let cell: MatrixCell
   let matrix: MatrixModel
-  let tint: Color
+  let number: Int
+  let alignment: Alignment
   @State private var isTargeted = false
+
+  private var isTop: Bool { alignment == .topLeading || alignment == .topTrailing }
+  private var isLeading: Bool { alignment == .topLeading || alignment == .bottomLeading }
 
   var body: some View {
     let cards = matrix.cards(in: cell)
-    VStack(alignment: .leading, spacing: theme.space.xs) {
-      HStack(spacing: theme.space.xs) {
-        Circle().fill(tint).frame(width: 8, height: 8)
-        Text(cell.title).font(theme.type.bodyMedium).foregroundStyle(theme.ink)
-        Spacer(minLength: 0)
-        Text("\(cards.count)").font(theme.type.numeral).foregroundStyle(theme.muted)
-      }
-      Text(cell.detail).font(theme.type.footnote).foregroundStyle(theme.muted)
-      Hairline(role: .borderMuted).padding(.vertical, theme.space.xxs)
-      LazyVStack(alignment: .leading, spacing: 0) {
+    VStack(alignment: isLeading ? .leading : .trailing, spacing: theme.mac(4)) {
+      if isTop { label(count: cards.count) }
+      VStack(alignment: .leading, spacing: theme.mac(4)) {
         ForEach(cards) { card in
           MatrixRow(card: card, matrix: matrix)
         }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.vertical, theme.mac(14))
       Spacer(minLength: 0)
+      if !isTop { label(count: cards.count) }
     }
-    .padding(theme.space.sm)
-    .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
-    .background(
-      RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
-        .fill(isTargeted ? tint.opacity(0.10) : theme.raised))
-    .overlay(
-      RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
-        .strokeBorder(isTargeted ? tint : theme.border, lineWidth: theme.stroke))
+    .padding(.horizontal, theme.mac(8))
+    .padding(.vertical, theme.mac(6))
+    .frame(maxWidth: .infinity, minHeight: 190, alignment: alignment)
+    .background(isTargeted ? theme.hover : Color.clear)
+    .contentShape(Rectangle())
     .dropDestination(for: String.self) { ids, _ in
       guard let id = ids.first else { return false }
       matrix.place(id, in: cell, model: model)
       return true
     } isTargeted: { isTargeted = $0 }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("\(cell.title), \(cell.detail)")
     .accessibilityIdentifier("matrix.cell.\(cell.rawValue)")
+  }
+
+  private func label(count: Int) -> some View {
+    Text("\(number)  \(cell.title.uppercased())  \(count)")
+      .font(theme.type.groupLabel)
+      .foregroundStyle(theme.dim)
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, alignment: isLeading ? .leading : .trailing)
+      .accessibilityAddTraits(.isHeader)
   }
 }
 
-/// Cards the matrix has not placed yet.
+/// Cards the matrix has not placed yet: the Mac's "Not placed" tray, the
+/// chips wrapping under it.
 struct MatrixTrayView: View {
   @Environment(\.theme) private var theme
   @Environment(WorkspaceModel.self) private var model
@@ -90,33 +145,31 @@ struct MatrixTrayView: View {
 
   var body: some View {
     let cards = matrix.unplaced
-    VStack(alignment: .leading, spacing: theme.space.xs) {
-      HStack {
-        Text("Unplaced").font(theme.type.bodyMedium).foregroundStyle(theme.ink)
-        Spacer()
-        Text("\(cards.count)").font(theme.type.numeral).foregroundStyle(theme.muted)
-      }
-      Text("Drag a task into a quadrant, or long-press it to place it.")
-        .font(theme.type.footnote).foregroundStyle(theme.muted)
-      Hairline(role: .borderMuted).padding(.vertical, theme.space.xxs)
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Not placed  \(cards.count)")
+        .font(theme.type.body)
+        .foregroundStyle(theme.muted)
+        .padding(.horizontal, theme.mac(8))
+        .padding(.vertical, theme.mac(4))
       if cards.isEmpty, matrix.isLoaded {
-        Text("Everything is placed.").font(theme.type.callout).foregroundStyle(theme.dim)
-          .frame(minHeight: 36)
+        Text("Everything is placed.").font(theme.type.secondary).foregroundStyle(theme.dim)
+          .padding(.horizontal, theme.mac(8))
+          .frame(minHeight: theme.mac(26))
       }
-      LazyVStack(alignment: .leading, spacing: 0) {
+      FlowLayout(spacing: theme.mac(4)) {
         ForEach(cards) { card in
           MatrixRow(card: card, matrix: matrix)
         }
       }
+      .padding(theme.mac(4))
     }
-    .padding(theme.space.sm)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, minHeight: theme.mac(120), alignment: .topLeading)
     .background(
-      RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
-        .fill(isTargeted ? theme.hover : theme.altRow))
+      RoundedRectangle(cornerRadius: theme.mac.radiusMenu, style: .continuous)
+        .fill(isTargeted ? theme.hover : theme.paper))
     .overlay(
-      RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
-        .strokeBorder(theme.border, lineWidth: theme.stroke))
+      RoundedRectangle(cornerRadius: theme.mac.radiusMenu, style: .continuous)
+        .strokeBorder(theme.borderMuted, lineWidth: 1))
     .dropDestination(for: String.self) { ids, _ in
       guard let id = ids.first else { return false }
       matrix.place(id, in: nil, model: model)
@@ -133,28 +186,41 @@ struct MatrixRow: View {
   let card: BoardCard
   let matrix: MatrixModel
 
+  private var isSelected: Bool { model.navigation.selectedTaskID == card.id }
+
+  /// The Mac's matrix chip: 20 high at radius 4 in the muted border, a 6pt
+  /// dot (accent when selected, muted when open, dim when done) and the
+  /// title. The dot completes it; the rest opens it.
   var body: some View {
-    HStack(spacing: theme.space.xs) {
+    HStack(spacing: theme.mac(4)) {
       Button { model.completeCelebrating(card.id) } label: {
-        TaskCheckbox(status: card.status, isList: card.isList, size: 16)
+        Circle()
+          .fill(isSelected ? theme.primary : card.status == .open ? theme.muted : theme.dim)
+          .frame(width: 6, height: 6)
           .celebrationIcon(card.id)
-          .frame(width: 28, height: 36)
           .hitTarget()
       }
       .buttonStyle(.plain)
       .accessibilityLabel(card.status == .open ? "Complete \(card.title)" : "Reopen \(card.title)")
       Text(card.title)
         .font(theme.type.callout)
-        .foregroundStyle(card.status == .open && !model.isBlocked(card.id) ? theme.ink : theme.muted)
+        .foregroundStyle(card.status == .open && !model.isBlocked(card.id) ? theme.ink : theme.dim)
         .strikethrough(card.status != .open, color: theme.dim)
-        .lineLimit(2)
+        .lineLimit(1)
         .celebrationStrike(card.id)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .padding(.horizontal, theme.mac(4))
+    .frame(height: theme.mac(20))
+    .background(
+      RoundedRectangle(cornerRadius: 3).fill(isSelected ? theme.selected : Color.clear).padding(1))
+    .background(RoundedRectangle(cornerRadius: theme.mac.radiusRow).fill(theme.paper))
+    .overlay(
+      RoundedRectangle(cornerRadius: theme.mac.radiusRow)
+        .strokeBorder(isSelected ? theme.focus : theme.borderMuted, lineWidth: 1))
     .contentShape(Rectangle())
     .onTapGesture { model.navigation.inspect(card.id, isPad: isPad) }
     .draggable(card.id) {
-      Text(card.title).font(theme.type.callout).padding(theme.space.sm).background(theme.raised)
+      Text(card.title).font(theme.type.callout).padding(theme.mac(4)).background(theme.paper)
     }
     .contextMenu {
       ForEach(MatrixCell.allCases) { cell in
