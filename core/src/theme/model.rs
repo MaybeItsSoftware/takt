@@ -220,7 +220,20 @@ impl CoreThemePalette {
                 "indentGuide" | "statusBar" => panel,
                 _ => at("paper"),
             };
-            return over(stated, below);
+            let drawn = over(stated, below);
+            // The keyboard's outline replaces a row's or a column's edge, so
+            // it must not be fainter than that edge: a theme whose focused
+            // border is quieter than its borders (Paper's grey against its
+            // purple) takes the accent instead.
+            if role == "focus" {
+                use super::color::contrast_ratio;
+                let page = at("paper");
+                let edge = contrast_ratio(&at("borderMuted"), &page);
+                if contrast_ratio(&drawn, &page) < edge {
+                    return at("primary");
+                }
+            }
+            return drawn;
         }
         match role {
             "selected" => mix(&at("paper"), &at("primary"), 0.16),

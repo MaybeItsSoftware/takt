@@ -478,3 +478,31 @@ fn zed_one_draws_the_macs_selection_and_guides() {
     assert_eq!(chrome("indentGuide", CoreThemeAppearance::Light), "#DFDFE0");
     assert_eq!(chrome("statusBar", CoreThemeAppearance::Dark), "#3B414D");
 }
+
+#[test]
+fn a_focus_fainter_than_the_borders_takes_the_accent() {
+    let style = r##"{
+      "name": "Paper",
+      "themes": [{
+        "name": "Paper Light",
+        "appearance": "light",
+        "style": {
+          "editor.background": "#faf8f0",
+          "text": "#222222",
+          "text.accent": "#6547b8",
+          "border": "#6547b8",
+          "border.variant": "#6547b8",
+          "panel.focused_border": "#cecbbf"
+        }
+      }]
+    }"##;
+    let spec = load_one("paper.json", style.as_bytes().to_vec())[0]
+        .specification
+        .clone()
+        .unwrap();
+    let light = CoreThemeAppearance::Light;
+    assert_eq!(
+        spec.palette.chrome("focus", light),
+        spec.palette.color("primary", light)
+    );
+}
