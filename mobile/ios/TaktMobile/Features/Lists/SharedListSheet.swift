@@ -30,7 +30,7 @@ struct SharedListSheet: View {
 
   var body: some View {
     NavigationStack {
-      Form {
+      List {
         if session?.isSignedIn != true {
           Section {
             Text("Sharing needs sync. Sign in under Settings → Sync first.")
@@ -73,7 +73,7 @@ struct SharedListSheet: View {
           }
         }
       }
-      .scrollContentBackground(.hidden)
+      .macSettingsList()
       .background(theme.paper)
       .font(theme.type.body)
       .navigationTitle(listName)
@@ -220,7 +220,7 @@ struct JoinListSheet: View {
 
   var body: some View {
     NavigationStack {
-      Form {
+      List {
         if session?.isSignedIn != true {
           Section {
             Text("Joining a shared list needs sync. Sign in under Settings → Sync first.")
@@ -250,7 +250,7 @@ struct JoinListSheet: View {
           }
         }
       }
-      .scrollContentBackground(.hidden)
+      .macSettingsList()
       .background(theme.paper)
       .navigationTitle("Join a shared list")
       .navigationBarTitleDisplayMode(.inline)

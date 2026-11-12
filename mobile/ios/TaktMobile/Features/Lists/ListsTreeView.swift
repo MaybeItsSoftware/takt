@@ -532,7 +532,7 @@ struct ListSettingsSheet: View {
 
   var body: some View {
     NavigationStack {
-      Form {
+      List {
         Section("Name") {
           TextField("Name", text: $name).font(theme.type.body)
         }
@@ -546,7 +546,7 @@ struct ListSettingsSheet: View {
           .padding(.vertical, theme.space.sm)
         }
       }
-      .scrollContentBackground(.hidden)
+      .macSettingsList()
       .background(theme.paper)
       .navigationTitle("List settings")
       .navigationBarTitleDisplayMode(.inline)

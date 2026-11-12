@@ -46,7 +46,7 @@ private struct SyncSettingsForm: View {
   private var session: SyncSession { controller.session }
 
   var body: some View {
-    Form {
+    List {
       // First, so a refused password says so without scrolling.
       if let error = controller.signInError {
         Section {
@@ -63,7 +63,7 @@ private struct SyncSettingsForm: View {
         signedOut
       }
     }
-    .scrollContentBackground(.hidden)
+    .macSettingsList()
     .background(theme.paper)
     .font(theme.type.body)
     .disabled(controller.isSigningIn)
@@ -105,7 +105,7 @@ private struct SyncSettingsForm: View {
     } header: {
       header("Account")
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
     .task(id: session.credentials?.accountId) {
       try? await session.refreshAccount()
     }
@@ -136,7 +136,7 @@ private struct SyncSettingsForm: View {
         Text("You signed in from a password-reset email. Set the password to use from now on.")
           .font(theme.type.footnote).foregroundStyle(theme.muted)
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
     }
 
     Section {
@@ -170,7 +170,7 @@ private struct SyncSettingsForm: View {
       Text("To add a device, sign in to the same account on it.")
         .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
 
     Section {
       Button("Sign out", role: .destructive) { isConfirmingSignOut = true }
@@ -195,7 +195,7 @@ private struct SyncSettingsForm: View {
       Text("Deleting the account removes everything synced to the server and signs out every device. Each device keeps its own copy.")
         .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
   }
 
   // MARK: - Signed out
@@ -208,7 +208,7 @@ private struct SyncSettingsForm: View {
           .foregroundStyle(theme.danger)
           .accessibilityIdentifier("sync.needsSignIn")
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
     }
 
     Section {
@@ -236,7 +236,7 @@ private struct SyncSettingsForm: View {
       Text("Keep this iPhone, your Mac and your other devices on one workspace. Every device keeps a full copy and works offline.")
         .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
 
     Section {
       // Apple and Google above are the usual way in; the email form is six
@@ -283,7 +283,7 @@ private struct SyncSettingsForm: View {
       Text("A new password needs 8 characters.")
         .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
 
     Section {
       DisclosureGroup("Use a different server", isExpanded: $usesOtherServer) {
@@ -298,7 +298,7 @@ private struct SyncSettingsForm: View {
       Text("For a server you run yourself. Leave it as it is to use Takt's.")
         .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
     .onAppear(perform: prefill)
   }
 
@@ -358,7 +358,7 @@ private struct SyncSettingsForm: View {
   }
 
   private func header(_ text: String) -> some View {
-    Text(text).font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+    SettingsGroupLabel(text)
   }
 }
 
@@ -407,7 +407,7 @@ private struct TaktSyncSection: View {
       )
       .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
     .task(id: session.credentials?.accountId) {
       await purchase.prepare(account: session.credentials?.accountId)
     }

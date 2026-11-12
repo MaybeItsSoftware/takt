@@ -85,12 +85,12 @@ struct ReminderSettingsSection: View {
         .accessibilityIdentifier("settings.reminders.denied")
       }
     } header: {
-      Text("Reminders").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+      SettingsGroupLabel("Reminders")
     } footer: {
       Text("Set on this phone only. A due day without a time is in the morning summary.")
         .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
-    .listRowBackground(theme.raised)
+    .settingsRows()
     .task { isDenied = await ReminderScheduler.isDenied() }
   }
 

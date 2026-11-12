@@ -16,7 +16,7 @@ struct ThemeSettingsView: View {
 
   var body: some View {
     @Bindable var themes = themes
-    Form {
+    List {
       Section {
         Picker(
           "Appearance", selection: Binding(get: { themes.effectiveAppearance }, set: { themes.setAppearance($0) })
@@ -35,7 +35,7 @@ struct ThemeSettingsView: View {
           footer("\(theme.specification.name) is always \(locked.rawValue).")
         }
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
 
       Section {
         // The whole library is a screen of swatches; folded, the row says
@@ -54,7 +54,7 @@ struct ThemeSettingsView: View {
           footer("The chosen theme isn't available on this phone yet, so the default theme is standing in.")
         }
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
       .accessibilityIdentifier("settings.theme")
 
       Section {
@@ -67,7 +67,7 @@ struct ThemeSettingsView: View {
             ? "This phone keeps its own theme and appearance. Your other devices are unaffected."
             : "Your theme and appearance follow your other devices.")
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
 
       if let lastImport {
         Section {
@@ -78,7 +78,7 @@ struct ThemeSettingsView: View {
         } header: {
           header(lastImport.identifier == nil ? "Couldn't import \(lastImport.fileName)" : "Imported \(lastImport.fileName)")
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
       }
 
       Section {
@@ -102,10 +102,10 @@ struct ThemeSettingsView: View {
       } footer: {
         footer("A theme is a .json file, the same format the Mac uses. Imported themes sync to your other devices.")
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
     }
     .font(theme.type.body)
-    .scrollContentBackground(.hidden)
+    .macSettingsList()
     .background(theme.paper)
     .navigationTitle("Theme")
     .navigationBarTitleDisplayMode(.inline)
@@ -116,7 +116,7 @@ struct ThemeSettingsView: View {
   }
 
   private func header(_ text: String) -> some View {
-    Text(text).microLabel()
+    SettingsGroupLabel(text)
   }
 
   private func footer(_ text: String) -> some View {

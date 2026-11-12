@@ -11,7 +11,7 @@ struct SettingsScreen: View {
 
   var body: some View {
     NavigationStack {
-      Form {
+      List {
         Section {
           NavigationLink {
             ThemeSettingsView()
@@ -30,7 +30,7 @@ struct SettingsScreen: View {
         } header: {
           header("Theme")
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
 
         Section {
           // Every style with its explanation is a screen of rows; folded, the
@@ -56,7 +56,7 @@ struct SettingsScreen: View {
         } header: {
           header("Completing a task")
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
 
         Section {
           NavigationLink {
@@ -87,7 +87,7 @@ struct SettingsScreen: View {
         } header: {
           header("Devices")
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
 
         ReminderSettingsSection()
 
@@ -107,16 +107,16 @@ struct SettingsScreen: View {
           header("Debug")
         }
         .font(theme.type.body)
-        .listRowBackground(theme.raised)
+        .settingsRows()
         #endif
 
         Section {
           LabeledContent("Version", value: Self.version)
             .font(theme.type.body)
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
       }
-      .scrollContentBackground(.hidden)
+      .macSettingsList()
       .background(theme.paper)
       .navigationDestination(isPresented: Binding(
         get: { model.navigation.isSyncSettingsPresented },
@@ -133,7 +133,7 @@ struct SettingsScreen: View {
   }
 
   private func header(_ text: String) -> some View {
-    Text(text).font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+    SettingsGroupLabel(text)
   }
 
   static var version: String {

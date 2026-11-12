@@ -23,9 +23,9 @@ struct CalendarSettingsRow: View {
       } header: {
         // The integrations under one heading, as the Mac's Settings →
         // Plugins; Google Calendar is the one this phone has.
-        Text("Plugins").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+        SettingsGroupLabel("Plugins")
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
     }
   }
 }
@@ -40,7 +40,7 @@ struct CalendarSettingsView: View {
   private var writable: [GoogleCalendarChoice] { calendar.calendars.filter(\.canWrite) }
 
   var body: some View {
-    Form {
+    List {
       Section {
         if calendar.isConnected {
           Button("Disconnect", role: .destructive) { calendar.disconnect() }
@@ -65,7 +65,7 @@ struct CalendarSettingsView: View {
         Text("Takt asks Google to see your calendars and edit their events.")
           .font(theme.type.caption).foregroundStyle(theme.muted)
       }
-      .listRowBackground(theme.raised)
+      .settingsRows()
 
       if calendar.isConnected {
         Section {
@@ -85,7 +85,7 @@ struct CalendarSettingsView: View {
           Text("Timed tasks become events in this calendar. Moving or renaming one there moves or renames the task.")
             .font(theme.type.caption).foregroundStyle(theme.muted)
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
 
         Section {
           // An account can hold dozens of calendars; folded, the row counts
@@ -104,10 +104,10 @@ struct CalendarSettingsView: View {
         } header: {
           header("Shown in Today")
         }
-        .listRowBackground(theme.raised)
+        .settingsRows()
       }
     }
-    .scrollContentBackground(.hidden)
+    .macSettingsList()
     .background(theme.paper)
     .navigationTitle("Google Calendar")
     .navigationBarTitleDisplayMode(.inline)
@@ -143,7 +143,7 @@ struct CalendarSettingsView: View {
   }
 
   private func header(_ text: String) -> some View {
-    Text(text).font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+    SettingsGroupLabel(text)
   }
 }
 

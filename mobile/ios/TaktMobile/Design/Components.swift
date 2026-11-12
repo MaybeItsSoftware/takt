@@ -505,3 +505,58 @@ struct TaskChips: View {
     }
   }
 }
+
+// MARK: - Settings pages
+
+/// A settings group's heading as the Mac's settings page sets one: the Mac's
+/// 10px bold capitals in the dim text, 24 above the rows it names.
+struct SettingsGroupLabel: View {
+  @Environment(\.theme) private var theme
+  let text: String
+
+  init(_ text: String) { self.text = text }
+
+  var body: some View {
+    Text(text.uppercased())
+      .font(theme.type.groupLabel)
+      .tracking(0.6)
+      .foregroundStyle(theme.dim)
+      .textCase(nil)
+      .padding(.top, theme.mac(24) - theme.space.md)
+      .accessibilityAddTraits(.isHeader)
+  }
+}
+
+extension View {
+  /// A settings page as the Mac draws one: rows full width on the paper, the
+  /// Mac's 38px least height, no inset cards. Navigation stays native.
+  func macSettingsList() -> some View { modifier(MacSettingsList()) }
+
+  /// A settings group's rows: on the paper, split by the muted hairline, the
+  /// group's edges in the border colour.
+  func settingsRows() -> some View { modifier(SettingsRows()) }
+}
+
+private struct MacSettingsList: ViewModifier {
+  @Environment(\.theme) private var theme
+
+  func body(content: Content) -> some View {
+    content
+      .listStyle(.grouped)
+      .scrollContentBackground(.hidden)
+      .environment(\.defaultMinListRowHeight, max(theme.touchTarget, theme.mac.settingsRow))
+      .listSectionSpacing(0)
+  }
+}
+
+private struct SettingsRows: ViewModifier {
+  @Environment(\.theme) private var theme
+
+  func body(content: Content) -> some View {
+    content
+      .listRowBackground(theme.paper)
+      .listRowSeparatorTint(theme.borderMuted)
+      .listSectionSeparatorTint(theme.border)
+      .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(10), bottom: 0, trailing: theme.mac(10)))
+  }
+}
