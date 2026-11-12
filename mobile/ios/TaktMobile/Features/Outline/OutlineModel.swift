@@ -22,6 +22,11 @@ struct OutlineRow: Identifiable, Equatable, Sendable {
   let isPlanned: Bool
   /// The list's name, in a combined scope where rows come from many lists.
   let listName: String?
+  /// What the Mac sets beside the title: tags, priority, waiting on, links.
+  var chips: TaskChipMetadata?
+  /// Children done and in all, for a parent: the Mac's `3/5`.
+  var childrenDone = 0
+  var childrenTotal = 0
 
   var menuContext: TaskMenuContext {
     TaskMenuContext(
@@ -36,6 +41,7 @@ struct OutlineBase: Sendable, Equatable {
   var items: [TaskOutlineItem] = []
   var planned: Set<String> = []
   var listNames: [String: String] = [:]
+  var chips: [String: TaskChipMetadata] = [:]
   /// The task the scope's top-level rows hang from: a nested list's task, or
   /// an imported wrapper; nil for a list's own top level.
   var rootParentID: String?
@@ -76,6 +82,7 @@ struct OutlineBase: Sendable, Equatable {
     }
     if hidesCompleted { base.items.removeAll { $0.task.status != .open } }
     let columns = try store.boardMetadata(for: base.items.map(\.id)).columns
+    base.chips = (try? store.chipMetadata(for: base.items.map(\.id))) ?? [:]
     base.planned = Set(columns.compactMap { $0.value == NextUpSelector.todayColumnID ? $0.key : nil })
     if base.isCombined {
       base.listNames = Dictionary(structure.lists.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
@@ -87,14 +94,24 @@ struct OutlineBase: Sendable, Equatable {
   /// has children and whether it is folded.
   func rows(folded: Set<String>) -> [OutlineRow] {
     let parents = TaskOutlineFolding.parentIDs(items)
+    var counts: [String: (done: Int, total: Int)] = [:]
+    for item in items {
+      guard let parent = item.task.parentTaskId else { continue }
+      var count = counts[parent] ?? (0, 0)
+      count.total += 1
+      if item.task.status == .completed { count.done += 1 }
+      counts[parent] = count
+    }
     return TaskOutlineFolding.visible(items, folded: folded).map { item in
       let task = item.task
+      let count = counts[task.id] ?? (0, 0)
       return OutlineRow(
         id: task.id, title: task.title, depth: item.depth, status: task.status, isList: task.isList,
         isPromoted: task.isPromoted == true, parentID: task.parentTaskId, listID: task.listId,
         dueAt: task.dueAt, estimateSeconds: task.estimateSeconds, hasNotes: !task.notes.isEmpty,
         hasChildren: parents.contains(task.id), isFolded: folded.contains(task.id),
-        isPlanned: planned.contains(task.id), listName: isCombined ? listNames[task.listId] : nil)
+        isPlanned: planned.contains(task.id), listName: isCombined ? listNames[task.listId] : nil,
+        chips: chips[task.id], childrenDone: count.done, childrenTotal: count.total)
     }
   }
 }

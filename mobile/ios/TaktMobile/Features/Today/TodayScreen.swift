@@ -45,9 +45,16 @@ struct TodayScreen: View {
           today.move(from: source, to: destination, drawn: cards, model: model)
         }
       } header: {
-        if !today.day.cards.isEmpty && !today.day.isPlanned {
-          Text("Nothing planned — the top of the ranking")
-            .font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+        if !today.day.cards.isEmpty {
+          // The Mac's day: the plan, else the head of the ranking.
+          Group {
+            if today.day.isPlanned {
+              SectionHeading("Today", count: today.day.cards.count)
+            } else {
+              SectionHeading("Up next · \(today.day.cards.count) ranked")
+            }
+          }
+          .listRowInsets(EdgeInsets())
         }
       }
       if !dailies.isEmpty {
@@ -57,19 +64,20 @@ struct TodayScreen: View {
               daily: daily, isLeaving: leavingDailies[daily.id] != nil,
               onToggle: { finish(daily, index: index) },
               onOpen: { model.navigation.inspect(daily.taskID, isPad: isPad) })
-              .listRowInsets(EdgeInsets(top: 0, leading: theme.space.lg, bottom: 0, trailing: theme.space.sm))
+              .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(4), bottom: 0, trailing: theme.mac(4)))
               .listRowBackground(theme.paper)
-              .listRowSeparatorTint(theme.borderMuted)
+              .listRowSeparator(.hidden)
               .moveDisabled(true)
               .selectionDisabled()
           }
         } header: {
-          Text("Dailies").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+          SectionHeading("Dailies", count: dailies.count).listRowInsets(EdgeInsets())
         }
       }
     }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
+    .environment(\.defaultMinListRowHeight, theme.touchTarget)
     .background(theme.paper)
     .overlay {
       if today.isLoaded && today.day.cards.isEmpty && today.day.dailies.isEmpty {
@@ -147,10 +155,10 @@ struct TodayScreen: View {
     }
     .tag(card.id)
     .listRowInsets(EdgeInsets(
-      top: 0, leading: card.isPlanned && !card.isRunning ? theme.space.xs : theme.space.lg, bottom: 0,
-      trailing: card.isRunning ? theme.space.lg : theme.space.sm))
-    .listRowBackground(card.isRunning ? theme.primary.opacity(0.06) : (isSelected ? theme.primary.opacity(0.10) : theme.paper))
-    .listRowSeparatorTint(theme.borderMuted)
+      top: 0, leading: card.isRunning ? theme.mac(12) : theme.mac(4), bottom: 0,
+      trailing: card.isRunning ? theme.mac(12) : theme.mac(4)))
+    .listRowBackground(card.isRunning ? theme.selected : theme.paper)
+    .listRowSeparator(.hidden)
     .moveDisabled(!card.isPlanned)
     .swipeActions(edge: .leading, allowsFullSwipe: true) {
       if leavingCards[card.id] == nil {
@@ -236,7 +244,7 @@ struct DayHeader: View {
           Spacer(minLength: theme.space.sm)
           if let finish = forecast.finishAt {
             Text("done by \(finish.formatted(date: .omitted, time: .shortened))")
-              .font(theme.type.numeral)
+              .font(theme.type.secondaryMono)
               .foregroundStyle(theme.primary)
           }
         }
@@ -246,7 +254,7 @@ struct DayHeader: View {
           Spacer(minLength: theme.space.sm)
           Text(day.loggedToday > 0 ? "\(Format.duration(day.loggedToday)) logged today" : "Nothing logged yet")
         }
-        .font(theme.type.caption)
+        .font(theme.type.secondary)
         .foregroundStyle(theme.muted)
         if day.workProgress.week.seconds > 0 || day.workProgress.week.completed > 0 {
           HStack(spacing: theme.space.sm) {
@@ -254,12 +262,12 @@ struct DayHeader: View {
             Spacer(minLength: theme.space.sm)
             Text("\(Format.duration(day.workProgress.week.seconds)) this week · \(Format.duration(day.workProgress.averageSecondsPerDay))/day")
           }
-          .font(theme.type.caption)
-          .foregroundStyle(theme.muted)
+          .font(theme.type.secondary)
+          .foregroundStyle(theme.dim)
         }
       }
-      .padding(.horizontal, theme.space.lg)
-      .padding(.vertical, theme.space.md)
+      .padding(.horizontal, theme.mac(12))
+      .padding(.vertical, theme.mac(12))
     }
     .overlay(alignment: .bottom) { Hairline() }
   }
@@ -351,43 +359,36 @@ struct DayCardRow<Menu: View>: View, Equatable {
     return parts.joined(separator: ", ")
   }
 
+  /// The Mac's day row (`views::day_row`): the status mark outside a box
+  /// that starts at the title — title, chips, then "list · reason" in dim
+  /// secondary text — 30 Mac pixels high. A tap on the box finishes the
+  /// task; the options and play sit after it as icons at rest.
   var body: some View {
     HStack(spacing: 0) {
-      if card.isPlanned {
-        // The list drags a planned card on a long press; the handle says so.
-        Image(systemName: "line.3.horizontal")
-          .font(theme.type.glyph(11.5))
-          .foregroundStyle(theme.dim)
-          .frame(width: 32, height: theme.touchTarget)
-          .accessibilityHidden(true)
-      }
+      Color.clear.frame(width: theme.mac(2 + 10 + 4), height: 1)
+      TaskCheckbox(status: isLeaving ? .completed : .open, isList: card.isList, showsBox: false)
       Button(action: onTick) {
-        VStack(alignment: .leading, spacing: theme.space.xxs) {
+        HStack(spacing: theme.mac(8)) {
           Text(card.title)
             .font(theme.type.body)
-            .foregroundStyle(isBlocked || isLeaving ? theme.muted : theme.ink)
+            .foregroundStyle(isLeaving || isBlocked ? theme.dim : theme.ink)
             .strikethrough(isLeaving, color: theme.dim)
-            .lineLimit(2)
+            .lineLimit(1)
             .celebrationStrike(card.id)
             .frame(maxWidth: .infinity, alignment: .leading)
-          HStack(spacing: theme.space.xs) {
-            if let reason = card.reason, reason != .planned {
-              Text(card.detail ?? reason.label).foregroundStyle(tint(for: reason))
-            } else if let detail = card.detail {
-              Text(detail)
-            }
-            if card.dailyID != nil {
-              Image(systemName: "repeat").imageScale(.small)
-            }
-            if let waiting { WaitingBadgeView(badge: waiting) }
-            if let list = card.listName {
-              Text(list).lineLimit(1)
-            }
-          }
-          .font(theme.type.footnote)
-          .foregroundStyle(theme.muted)
+          TaskChips(isBlocked: isBlocked, waitingOn: waiting?.waitingOn)
+          if card.dailyID != nil { Chip(text: "↻", tint: theme.dim) }
+          cost
+          Text(context)
+            .font(theme.type.secondary)
+            .foregroundStyle(reasonTint)
+            .lineLimit(1)
         }
-        .padding(.vertical, 9)
+        .padding(.leading, theme.mac(6))
+        .padding(.trailing, theme.mac(8))
+        .frame(height: theme.mac(30))
+        .rowSelection(isSelected)
+        .frame(minHeight: theme.touchTarget)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -395,12 +396,11 @@ struct DayCardRow<Menu: View>: View, Equatable {
       .accessibilityLabel(accessibilityText)
       .accessibilityHint(card.dailyID != nil ? "Logs it for today" : "Completes it")
       .accessibilityIdentifier("today.check.\(card.title)")
-      cost.padding(.leading, theme.space.sm)
       SwiftUI.Menu(content: menu) {
         Image(systemName: "ellipsis")
-          .font(theme.type.glyph(12.5))
-          .foregroundStyle(theme.muted)
-          .frame(width: 36, height: theme.touchTarget)
+          .font(theme.type.glyph(13))
+          .foregroundStyle(theme.icon)
+          .frame(width: 32, height: theme.touchTarget)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -409,8 +409,8 @@ struct DayCardRow<Menu: View>: View, Equatable {
       Button(action: onStart) {
         Image(systemName: "play.fill")
           .font(theme.type.glyph(11.5))
-          .foregroundStyle(theme.primary)
-          .frame(width: 36, height: theme.touchTarget)
+          .foregroundStyle(theme.icon)
+          .frame(width: 32, height: theme.touchTarget)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -420,24 +420,34 @@ struct DayCardRow<Menu: View>: View, Equatable {
     .celebrationRow(card.id)
   }
 
+  /// "list · reason", as the Mac's day row ends.
+  private var context: String {
+    let reason: String =
+      switch card.reason {
+      case nil: card.detail ?? "ranked"
+      case .planned: card.detail ?? "planned"
+      case let reason?: card.detail ?? reason.label
+      }
+    return [card.listName, reason].compactMap { $0 }.joined(separator: " · ")
+  }
+
+  private var reasonTint: Color {
+    switch card.reason {
+    case .overdue: theme.danger
+    default: theme.dim
+    }
+  }
+
   @ViewBuilder
   private var cost: some View {
     if let estimate = card.estimateSeconds, estimate > 0 {
       Text(card.loggedSeconds > 0
         ? "\(Format.duration(card.loggedSeconds))/\(Format.duration(estimate))" : Format.duration(estimate))
-        .font(theme.type.numeral)
-        .foregroundStyle(card.loggedSeconds > estimate ? theme.warning : theme.muted)
+        .font(theme.type.secondaryMono)
+        .foregroundStyle(card.loggedSeconds > estimate ? theme.warning : theme.dim)
+        .fixedSize()
     } else if card.loggedSeconds > 0 {
-      Text(Format.duration(card.loggedSeconds)).font(theme.type.numeral).foregroundStyle(theme.muted)
-    }
-  }
-
-  private func tint(for reason: DayPlanReason) -> Color {
-    switch reason {
-    case .overdue: theme.danger
-    case .dueToday: theme.primary
-    case .startsToday: theme.success
-    case .running, .planned: theme.muted
+      Text(Format.duration(card.loggedSeconds)).font(theme.type.secondaryMono).foregroundStyle(theme.dim).fixedSize()
     }
   }
 }
@@ -460,12 +470,12 @@ struct RunningDayCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: theme.space.sm) {
-      HStack(spacing: theme.space.sm) {
-        Text("\(index)").font(theme.type.numeral).foregroundStyle(theme.primary)
-        Text(card.title).font(theme.type.title).foregroundStyle(theme.ink).lineLimit(2)
+      HStack(spacing: theme.mac(8)) {
+        Text("\(index)").font(theme.type.secondaryMono).foregroundStyle(theme.primary)
+        Text(card.title).font(theme.type.bodyMedium).foregroundStyle(theme.ink).lineLimit(2)
         Spacer(minLength: theme.space.sm)
         if let list = card.listName {
-          Text(list).font(theme.type.footnote).foregroundStyle(theme.muted).lineLimit(1)
+          Text(list).font(theme.type.secondary).foregroundStyle(theme.dim).lineLimit(1)
         }
       }
       HStack(alignment: .firstTextBaseline, spacing: theme.space.sm) {
@@ -485,7 +495,7 @@ struct RunningDayCard: View {
             .accessibilityIdentifier("today.clock")
         }
         Text(isPaused ? "paused" : (session.openEnded ? "so far" : "of \(Format.duration(session.workDurationSeconds))"))
-          .font(theme.type.caption)
+          .font(theme.type.secondary)
           .foregroundStyle(isPaused ? theme.warning : theme.muted)
         Spacer(minLength: 0)
       }
@@ -511,10 +521,11 @@ struct RunningDayCard: View {
   private func control(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
     Button(action: action) {
       Image(systemName: symbol)
-        .font(theme.type.glyph(12.5))
+        .font(theme.type.glyph(11.5))
         .foregroundStyle(theme.ink)
-        .frame(width: 44, height: 36)
-        .overlay(RoundedRectangle(cornerRadius: theme.radius.control).strokeBorder(theme.inputBorder, lineWidth: theme.stroke))
+        .frame(width: theme.mac(34), height: theme.mac.control)
+        .background(RoundedRectangle(cornerRadius: theme.mac.radiusMenu).fill(theme.altRow))
+        .overlay(RoundedRectangle(cornerRadius: theme.mac.radiusMenu).strokeBorder(theme.border, lineWidth: 1))
         .hitTarget()
     }
     .buttonStyle(.plain)
@@ -533,18 +544,22 @@ struct DailyRow: View {
 
   var body: some View {
     HStack(spacing: 0) {
+      Color.clear.frame(width: theme.mac(2 + 10 + 4) + theme.mac.mark, height: 1)
       Button(action: onToggle) {
-        HStack(spacing: theme.space.sm) {
+        HStack(spacing: theme.mac(8)) {
           Text(daily.title)
             .font(theme.type.body)
-            .foregroundStyle(isLeaving ? theme.muted : theme.ink)
+            .foregroundStyle(isLeaving ? theme.dim : theme.ink)
             .strikethrough(isLeaving, color: theme.dim)
-            .lineLimit(2)
+            .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
+          Chip(text: "↻", tint: theme.dim)
           if daily.secondsToday > 0 || daily.targetSeconds != nil {
-            Text(progress).font(theme.type.numeral).foregroundStyle(theme.muted)
+            Chip(text: progress, tint: theme.dim, mono: true)
           }
         }
+        .padding(.leading, theme.mac(6))
+        .padding(.trailing, theme.mac(8))
         .frame(minHeight: theme.touchTarget)
         .contentShape(Rectangle())
       }
@@ -554,9 +569,9 @@ struct DailyRow: View {
       .accessibilityIdentifier("today.daily.\(daily.title)")
       Button(action: onOpen) {
         Image(systemName: "ellipsis")
-          .font(theme.type.glyph(12.5))
-          .foregroundStyle(theme.muted)
-          .frame(width: 36, height: theme.touchTarget)
+          .font(theme.type.glyph(13))
+          .foregroundStyle(theme.icon)
+          .frame(width: 32, height: theme.touchTarget)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)

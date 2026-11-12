@@ -47,7 +47,7 @@ struct OutlineView: View {
       }
       .listStyle(.plain)
       .scrollContentBackground(.hidden)
-      .environment(\.defaultMinListRowHeight, 40)
+      .environment(\.defaultMinListRowHeight, theme.touchTarget)
       .overlay {
         if outline.isLoaded && outline.rows.isEmpty && outline.composer == nil {
           VStack(spacing: theme.space.md) {
@@ -115,9 +115,11 @@ struct OutlineView: View {
       }
     }
     .tag(row.id)
-    .listRowInsets(EdgeInsets(top: 0, leading: theme.space.md, bottom: 0, trailing: theme.space.md))
-    .listRowBackground(isSelected ? theme.primary.opacity(0.10) : theme.paper)
-    .listRowSeparatorTint(theme.borderMuted)
+    .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(4), bottom: 0, trailing: theme.mac(4)))
+    // The selection is painted by the row, a box round its title as the
+    // Mac's is; the list's own row stays the paper.
+    .listRowBackground(theme.paper)
+    .listRowSeparator(.hidden)
     .swipeActions(edge: .leading, allowsFullSwipe: true) {
       Button { model.completeCelebrating(row.id) } label: {
         Label(row.status == .open ? "Complete" : "Reopen", systemImage: row.status == .open ? "checkmark" : "arrow.uturn.backward")
@@ -156,10 +158,10 @@ struct OutlineView: View {
   /// A row of its own that cannot be selected, dragged or swiped.
   private func blockedLabelRow(depth: Int, isBuried: Bool = false) -> some View {
     BlockedDivider(isBuried: isBuried)
-      .padding(.leading, CGFloat(depth) * Metrics.indent + 22 + 32 + theme.space.xs * 3)
+      .padding(.leading, OutlineRowView.titleInset(depth: depth, theme: theme))
       .padding(.top, theme.space.sm)
       .padding(.bottom, theme.space.xxs)
-      .listRowInsets(EdgeInsets(top: 0, leading: theme.space.md, bottom: 0, trailing: theme.space.md))
+      .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(4), bottom: 0, trailing: theme.mac(4)))
       .listRowBackground(theme.paper)
       .listRowSeparator(.hidden)
       .selectionDisabled()
@@ -169,8 +171,8 @@ struct OutlineView: View {
 
   private var composerRow: some View {
     let depth = outline.composer?.depth ?? 0
-    return HStack(spacing: theme.space.sm) {
-      TaskCheckbox(status: .open).opacity(0.4)
+    return HStack(spacing: theme.mac(8)) {
+      TaskCheckbox(status: .open)
       TextField("New task", text: Binding(
         get: { outline.composer?.text ?? "" },
         set: { outline.composer?.text = $0 }))
@@ -195,16 +197,22 @@ struct OutlineView: View {
       .buttonStyle(.plain)
       .accessibilityLabel("Cancel new task")
     }
-    .padding(.leading, CGFloat(depth) * Metrics.indent + 24)
+    .padding(.leading, OutlineRowView.markInset(depth: depth, theme: theme))
+    .padding(.trailing, theme.mac(12))
+    .frame(minHeight: theme.mac.row)
+    .background(
+      RoundedRectangle(cornerRadius: theme.mac.radiusRow).strokeBorder(theme.focus, lineWidth: 1)
+        .padding(.leading, OutlineRowView.markInset(depth: depth, theme: theme) + theme.mac.mark + theme.mac(2)))
     .frame(minHeight: theme.touchTarget)
-    .listRowInsets(EdgeInsets(top: 0, leading: theme.space.md, bottom: 0, trailing: theme.space.md))
-    .listRowBackground(theme.raised)
+    .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(4), bottom: 0, trailing: theme.mac(4)))
+    .listRowBackground(theme.paper)
+    .listRowSeparator(.hidden)
     .moveDisabled(true)
     .selectionDisabled()
   }
 
   private func renameRow(_ row: OutlineRow) -> some View {
-    HStack(spacing: theme.space.sm) {
+    HStack(spacing: theme.mac(8)) {
       TaskCheckbox(status: row.status, isList: row.isList)
       TextField("Title", text: $outline.editingText)
         .font(theme.type.body)
@@ -212,8 +220,13 @@ struct OutlineView: View {
         .submitLabel(.done)
         .onSubmit { outline.commitRename(model) }
         .accessibilityIdentifier("outline.rename")
+        .padding(.horizontal, theme.mac(6))
+        .frame(minHeight: theme.mac.row)
+        .background(RoundedRectangle(cornerRadius: theme.mac.radiusRow).fill(theme.selected))
+        .overlay(RoundedRectangle(cornerRadius: theme.mac.radiusRow).strokeBorder(theme.focus, lineWidth: 1))
     }
-    .padding(.leading, CGFloat(row.depth) * Metrics.indent + 24)
+    .padding(.leading, OutlineRowView.markInset(depth: row.depth, theme: theme))
+    .padding(.trailing, theme.mac(12))
     .frame(minHeight: theme.touchTarget)
   }
 
@@ -315,53 +328,79 @@ struct OutlineRowView: View, Equatable {
       && lhs.starts == rhs.starts && lhs.waiting == rhs.waiting
   }
 
+  /// Where the status mark starts: past the indent, the fold arrow and the
+  /// gap after it. The Mac's `2 + depth × 18`, then 10, then 4.
+  static func markInset(depth: Int, theme: Theme) -> CGFloat {
+    theme.mac(2) + CGFloat(depth) * theme.mac.indent + theme.mac.disclosure + theme.mac(4)
+  }
+
+  /// Where the title starts, inside its selection box.
+  static func titleInset(depth: Int, theme: Theme) -> CGFloat {
+    markInset(depth: depth, theme: theme) + theme.mac.mark + theme.mac(6)
+  }
+
+  /// The Mac's outline row (`views::outline_row`): the indent, a 10 fold
+  /// arrow in dim text, 4, the 12 status mark, then the title and its chips
+  /// in a box at radius 4 that is the selection. The painted row is 26 Mac
+  /// pixels; the list row round it is the touch target.
   var body: some View {
-    HStack(spacing: theme.space.xs) {
-      Color.clear.frame(width: CGFloat(row.depth) * Metrics.indent, height: 1)
+    HStack(spacing: 0) {
+      Color.clear.frame(width: theme.mac(2) + CGFloat(row.depth) * theme.mac.indent, height: 1)
       disclosure
+      Color.clear.frame(width: theme.mac(4), height: 1)
       Button {
         model.completeCelebrating(row.id)
       } label: {
         TaskCheckbox(status: row.status, isList: row.isList)
           .celebrationIcon(row.id)
-          .frame(width: 32, height: 40)
-          .contentShape(Rectangle())
+          .hitTarget()
       }
       .buttonStyle(.plain)
       .accessibilityLabel(row.status == .open ? "Complete \(row.title)" : "Reopen \(row.title)")
       .accessibilityIdentifier("outline.check.\(row.title)")
-      VStack(alignment: .leading, spacing: 1) {
+      HStack(spacing: theme.mac(8)) {
         Text(row.title)
-          .font(row.isList ? theme.type.bodyMedium : theme.type.body)
-          .foregroundStyle(row.status == .open ? theme.ink : theme.muted)
+          .font(theme.type.body)
+          .foregroundStyle(titleColor)
           .strikethrough(row.status != .open, color: theme.dim)
-          .lineLimit(3)
+          .lineLimit(1)
+          .truncationMode(.tail)
           .celebrationStrike(row.id)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        TaskChips(
+          status: row.status, isBlocked: isBlocked, isLater: starts != nil, waitingOn: waiting?.waitingOn,
+          metadata: row.chips, dueAt: row.dueAt, childrenDone: row.childrenDone, childrenTotal: row.childrenTotal,
+          hasNotes: row.hasNotes)
         if let listName = row.listName {
-          Text(listName).font(theme.type.footnote).foregroundStyle(theme.muted).lineLimit(1)
+          Chip(text: listName, tint: theme.dim)
+        }
+        if isSelected {
+          Button {
+            model.navigation.inspect(row.id, isPad: isPad)
+          } label: {
+            Image(systemName: "info.circle")
+              .font(theme.type.glyph(13))
+              .foregroundStyle(theme.icon)
+              .hitTarget()
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Details")
+          .accessibilityIdentifier("outline.details")
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.vertical, 9)
-      badges
-      if isSelected {
-        Button {
-          model.navigation.inspect(row.id, isPad: isPad)
-        } label: {
-          Image(systemName: "info.circle")
-            .foregroundStyle(theme.primary)
-            .frame(width: 32, height: 40)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Details")
-        .accessibilityIdentifier("outline.details")
-      }
+      .padding(.leading, theme.mac(6))
+      .padding(.trailing, theme.mac(12))
+      .frame(height: theme.mac.row)
+      .rowSelection(isSelected, focused: isPad)
     }
-    // Blocked, the whole row — mark, title and badges — steps back, not only
-    // its title's colour; the selection behind it keeps its weight.
-    .opacity(isBlocked || starts != nil ? Theme.disabledOpacity : 1)
     .celebrationRow(row.id)
+  }
+
+  /// Done or cancelled, struck through in dim; blocked or buried, dim.
+  private var titleColor: Color {
+    if row.status != .open { return theme.dim }
+    if isBlocked || starts != nil { return theme.dim }
+    return theme.ink
   }
 
   @ViewBuilder
@@ -370,51 +409,17 @@ struct OutlineRowView: View, Equatable {
       Button {
         withAnimation(.snappy(duration: 0.2)) { onFold() }
       } label: {
-        Image(systemName: "chevron.right")
-          .font(theme.type.glyph(9.5, .semibold))
-          .foregroundStyle(theme.muted)
-          .rotationEffect(.degrees(row.isFolded ? 0 : 90))
-          .frame(width: 22, height: 40)
-          .contentShape(Rectangle())
+        Text(row.isFolded ? "▸" : "▾")
+          .font(theme.type.groupLabel.weight(.regular))
+          .foregroundStyle(theme.dim)
+          .frame(width: theme.mac.disclosure)
+          .hitTarget()
       }
       .buttonStyle(.plain)
       .accessibilityLabel(row.isFolded ? "Unfold \(row.title)" : "Fold \(row.title)")
       .accessibilityIdentifier("outline.fold.\(row.title)")
     } else {
-      Color.clear.frame(width: 22, height: 1)
+      Color.clear.frame(width: theme.mac.disclosure, height: 1)
     }
-  }
-
-  @ViewBuilder
-  private var badges: some View {
-    HStack(spacing: theme.space.xs) {
-      if let starts {
-        Text(starts).font(theme.type.numeral).foregroundStyle(theme.warning).lineLimit(1)
-      }
-      if row.isPlanned {
-        Image(systemName: "sun.max").font(theme.type.glyph(10.5)).foregroundStyle(theme.warning)
-          .accessibilityLabel("Planned for today")
-      }
-      if let waiting { WaitingBadgeView(badge: waiting) }
-      if row.hasNotes {
-        Image(systemName: "note.text").font(theme.type.glyph(9.5)).foregroundStyle(theme.dim)
-      }
-      if let estimate = row.estimateSeconds, estimate > 0 {
-        Text(Format.duration(estimate)).font(theme.type.numeral).foregroundStyle(theme.muted)
-      }
-      if let due = row.dueAt {
-        Tag(text: Format.due(due), tint: dueTint(due), mono: false)
-      }
-      if row.isList {
-        Image(systemName: "list.bullet").font(theme.type.glyph(9.5)).foregroundStyle(theme.muted)
-      }
-    }
-  }
-
-  private func dueTint(_ due: Date) -> Color {
-    guard row.status == .open else { return theme.muted }
-    if Format.isOverdue(due) { return theme.danger }
-    if Format.isToday(due) { return theme.primary }
-    return theme.muted
   }
 }

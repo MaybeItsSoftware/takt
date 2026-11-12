@@ -59,6 +59,20 @@ enum Format {
     return "starts \(start.formatted(.dateTime.day().month(.abbreviated)))"
   }
 
+  /// A day as the Mac's chips write one: "Today", "Tomorrow", "Yesterday",
+  /// else "Mon 3 Nov" (`widgets::format_day`).
+  static func day(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+    let days = calendar.dateComponents(
+      [.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)
+    ).day ?? 0
+    switch days {
+    case 0: return "Today"
+    case 1: return "Tomorrow"
+    case -1: return "Yesterday"
+    default: return date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+    }
+  }
+
   static func isOverdue(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> Bool {
     let hasTime = !calendar.isDate(date, equalTo: calendar.startOfDay(for: date), toGranularity: .minute)
     return hasTime ? date < now : calendar.startOfDay(for: date) < calendar.startOfDay(for: now)

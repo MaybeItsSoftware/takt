@@ -447,3 +447,61 @@ struct FlowLayout: Layout {
     return rows
   }
 }
+
+/// The chips the Mac sets after a task's title, in its order
+/// (`widgets::detail_chips` then `task_chips`): blocked or later, ⌛ who,
+/// up to three #tags, ↻ and ↗, the priority, the due day, done/total in mono,
+/// and ¶ when there are notes. Plain secondary text, no boxes.
+struct TaskChips: View {
+  @Environment(\.theme) private var theme
+  var status: TaskStatus = .open
+  var isBlocked = false
+  var isLater = false
+  var waitingOn: String?
+  var metadata: TaskChipMetadata?
+  var dueAt: Date?
+  var childrenDone = 0
+  var childrenTotal = 0
+  var hasNotes = false
+
+  var body: some View {
+    HStack(spacing: theme.mac(8)) {
+      if status == .open, isBlocked {
+        Chip(text: "blocked", tint: theme.warning)
+      } else if status == .open, isLater {
+        Chip(text: "later", tint: theme.dim)
+      }
+      if let who = waitingOn ?? metadata?.waitingOn {
+        Chip(text: "⌛ \(who)", tint: theme.muted)
+      }
+      if let metadata {
+        ForEach(metadata.tags.prefix(3), id: \.self) { tag in
+          Chip(text: "#\(tag)", tint: theme.primary)
+        }
+        if metadata.isRecurring { Chip(text: "↻", tint: theme.dim) }
+        if metadata.isLinked { Chip(text: "↗", tint: theme.dim) }
+        if let priority = metadata.priority { Chip(text: Self.priorityLabel(priority), tint: priorityTint(priority)) }
+      }
+      if let dueAt {
+        Chip(text: Format.day(dueAt), tint: status == .open && Format.isOverdue(dueAt) ? theme.danger : theme.dim)
+      }
+      if childrenTotal > 0 {
+        Chip(text: "\(childrenDone)/\(childrenTotal)", tint: theme.dim, mono: true)
+      }
+      if hasNotes { Chip(text: "¶", tint: theme.dim) }
+    }
+  }
+
+  static func priorityLabel(_ priority: Int) -> String {
+    priority < 0 ? "↓\(-priority)" : "P\(priority)"
+  }
+
+  private func priorityTint(_ priority: Int) -> Color {
+    switch priority {
+    case 1: theme.danger
+    case 2: theme.warning
+    case ..<0: theme.dim
+    default: theme.muted
+    }
+  }
+}

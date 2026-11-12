@@ -18,8 +18,9 @@ struct ListsTreeView: View {
       List {
         ListsTreeRows()
       }
-      .listStyle(.sidebar)
+      .listStyle(.plain)
       .scrollContentBackground(.hidden)
+      .environment(\.defaultMinListRowHeight, theme.touchTarget)
       .background(theme.paper)
       .navigationTitle("Lists")
       .navigationBarTitleDisplayMode(.inline)
@@ -152,18 +153,29 @@ struct ListsTreeRows: View {
       }
       .onMove { source, destination in reorder(rootLists, source: source, destination: destination, folderID: nil) }
     } header: {
-      Text("Lists").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
+      SectionHeading("Lists", count: rootFolders.count + rootLists.count)
+        .listRowInsets(EdgeInsets())
     }
     if !structure.archivedLists.isEmpty {
       Section {
-        DisclosureGroup(isExpanded: $showsArchived) {
+        Button {
+          withAnimation(.snappy(duration: 0.2)) { showsArchived.toggle() }
+        } label: {
+          TreeRowLabel(
+            depth: 0, disclosure: showsArchived ? .open : .folded, symbol: "archivebox", title: "Archived",
+            count: structure.archivedLists.count, muted: true)
+        }
+        .buttonStyle(.plain)
+        .treeRow()
+        if showsArchived {
           ForEach(structure.archivedLists) { list in
-            HStack {
-              Text(list.name).font(theme.type.body).foregroundStyle(theme.muted)
-              Spacer()
+            HStack(spacing: theme.mac(8)) {
+              TreeRowLabel(depth: 1, symbol: "list.bullet", title: list.name, count: nil, muted: true)
               Button("Restore") { model.setArchived(false, list: list.id) }
                 .buttonStyle(ThemedButtonStyle(kind: .quiet, compact: true))
+                .padding(.trailing, theme.mac(12))
             }
+            .treeRow()
             .contextMenu {
               Button { model.setArchived(false, list: list.id) } label: { Label("Restore", systemImage: "tray.and.arrow.up") }
               Button(role: .destructive) {
@@ -171,13 +183,14 @@ struct ListsTreeRows: View {
               } label: { Label("Delete…", systemImage: "trash") }
             }
           }
-        } label: {
-          Label("Archived", systemImage: "archivebox").font(theme.type.body).foregroundStyle(theme.muted)
         }
       }
     }
     Section {
       SyncStatusLine()
+        .padding(.horizontal, theme.mac(12))
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
     }
   }
 
@@ -205,15 +218,34 @@ struct ListsTreeRows: View {
     }
   }
 
-  fileprivate func folderLabel(_ folder: ListFolder) -> some View {
-    Button {
-      model.navigation.open(.folder(folder.id), isPad: isPad)
-    } label: {
-      Label(folder.name, systemImage: "folder")
-        .font(theme.type.body)
-        .foregroundStyle(theme.ink)
+  fileprivate func folderLabel(_ folder: ListFolder, depth: Int, isExpanded: Binding<Bool>) -> some View {
+    HStack(spacing: 0) {
+      // The fold arrow, in the row's inset: a tap there folds; anywhere else
+      // opens the folder's tasks.
+      Button {
+        withAnimation(.snappy(duration: 0.2)) { isExpanded.wrappedValue.toggle() }
+      } label: {
+        Color.clear
+          .frame(width: TreeRowLabel.inset(theme) + CGFloat(depth) * TreeRowLabel.indent(theme) + theme.mac(16))
+          .frame(maxHeight: .infinity)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(isExpanded.wrappedValue ? "Collapse \(folder.name)" : "Expand \(folder.name)")
+      Button {
+        model.navigation.open(.folder(folder.id), isPad: isPad)
+      } label: {
+        Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(folder.name)
     }
-    .buttonStyle(.plain)
+    .background {
+      TreeRowLabel(
+        depth: depth, disclosure: isExpanded.wrappedValue ? .open : .folded,
+        symbol: "folder", title: folder.name, count: nil)
+    }
+    .treeRow()
     .accessibilityIdentifier("lists.folder.\(folder.name)")
     .contextMenu { folderMenu(folder) }
   }
@@ -225,13 +257,13 @@ struct ListsTreeRows: View {
       .list(list.id), title: list.name,
       symbol: list.systemRole == .inbox ? "tray" : structure.sharedListIDs.contains(list.id) ? "person.2" : "list.bullet",
       count: structure.sidebar.taskCounts[list.id], tint: ListColor.color(hex: list.colorHex),
-      completed: list.completedAt != nil
+      completed: list.completedAt != nil, depth: depth
     )
     .contextMenu { listMenu(list) }
     ForEach(nested) { item in
       scopeRow(
-        .nested(listID: list.id, taskID: item.id), title: item.task.title, symbol: "list.bullet.indent",
-        count: structure.sidebar.taskCounts[item.id], indent: CGFloat(item.depth + 1) * theme.space.lg
+        .nested(listID: list.id, taskID: item.id), title: item.task.title, symbol: "arrow.turn.down.right",
+        count: structure.sidebar.taskCounts[item.id], depth: depth + item.depth + 1
       )
       .contextMenu {
         Button { model.togglePromoted(item.id) } label: { Label("Pin to lists", systemImage: "pin") }
@@ -246,40 +278,21 @@ struct ListsTreeRows: View {
 
   private func scopeRow(
     _ scope: ListScope, title: String, symbol: String, count: Int?, tint: Color? = nil, completed: Bool = false,
-    indent: CGFloat = 0, subtitle: String? = nil
+    depth: Int = 0, subtitle: String? = nil
   ) -> some View {
-    let label = HStack(spacing: theme.space.sm) {
-      Image(systemName: symbol)
-        .foregroundStyle(tint ?? theme.muted)
-        .frame(width: 22)
-      VStack(alignment: .leading, spacing: 1) {
-        Text(title)
-          .font(theme.type.body)
-          .foregroundStyle(completed ? theme.muted : theme.ink)
-          .strikethrough(completed, color: theme.dim)
-          .lineLimit(1)
-        if let subtitle {
-          Text(subtitle)
-            .font(theme.type.footnote)
-            .foregroundStyle(theme.muted)
-            .lineLimit(1)
-        }
-      }
-      Spacer(minLength: theme.space.sm)
-      if let count, count > 0 {
-        Text("\(count)").font(theme.type.numeral).foregroundStyle(theme.muted)
-      }
-    }
-    .padding(.leading, indent)
-    .contentShape(Rectangle())
+    let label = TreeRowLabel(
+      depth: depth, symbol: symbol, title: title, count: count, tint: tint, completed: completed, subtitle: subtitle)
     return Group {
       if isPad {
         // The sidebar's `List(selection:)` reads the tag.
         label.tag(SidebarItem.scope(scope))
       } else {
-        NavigationLink(value: scope) { label }
+        // The link's own chevron is hidden: a row in the Mac's sidebar is
+        // its icon, its name and its count.
+        label.background { NavigationLink(value: scope) { EmptyView() }.opacity(0) }
       }
     }
+    .treeRow(selected: isPad && model.navigation.sidebarSelection == .scope(scope))
     .accessibilityIdentifier("lists.row.\(title)")
   }
 
@@ -366,11 +379,97 @@ struct AnyFolderBranch: View {
   }
 
   var body: some View {
-    DisclosureGroup(isExpanded: $isExpanded) {
+    rows.folderLabel(folder, depth: depth, isExpanded: $isExpanded)
+    if isExpanded {
       rows.folderContents(folder, depth: depth)
-    } label: {
-      rows.folderLabel(folder)
     }
+  }
+}
+
+/// One row of the tree as the Mac's sidebar draws it (`chrome.rs`): inset
+/// 10, 20 a level, a 16 icon in muted, the name, the count in dim secondary
+/// text; under each ancestor's icon an indent guide, so a level's line runs
+/// on unbroken from row to row. The row is the touch target high; nothing
+/// but the guides is painted.
+struct TreeRowLabel: View {
+  @Environment(\.theme) private var theme
+  enum Disclosure { case none, open, folded }
+  let depth: Int
+  var disclosure: Disclosure = .none
+  let symbol: String
+  let title: String
+  let count: Int?
+  var tint: Color?
+  var completed = false
+  var subtitle: String?
+  var muted = false
+
+  static func inset(_ theme: Theme) -> CGFloat { theme.mac(10) }
+  static func indent(_ theme: Theme) -> CGFloat { theme.mac(20) }
+
+  var body: some View {
+    let inset = Self.inset(theme)
+    let indent = Self.indent(theme)
+    HStack(spacing: theme.mac(8)) {
+      Image(systemName: symbol)
+        .font(theme.type.glyph(13))
+        .foregroundStyle(tint ?? theme.muted)
+        .frame(width: theme.mac(16))
+      VStack(alignment: .leading, spacing: 0) {
+        Text(title)
+          .font(theme.type.body)
+          .foregroundStyle(completed || muted ? theme.muted : theme.ink)
+          .strikethrough(completed, color: theme.dim)
+          .lineLimit(1)
+        if let subtitle {
+          Text(subtitle).font(theme.type.secondary).foregroundStyle(theme.dim).lineLimit(1)
+        }
+      }
+      Spacer(minLength: theme.space.sm)
+      if let count, count > 0 {
+        Text("\(count)").font(theme.type.secondary).foregroundStyle(theme.dim)
+      }
+    }
+    .padding(.leading, inset + CGFloat(depth) * indent)
+    .padding(.trailing, theme.mac(12))
+    .frame(maxWidth: .infinity, minHeight: theme.touchTarget, alignment: .leading)
+    .overlay(alignment: .leading) {
+      ZStack(alignment: .leading) {
+        ForEach(0..<depth, id: \.self) { level in
+          Rectangle().fill(theme.indentGuide)
+            .frame(width: 1)
+            .padding(.leading, inset + CGFloat(level) * indent + theme.mac(7.5))
+        }
+        if disclosure != .none {
+          Text(disclosure == .open ? "▾" : "▸")
+            .font(theme.type.groupLabel.weight(.regular))
+            .foregroundStyle(theme.dim)
+            .frame(width: inset, alignment: .center)
+            .padding(.leading, CGFloat(depth) * indent)
+            .accessibilityHidden(true)
+        }
+      }
+      .frame(maxHeight: .infinity, alignment: .leading)
+    }
+    .contentShape(Rectangle())
+  }
+}
+
+extension View {
+  /// A tree row in a plain list: no insets, no separator, on the paper —
+  /// or, chosen, on the selection fill, as the Mac's sidebar marks the view
+  /// in front.
+  func treeRow(selected: Bool = false) -> some View { modifier(TreeRowModifier(isSelected: selected)) }
+}
+
+private struct TreeRowModifier: ViewModifier {
+  @Environment(\.theme) private var theme
+  let isSelected: Bool
+  func body(content: Content) -> some View {
+    content
+      .listRowInsets(EdgeInsets())
+      .listRowSeparator(.hidden)
+      .listRowBackground(isSelected ? theme.selected : theme.paper)
   }
 }
 
