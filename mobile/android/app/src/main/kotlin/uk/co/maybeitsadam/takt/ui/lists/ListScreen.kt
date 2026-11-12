@@ -1,13 +1,15 @@
 package uk.co.maybeitsadam.takt.ui.lists
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.heightIn
+import uk.co.maybeitsadam.takt.ui.components.MicroLabel
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
@@ -147,10 +149,8 @@ internal fun ListContent(route: ListRoute, showBack: Boolean, onClose: () -> Uni
                 null
             },
         ) {
-            // The Mac's mode strip, in the title bar beside the list's name.
-            ModeTag(ListViewMode.OUTLINE, PIcons.Outline, mode, "view_outline", vm)
-            ModeTag(ListViewMode.BOARD, PIcons.Board, mode, "view_board", vm)
-            ModeTag(ListViewMode.MATRIX, PIcons.Grid, mode, "view_matrix", vm)
+            // The Mac's mode strip, as one tag that steps through the three.
+            ViewModeToggle(mode, vm::setViewMode)
             ListOverflow(vm, hideCompleted, canEditList, list?.completedAt != null, onArchive = onClose) { dialog = it }
         }
         QuickAddBar(route.listId, Modifier.fillMaxWidth())
@@ -166,28 +166,71 @@ internal fun ListContent(route: ListRoute, showBack: Boolean, onClose: () -> Uni
     ListDialogHost(dialog, vm, actions, title, onClose) { dialog = null }
 }
 
-/** One of the title bar's three modes: an icon, filled in when it is the one shown. */
+/**
+ * The list's view, at the top: one labelled tag saying which of outline,
+ * board and matrix is shown. A tap moves to the next; holding it lists all
+ * three. Labelled rather than three bare icons, because the icons alone
+ * were easy to miss.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ModeTag(mode: ListViewMode, icon: androidx.compose.ui.graphics.vector.ImageVector, current: ListViewMode, tag: String, vm: ListViewModel) {
-    val selected = mode == current
-    Box(
-        Modifier
-            .size(Metrics.touchTarget)
-            .clickable(role = Role.Tab, onClickLabel = mode.title) { vm.setViewMode(mode) }
-            .semantics {
-                contentDescription = mode.title
-                this.selected = selected
-            }
-            .testTag(tag),
-        contentAlignment = Alignment.Center,
-    ) {
+internal fun ViewModeToggle(current: ListViewMode, onChange: (ListViewMode) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val colors = TaktTheme.colors
+    val icon = when (current) {
+        ListViewMode.OUTLINE -> PIcons.Outline
+        ListViewMode.BOARD -> PIcons.Board
+        ListViewMode.MATRIX -> PIcons.Grid
+    }
+    Box {
         Box(
             Modifier
-                .size(32.dp)
-                .background(if (selected) TaktTheme.colors.well else Color.Transparent, Metrics.control),
+                .heightIn(min = Metrics.touchTarget)
+                .combinedClickable(
+                    role = Role.Button,
+                    onClickLabel = "Show ${current.next().title}",
+                    onLongClickLabel = "Choose a view",
+                    onLongClick = { menu = true },
+                    onClick = { onChange(current.next()) },
+                )
+                .semantics { contentDescription = "View: ${current.title}. Tap for ${current.next().title}" }
+                .testTag("view_toggle"),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, null, tint = if (selected) TaktTheme.colors.ink else TaktTheme.colors.mutedText, modifier = Modifier.size(18.dp))
+            Row(
+                Modifier
+                    .border(Metrics.hairline, colors.border, Metrics.control)
+                    .background(colors.paper, Metrics.control)
+                    .padding(horizontal = Metrics.sm, vertical = Metrics.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Metrics.xs),
+            ) {
+                Icon(icon, null, tint = colors.primary, modifier = Modifier.size(16.dp))
+                MicroLabel(current.title, color = colors.ink)
+                // Where it stands in the round: one mark per view, this one filled.
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (mode in ListViewMode.entries) {
+                        Box(Modifier.size(4.dp).background(if (mode == current) colors.primary else colors.borderMuted, Metrics.control))
+                    }
+                }
+            }
+        }
+        PMenu(menu, { menu = false }) {
+            for (mode in ListViewMode.entries) {
+                PMenuItem(
+                    mode.title,
+                    when (mode) {
+                        ListViewMode.OUTLINE -> PIcons.Outline
+                        ListViewMode.BOARD -> PIcons.Board
+                        ListViewMode.MATRIX -> PIcons.Grid
+                    },
+                    selected = mode == current,
+                    modifier = Modifier.testTag("view_${mode.raw}"),
+                ) {
+                    menu = false
+                    onChange(mode)
+                }
+            }
         }
     }
 }

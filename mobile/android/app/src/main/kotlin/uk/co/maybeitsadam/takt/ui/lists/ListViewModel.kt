@@ -43,6 +43,9 @@ enum class ListViewMode(val raw: String, val title: String) {
     companion object {
         fun of(raw: String?): ListViewMode = entries.firstOrNull { it.raw == raw } ?: OUTLINE
     }
+
+    /** The view a tap on the toggle moves to: outline, board, matrix, round again. */
+    fun next(): ListViewMode = entries[(ordinal + 1) % entries.size]
 }
 
 /** A scope's data with its tasks indexed by id, built off the main thread. */
