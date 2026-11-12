@@ -35,33 +35,35 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import uk.co.maybeitsadam.takt.app.CelebrationStyle
 import uk.co.maybeitsadam.takt.core.TaskStatus
-import uk.co.maybeitsadam.takt.ui.components.Tag
+import uk.co.maybeitsadam.takt.ui.components.Chip
 import uk.co.maybeitsadam.takt.ui.components.TaskCheck
 import uk.co.maybeitsadam.takt.ui.components.priorityColor
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 import uk.co.maybeitsadam.takt.ui.theme.Metrics
 import uk.co.maybeitsadam.takt.ui.theme.PIcons
 
-/** A disclosure chevron: "Fold <title>" when open, "Unfold <title>" when folded. */
+/**
+ * The Mac's disclosure: a ▸ or ▾ in the dim text, in a column as narrow as
+ * the Mac's 10 (a little wider for a thumb) and as tall as the row.
+ * "Fold <title>" when open, "Unfold <title>" when folded.
+ */
 @Composable
 internal fun FoldChevron(title: String, isFolded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     val description = if (isFolded) "Unfold $title" else "Fold $title"
     Box(
         modifier
-            .width(32.dp)
+            .width(FOLD_COLUMN)
             .heightIn(min = Metrics.touchTarget)
-            .clickable(role = Role.Button, onClick = onToggle)
+            .clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onToggle)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            if (isFolded) Icons.AutoMirrored.Filled.KeyboardArrowRight else Icons.Filled.KeyboardArrowDown,
-            contentDescription = null,
-            tint = TaktTheme.colors.mutedText,
-            modifier = Modifier.size(18.dp),
-        )
+        Text(if (isFolded) "▸" else "▾", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, maxLines = 1)
     }
 }
+
+/** The fold column's width, which a row without children leaves blank. */
+internal val FOLD_COLUMN = 22.dp
 
 /** The tick, with the Spark celebration drawn round it when it is newly finished. */
 @Composable
@@ -108,9 +110,10 @@ internal fun CelebratedCheck(
 }
 
 /**
- * The title. A closed row is muted; with Strike, Spark or Fold it also carries
- * a rule through it, drawn across when the row is newly finished. An open row
- * waiting on an open task ([isBlocked]) is muted too, without the rule.
+ * The title. A closed row is dim, as the Mac's; with Strike, Spark or Fold it
+ * also carries a rule through it, drawn across when the row is newly
+ * finished. An open row waiting on an open task ([isBlocked]) is dim too,
+ * without the rule.
  */
 @Composable
 internal fun TaskTitle(
@@ -137,11 +140,11 @@ internal fun TaskTitle(
         }
         previous = status
     }
-    val ruleColor = TaktTheme.colors.mutedText
+    val ruleColor = TaktTheme.colors.dimText
     Text(
         title,
         style = style,
-        color = if (closed || isBlocked) TaktTheme.colors.mutedText else TaktTheme.colors.ink,
+        color = if (closed || isBlocked) TaktTheme.colors.dimText else TaktTheme.colors.ink,
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier.drawWithContent {
@@ -156,32 +159,31 @@ internal fun TaskTitle(
     )
 }
 
-/** Blocked, due, estimate, priority, tags, daily and planned, compactly, after the title. */
+/**
+ * The Mac's chips after the title (`widgets::detail_chips`), bare text at the
+ * secondary size in its order: blocked (warning) or later (dim), ⌛ who
+ * (muted), #tags up to three (accent), ↻ (dim), P1 (danger) / P2 (warning) /
+ * other (muted), the due day (dim, danger overdue), the estimate in mono,
+ * and ¶ when the task has notes. A phone also marks a task planned for today.
+ */
 @Composable
-internal fun RowMarkers(row: OutlineRow, modifier: Modifier = Modifier, maxTags: Int = 2) {
+internal fun RowMarkers(row: OutlineRow, modifier: Modifier = Modifier, maxTags: Int = 3) {
     Row(modifier.fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(Metrics.xs + Metrics.xxs), verticalAlignment = Alignment.CenterVertically) {
         val colors = TaktTheme.colors
-        if (row.isBlocked) Icon(PIcons.Link, "Blocked by another task", tint = colors.dimText, modifier = Modifier.size(14.dp))
-        row.starts?.let { Text(it, style = TaktTheme.type.monoSmall, color = colors.warning, maxLines = 1) }
-        if (row.isPlanned) Icon(PIcons.Today, "Planned for today", tint = colors.primary, modifier = Modifier.size(14.dp))
-        if (row.isDaily) Icon(PIcons.Repeat, "Daily", tint = colors.success, modifier = Modifier.size(14.dp))
-        row.waitingOn?.let { Tag(it, Modifier.semantics { contentDescription = "Waiting on $it" }) }
-        row.followUp?.let { Text(it, style = TaktTheme.type.monoSmall, color = colors.mutedText, maxLines = 1) }
-        for (tag in row.tags.take(maxTags)) {
-            Text("#$tag", style = TaktTheme.type.small, color = colors.mutedText, maxLines = 1)
+        val open = row.status == TaskStatus.OPEN
+        when {
+            row.isBlocked && open -> Chip("blocked", colors.warning, Modifier.semantics { contentDescription = "Blocked by another task" })
+            row.isBuried && open -> Chip(row.starts ?: "later", colors.dimText)
         }
-        if (row.tags.size > maxTags) Text("+${row.tags.size - maxTags}", style = TaktTheme.type.monoSmall, color = colors.dimText)
-        row.priority?.let { Text("!$it", style = TaktTheme.type.mono, color = priorityColor(it)) }
-        row.estimate?.let { Text(it, style = TaktTheme.type.monoSmall, color = colors.mutedText) }
-        row.due?.let { due ->
-            val tint = when {
-                row.status != TaskStatus.OPEN -> colors.dimText
-                due.isOverdue -> colors.danger
-                due.isToday -> colors.warning
-                else -> colors.mutedText
-            }
-            Text(due.text, style = TaktTheme.type.monoSmall, color = tint, maxLines = 1)
-        }
-        if (row.hasNotes) Icon(PIcons.Notes, "Has notes", tint = colors.dimText, modifier = Modifier.size(14.dp))
+        row.waitingOn?.let { Chip("⌛ $it", colors.mutedText, Modifier.semantics { contentDescription = "Waiting on $it" }) }
+        row.followUp?.let { Chip(it, colors.dimText, mono = true) }
+        for (tag in row.tags.take(maxTags)) Chip("#$tag", colors.primary)
+        if (row.tags.size > maxTags) Chip("+${row.tags.size - maxTags}", colors.dimText)
+        if (row.isDaily) Chip("↻", colors.dimText, Modifier.semantics { contentDescription = "Daily" })
+        if (row.isPlanned && open) Chip("☀", colors.dimText, Modifier.semantics { contentDescription = "Planned for today" })
+        row.priority?.let { Chip("P$it", priorityColor(it)) }
+        row.due?.let { due -> Chip(due.text, if (open && due.isOverdue) colors.danger else colors.dimText) }
+        row.estimate?.let { Chip(it, colors.dimText, mono = true) }
+        if (row.hasNotes) Chip("¶", colors.dimText, Modifier.semantics { contentDescription = "Has notes" })
     }
 }

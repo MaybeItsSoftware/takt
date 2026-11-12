@@ -35,7 +35,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
@@ -257,42 +259,50 @@ private fun OutlineRowView(
         modifier = modifier,
     ) {
         val colors = TaktTheme.colors
-        Box {
+        // The Mac's row: [indent][▸][mark][title, truncated][chips], the
+        // selection a box at radius 4 in the selection colour with the focus
+        // outline. The row is a finger tall; only the selection is painted.
+        Box(Modifier.background(colors.paper)) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(if (isSelected) colors.primary.copy(alpha = 0.10f) else colors.paper)
                     .heightIn(min = Metrics.rowHeight)
+                    .padding(horizontal = Metrics.xxs, vertical = Metrics.xxs)
+                    .then(
+                        if (isSelected) {
+                            Modifier
+                                .clip(Metrics.row)
+                                .background(colors.selected)
+                                .border(BorderStroke(Metrics.hairline, colors.focus), Metrics.row)
+                        } else {
+                            Modifier.clip(Metrics.row)
+                        },
+                    )
                     .combinedClickable(onClick = onTap, onLongClick = { menu = true }, onLongClickLabel = "Task actions")
-                    // Blocked, the whole row — mark, title and markers — steps
-                    // back, not only its title; the selection behind it keeps its weight.
-                    .alpha(if (row.isBlocked || row.isBuried) TaktTheme.DISABLED_ALPHA else 1f)
-                    .padding(start = Metrics.xs + Metrics.indent * row.depth, end = Metrics.xs),
+                    .padding(start = Metrics.indent * row.depth),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (row.hasChildren) {
                     FoldChevron(row.title, row.isFolded, onToggle = { actions.toggleFold(row.id) })
                 } else {
-                    Spacer(Modifier.width(32.dp))
+                    Spacer(Modifier.width(FOLD_COLUMN))
                 }
                 CelebratedCheck(row.status, row.isList, row.title, celebration) { actions.toggleComplete(row.id) }
-                if (row.isList) {
-                    Icon(ListIcons.Nested, "List", tint = colors.mutedText, modifier = Modifier.padding(end = Metrics.xs + Metrics.xxs).size(16.dp))
-                }
                 TaskTitle(
                     row.title, row.status, celebration,
-                    style = if (row.isList) TaktTheme.type.bodyStrong else TaktTheme.type.body,
-                    modifier = Modifier.weight(1f, fill = true).padding(vertical = Metrics.xs),
+                    maxLines = 1,
+                    isBlocked = row.isBlocked || row.isBuried,
+                    modifier = Modifier.weight(1f, fill = true),
                 )
-                RowMarkers(row, Modifier.padding(start = Metrics.xs).heightIn(min = 24.dp))
+                RowMarkers(row, Modifier.padding(start = Metrics.sm).heightIn(min = 24.dp))
                 Box(
                     dragHandle
-                        .width(36.dp)
-                        .heightIn(min = Metrics.touchTarget)
+                        .width(32.dp)
+                        .heightIn(min = Metrics.touchTarget - Metrics.xs)
                         .semantics { contentDescription = "Reorder ${row.title}" },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(PIcons.DragHandle, null, tint = colors.dimText, modifier = Modifier.size(18.dp))
+                    Icon(PIcons.DragHandle, null, tint = colors.dimText, modifier = Modifier.size(16.dp))
                 }
             }
             PMenu(expanded = menu, onDismiss = { menu = false }) {

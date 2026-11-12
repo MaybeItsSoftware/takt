@@ -38,7 +38,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -61,6 +64,9 @@ import uk.co.maybeitsadam.takt.ui.components.Tag
 import uk.co.maybeitsadam.takt.ui.navigation.LocalShell
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 import uk.co.maybeitsadam.takt.ui.theme.Metrics
+
+/** Where a card's second line starts: flush with its title, past the status mark's strip. */
+private val CARD_TEXT_INSET = 28.dp
 
 /** How many subtask rows a card draws before "+N more", as on the Mac. */
 private const val VISIBLE_SUBTASK_ROWS = 12
@@ -206,26 +212,35 @@ private fun BoardColumnView(
     actions: TaskActions,
     vm: ListViewModel,
 ) {
-    Column(Modifier.fillMaxSize()) {
+    // The Mac's column: the panel fill at radius 6 in the muted border, 8 in
+    // from its neighbours, the muted title and the count at its head.
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(Metrics.sm)
+            .clip(Metrics.popover)
+            .background(TaktTheme.colors.altRow)
+            .border(BorderStroke(Metrics.hairline, TaktTheme.colors.borderMuted), Metrics.popover),
+    ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = Metrics.lg),
+            Modifier.fillMaxWidth().heightIn(min = Metrics.paintedRow + Metrics.xs).padding(horizontal = Metrics.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(column.title, style = TaktTheme.type.label, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f))
+            Text(column.title, style = TaktTheme.type.body, color = TaktTheme.colors.mutedText, maxLines = 1, modifier = Modifier.weight(1f))
             // Filled by its rules: a card dropped here is edited to match them.
             if (column.isRuleColumn) {
                 MonoText("rules", style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText, modifier = Modifier.padding(end = Metrics.sm))
             }
-            MonoText(column.cards.size.toString(), style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText)
+            Text(column.cards.size.toString(), style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText)
         }
         LazyColumn(
             Modifier.fillMaxSize().testTag("board_column_${column.id}"),
-            contentPadding = PaddingValues(start = Metrics.md, end = Metrics.md, bottom = Metrics.xl),
-            verticalArrangement = Arrangement.spacedBy(Metrics.sm),
+            contentPadding = PaddingValues(start = Metrics.xs, end = Metrics.xs, bottom = Metrics.xl),
+            verticalArrangement = Arrangement.spacedBy(Metrics.xs),
         ) {
             if (column.cards.isEmpty()) {
                 item(key = "empty", contentType = "empty") {
-                    Text("No cards", style = TaktTheme.type.small, color = TaktTheme.colors.dimText, modifier = Modifier.padding(Metrics.sm))
+                    Text("No cards", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, modifier = Modifier.padding(Metrics.sm))
                 }
             }
             for (card in column.cards) {
@@ -266,33 +281,35 @@ private fun BoardCardView(
                 Modifier
                     .fillMaxWidth()
                     .combinedClickable(onClick = { actions.tap(row.id) }, onLongClick = { menu = true }, onLongClickLabel = "Card actions")
-                    // Blocked, the whole card steps back — mark, title, markers and the
-                    // subtasks that wait with it — while its frame and selection keep theirs.
-                    .alpha(if (row.isBlocked || row.isBuried) TaktTheme.DISABLED_ALPHA else 1f)
                     .padding(end = Metrics.sm, bottom = Metrics.xs),
             ) {
+                // The Mac's card: the mark and title, then the list (or the
+                // parent) in dim secondary text and the chips, flush with the title.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CelebratedCheck(row.status, row.isList, row.title, celebration) { actions.toggleComplete(row.id) }
-                    TaskTitle(row.title, row.status, celebration, Modifier.weight(1f).padding(vertical = Metrics.sm), maxLines = 3)
+                    TaskTitle(
+                        row.title, row.status, celebration, Modifier.weight(1f).padding(vertical = Metrics.xs),
+                        maxLines = 2, isBlocked = row.isBlocked || row.isBuried,
+                    )
                     if (row.hasChildren) FoldChevron(row.title, row.isFolded, onToggle = { actions.toggleFold(row.id) })
                 }
                 val detail = card.parentTitle?.let { "Under $it" } ?: card.listName
                 if (detail != null) {
-                    Text(detail, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1, modifier = Modifier.padding(start = Metrics.touchTarget))
+                    Text(detail, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, maxLines = 1, modifier = Modifier.padding(start = CARD_TEXT_INSET))
                 }
-                Box(Modifier.padding(start = Metrics.touchTarget).heightIn(max = 24.dp)) { RowMarkers(row) }
+                Box(Modifier.padding(start = CARD_TEXT_INSET).heightIn(max = 24.dp)) { RowMarkers(row) }
                 for (sub in card.subtasks.take(VISIBLE_SUBTASK_ROWS)) {
                     SubtaskRow(sub, celebration, actions, cardIsBlocked = row.isBlocked || row.isBuried)
                 }
                 if (card.subtasks.size > VISIBLE_SUBTASK_ROWS) {
                     Text(
-                        "+${card.subtasks.size - VISIBLE_SUBTASK_ROWS} more", style = TaktTheme.type.small, color = TaktTheme.colors.dimText,
-                        modifier = Modifier.padding(start = Metrics.touchTarget, top = Metrics.xxs),
+                        "+${card.subtasks.size - VISIBLE_SUBTASK_ROWS} more", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText,
+                        modifier = Modifier.padding(start = CARD_TEXT_INSET, top = Metrics.xxs),
                     )
                 } else if (row.isFolded && card.subtaskCount > 0) {
                     Text(
-                        "${card.subtaskCount} folded", style = TaktTheme.type.small, color = TaktTheme.colors.dimText,
-                        modifier = Modifier.padding(start = Metrics.touchTarget, top = Metrics.xxs),
+                        "${card.subtaskCount} folded", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText,
+                        modifier = Modifier.padding(start = CARD_TEXT_INSET, top = Metrics.xxs),
                     )
                 }
             }
@@ -318,17 +335,20 @@ private fun BoardCardView(
 
 @Composable
 private fun SubtaskRow(row: OutlineRow, celebration: CelebrationStyle, actions: TaskActions, cardIsBlocked: Boolean) {
+    // The Mac's compact subtask row, marked └ and set in the secondary size;
+    // a blocked one is dim.
     Row(
         Modifier
             .fillMaxWidth()
-            // A blocked subtask on a card that is not steps back as a blocked
-            // card does; on a blocked card it already has.
-            .alpha(if ((row.isBlocked || row.isBuried) && !cardIsBlocked) TaktTheme.DISABLED_ALPHA else 1f)
-            .padding(start = Metrics.lg + Metrics.indent * row.depth),
+            .padding(start = Metrics.sm + Metrics.indent * row.depth),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Text("└", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText)
         CelebratedCheck(row.status, row.isList, row.title, celebration) { actions.toggleComplete(row.id) }
-        TaskTitle(row.title, row.status, celebration, Modifier.weight(1f), style = TaktTheme.type.small, maxLines = 2)
+        TaskTitle(
+            row.title, row.status, celebration, Modifier.weight(1f), style = TaktTheme.type.secondary, maxLines = 1,
+            isBlocked = row.isBlocked || row.isBuried || cardIsBlocked,
+        )
         if (row.hasChildren) {
             FoldChevron(row.title, row.isFolded, onToggle = { actions.toggleFold(row.id) })
         } else {

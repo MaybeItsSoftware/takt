@@ -372,8 +372,8 @@ private fun DayCardRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .padding(start = if (handle == null) Metrics.lg - Metrics.xs else 0.dp, end = Metrics.xs),
+                .heightIn(min = Metrics.rowHeight)
+                .padding(start = if (handle == null) Metrics.md - Metrics.xs else 0.dp, end = Metrics.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (handle != null) {
@@ -381,13 +381,13 @@ private fun DayCardRow(
                     handle.size(Metrics.touchTarget).semantics { contentDescription = "Reorder ${card.title}" },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(PIcons.DragHandle, null, tint = TaktTheme.colors.dimText, modifier = Modifier.size(20.dp))
+                    Icon(PIcons.DragHandle, null, tint = TaktTheme.colors.dimText, modifier = Modifier.size(16.dp))
                 }
             }
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(Metrics.control)
+                    .clip(Metrics.row)
                     .combinedClickable(
                         enabled = !isLeaving,
                         onClick = onTick,
@@ -395,14 +395,14 @@ private fun DayCardRow(
                         onLongClick = { menuOpen = true },
                         onLongClickLabel = "Task actions",
                     )
-                    .padding(vertical = Metrics.sm, horizontal = Metrics.xs),
+                    .padding(vertical = Metrics.xs, horizontal = Metrics.xs),
             ) {
                 Text(
                     card.title,
                     style = TaktTheme.type.body,
-                    color = if (card.isBlocked || isLeaving) TaktTheme.colors.mutedText else TaktTheme.colors.ink,
+                    color = if (card.isBlocked || isLeaving) TaktTheme.colors.dimText else TaktTheme.colors.ink,
                     textDecoration = if (isLeaving) TextDecoration.LineThrough else null,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 CardDetail(card)
@@ -416,7 +416,6 @@ private fun DayCardRow(
                 IconAction(Icons.Filled.PlayArrow, "Start focus on ${card.title}", tint = TaktTheme.colors.primary, onClick = onStart)
             }
         }
-        Hairline(color = TaktTheme.colors.borderMuted)
     }
 }
 
@@ -425,22 +424,20 @@ private fun CardDetail(card: DayCard) {
     val detail = DayShaping.detail(card) { Format.due(it) }
     val tint = when (card.reason) {
         DayPlanReason.OVERDUE -> TaktTheme.colors.danger
-        DayPlanReason.DUE_TODAY -> TaktTheme.colors.primary
-        DayPlanReason.STARTS_TODAY -> TaktTheme.colors.success
-        else -> TaktTheme.colors.mutedText
+        else -> TaktTheme.colors.dimText
     }
     if (detail == null && card.listName == null && card.dailyId == null && !card.isBlocked && card.waiting == null) return
     Row(horizontalArrangement = Arrangement.spacedBy(Metrics.xs + Metrics.xxs), verticalAlignment = Alignment.CenterVertically) {
-        if (card.isBlocked) Text("Blocked", style = TaktTheme.type.small, color = TaktTheme.colors.dimText, maxLines = 1)
-        if (detail != null) Text(detail, style = TaktTheme.type.small, color = tint, maxLines = 1)
+        if (card.isBlocked) Text("Blocked", style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, maxLines = 1)
+        if (detail != null) Text(detail, style = TaktTheme.type.secondary, color = tint, maxLines = 1)
         WaitingMarkers(card.waiting)
         if (card.dailyId != null) {
-            Icon(PIcons.Repeat, "Daily", tint = TaktTheme.colors.categoricalPurple, modifier = Modifier.size(12.dp))
+            Icon(PIcons.Repeat, "Daily", tint = TaktTheme.colors.dimText, modifier = Modifier.size(12.dp))
         }
         card.listName?.let { name ->
             val dot = parseHexColor(card.listColorHex)
             if (dot != null) Box(Modifier.size(6.dp).clip(Metrics.control).background(dot))
-            Text(name, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -574,16 +571,16 @@ private fun DailyRow(daily: DayDaily, isLeaving: Boolean, onToggle: () -> Unit, 
                 .fillMaxWidth()
                 .heightIn(min = Metrics.touchTarget)
                 .clickable(enabled = !isLeaving, onClickLabel = "Log today ${daily.title}", onClick = onToggle)
-                .padding(start = Metrics.lg, end = Metrics.xs),
+                .padding(start = Metrics.md, end = Metrics.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f).padding(end = Metrics.xs)) {
                 Text(
                     daily.title,
                     style = TaktTheme.type.body,
-                    color = if (crossed) TaktTheme.colors.mutedText else TaktTheme.colors.ink,
+                    color = if (crossed) TaktTheme.colors.dimText else TaktTheme.colors.ink,
                     textDecoration = if (crossed) TextDecoration.LineThrough else null,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 daily.progressFraction?.let { fraction ->
@@ -595,7 +592,6 @@ private fun DailyRow(daily: DayDaily, isLeaving: Boolean, onToggle: () -> Unit, 
             daily.progressText?.let { MonoText(it) }
             IconAction(Icons.Filled.MoreVert, "Options for ${daily.title}", onClick = onOpen)
         }
-        Hairline(color = TaktTheme.colors.borderMuted)
     }
 }
 

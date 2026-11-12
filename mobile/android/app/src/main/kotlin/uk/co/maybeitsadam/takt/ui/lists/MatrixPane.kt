@@ -1,6 +1,9 @@
 package uk.co.maybeitsadam.takt.ui.lists
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -24,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -31,13 +36,15 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.maybeitsadam.takt.app.CelebrationStyle
 import uk.co.maybeitsadam.takt.ui.commands.KeyCommand
 import uk.co.maybeitsadam.takt.ui.components.Hairline
-import uk.co.maybeitsadam.takt.ui.components.MonoText
+import uk.co.maybeitsadam.takt.ui.components.MicroLabel
 import uk.co.maybeitsadam.takt.ui.components.VerticalHairline
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 import uk.co.maybeitsadam.takt.ui.theme.Metrics
@@ -87,9 +94,8 @@ internal fun MatrixPane(vm: ListViewModel, actions: TaskActions, modifier: Modif
             },
     ) {
         if (shape.unplaced.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = Metrics.lg), verticalAlignment = Alignment.CenterVertically) {
-                Text("Unplaced", style = TaktTheme.type.label, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f))
-                MonoText(shape.unplaced.size.toString(), style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText)
+            Row(Modifier.fillMaxWidth().heightIn(min = Metrics.paintedRow).padding(horizontal = Metrics.md), verticalAlignment = Alignment.CenterVertically) {
+                Text("Not placed  ${shape.unplaced.size}", style = TaktTheme.type.body, color = TaktTheme.colors.mutedText, modifier = Modifier.weight(1f))
             }
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 168.dp).testTag("matrix_unplaced")) {
                 items(shape.unplaced, key = { it.id }, contentType = { "matrix_row" }) { card ->
@@ -122,14 +128,13 @@ private fun QuadrantView(
     vm: ListViewModel,
     modifier: Modifier,
 ) {
-    val tint = quadrant.cell.tint()
+    // The Mac's quadrant: its number, name and count in a micro-label, no hue.
     Column(modifier.testTag("matrix_${quadrant.cell.name.lowercase()}")) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = Metrics.md), verticalAlignment = Alignment.CenterVertically) {
-            Text(quadrant.cell.title, style = TaktTheme.type.label, color = tint, modifier = Modifier.weight(1f), maxLines = 1)
-            MonoText(quadrant.cards.size.toString(), style = TaktTheme.type.monoSmall, color = TaktTheme.colors.dimText)
+        Row(Modifier.fillMaxWidth().heightIn(min = Metrics.paintedRow).padding(horizontal = Metrics.sm), verticalAlignment = Alignment.CenterVertically) {
+            MicroLabel("${quadrant.cell.ordinal + 1}  ${quadrant.cell.title}  ${quadrant.cards.size}", Modifier.weight(1f), color = TaktTheme.colors.dimText)
         }
         if (quadrant.cards.isEmpty()) {
-            Text(quadrant.cell.detail, style = TaktTheme.type.small, color = TaktTheme.colors.dimText, modifier = Modifier.padding(horizontal = Metrics.md))
+            Text(quadrant.cell.detail, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText, modifier = Modifier.padding(horizontal = Metrics.sm))
         }
         LazyColumn(Modifier.fillMaxSize()) {
             items(quadrant.cards, key = { it.id }, contentType = { "matrix_row" }) { card ->
@@ -150,21 +155,32 @@ private fun MatrixRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     val row = card.row
-    Box {
+    val colors = TaktTheme.colors
+    val open = row.status == uk.co.maybeitsadam.takt.core.TaskStatus.OPEN
+    // The Mac's matrix chip: a box 20 high (23dp) at radius 4 in the muted
+    // border, a 6dp dot and the title; selected, the selection's fill and the
+    // focus outline. The row around it is a finger tall; the dot completes.
+    Box(Modifier.fillMaxWidth().heightIn(min = Metrics.touchTarget).padding(horizontal = Metrics.xs), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
-                .fillMaxWidth()
-                .background(if (isSelected) TaktTheme.colors.primary.copy(alpha = 0.10f) else Color.Transparent)
-                .heightIn(min = Metrics.touchTarget)
+                .heightIn(min = 23.dp)
+                .clip(Metrics.row)
+                .background(if (isSelected) colors.selected else colors.paper)
+                .border(BorderStroke(Metrics.hairline, if (isSelected) colors.focus else colors.borderMuted), Metrics.row)
                 .combinedClickable(onClick = { actions.tap(row.id) }, onLongClick = { menu = true }, onLongClickLabel = "Task actions")
-                .padding(end = Metrics.sm),
+                .padding(end = Metrics.xs + Metrics.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CelebratedCheck(row.status, row.isList, row.title, celebration) { actions.toggleComplete(row.id) }
-            Column(Modifier.weight(1f)) {
-                TaskTitle(row.title, row.status, celebration, style = TaktTheme.type.small, maxLines = 2, isBlocked = row.isBlocked || row.isBuried)
-                card.listName?.let { Text(it, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            Box(
+                Modifier
+                    .size(width = 20.dp, height = Metrics.touchTarget)
+                    .clickable(role = Role.Checkbox, indication = null, interactionSource = null) { actions.toggleComplete(row.id) }
+                    .semantics { contentDescription = (if (open) "Complete " else "Reopen ") + row.title },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(6.dp).clip(Metrics.pill).background(if (isSelected) colors.primary else if (open) colors.mutedText else colors.dimText))
             }
+            TaskTitle(row.title, row.status, celebration, style = TaktTheme.type.small, maxLines = 1, isBlocked = row.isBlocked || row.isBuried)
         }
         PMenu(menu, { menu = false }) {
             MatrixCell.entries.forEachIndexed { index, target ->
