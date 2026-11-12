@@ -108,8 +108,20 @@ pub struct Takt {
     /// The main window, while it is open: closing it leaves the app in the
     /// menu bar, and this entity lives on for the next one.
     main: Option<gpui::WindowHandle<Takt>>,
-    /// ⌘, asked for the main window, which settings is drawn in, to come
-    /// forward.
+    /// The settings window, while it is open: a second window onto this
+    /// same entity, drawing only the settings page.
+    settings_window: Option<gpui::WindowHandle<Takt>>,
+    /// The settings window closed but not yet gone: it keeps drawing the
+    /// settings page, never the main window's, until it is removed.
+    settings_closing: Option<gpui::WindowId>,
+    /// A settings window is on its way: asked for, not yet open. ⌘, comes
+    /// by two routes (the menu's key and the window's), and a second must
+    /// not open a second window, which would draw the main view.
+    settings_opening: bool,
+    /// The settings window is the one in front: sheets and pickers come
+    /// up there rather than in the main window.
+    settings_active: bool,
+    /// ⌘, asked for the settings window to come forward.
     settings_wanted_front: bool,
     /// The status item and hotkeys are up (not in a smoke run).
     platform_live: bool,
@@ -172,9 +184,15 @@ pub fn window_closed(cx: &mut GpuiApp) {
     }
     // The panel put away shrinks back to the pill.
     takt.update(cx, |this, cx| this.sync_pill(cx));
-    // Settings is drawn in the main window, and goes with it.
-    if !open && takt.read(cx).app.settings_page.is_some() {
+    let settings = takt.read(cx).settings_window;
+    if settings.is_some_and(|handle| {
+        !cx.windows()
+            .iter()
+            .any(|w| w.window_id() == handle.window_id())
+    }) {
         takt.update(cx, |this, cx| {
+            this.settings_window = None;
+            this.settings_active = false;
             this.app.close_settings_page();
             cx.notify();
         });
@@ -211,6 +229,10 @@ impl Takt {
             pill_opening: false,
             pill_at: None,
             main: None,
+            settings_window: None,
+            settings_closing: None,
+            settings_opening: false,
+            settings_active: false,
             settings_wanted_front: false,
             platform_live: false,
             board_links: Default::default(),
@@ -458,11 +480,9 @@ impl Takt {
     /// so reaching the window (or drawing a new one) from inside one of its
     /// updates would lease it twice and abort.
     pub fn show_main_window(&mut self, cx: &mut Context<Self>) {
+        let main = self.main;
         let takt = cx.entity();
         cx.defer(move |cx| {
-            // Read when it runs: a second call queued behind the first
-            // finds the window the first opened.
-            let main = takt.read(cx).main;
             if let Some(handle) = main
                 && handle
                     .update(cx, |_, window, _| window.activate_window())
@@ -746,12 +766,6 @@ impl Takt {
             return;
         }
         if keystroke.modifiers.platform && keystroke.key == "w" {
-            // Settings is a page of the window: ⌘W puts it away.
-            if self.app.settings_page.is_some() {
-                self.app.close_settings_page();
-                cx.notify();
-                return;
-            }
             let handle = window.window_handle();
             // Not through the root: that is this entity, which may be
             // mid-update when the deferral runs.
@@ -782,7 +796,7 @@ impl Takt {
             self.overlay_key(keystroke, cx)
         } else if self.app.editing.is_some() {
             self.editing_key(keystroke, cx)
-        } else if self.app.settings_page.is_some() {
+        } else if self.is_settings_window(window) {
             self.settings_key(keystroke, cx)
         } else {
             self.command_key(keystroke, cx)
@@ -1603,7 +1617,13 @@ impl Render for Takt {
             window.appearance(),
             &self.app.prefs.appearance,
         );
-        let settings = self.app.settings_page.is_some();
+        let settings = self.is_settings_window(window);
+        // Sheets and pickers come up in the window in front.
+        let popups = if settings {
+            self.settings_active
+        } else {
+            self.settings_window.is_none() || !self.settings_active
+        };
         let inspector = if self.app.prefs.right_dock_visible && !settings {
             Some(
                 self.app
@@ -1651,10 +1671,7 @@ impl Render for Takt {
             .text_color(t.text)
             .font_family(UI_FONT)
             .text_size(px(13.))
-            .when(settings, |d| {
-                d.child(self.title_bar(t, cx))
-                    .child(self.settings_page(t, cx))
-            })
+            .when(settings, |d| d.child(self.settings_page(t, cx)))
             .when(!settings, |d| {
                 let bottom = (self.app.prefs.bottom_dock_visible)
                     .then(|| self.bottom_dock(t, cx).into_any_element());
@@ -1731,10 +1748,11 @@ impl Render for Takt {
             .when(!settings && self.app.focus_prompt.is_some(), |d| {
                 d.child(self.focus_prompt_sheet(t))
             })
-            .when(matches!(self.app.editing, Some(Editing::Ask(_))), |d| {
-                d.child(self.ask_sheet(t))
-            })
-            .when(self.app.overlay.is_some(), |d| {
+            .when(
+                popups && matches!(self.app.editing, Some(Editing::Ask(_))),
+                |d| d.child(self.ask_sheet(t)),
+            )
+            .when(popups && self.app.overlay.is_some(), |d| {
                 d.child(self.overlay_view(t, cx))
             })
             .when(!settings && self.app.context_menu.is_some(), |d| {

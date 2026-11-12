@@ -103,7 +103,7 @@ fn main() {
                         // After the deferred open: the window, then Esc in it.
                         let takt = cx.entity();
                         cx.defer(move |cx| {
-                            let handle = takt.read(cx).main_window_handle();
+                            let handle = takt.read(cx).settings_window_handle();
                             let windows = cx.windows().len();
                             let closed = handle.and_then(|handle| {
                                 handle
@@ -149,7 +149,7 @@ fn main() {
                                     );
                                 });
                                 let _ = cx.update(|cx| {
-                                    let handle = takt.read(cx).main_window_handle();
+                                    let handle = takt.read(cx).settings_window_handle();
                                     if let Some(handle) = handle {
                                         let _ = cx.update_window(handle.into(), |_, window, cx| {
                                             // TAKT_DESKTOP_SMOKE_SETTINGS_KEY: the key
@@ -183,7 +183,7 @@ fn main() {
                                         "smoke settings close key: {} windows after ({} main, settings gone {}), settings page {}",
                                         cx.windows().len(),
                                         mains,
-                                        takt.read(cx).settings_gone(),
+                                        takt.read(cx).settings_gone(cx),
                                         takt.read(cx).app.settings_page.is_some()
                                     );
                                 });
