@@ -130,6 +130,12 @@ pub const ROLES: [&str; 21] = [
     "mediaScrimInk",
 ];
 
+/// Zed's chrome, which a theme may state and need not: the selected row,
+/// the hairlines under a tree's levels, the status bar, the outline round the
+/// keyboard's row and an icon at rest. A role left out is derived from the
+/// others ([`CoreThemePalette::chrome`]), as Zed draws a theme that names none.
+pub const CHROME_ROLES: [&str; 5] = ["selected", "indentGuide", "statusBar", "focus", "icon"];
+
 /// Roles that do not flip with the appearance: media surfaces, whose content
 /// is not ours to theme. They always answer from the light table.
 pub const INVARIANT_ROLES: [&str; 3] = ["mediaLetterbox", "mediaScrim", "mediaScrimInk"];
@@ -141,7 +147,7 @@ pub const DESIGNS: [&str; 4] = ["serif", "sans", "monospaced", "rounded"];
 pub const WEIGHTS: [&str; 5] = ["regular", "medium", "semibold", "bold", "black"];
 
 pub fn is_role(raw: &str) -> bool {
-    ROLES.contains(&raw)
+    ROLES.contains(&raw) || CHROME_ROLES.contains(&raw)
 }
 
 pub fn is_invariant(role: &str) -> bool {
@@ -190,6 +196,40 @@ impl CoreThemePalette {
             .or_else(|| self.table(appearance.opposite()).get(role))
             .copied()
             .unwrap_or(super::color::UNRESOLVED)
+    }
+
+    /// A role as the theme states it for `appearance`, if it does: its own
+    /// table, else the other.
+    pub fn stated(&self, role: &str, appearance: CoreThemeAppearance) -> Option<CoreThemeColor> {
+        self.table(appearance)
+            .get(role)
+            .or_else(|| self.table(appearance.opposite()).get(role))
+            .copied()
+    }
+
+    /// One of the [`CHROME_ROLES`], opaque: as stated, else derived as Zed
+    /// draws a theme that names none. A selection is a sixth of the accent in
+    /// the page; a guide a seventh of the text in the panel; the status bar
+    /// the well; the keyboard's outline the accent; an icon the muted text.
+    pub fn chrome(&self, role: &str, appearance: CoreThemeAppearance) -> CoreThemeColor {
+        use super::color::{mix, over};
+        let at = |r: &str| self.color(r, appearance);
+        let panel = at("altRow");
+        if let Some(stated) = self.stated(role, appearance) {
+            let below = match role {
+                "indentGuide" | "statusBar" => panel,
+                _ => at("paper"),
+            };
+            return over(stated, below);
+        }
+        match role {
+            "selected" => mix(&at("paper"), &at("primary"), 0.16),
+            "indentGuide" => mix(&panel, &at("ink"), 0.14),
+            "statusBar" => at("well"),
+            "focus" => at("primary"),
+            "icon" => at("mutedText"),
+            _ => self.color(role, appearance),
+        }
     }
 
     /// Roles absent from `appearance`'s own table, by name. Invariant roles

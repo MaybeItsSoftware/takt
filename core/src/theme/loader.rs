@@ -175,7 +175,7 @@ pub fn load(
     default_base: Option<&CoreThemeSpecification>,
 ) -> Vec<CoreThemeFileOutcome> {
     let built_ins = built_ins.unwrap_or_else(|| builtins::all(platform));
-    let default_base = default_base.unwrap_or_else(|| builtins::default_theme(platform));
+    let default_base = default_base.unwrap_or_else(|| builtins::extends_base(platform));
     let mut ordered: Vec<&CoreThemeFileSource> = sources.iter().collect();
     ordered.sort_by(|a, b| a.name.cmp(&b.name));
     let mut built_ins_by_identifier = HashMap::new();
@@ -270,7 +270,7 @@ pub fn resolve(
         &identifier(file, source),
         source,
         base,
-        &builtins::default_theme(platform).structure,
+        &builtins::extends_base(platform).structure,
         platform,
     )
 }

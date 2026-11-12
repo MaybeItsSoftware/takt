@@ -4,31 +4,31 @@
       "dark" : {
         "appearance" : "dark",
         "colors" : {
-          "altRow" : "#211f29",
-          "border" : "#34313f",
-          "borderMuted" : "#2d2b38",
+          "altRow" : "#2f343e",
+          "border" : "#464b57",
+          "borderMuted" : "#363c46",
           "categoricalOrange" : "#ff6b2b",
           "categoricalPink" : "#ff88dc",
           "categoricalPurple" : "#7a4de8",
-          "danger" : "#d62246",
-          "dimText" : "#6e6b7c",
-          "hover" : "#2d2b38",
-          "ink" : "#f5f4f7",
-          "inputBorder" : "#403d4d",
+          "danger" : "#d07277",
+          "dimText" : "#878a98",
+          "hover" : "#363c46",
+          "ink" : "#dce0e5",
+          "inputBorder" : "#464b57",
           "mediaLetterbox" : "#000000",
           "mediaScrim" : "#000000b3",
           "mediaScrimInk" : "#ffffff",
-          "mutedText" : "#b6b3bf",
-          "paper" : "#1c1a23",
-          "primary" : "#007fff",
-          "raised" : "#25232f",
-          "success" : "#4cc38e",
-          "warning" : "#ffbf00",
-          "well" : "#2d2b38"
+          "mutedText" : "#a9afbc",
+          "paper" : "#282c33",
+          "primary" : "#74ade8",
+          "raised" : "#2f343e",
+          "success" : "#a1c181",
+          "warning" : "#dec184",
+          "well" : "#3b414d"
         },
-        "identifier" : "native.theme.priority",
+        "identifier" : "native.theme.one",
         "lockedAppearance" : null,
-        "name" : "Takt",
+        "name" : "Zed One",
         "structure" : {
           "border" : {
             "emphasis" : 2,
@@ -36,8 +36,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -58,7 +58,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 16,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -67,7 +67,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -79,11 +79,11 @@
               ]
             },
             "scale" : {
-              "body" : 16,
-              "caption" : 12,
+              "body" : 15,
+              "caption" : 13,
               "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -93,31 +93,31 @@
       "light" : {
         "appearance" : "light",
         "colors" : {
-          "altRow" : "#f5f3f1",
-          "border" : "#e6e4ea",
-          "borderMuted" : "#efedf2",
+          "altRow" : "#ebebec",
+          "border" : "#c9c9ca",
+          "borderMuted" : "#dfdfe0",
           "categoricalOrange" : "#ff6b2b",
           "categoricalPink" : "#ff88dc",
           "categoricalPurple" : "#7a4de8",
-          "danger" : "#d62246",
-          "dimText" : "#b6b3bf",
-          "hover" : "#f1eff1",
-          "ink" : "#444054",
-          "inputBorder" : "#d8d5dd",
+          "danger" : "#d36151",
+          "dimText" : "#7e8086",
+          "hover" : "#dfdfe0",
+          "ink" : "#242529",
+          "inputBorder" : "#c9c9ca",
           "mediaLetterbox" : "#000000",
           "mediaScrim" : "#000000b3",
           "mediaScrimInk" : "#ffffff",
-          "mutedText" : "#6e6b7c",
-          "paper" : "#faf8f4",
-          "primary" : "#007fff",
-          "raised" : "#ffffff",
-          "success" : "#4cc38e",
-          "warning" : "#ffbf00",
-          "well" : "#edebef"
+          "mutedText" : "#58585a",
+          "paper" : "#fafafa",
+          "primary" : "#5c78e2",
+          "raised" : "#ebebec",
+          "success" : "#669f59",
+          "warning" : "#a48819",
+          "well" : "#dcdcdd"
         },
-        "identifier" : "native.theme.priority",
+        "identifier" : "native.theme.one",
         "lockedAppearance" : null,
-        "name" : "Takt",
+        "name" : "Zed One",
         "structure" : {
           "border" : {
             "emphasis" : 2,
@@ -125,8 +125,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -147,7 +147,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 16,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -156,7 +156,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -168,11 +168,11 @@
               ]
             },
             "scale" : {
-              "body" : 16,
-              "caption" : 12,
+              "body" : 15,
+              "caption" : 13,
               "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -184,31 +184,31 @@
       "dark" : {
         "appearance" : "dark",
         "colors" : {
-          "altRow" : "#211f29",
-          "border" : "#34313f",
-          "borderMuted" : "#2d2b38",
+          "altRow" : "#2f343e",
+          "border" : "#464b57",
+          "borderMuted" : "#363c46",
           "categoricalOrange" : "#ff6b2b",
           "categoricalPink" : "#ff88dc",
           "categoricalPurple" : "#7a4de8",
-          "danger" : "#d62246",
-          "dimText" : "#6e6b7c",
-          "hover" : "#2d2b38",
-          "ink" : "#f5f4f7",
-          "inputBorder" : "#403d4d",
+          "danger" : "#d07277",
+          "dimText" : "#878a98",
+          "hover" : "#363c46",
+          "ink" : "#dce0e5",
+          "inputBorder" : "#464b57",
           "mediaLetterbox" : "#000000",
           "mediaScrim" : "#000000b3",
           "mediaScrimInk" : "#ffffff",
-          "mutedText" : "#b6b3bf",
-          "paper" : "#1c1a23",
-          "primary" : "#007fff",
-          "raised" : "#25232f",
-          "success" : "#4cc38e",
-          "warning" : "#ffbf00",
-          "well" : "#2d2b38"
+          "mutedText" : "#a9afbc",
+          "paper" : "#282c33",
+          "primary" : "#74ade8",
+          "raised" : "#2f343e",
+          "success" : "#a1c181",
+          "warning" : "#dec184",
+          "well" : "#3b414d"
         },
-        "identifier" : "native.theme.priority",
+        "identifier" : "native.theme.one",
         "lockedAppearance" : null,
-        "name" : "Takt",
+        "name" : "Zed One",
         "structure" : {
           "border" : {
             "emphasis" : 2,
@@ -216,8 +216,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -238,7 +238,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 17,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -259,11 +259,11 @@
               ]
             },
             "scale" : {
-              "body" : 17,
+              "body" : 15,
               "caption" : 13,
-              "display" : 34,
+              "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -273,31 +273,31 @@
       "light" : {
         "appearance" : "light",
         "colors" : {
-          "altRow" : "#f5f3f1",
-          "border" : "#e6e4ea",
-          "borderMuted" : "#efedf2",
+          "altRow" : "#ebebec",
+          "border" : "#c9c9ca",
+          "borderMuted" : "#dfdfe0",
           "categoricalOrange" : "#ff6b2b",
           "categoricalPink" : "#ff88dc",
           "categoricalPurple" : "#7a4de8",
-          "danger" : "#d62246",
-          "dimText" : "#b6b3bf",
-          "hover" : "#f1eff1",
-          "ink" : "#444054",
-          "inputBorder" : "#d8d5dd",
+          "danger" : "#d36151",
+          "dimText" : "#7e8086",
+          "hover" : "#dfdfe0",
+          "ink" : "#242529",
+          "inputBorder" : "#c9c9ca",
           "mediaLetterbox" : "#000000",
           "mediaScrim" : "#000000b3",
           "mediaScrimInk" : "#ffffff",
-          "mutedText" : "#6e6b7c",
-          "paper" : "#faf8f4",
-          "primary" : "#007fff",
-          "raised" : "#ffffff",
-          "success" : "#4cc38e",
-          "warning" : "#ffbf00",
-          "well" : "#edebef"
+          "mutedText" : "#58585a",
+          "paper" : "#fafafa",
+          "primary" : "#5c78e2",
+          "raised" : "#ebebec",
+          "success" : "#669f59",
+          "warning" : "#a48819",
+          "well" : "#dcdcdd"
         },
-        "identifier" : "native.theme.priority",
+        "identifier" : "native.theme.one",
         "lockedAppearance" : null,
-        "name" : "Takt",
+        "name" : "Zed One",
         "structure" : {
           "border" : {
             "emphasis" : 2,
@@ -305,8 +305,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -327,7 +327,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 17,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -348,11 +348,11 @@
               ]
             },
             "scale" : {
-              "body" : 17,
+              "body" : 15,
               "caption" : 13,
-              "display" : 34,
+              "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -364,31 +364,31 @@
       "dark" : {
         "appearance" : "dark",
         "colors" : {
-          "altRow" : "#211f29",
-          "border" : "#34313f",
-          "borderMuted" : "#2d2b38",
+          "altRow" : "#2f343e",
+          "border" : "#464b57",
+          "borderMuted" : "#363c46",
           "categoricalOrange" : "#ff6b2b",
           "categoricalPink" : "#ff88dc",
           "categoricalPurple" : "#7a4de8",
-          "danger" : "#d62246",
-          "dimText" : "#6e6b7c",
-          "hover" : "#2d2b38",
-          "ink" : "#f5f4f7",
-          "inputBorder" : "#403d4d",
+          "danger" : "#d07277",
+          "dimText" : "#878a98",
+          "hover" : "#363c46",
+          "ink" : "#dce0e5",
+          "inputBorder" : "#464b57",
           "mediaLetterbox" : "#000000",
           "mediaScrim" : "#000000b3",
           "mediaScrimInk" : "#ffffff",
-          "mutedText" : "#b6b3bf",
-          "paper" : "#1c1a23",
-          "primary" : "#007fff",
-          "raised" : "#25232f",
-          "success" : "#4cc38e",
-          "warning" : "#ffbf00",
-          "well" : "#2d2b38"
+          "mutedText" : "#a9afbc",
+          "paper" : "#282c33",
+          "primary" : "#74ade8",
+          "raised" : "#2f343e",
+          "success" : "#a1c181",
+          "warning" : "#dec184",
+          "well" : "#3b414d"
         },
-        "identifier" : "native.theme.priority",
+        "identifier" : "native.theme.one",
         "lockedAppearance" : null,
-        "name" : "Takt",
+        "name" : "Zed One",
         "structure" : {
           "border" : {
             "emphasis" : 2,
@@ -453,31 +453,31 @@
       "light" : {
         "appearance" : "light",
         "colors" : {
-          "altRow" : "#f5f3f1",
-          "border" : "#e6e4ea",
-          "borderMuted" : "#efedf2",
+          "altRow" : "#ebebec",
+          "border" : "#c9c9ca",
+          "borderMuted" : "#dfdfe0",
           "categoricalOrange" : "#ff6b2b",
           "categoricalPink" : "#ff88dc",
           "categoricalPurple" : "#7a4de8",
-          "danger" : "#d62246",
-          "dimText" : "#b6b3bf",
-          "hover" : "#f1eff1",
-          "ink" : "#444054",
-          "inputBorder" : "#d8d5dd",
+          "danger" : "#d36151",
+          "dimText" : "#7e8086",
+          "hover" : "#dfdfe0",
+          "ink" : "#242529",
+          "inputBorder" : "#c9c9ca",
           "mediaLetterbox" : "#000000",
           "mediaScrim" : "#000000b3",
           "mediaScrimInk" : "#ffffff",
-          "mutedText" : "#6e6b7c",
-          "paper" : "#faf8f4",
-          "primary" : "#007fff",
-          "raised" : "#ffffff",
-          "success" : "#4cc38e",
-          "warning" : "#ffbf00",
-          "well" : "#edebef"
+          "mutedText" : "#58585a",
+          "paper" : "#fafafa",
+          "primary" : "#5c78e2",
+          "raised" : "#ebebec",
+          "success" : "#669f59",
+          "warning" : "#a48819",
+          "well" : "#dcdcdd"
         },
-        "identifier" : "native.theme.priority",
+        "identifier" : "native.theme.one",
         "lockedAppearance" : null,
-        "name" : "Takt",
+        "name" : "Zed One",
         "structure" : {
           "border" : {
             "emphasis" : 2,

@@ -37,7 +37,7 @@
           },
           "radius" : {
             "control" : 0,
-            "panel" : 8,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -58,7 +58,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 16,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -67,7 +67,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -79,11 +79,11 @@
               ]
             },
             "scale" : {
-              "body" : 16,
-              "caption" : 12,
+              "body" : 15,
+              "caption" : 13,
               "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -126,7 +126,7 @@
           },
           "radius" : {
             "control" : 0,
-            "panel" : 8,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -147,7 +147,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 16,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -156,7 +156,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -168,11 +168,11 @@
               ]
             },
             "scale" : {
-              "body" : 16,
-              "caption" : 12,
+              "body" : 15,
+              "caption" : 13,
               "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -217,7 +217,7 @@
           },
           "radius" : {
             "control" : 0,
-            "panel" : 8,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -238,7 +238,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 17,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -259,11 +259,11 @@
               ]
             },
             "scale" : {
-              "body" : 17,
+              "body" : 15,
               "caption" : 13,
-              "display" : 34,
+              "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -306,7 +306,7 @@
           },
           "radius" : {
             "control" : 0,
-            "panel" : 8,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -327,7 +327,7 @@
                 "IBM Plex Sans"
               ]
             },
-            "bodySize" : 17,
+            "bodySize" : 15,
             "display" : {
               "design" : "sans",
               "families" : [
@@ -348,11 +348,11 @@
               ]
             },
             "scale" : {
-              "body" : 17,
+              "body" : 15,
               "caption" : 13,
-              "display" : 34,
+              "display" : 32,
               "hero" : 72,
-              "title" : 20
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,

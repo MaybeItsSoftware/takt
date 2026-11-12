@@ -1,12 +1,15 @@
 # Themes
 
 Takt's look is a theme: a colour palette and a set of structural values
-(radii, borders, spacing, type) under a name. Three ship with every app — the
+(radii, borders, spacing, type) under a name. Five ship with every app — the
 Mac, the iPhone and Android:
 
-- **Takt**, the default. Zed's structure, the one the Mac app draws: IBM Plex
-  Sans with Lilex for numerals, square panels and rows, 4px controls and the
-  editor spacing scale (the phones take Zed's phone sizes too), in the house colours: chalk paper (`#faf8f4`),
+- **Zed One**, the default: Zed's own One Light and One Dark, in Zed's
+  structure — IBM Plex Sans with Lilex for numerals, square panels and rows,
+  4px controls and the editor spacing scale (`native.theme.one`). It is what
+  the Mac draws out of the box, and the phones draw it the same, their type a
+  step larger.
+- **Takt**: the same structure in the house colours: chalk paper (`#faf8f4`),
   grape ink (`#444054`) and an azure accent (`#007fff`), with dark the same
   grape pulled down (`#1c1a23`). It is grown from seeds, so it is the easiest
   one to make your own. Its identifier is still `native.theme.priority`, its old
@@ -28,8 +31,9 @@ You can add your own the way Zed does: as JSON files in a folder.
 Every `.json` file there is a theme. It appears in **Settings → Appearance** beside
 the built-ins, and the app reloads it as you save it. If the theme you are
 using is edited, the window redraws; if its file disappears or stops loading,
-the default (Takt) stands in until it comes back. Your themes and your choice sync to
-the iPhone and Android.
+the default (Zed One) stands in until it comes back. Your themes and your choice sync to
+the iPhone and Android. So do the themes in Zed's own folder: the Mac uploads
+each file it loads from there, and the phones list them beside the built-ins.
 
 ## Getting started
 
@@ -50,7 +54,7 @@ which also lists every problem found in the files.
 ## A theme can be three colours
 
 Every field is optional. Anything a file leaves out comes from the theme it
-**extends**, which is the default, Takt (`native.theme.priority`), unless it says otherwise.
+**extends**, which is Takt (`native.theme.priority`), unless it says otherwise.
 
 The quickest start is **seeds**: the page, the text and the accent, for each
 appearance. The app works out the other neutrals (rows, hover, wells, the
@@ -207,7 +211,7 @@ is stated, so it is also a reference for what can be set.
 | `identifier` | What the app stores as your choice. Optional: a file without one is `user.<file name>`, so `dusk.json` is `user.dusk`. It cannot be a built-in's (`native.theme.priority`, `native.theme.chalk`, `native.theme.chalk.dark`), and two files cannot share one — the second, in file-name order, is skipped. |
 | `name` | Shown in the picker. Defaults to the file name. Not inherited. |
 | `summary` | Shown under the picker. Not inherited. |
-| `extends` | The identifier of the theme to take every unstated value from: a built-in, or another of your files (in any order; a cycle is reported and both are skipped). Leave it out for Takt, the default; `"native.theme.chalk"` is Zed. `null` inherits no colours at all — see [Missing roles](#missing-roles). |
+| `extends` | The identifier of the theme to take every unstated value from: a built-in, or another of your files (in any order; a cycle is reported and both are skipped). Leave it out for Takt; `"native.theme.chalk"` is Zed. `null` inherits no colours at all — see [Missing roles](#missing-roles). |
 | `lockedAppearance` | `"light"` or `"dark"` makes the theme *be* that appearance whatever the system is set to, the way Zed Dark does. `null` clears an inherited lock, so a theme extending Zed Dark can follow the system again. Leave it out to inherit. |
 
 ### Palette
@@ -238,8 +242,22 @@ Colours are `#rgb`, `#rrggbb` or `#rrggbbaa` (the last two digits are alpha:
 | `categoricalPurple`, `categoricalPink`, `categoricalOrange` | Identity colour for charts, avatars and per-item hues. Never chrome. |
 | `mediaLetterbox`, `mediaScrim`, `mediaScrimInk` | Behind and over photos. These do not flip with the appearance: they are read from `light` only, whatever is in force. |
 
-Selection fills and status tints are made from these at low alpha where they
-are drawn, so a new `primary` gives you a new selection colour too.
+Five more roles are Zed's chrome, and a theme may leave every one of them
+out. Each is drawn opaque; a role left out is derived as Zed draws a theme
+that names none:
+
+| Role | What it paints | Left out |
+| --- | --- | --- |
+| `selected` | The selected row, tab or menu item. | `paper` with a sixth of `primary` |
+| `indentGuide` | The hairlines under a tree's levels. | `altRow` with a seventh of `ink` |
+| `statusBar` | The status bar and the phones' bars. Stating it sets the bar's words in `ink`. | `well` |
+| `focus` | The outline round the row the keyboard is on. | `primary` |
+| `icon` | An icon at rest. | `mutedText` |
+
+A Zed theme's `ghost_element.selected`, `panel.indent_guide`,
+`status_bar.background`, `panel.focused_border` and `icon` become these.
+
+Status tints are made from these at low alpha where they are drawn.
 
 ### Structure
 
@@ -404,28 +422,21 @@ the point is that colour stays consistent.
 
 ### The built-ins per platform
 
-Takt (`native.theme.priority`):
+Takt, Zed, Zed Dark and Zed One share one table. The phones are set as the Mac
+is — the same radii, spacing and faces — with the type a step larger so it
+reads in the hand:
 
 | | macOS | iOS | Android |
 | --- | --- | --- | --- |
-| `typography.bodySize` | 13 | 17 | 16 |
-| `typography.scale` caption / body / title / display / hero | 12 / 13 / 16 / 30 / 64 | 13 / 17 / 20 / 34 / 72 | 12 / 16 / 20 / 32 / 72 |
-| `radius` panel / row / control / shell | 12 / 8 / 8 / 18 | 14 / 10 / 10 / 18 | 16 / 12 / 10 / 18 |
-| `spacing` xxs … xl | 2 6 10 14 20 28 | 2 6 10 14 20 28 | 2 6 10 14 20 28 |
-| `touchTarget` | 0 (pointer) | 44 | 48 |
-| fonts | Inter, Geist Mono | the same | the same |
-
-Zed:
-
-| | macOS | iOS | Android |
-| --- | --- | --- | --- |
-| `typography.bodySize` | 13 | 17 | 16 |
-| `typography.scale` caption / body / title / display / hero | 12 / 13 / 15 / 28 / 64 | 13 / 17 / 20 / 34 / 72 | 12 / 16 / 20 / 32 / 72 |
-| `typography.microLabel.size` | 12 | 13 | 12 |
-| `radius` panel / row / control | 0 / 0 / 4 | 8 / 0 / 6 | 8 / 0 / 6 |
+| `typography.bodySize` | 13 | 15 | 15 |
+| `typography.scale` caption / body / title / display / hero | 12 / 13 / 15 / 28 / 64 | 13 / 15 / 17 / 32 / 72 | 13 / 15 / 17 / 32 / 72 |
+| `typography.microLabel.size` | 12 | 13 | 13 |
+| `radius` panel / row / control | 0 / 0 / 4 | 0 / 0 / 4 | 0 / 0 / 4 |
 | `spacing` xxs … xl | 2 4 8 12 16 24 | 2 4 8 12 16 24 | 2 4 8 12 16 24 |
 | `touchTarget` | 0 (pointer) | 44 | 48 |
 | fonts | IBM Plex Sans, Lilex | the same | the same |
+
+Grape takes the same type and touch targets and keeps its own radii.
 
 Zed Dark extends Zed and so takes the same per-platform structure.
 
@@ -481,7 +492,7 @@ Your themes and your choice of theme sync with the rest of the workspace
   the workspace, its current theme and appearance become the synced choice,
   unless another device has already set one.
 - A device that does not know the chosen theme (it failed to load there, or
-  has not arrived yet) shows Takt, the default, until it does.
+  has not arrived yet) shows Zed One, the default, until it does.
 
 ### Your fonts are not part of the theme
 

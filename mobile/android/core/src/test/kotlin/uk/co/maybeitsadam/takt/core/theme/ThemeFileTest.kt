@@ -96,8 +96,8 @@ class ThemeFileTest {
         assertEquals(priority.structure.border, dusk.structure.border)
         assertEquals(15.0, dusk.structure.typography.bodySize, 0.0)
         assertEquals(
-            "a new body size with no scale re-proportions the scale",
-            ThemeTypeScale.proportioned(15.0), dusk.structure.typography.scale,
+            "the body size Android already has keeps Android's scale",
+            priority.structure.typography.scale, dusk.structure.typography.scale,
         )
     }
 
@@ -277,8 +277,8 @@ class ThemeFileTest {
     fun prioritysPerPlatformStructureIsTheDocumentedTable() {
         val table = mapOf(
             ThemePlatform.MACOS to Triple(13.0, listOf(0.0, 0.0, 4.0), 0.0),
-            ThemePlatform.IOS to Triple(17.0, listOf(8.0, 0.0, 6.0), 44.0),
-            ThemePlatform.ANDROID to Triple(16.0, listOf(8.0, 0.0, 6.0), 48.0),
+            ThemePlatform.IOS to Triple(15.0, listOf(0.0, 0.0, 4.0), 44.0),
+            ThemePlatform.ANDROID to Triple(15.0, listOf(0.0, 0.0, 4.0), 48.0),
         )
         for ((platform, row) in table) {
             val structure = BuiltInThemeSpecifications.priority(platform).structure
@@ -293,12 +293,12 @@ class ThemeFileTest {
             assertFalse("$platform: $issues", issues.any { it.severity == ThemeIssueSeverity.ERROR })
         }
         val droid = priority.structure.typography
-        assertEquals(ThemeTypeScale(12.0, 16.0, 20.0, 32.0, 72.0), droid.scale)
-        assertEquals(12.0, droid.microLabel.size, 0.0)
+        assertEquals(ThemeTypeScale(13.0, 15.0, 17.0, 32.0, 72.0), droid.scale)
+        assertEquals(13.0, droid.microLabel.size, 0.0)
     }
 
     @Test
-    fun priorityIsTheDefaultFirstAndSetInPlex() {
+    fun theBuiltInsComeInOrderAndTheDefaultIsZedOne() {
         for (platform in ThemePlatform.entries) {
             val all = BuiltInThemeSpecifications.all(platform)
             assertEquals(
@@ -306,7 +306,7 @@ class ThemeFileTest {
                 all.map { it.identifier },
             )
             assertEquals(listOf("Takt", "Zed", "Zed Dark", "Grape", "Zed One"), all.map { it.name })
-            assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, BuiltInThemeSpecifications.defaultTheme(platform).identifier)
+            assertEquals("native.theme.one", BuiltInThemeSpecifications.defaultTheme(platform).identifier)
         }
         val type = priority.structure.typography
         assertEquals(ThemeFontFace(listOf("IBM Plex Sans"), ThemeFontDesign.SANS), type.body)
@@ -429,10 +429,10 @@ class ThemeFileTest {
         val mac = BuiltInThemeSpecifications.chalk(ThemePlatform.MACOS).structure
         val ios = BuiltInThemeSpecifications.chalk(ThemePlatform.IOS).structure
         val droid = chalk.structure
-        assertEquals(listOf(13.0, 17.0, 16.0), listOf(mac, ios, droid).map { it.typography.bodySize })
-        assertEquals(ThemeTypeScale(12.0, 16.0, 20.0, 32.0, 72.0), droid.typography.scale)
+        assertEquals(listOf(13.0, 15.0, 15.0), listOf(mac, ios, droid).map { it.typography.bodySize })
+        assertEquals(ThemeTypeScale(13.0, 15.0, 17.0, 32.0, 72.0), droid.typography.scale)
         assertEquals(listOf(0.0, 44.0, 48.0), listOf(mac, ios, droid).map { it.touchTarget })
-        assertEquals(listOf(8.0, 0.0, 6.0), droid.radius.let { listOf(it.panel, it.row, it.control) })
+        assertEquals(listOf(0.0, 0.0, 4.0), droid.radius.let { listOf(it.panel, it.row, it.control) })
         assertEquals(13.0, ios.typography.microLabel.size, 0.0)
         assertEquals(
             "Chalk Dark extends Chalk and takes the same per-platform structure",
@@ -465,7 +465,7 @@ class ThemeFileTest {
         assertEquals(12.0, onIOS.structure.spacing.md, 0.0)
         assertEquals(2.0, onAndroid.structure.radius.control, 0.0)
         assertEquals(2.0, onMac.structure.radius.control, 0.0)
-        assertEquals("Android keeps Chalk's Android body size", 16.0, onAndroid.structure.typography.bodySize, 0.0)
+        assertEquals("Android keeps Chalk's Android body size", 15.0, onAndroid.structure.typography.bodySize, 0.0)
         assertEquals(18.0, onIOS.structure.typography.bodySize, 0.0)
         assertEquals(ThemeTypeScale.proportioned(18.0), onIOS.structure.typography.scale)
         assertEquals(13.0, onMac.structure.typography.bodySize, 0.0)

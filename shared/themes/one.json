@@ -14,12 +14,14 @@
       "danger" : "#d07277",
       "dimText" : "#878a98",
       "hover" : "#363c46",
+      "indentGuide" : "#363c46",
       "ink" : "#dce0e5",
       "inputBorder" : "#464b57",
       "mutedText" : "#a9afbc",
       "paper" : "#282c33",
       "primary" : "#74ade8",
       "raised" : "#2f343e",
+      "selected" : "#454a56",
       "success" : "#a1c181",
       "warning" : "#dec184",
       "well" : "#3b414d"
@@ -34,6 +36,7 @@
       "danger" : "#d36151",
       "dimText" : "#7e8086",
       "hover" : "#dfdfe0",
+      "indentGuide" : "#dfdfe0",
       "ink" : "#242529",
       "inputBorder" : "#c9c9ca",
       "mediaLetterbox" : "#000000",
@@ -43,6 +46,7 @@
       "paper" : "#fafafa",
       "primary" : "#5c78e2",
       "raised" : "#ebebec",
+      "selected" : "#cacaca",
       "success" : "#669f59",
       "warning" : "#a48819",
       "well" : "#dcdcdd"
@@ -51,41 +55,36 @@
   "platforms" : {
     "android" : {
       "structure" : {
-        "radius" : {
-          "control" : 6,
-          "panel" : 8
-        },
         "touchTarget" : 48,
         "typography" : {
-          "bodySize" : 16,
+          "bodySize" : 15,
+          "microLabel" : {
+            "size" : 13
+          },
           "scale" : {
-            "body" : 16,
-            "caption" : 12,
+            "body" : 15,
+            "caption" : 13,
             "display" : 32,
             "hero" : 72,
-            "title" : 20
+            "title" : 17
           }
         }
       }
     },
     "ios" : {
       "structure" : {
-        "radius" : {
-          "control" : 6,
-          "panel" : 8
-        },
         "touchTarget" : 44,
         "typography" : {
-          "bodySize" : 17,
+          "bodySize" : 15,
           "microLabel" : {
             "size" : 13
           },
           "scale" : {
-            "body" : 17,
+            "body" : 15,
             "caption" : 13,
-            "display" : 34,
+            "display" : 32,
             "hero" : 72,
-            "title" : 20
+            "title" : 17
           }
         }
       }

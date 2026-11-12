@@ -97,7 +97,34 @@ fn the_built_ins_are_fit_to_ship_on_every_platform() {
     let android =
         builtins::specification(builtins::CHALK_IDENTIFIER, CoreThemePlatform::Android).unwrap();
     assert_eq!(android.structure.touch_target, 48.0);
-    assert_eq!(android.structure.typography.body_size, 16.0);
+    assert_eq!(android.structure.typography.body_size, 15.0);
+}
+
+#[test]
+fn the_phones_are_set_as_the_mac_is_a_step_larger() {
+    let mac = builtins::specification(builtins::ONE_IDENTIFIER, CoreThemePlatform::Macos).unwrap();
+    for platform in [CoreThemePlatform::Ios, CoreThemePlatform::Android] {
+        let phone = builtins::specification(builtins::ONE_IDENTIFIER, platform).unwrap();
+        assert_eq!(phone.structure.radius, mac.structure.radius, "{platform:?}");
+        assert_eq!(
+            phone.structure.spacing, mac.structure.spacing,
+            "{platform:?}"
+        );
+        let scale = &phone.structure.typography.scale;
+        assert_eq!(
+            (scale.caption, scale.body, scale.title),
+            (13.0, 15.0, 17.0),
+            "{platform:?}"
+        );
+    }
+    assert_eq!(
+        builtins::default_theme(CoreThemePlatform::Ios).identifier,
+        builtins::ONE_IDENTIFIER
+    );
+    assert_eq!(
+        builtins::extends_base(CoreThemePlatform::Ios).identifier,
+        builtins::PRIORITY_IDENTIFIER
+    );
 }
 
 #[test]
@@ -389,4 +416,65 @@ fn a_zed_variant_takes_a_primary_that_can_carry_the_focus_ring() {
         spec.palette.color("paper", CoreThemeAppearance::Light),
         spec.palette.color("paper", dark)
     );
+}
+
+#[test]
+fn a_zed_variant_carries_zeds_chrome() {
+    let style = r##"{
+      "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
+      "name": "Chrome",
+      "themes": [{
+        "name": "Chrome Dark",
+        "appearance": "dark",
+        "style": {
+          "editor.background": "#101010",
+          "panel.background": "#202020",
+          "text": "#eeeeee",
+          "text.accent": "#4080ff",
+          "ghost_element.selected": "#303030",
+          "panel.indent_guide": "#ffffff20",
+          "status_bar.background": "#123456",
+          "panel.focused_border": "#ff8000",
+          "icon": "#aaaaaa"
+        }
+      }]
+    }"##;
+    let outcomes = load_one("chrome.json", style.as_bytes().to_vec());
+    let spec = outcomes[0].specification.clone().unwrap();
+    let dark = CoreThemeAppearance::Dark;
+    let chrome = |role: &str| color::hex_string(&spec.palette.chrome(role, dark));
+    assert_eq!(chrome("selected"), "#303030");
+    // #ffffff20 over the panel.
+    assert_eq!(chrome("indentGuide"), "#3C3C3C");
+    assert_eq!(chrome("statusBar"), "#123456");
+    assert_eq!(chrome("focus"), "#FF8000");
+    assert_eq!(chrome("icon"), "#AAAAAA");
+
+    // Meadow names none of the five: its selection and guide are derived from
+    // its own colours, not Zed One's, and its status bar is left unstated.
+    let dusk = load_one("meadow.json", meadow())[0]
+        .specification
+        .clone()
+        .unwrap();
+    let one = builtins::specification(builtins::ONE_IDENTIFIER, CoreThemePlatform::Macos).unwrap();
+    assert_ne!(
+        dusk.palette.chrome("selected", dark),
+        one.palette.chrome("selected", dark)
+    );
+    assert!(dusk.palette.stated("statusBar", dark).is_none());
+    assert_eq!(
+        dusk.palette.chrome("statusBar", dark),
+        dusk.palette.color("well", dark)
+    );
+}
+
+#[test]
+fn zed_one_draws_the_macs_selection_and_guides() {
+    let one = builtins::specification(builtins::ONE_IDENTIFIER, CoreThemePlatform::Ios).unwrap();
+    let chrome = |role: &str, a| color::hex_string(&one.palette.chrome(role, a));
+    assert_eq!(chrome("selected", CoreThemeAppearance::Dark), "#454A56");
+    assert_eq!(chrome("indentGuide", CoreThemeAppearance::Dark), "#363C46");
+    assert_eq!(chrome("selected", CoreThemeAppearance::Light), "#CACACA");
+    assert_eq!(chrome("indentGuide", CoreThemeAppearance::Light), "#DFDFE0");
+    assert_eq!(chrome("statusBar", CoreThemeAppearance::Dark), "#3B414D");
 }

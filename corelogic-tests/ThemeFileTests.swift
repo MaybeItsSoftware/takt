@@ -265,11 +265,11 @@ final class ThemeFileTests: XCTestCase {
         bodySize: 13, scale: .init(caption: 12, body: 13, title: 15, display: 28, hero: 64),
         microLabel: 12, radius: (0, 0, 4), touchTarget: 0),
       .ios: Row(
-        bodySize: 17, scale: .init(caption: 13, body: 17, title: 20, display: 34, hero: 72),
-        microLabel: 13, radius: (8, 0, 6), touchTarget: 44),
+        bodySize: 15, scale: .init(caption: 13, body: 15, title: 17, display: 32, hero: 72),
+        microLabel: 13, radius: (0, 0, 4), touchTarget: 44),
       .android: Row(
-        bodySize: 16, scale: .init(caption: 12, body: 16, title: 20, display: 32, hero: 72),
-        microLabel: 12, radius: (8, 0, 6), touchTarget: 48),
+        bodySize: 15, scale: .init(caption: 13, body: 15, title: 17, display: 32, hero: 72),
+        microLabel: 13, radius: (0, 0, 4), touchTarget: 48),
     ]
     for (platform, row) in table {
       for builtIn in [
@@ -295,8 +295,8 @@ final class ThemeFileTests: XCTestCase {
   func testPrioritysPerPlatformStructureIsTheDocumentedTable() {
     let table: [ThemePlatform: (bodySize: Double, radius: [Double], touchTarget: Double)] = [
       .macos: (13, [0, 0, 4], 0),
-      .ios: (17, [8, 0, 6], 44),
-      .android: (16, [8, 0, 6], 48),
+      .ios: (15, [0, 0, 4], 44),
+      .android: (15, [0, 0, 4], 48),
     ]
     for (platform, row) in table {
       let structure = BuiltInThemeSpecifications.priority(for: platform).structure
@@ -355,11 +355,11 @@ final class ThemeFileTests: XCTestCase {
     XCTAssertEqual(mac.structure.radius.panel, 0, "inherits the Mac's default")
     XCTAssertEqual(ios.structure.typography.bodySize, 18)
     XCTAssertEqual(ios.structure.typography.scale, .proportioned(fromBody: 18))
-    XCTAssertEqual(ios.structure.radius.panel, 8, "inherits the iPhone's default")
+    XCTAssertEqual(ios.structure.radius.panel, 0, "inherits the iPhone's default, the Mac's radii")
     XCTAssertEqual(ios.structure.touchTarget, 44)
     XCTAssertEqual(ios.structure.spacing.md, BuiltInThemeSpecifications.priority(for: .ios).structure.spacing.md)
     XCTAssertEqual(android.structure.spacing.md, 18)
-    XCTAssertEqual(android.structure.typography.bodySize, 16)
+    XCTAssertEqual(android.structure.typography.bodySize, 15)
     XCTAssertEqual(android.structure.touchTarget, 48)
   }
 
@@ -370,7 +370,10 @@ final class ThemeFileTests: XCTestCase {
     )
     XCTAssertEqual(load(for: .macos, big).themes.first?.structure.typography.bodySize, 15)
     XCTAssertEqual(load(for: .ios, big).themes.first?.structure.typography.bodySize, 15)
-    XCTAssertEqual(load(for: .ios, big).themes.first?.structure.typography.scale, .proportioned(fromBody: 15))
+    // The iPhone's default is already set at 15, so its own scale stands.
+    XCTAssertEqual(
+      load(for: .ios, big).themes.first?.structure.typography.scale,
+      BuiltInThemeSpecifications.priority(for: .ios).structure.typography.scale)
     XCTAssertEqual(load(for: .android, big).themes.first?.structure.typography.bodySize, 19)
   }
 
@@ -414,7 +417,7 @@ final class ThemeFileTests: XCTestCase {
         messages(outcome).contains("platforms.android.structure.radius.panel -2 should be zero or more"),
         "\(platform): \(messages(outcome))")
     }
-    XCTAssertEqual(load(for: .android, file).themes.first?.structure.radius.panel, 8)
+    XCTAssertEqual(load(for: .android, file).themes.first?.structure.radius.panel, 0)
   }
 
   func testATouchTargetIsDecodedAndAudited() throws {

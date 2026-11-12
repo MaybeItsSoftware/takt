@@ -51,41 +51,36 @@
   "platforms" : {
     "android" : {
       "structure" : {
-        "radius" : {
-          "control" : 6,
-          "panel" : 8
-        },
         "touchTarget" : 48,
         "typography" : {
-          "bodySize" : 16,
+          "bodySize" : 15,
+          "microLabel" : {
+            "size" : 13
+          },
           "scale" : {
-            "body" : 16,
-            "caption" : 12,
+            "body" : 15,
+            "caption" : 13,
             "display" : 32,
             "hero" : 72,
-            "title" : 20
+            "title" : 17
           }
         }
       }
     },
     "ios" : {
       "structure" : {
-        "radius" : {
-          "control" : 6,
-          "panel" : 8
-        },
         "touchTarget" : 44,
         "typography" : {
-          "bodySize" : 17,
+          "bodySize" : 15,
           "microLabel" : {
             "size" : 13
           },
           "scale" : {
-            "body" : 17,
+            "body" : 15,
             "caption" : 13,
-            "display" : 34,
+            "display" : 32,
             "hero" : 72,
-            "title" : 20
+            "title" : 17
           }
         }
       }

@@ -26,7 +26,7 @@ class ThemeLibraryStateTest {
     fun aChosenRowIsInForceWithAndroidStructure() {
         val s = state(mapOf(WorkspacePreferenceKey.THEME_SELECTED to "user.dusk"))
         assertEquals("Dusk", s.specification.name)
-        assertEquals(16.0, s.specification.structure.typography.bodySize, 0.0)
+        assertEquals(15.0, s.specification.structure.typography.bodySize, 0.0)
         assertEquals(listOf(UserThemeFile("user.dusk", "dusk.json", duskJson)), s.files)
         assertEquals(
             listOf("native.theme.priority", "native.theme.chalk", "native.theme.chalk.dark", "native.theme.grape", "native.theme.one", "user.dusk"),
@@ -38,15 +38,15 @@ class ThemeLibraryStateTest {
     @Test
     fun anUnknownOrClearedChoiceShowsTheDefaultUntilItArrives() {
         val s = state(mapOf(WorkspacePreferenceKey.THEME_SELECTED to "user.not-here", WorkspacePreferenceKey.THEME_APPEARANCE to "dark"))
-        assertEquals(BuiltInThemeSpecifications.PRIORITY_IDENTIFIER, s.specification.identifier)
+        assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, s.specification.identifier)
         assertEquals(ThemeMode.DARK, s.mode)
-        assertEquals(BuiltInThemeSpecifications.PRIORITY_IDENTIFIER, state(mapOf(WorkspacePreferenceKey.THEME_SELECTED to null)).specification.identifier)
+        assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, state(mapOf(WorkspacePreferenceKey.THEME_SELECTED to null)).specification.identifier)
     }
 
     @Test
     fun nothingChosenIsPriorityAndAChosenZedIsKept() {
-        assertEquals(BuiltInThemeSpecifications.PRIORITY_IDENTIFIER, ThemeLibraryState().specification.identifier)
-        assertEquals(BuiltInThemeSpecifications.PRIORITY_IDENTIFIER, state(emptyMap()).specification.identifier)
+        assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, ThemeLibraryState().specification.identifier)
+        assertEquals(BuiltInThemeSpecifications.DEFAULT_IDENTIFIER, state(emptyMap()).specification.identifier)
         val zed = state(mapOf(WorkspacePreferenceKey.THEME_SELECTED to BuiltInThemeSpecifications.CHALK_IDENTIFIER))
         assertEquals(BuiltInThemeSpecifications.CHALK_IDENTIFIER, zed.specification.identifier)
         assertEquals("Zed", zed.specification.name)

@@ -60,7 +60,7 @@ Last checked against `main` on 6 October 2026.
 
 | Mac feature | Android | Notes |
 | --- | --- | --- |
-| Default theme "Takt" with Inter and Geist Mono | Done | The fonts are bundled in `res/font` and survive release shrinking. `BundledFontsTest` pins the mapping |
+| Default theme Zed One with IBM Plex Sans and Lilex | Done | The fonts are bundled in `res/font` and survive release shrinking. `BundledFontsTest` pins the mapping |
 | Built-in themes, theme files, import, follow the device's choice | Done | Shared conformance fixtures in `shared/themes` |
 | Theme gallery with miniatures | Done, as a list | Themes are listed by name, without miniatures |
 | Font controls: interface, heading and numeral families, text size (cc8a82d, 8108dae) | Done | Settings → Type. `ThemeTypographyOverride` in `:core`, merged over the theme as on the Mac and kept per device. The faces are the seven bundled families; a phone cannot offer fonts installed on the system. The size scales the theme's own sizes, on top of the system font scale |

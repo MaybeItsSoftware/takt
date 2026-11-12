@@ -109,6 +109,17 @@ pub fn contrast_ratio(a: &CoreThemeColor, b: &CoreThemeColor) -> f64 {
 
 /// `a` moved `t` of the way to `b`, per channel, on whole 0–255 steps,
 /// rounded half away from zero. Opaque.
+/// `top` laid over an opaque `bottom`, as a translucent colour is drawn.
+pub fn over(top: CoreThemeColor, bottom: CoreThemeColor) -> CoreThemeColor {
+    let a = top.alpha;
+    rgba(
+        top.red * a + bottom.red * (1.0 - a),
+        top.green * a + bottom.green * (1.0 - a),
+        top.blue * a + bottom.blue * (1.0 - a),
+        1.0,
+    )
+}
+
 pub fn mix(a: &CoreThemeColor, b: &CoreThemeColor, t: f64) -> CoreThemeColor {
     let channel = |from: f64, to: f64| {
         let start = (from * 255.0).round();

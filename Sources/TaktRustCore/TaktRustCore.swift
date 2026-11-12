@@ -32769,6 +32769,21 @@ public func themeBuiltins(platform: CoreThemePlatform) -> [CoreThemeSpecificatio
 })
 }
 /**
+ * One of Zed's chrome roles (`selected`, `indentGuide`, `statusBar`,
+ * `focus`, `icon`), opaque: as the theme states it, else derived from its
+ * other roles as Zed draws a theme that names none.
+ */
+public func themeChromeColor(palette: CoreThemePalette, role: String, appearance: CoreThemeAppearance) -> CoreThemeColor  {
+    return try!  FfiConverterTypeCoreThemeColor_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_theme_chrome_color(
+        FfiConverterTypeCoreThemePalette_lower(palette),
+        FfiConverterString.lower(role),
+        FfiConverterTypeCoreThemeAppearance_lower(appearance),uniffiCallStatus
+    )
+})
+}
+/**
  * A conformance case, as the bytes `shared/themes/conformance/` holds.
  */
 public func themeConformanceCase(files: [CoreThemeNamedText], selected: String) -> String  {
@@ -32957,6 +32972,19 @@ public func themeSharedFiles() -> [CoreThemeNamedText]  {
     return try!  FfiConverterSequenceTypeCoreThemeNamedText.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_takt_core_fn_func_theme_shared_files(uniffiCallStatus
+    )
+})
+}
+/**
+ * Whether the theme states `role` itself, in either appearance: a theme
+ * that paints its status bar sets its words in ink rather than muted.
+ */
+public func themeStatesRole(palette: CoreThemePalette, role: String) -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_theme_states_role(
+        FfiConverterTypeCoreThemePalette_lower(palette),
+        FfiConverterString.lower(role),uniffiCallStatus
     )
 })
 }
@@ -33671,6 +33699,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_func_theme_builtins() != 9982) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_func_theme_chrome_color() != 60718) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_func_theme_conformance_case() != 22428) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33726,6 +33757,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_func_theme_shared_files() != 13538) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_theme_states_role() != 347) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_func_theme_structure_difference() != 4637) {

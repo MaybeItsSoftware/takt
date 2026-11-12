@@ -36,8 +36,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -67,7 +67,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -81,9 +81,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
+              "display" : 32,
               "hero" : 80,
-              "title" : 19
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -125,8 +125,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -156,7 +156,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -170,9 +170,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
+              "display" : 32,
               "hero" : 80,
-              "title" : 19
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -216,8 +216,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -261,9 +261,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
+              "display" : 32,
               "hero" : 80,
-              "title" : 19
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -305,8 +305,8 @@
             "hairline" : 1
           },
           "radius" : {
-            "control" : 6,
-            "panel" : 8,
+            "control" : 4,
+            "panel" : 0,
             "pill" : 9999,
             "row" : 0,
             "shell" : 20
@@ -350,9 +350,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
+              "display" : 32,
               "hero" : 80,
-              "title" : 19
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,

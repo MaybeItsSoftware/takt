@@ -6,9 +6,7 @@ use std::sync::OnceLock;
 
 use super::color::{from_hex, rgba};
 use super::file::{CoreThemeFileMicroLabel, CoreThemeFileTypography};
-use super::file::{
-    CoreThemeFileRadius, CoreThemeFileSpacing, CoreThemeFileStructure, CoreThemeFileTypeScale,
-};
+use super::file::{CoreThemeFileStructure, CoreThemeFileTypeScale};
 use super::merge::merge_structure;
 use super::model::{
     ColorTable, CoreThemeAppearance, CoreThemeBorder, CoreThemeColor, CoreThemeFontFace,
@@ -17,8 +15,8 @@ use super::model::{
 };
 use super::seeds::CoreThemeSeeds;
 
-/// The default: what a fresh install shows, what a file extends unless it
-/// says otherwise, and what stands in for a theme that will not load.
+/// Takt, in the house colours: what a theme file extends unless it says
+/// otherwise.
 pub const PRIORITY_IDENTIFIER: &str = "native.theme.priority";
 /// The Zed look, under its old name.
 pub const CHALK_IDENTIFIER: &str = "native.theme.chalk";
@@ -27,9 +25,14 @@ pub const CHALK_DARK_IDENTIFIER: &str = "native.theme.chalk.dark";
 pub const GRAPE_IDENTIFIER: &str = "native.theme.grape";
 /// Zed's own default pair, One Light and One Dark: what the Rust Mac app draws.
 pub const ONE_IDENTIFIER: &str = "native.theme.one";
-pub const DEFAULT_IDENTIFIER: &str = PRIORITY_IDENTIFIER;
+/// The default on every platform: what a fresh install shows and what stands
+/// in for a theme that will not load. Zed One, as the Mac app draws it.
+pub const DEFAULT_IDENTIFIER: &str = ONE_IDENTIFIER;
+/// What a theme file extends when it names nothing: Takt, so a file of three
+/// seeds keeps the house neutrals it was written against.
+pub const EXTENDS_IDENTIFIER: &str = PRIORITY_IDENTIFIER;
 
-/// The built-ins, default first.
+/// The built-ins, the base a file extends first.
 pub const IDENTIFIERS: [&str; 5] = [
     PRIORITY_IDENTIFIER,
     CHALK_IDENTIFIER,
@@ -201,6 +204,8 @@ fn one_palette() -> CoreThemePalette {
         ("mutedText", "#58585a"),
         ("dimText", "#7e8086"),
         ("primary", "#5c78e2"),
+        ("selected", "#cacaca"),
+        ("indentGuide", "#dfdfe0"),
         ("success", "#669f59"),
         ("danger", "#d36151"),
         ("warning", "#a48819"),
@@ -224,6 +229,8 @@ fn one_palette() -> CoreThemePalette {
         ("mutedText", "#a9afbc"),
         ("dimText", "#878a98"),
         ("primary", "#74ade8"),
+        ("selected", "#454a56"),
+        ("indentGuide", "#363c46"),
         ("success", "#a1c181"),
         ("danger", "#d07277"),
         ("warning", "#dec184"),
@@ -353,27 +360,17 @@ fn grape() -> CoreThemeSpecification {
 
 // MARK: - Per platform
 
-fn radius(panel: f64, row: f64, control: f64) -> Option<CoreThemeFileRadius> {
-    Some(CoreThemeFileRadius {
-        panel: Some(panel),
-        row: Some(row),
-        control: Some(control),
-        ..Default::default()
-    })
-}
-
-/// The phones' type: the platform body size and the scale that goes with it.
-fn phone_type(platform: CoreThemePlatform, micro_label: bool) -> Option<CoreThemeFileTypography> {
-    let (body, caption, display) = match platform {
-        CoreThemePlatform::Ios => (17.0, 13.0, 34.0),
-        _ => (16.0, 12.0, 32.0),
-    };
+/// The phones' type: the Mac's scale in its proportions, set at 15 rather
+/// than 13 so it reads in the hand (caption 12→13 is kept at the Mac's
+/// caption-to-body step, the title 15→17, the micro-label the caption's).
+fn phone_type(micro_label: bool) -> Option<CoreThemeFileTypography> {
+    let (body, caption, title, display) = (15.0, 13.0, 17.0, 32.0);
     Some(CoreThemeFileTypography {
         body_size: Some(body),
         scale: Some(CoreThemeFileTypeScale {
             caption: Some(caption),
             body: Some(body),
-            title: Some(20.0),
+            title: Some(title),
             display: Some(display),
             hero: Some(72.0),
         }),
@@ -403,27 +400,20 @@ pub fn platform_structure(
         return None;
     }
     match identifier {
-        // 13pt is right at a desk and too small in the hand: the platform's
-        // body size, panels and controls rounded a little, hit areas grown.
+        // The Mac's own look in the hand: its square panels, 4pt controls and
+        // spacing kept, the type at the Mac's proportions set a step larger,
+        // and hit areas grown to the platform's minimum (invisibly: a control
+        // keeps its painted size).
         PRIORITY_IDENTIFIER | CHALK_IDENTIFIER | CHALK_DARK_IDENTIFIER | ONE_IDENTIFIER => {
             Some(CoreThemeFileStructure {
-                radius: radius(8.0, 0.0, 6.0),
-                spacing: Some(CoreThemeFileSpacing {
-                    xxs: Some(2.0),
-                    xs: Some(4.0),
-                    sm: Some(8.0),
-                    md: Some(12.0),
-                    lg: Some(16.0),
-                    xl: Some(24.0),
-                }),
-                typography: phone_type(platform, true),
+                typography: phone_type(true),
                 touch_target: touch_target(platform),
                 ..Default::default()
             })
         }
         // The Mac's radius scale; the micro-label stays 10pt.
         GRAPE_IDENTIFIER => Some(CoreThemeFileStructure {
-            typography: phone_type(platform, false),
+            typography: phone_type(false),
             touch_target: touch_target(platform),
             ..Default::default()
         }),
@@ -448,7 +438,7 @@ fn for_platform(
     }
 }
 
-/// The built-ins as `platform` resolves them, the default first.
+/// The built-ins as `platform` resolves them, the base a file extends first.
 pub fn all(platform: CoreThemePlatform) -> &'static [CoreThemeSpecification] {
     static CACHE: OnceLock<[Vec<CoreThemeSpecification>; 3]> = OnceLock::new();
     let cache = CACHE.get_or_init(|| {
@@ -462,7 +452,13 @@ pub fn all(platform: CoreThemePlatform) -> &'static [CoreThemeSpecification] {
     &cache[platform.index()]
 }
 
+/// The default, Zed One, as `platform` resolves it.
 pub fn default_theme(platform: CoreThemePlatform) -> &'static CoreThemeSpecification {
+    specification(DEFAULT_IDENTIFIER, platform).unwrap_or(&all(platform)[0])
+}
+
+/// What a file that names no base extends: Takt, as `platform` resolves it.
+pub fn extends_base(platform: CoreThemePlatform) -> &'static CoreThemeSpecification {
     &all(platform)[0]
 }
 

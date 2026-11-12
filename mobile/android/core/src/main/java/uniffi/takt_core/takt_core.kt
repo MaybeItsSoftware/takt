@@ -1061,6 +1061,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_func_theme_builtins(
     ): Int
+    external fun uniffi_takt_core_checksum_func_theme_chrome_color(
+    ): Int
     external fun uniffi_takt_core_checksum_func_theme_conformance_case(
     ): Int
     external fun uniffi_takt_core_checksum_func_theme_contrast_findings(
@@ -1098,6 +1100,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_func_theme_shared_file(
     ): Int
     external fun uniffi_takt_core_checksum_func_theme_shared_files(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_theme_states_role(
     ): Int
     external fun uniffi_takt_core_checksum_func_theme_structure_difference(
     ): Int
@@ -2557,6 +2561,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_theme_builtins(`platform`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_theme_chrome_color(`palette`: RustBuffer.ByValue,`role`: RustBuffer.ByValue,`appearance`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_theme_conformance_case(`files`: RustBuffer.ByValue,`selected`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_theme_contrast_findings(`specification`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -2595,6 +2601,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_theme_shared_files(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_theme_states_role(`palette`: RustBuffer.ByValue,`role`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_takt_core_fn_func_theme_structure_difference(`base`: RustBuffer.ByValue,`target`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_theme_structure_findings(`structure`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -3313,6 +3321,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_func_theme_builtins() and 0xFFFF) != 9982) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_func_theme_chrome_color() and 0xFFFF) != 60718) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_func_theme_conformance_case() and 0xFFFF) != 22428) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -3368,6 +3379,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_theme_shared_files() and 0xFFFF) != 13538) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_theme_states_role() and 0xFFFF) != 347) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_theme_structure_difference() and 0xFFFF) != 4637) {
@@ -36825,6 +36839,24 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
     
 
         /**
+         * One of Zed's chrome roles (`selected`, `indentGuide`, `statusBar`,
+         * `focus`, `icon`), opaque: as the theme states it, else derived from its
+         * other roles as Zed draws a theme that names none.
+         */ fun `themeChromeColor`(`palette`: CoreThemePalette, `role`: kotlin.String, `appearance`: CoreThemeAppearance): CoreThemeColor {
+            return FfiConverterTypeCoreThemeColor.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_theme_chrome_color(
+    
+        
+        FfiConverterTypeCoreThemePalette.lower(`palette`),
+        FfiConverterString.lower(`role`),
+        FfiConverterTypeCoreThemeAppearance.lower(`appearance`),_status)
+}
+    )
+    }
+    
+
+        /**
          * A conformance case, as the bytes `shared/themes/conformance/` holds.
          */ fun `themeConformanceCase`(`files`: List<CoreThemeNamedText>, `selected`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
@@ -37068,6 +37100,22 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
     UniffiLib.uniffi_takt_core_fn_func_theme_shared_files(
     
         _status)
+}
+    )
+    }
+    
+
+        /**
+         * Whether the theme states `role` itself, in either appearance: a theme
+         * that paints its status bar sets its words in ink rather than muted.
+         */ fun `themeStatesRole`(`palette`: CoreThemePalette, `role`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_theme_states_role(
+    
+        
+        FfiConverterTypeCoreThemePalette.lower(`palette`),
+        FfiConverterString.lower(`role`),_status)
 }
     )
     }

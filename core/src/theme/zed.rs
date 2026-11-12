@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use super::builtins::ONE_IDENTIFIER;
-use super::color::{contrast_ratio, from_hex, hex_string, relative_luminance, rgba};
+use super::color::{contrast_ratio, from_hex, hex_string, mix, over, relative_luminance, rgba};
 use super::file::{
     CoreThemeFile, CoreThemeFileBase, CoreThemeFileIssue, CoreThemeFileLock, CoreThemeFilePalette,
 };
@@ -67,6 +67,19 @@ const ROLE_KEYS: [(&str, &[&str]); 14] = [
     ("warning", &["warning", "modified"]),
 ];
 
+/// Zed's chrome, each read from these keys, first stated wins. A selection
+/// and a guide the variant leaves out are derived from its own page, panel,
+/// accent and text (`CoreThemePalette::chrome`) and written down, so they are
+/// not inherited from Zed One; the rest stay unstated, which is how the Mac
+/// knows whether the variant paints its status bar.
+const CHROME_KEYS: [(&str, &[&str]); 5] = [
+    ("selected", &["ghost_element.selected", "element.selected"]),
+    ("indentGuide", &["panel.indent_guide"]),
+    ("statusBar", &["status_bar.background"]),
+    ("focus", &["panel.focused_border", "border.focused"]),
+    ("icon", &["icon"]),
+];
+
 /// Where `primary` is looked for, in order: the first that stands 3:1 off
 /// the page (it has to carry the focus ring) wins, else the one that stands
 /// furthest off it. `players.0.cursor` and `accents.0` are read too, after
@@ -106,17 +119,6 @@ fn text(value: Option<&Json>) -> Option<String> {
         Some(Json::String(s)) if !s.trim().is_empty() => Some(s.trim().to_string()),
         _ => None,
     }
-}
-
-/// `top` laid over `bottom`, opaque.
-fn over(top: CoreThemeColor, bottom: CoreThemeColor) -> CoreThemeColor {
-    let a = top.alpha;
-    rgba(
-        top.red * a + bottom.red * (1.0 - a),
-        top.green * a + bottom.green * (1.0 - a),
-        top.blue * a + bottom.blue * (1.0 - a),
-        1.0,
-    )
 }
 
 /// Hue in degrees and saturation (HSL), for matching the categorical roles.
@@ -390,6 +392,37 @@ fn variant(
     }
     for (role, colour) in &roles {
         table.insert(role.to_string(), hex_string(colour));
+    }
+    // Zed's chrome, opaque: a guide and the status bar over the panel, as
+    // Zed draws them, the rest over the page.
+    let at = |role: &str| {
+        table
+            .get(role)
+            .and_then(|hex| from_hex(hex))
+            .unwrap_or(canvas)
+    };
+    let (page, panel, accent, ink) = (at("paper"), at("altRow"), at("primary"), at("ink"));
+    let mut chrome = Vec::new();
+    for (role, keys) in CHROME_KEYS {
+        let below = if matches!(role, "indentGuide" | "statusBar") {
+            panel
+        } else {
+            page
+        };
+        let colour = match reader.first(keys) {
+            Some(stated) => Some(over(stated, below)),
+            None => match role {
+                "selected" => Some(mix(&page, &accent, 0.16)),
+                "indentGuide" => Some(mix(&panel, &ink, 0.14)),
+                _ => None,
+            },
+        };
+        if let Some(colour) = colour {
+            chrome.push((role, hex_string(&colour)));
+        }
+    }
+    for (role, hex) in chrome {
+        table.insert(role.to_string(), hex);
     }
     // The same table both ways: the theme is locked to its appearance, and
     // a reader that ignored the lock would still see the variant.

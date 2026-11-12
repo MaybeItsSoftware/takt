@@ -8,9 +8,8 @@ import TaktRustCore
 /// whole to `shared/themes/`. These are their Swift values, built once per
 /// platform. `Takt/Plugins/Native/Theme/` wraps them as plugins.
 public enum BuiltInThemeSpecifications {
-  /// The default (shown as "Takt", stored as Priority): what a fresh install shows, what a theme file
-  /// extends unless it says otherwise, and what stands in for a theme that
-  /// will not load.
+  /// Takt (stored as Priority): what a theme file extends unless it says
+  /// otherwise.
   public static let priorityIdentifier = "native.theme.priority"
   /// The Zed look. The identifiers still say Chalk, its old name, because
   /// they are stored as people's choice and synced between devices.
@@ -19,15 +18,18 @@ public enum BuiltInThemeSpecifications {
   /// Grape: the house design language, whole — Zed's palette with its own
   /// type, radii and labels rather than Zed's.
   public static let grapeIdentifier = "native.theme.grape"
+  /// Zed One: Zed's own One Light and One Dark, the Mac app's look.
+  public static let oneIdentifier = "native.theme.one"
 
-  /// The identifier a device uses when nothing has been chosen.
-  public static let defaultIdentifier = priorityIdentifier
+  /// The default, Zed One, as on the Mac: what a fresh install shows and what
+  /// stands in for a theme that will not load.
+  public static let defaultIdentifier = oneIdentifier
 
-  /// The built-ins as the Mac resolves them, the default first.
+  /// The built-ins as the Mac resolves them, Takt first.
   public static var all: [ThemeSpecification] { all(for: .macos) }
 
   /// The built-ins as `platform` resolves them: the same palettes, with each
-  /// theme's per-platform structure. Default first, then Zed, Zed Dark and Grape.
+  /// theme's per-platform structure: Takt, Zed, Zed Dark, Grape and Zed One.
   public static func all(for platform: ThemePlatform) -> [ThemeSpecification] {
     switch platform {
     case .macos: macos
@@ -42,10 +44,15 @@ public enum BuiltInThemeSpecifications {
 
   /// The default theme, resolved for `platform`.
   public static func defaultTheme(for platform: ThemePlatform) -> ThemeSpecification {
-    priority(for: platform)
+    one(for: platform)
   }
 
-  /// The default, resolved for `platform`. `priority` is the macOS one.
+  /// Zed One, resolved for `platform`.
+  public static func one(for platform: ThemePlatform) -> ThemeSpecification {
+    specification(withIdentifier: oneIdentifier, for: platform) ?? priority(for: platform)
+  }
+
+  /// Takt, resolved for `platform`. `priority` is the macOS one.
   public static func priority(for platform: ThemePlatform) -> ThemeSpecification {
     all(for: platform)[0]
   }
@@ -76,7 +83,7 @@ public enum BuiltInThemeSpecifications {
     all(for: platform).first { $0.identifier == identifier }
   }
 
-  /// The Mac app's structure (IBM Plex Sans, square panels) in the house colours: the default.
+  /// The Mac app's structure (IBM Plex Sans, square panels) in the house colours.
   public static var priority: ThemeSpecification { priority(for: .macos) }
   /// Zed: IBM Plex Sans and Lilex, square panels, hairlines, warm paper and grape ink.
   public static var chalk: ThemeSpecification { chalk(for: .macos) }
@@ -91,7 +98,7 @@ public enum BuiltInThemeSpecifications {
   /// in `docs/themes.md`. The Mac has no entry, because a built-in's own
   /// structure already *is* the Mac's.
   public static let platformStructures: [String: [ThemePlatform: ThemeFile.Structure]] = {
-    let identifiers = [priorityIdentifier, chalkIdentifier, chalkDarkIdentifier, grapeIdentifier]
+    let identifiers = [priorityIdentifier, chalkIdentifier, chalkDarkIdentifier, grapeIdentifier, oneIdentifier]
     return Dictionary(
       uniqueKeysWithValues: identifiers.map { identifier in
         let entries = themeBuiltinPlatformStructures(identifier: identifier).map {
@@ -101,8 +108,8 @@ public enum BuiltInThemeSpecifications {
       })
   }()
 
-  /// Zed's per-platform structure: the platform's body size, panels and
-  /// controls rounded a little, hit areas grown to the platform minimum.
+  /// Zed's per-platform structure: the Mac's type a step larger and hit
+  /// areas grown to the platform minimum; radii and spacing are the Mac's.
   public static var chalkPlatformStructures: [ThemePlatform: ThemeFile.Structure] {
     platformStructures[chalkIdentifier] ?? [:]
   }

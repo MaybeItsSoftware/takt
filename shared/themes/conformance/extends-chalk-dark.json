@@ -67,7 +67,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -81,9 +81,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
-              "hero" : 75,
-              "title" : 19
+              "display" : 32,
+              "hero" : 72,
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -156,7 +156,7 @@
             },
             "microLabel" : {
               "role" : "mutedText",
-              "size" : 12,
+              "size" : 13,
               "tracking" : 0,
               "uppercase" : false,
               "weight" : "regular"
@@ -170,9 +170,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
-              "hero" : 75,
-              "title" : 19
+              "display" : 32,
+              "hero" : 72,
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -261,9 +261,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
-              "hero" : 75,
-              "title" : 19
+              "display" : 32,
+              "hero" : 72,
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,
@@ -350,9 +350,9 @@
             "scale" : {
               "body" : 15,
               "caption" : 13,
-              "display" : 33,
-              "hero" : 75,
-              "title" : 19
+              "display" : 32,
+              "hero" : 72,
+              "title" : 17
             }
           },
           "usesGradientsOnChrome" : false,

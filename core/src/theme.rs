@@ -25,8 +25,8 @@ use file::{CoreThemeFile, CoreThemeFileIssue, CoreThemeFileStructure};
 use loader::CoreThemeFileSource;
 use merge::CoreThemeFileOutcome;
 use model::{
-    CoreThemeAppearance, CoreThemeColor, CoreThemeIssueSeverity, CoreThemePlatform,
-    CoreThemeSpecification, CoreThemeStructure, CoreThemeTypeScale,
+    CoreThemeAppearance, CoreThemeColor, CoreThemeIssueSeverity, CoreThemePalette,
+    CoreThemePlatform, CoreThemeSpecification, CoreThemeStructure, CoreThemeTypeScale,
 };
 use seeds::CoreThemeSeeds;
 
@@ -184,6 +184,25 @@ pub fn theme_seed_roles(
     appearance: CoreThemeAppearance,
 ) -> Option<HashMap<String, CoreThemeColor>> {
     seeds.roles(appearance)
+}
+
+/// One of Zed's chrome roles (`selected`, `indentGuide`, `statusBar`,
+/// `focus`, `icon`), opaque: as the theme states it, else derived from its
+/// other roles as Zed draws a theme that names none.
+#[uniffi::export]
+pub fn theme_chrome_color(
+    palette: CoreThemePalette,
+    role: String,
+    appearance: CoreThemeAppearance,
+) -> CoreThemeColor {
+    palette.chrome(&role, appearance)
+}
+
+/// Whether the theme states `role` itself, in either appearance: a theme
+/// that paints its status bar sets its words in ink rather than muted.
+#[uniffi::export]
+pub fn theme_states_role(palette: CoreThemePalette, role: String) -> bool {
+    palette.light.contains_key(&role) || palette.dark.contains_key(&role)
 }
 
 #[uniffi::export]

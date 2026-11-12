@@ -32,17 +32,20 @@ object BuiltInThemeSpecifications {
     /** Zed One: Zed's own One Light and One Dark, the Rust Mac app's look. */
     const val ONE_IDENTIFIER = "native.theme.one"
 
-    /** The identifier a device uses when nothing has been chosen. */
-    const val DEFAULT_IDENTIFIER = PRIORITY_IDENTIFIER
+    /** The identifier a device uses when nothing has been chosen: Zed One, as on the Mac. */
+    const val DEFAULT_IDENTIFIER = ONE_IDENTIFIER
 
     private val cache = ConcurrentHashMap<ThemePlatform, List<ThemeSpecification>>()
 
-    /** Priority, then Zed, Zed Dark and Grape: the default first. */
+    /** Takt (Priority), Zed, Zed Dark, Grape and Zed One, in the core's order. */
     fun all(platform: ThemePlatform): List<ThemeSpecification> =
         cache.getOrPut(platform) { themeBuiltins(platform.core).map { it.local() } }
 
     /** The default theme, resolved for [platform]. */
-    fun defaultTheme(platform: ThemePlatform): ThemeSpecification = priority(platform)
+    fun defaultTheme(platform: ThemePlatform): ThemeSpecification = one(platform)
+
+    fun one(platform: ThemePlatform): ThemeSpecification =
+        specification(ONE_IDENTIFIER, platform) ?: priority(platform)
 
     fun priority(platform: ThemePlatform): ThemeSpecification = all(platform)[0]
 

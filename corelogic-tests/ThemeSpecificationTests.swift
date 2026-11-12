@@ -16,8 +16,8 @@ final class ThemeSpecificationTests: XCTestCase {
       BuiltInThemeSpecifications.specification(withIdentifier: "native.theme.chalk")?.name,
       "Zed"
     )
-    XCTAssertEqual(BuiltInThemeSpecifications.all.first?.identifier, BuiltInThemeSpecifications.defaultIdentifier)
-    XCTAssertEqual(BuiltInThemeSpecifications.defaultIdentifier, "native.theme.priority")
+    XCTAssertEqual(BuiltInThemeSpecifications.all.first?.identifier, BuiltInThemeSpecifications.priorityIdentifier)
+    XCTAssertEqual(BuiltInThemeSpecifications.defaultIdentifier, "native.theme.one")
     XCTAssertNil(BuiltInThemeSpecifications.specification(withIdentifier: "native.theme.nope"))
   }
 

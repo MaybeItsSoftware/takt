@@ -246,7 +246,7 @@ final class ThemeConformanceTests: XCTestCase {
 
     let zedTeal = try built("extends-zed")
     XCTAssertEqual(zedTeal.expected["macos"]?["light"]?.colors["paper"], "#faf8f4", "Zed's paper")
-    XCTAssertEqual(zedTeal.expected["ios"]?["light"]?.structure.typography.bodySize, 17)
+    XCTAssertEqual(zedTeal.expected["ios"]?["light"]?.structure.typography.bodySize, 15)
 
     let cleared = try built("locked-appearance-cleared")
     XCTAssertNil(cleared.expected["ios"]?["light"]?.lockedAppearance)
