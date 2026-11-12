@@ -87,8 +87,29 @@ fun NowConditionsBar(modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf(false) }
     if (sheet) NowConditionsSheet(onDismiss = { sheet = false })
-    if (!state.isLoaded || state.available.isEmpty()) return
+    if (!state.isLoaded) return
     val colors = TaktTheme.colors
+    // No conditions yet: still a row, so there is somewhere to start.
+    if (state.available.isEmpty()) {
+        Column(modifier) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Metrics.touchTarget)
+                    .clickable(onClickLabel = "Set up conditions") { sheet = true }
+                    .padding(horizontal = Metrics.lg)
+                    .testTag("today_conditions"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Metrics.sm),
+            ) {
+                Icon(Icons.Filled.LocationOn, null, tint = colors.mutedText, modifier = Modifier.size(18.dp))
+                Text("Say where you are", style = TaktTheme.type.body, color = colors.mutedText, modifier = Modifier.weight(1f))
+                Tag("Add places and tools", color = colors.primary, onClick = { sheet = true })
+            }
+            Hairline()
+        }
+        return
+    }
     val summary = ConditionPicker.nowSummary(state.conditions, state.held)
     val list = remember(state) {
         ConditionPicker.list(
