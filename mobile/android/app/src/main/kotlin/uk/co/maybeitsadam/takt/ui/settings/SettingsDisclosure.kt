@@ -36,7 +36,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
-import uk.co.maybeitsadam.takt.ui.components.Card
 import uk.co.maybeitsadam.takt.ui.theme.Metrics
 import uk.co.maybeitsadam.takt.ui.theme.TaktTheme
 
@@ -97,8 +96,8 @@ internal fun CollapsibleSection(
         // animations" collapses them to an instant change.
         AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
             Column(verticalArrangement = Arrangement.spacedBy(Metrics.sm)) {
-                Card(Modifier.fillMaxWidth()) { Column(content = content) }
-                if (footer != null) Text(footer, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText)
+                SettingsRows(content)
+                if (footer != null) Text(footer, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText)
             }
         }
     }

@@ -53,7 +53,10 @@ data class ThemeLibraryState(
      */
     val typography: ThemeTypographyOverride = ThemeTypographyOverride(),
 ) {
-    val builtIns: List<ThemeSpecification> get() = BuiltInThemeSpecifications.all(ThemePlatform.ANDROID)
+    /** The built-ins, Zed One (the default, as on the Mac) first. */
+    val builtIns: List<ThemeSpecification>
+        get() = BuiltInThemeSpecifications.all(ThemePlatform.ANDROID)
+            .sortedBy { it.identifier != BuiltInThemeSpecifications.ONE_IDENTIFIER }
 
     /** Built-ins first, then every user theme that loaded. */
     val available: List<ThemeSpecification> get() = builtIns + library.themes

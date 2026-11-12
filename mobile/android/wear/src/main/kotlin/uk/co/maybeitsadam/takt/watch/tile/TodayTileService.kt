@@ -109,9 +109,9 @@ class TodayTileService : TileService() {
 
     private companion object {
         const val RESOURCES_VERSION = "1"
-        const val INK = 0xFFF5F4F7.toInt()
-        const val MUTED = 0xFFB6B3BF.toInt()
-        const val AZURE = 0xFF007FFF.toInt()
-        const val AMBER = 0xFFFFBF00.toInt()
+        const val INK = 0xFFDCE0E5.toInt()
+        const val MUTED = 0xFFA9AFBC.toInt()
+        const val AZURE = 0xFF74ADE8.toInt()
+        const val AMBER = 0xFFDEC184.toInt()
     }
 }

@@ -29,10 +29,10 @@ class ThemeLibraryStateTest {
         assertEquals(15.0, s.specification.structure.typography.bodySize, 0.0)
         assertEquals(listOf(UserThemeFile("user.dusk", "dusk.json", duskJson)), s.files)
         assertEquals(
-            listOf("native.theme.priority", "native.theme.chalk", "native.theme.chalk.dark", "native.theme.grape", "native.theme.one", "user.dusk"),
+            listOf("native.theme.one", "native.theme.priority", "native.theme.chalk", "native.theme.chalk.dark", "native.theme.grape", "user.dusk"),
             s.available.map { it.identifier },
         )
-        assertEquals(listOf("Takt", "Zed", "Zed Dark", "Grape", "Zed One"), s.builtIns.map { it.name })
+        assertEquals(listOf("Zed One", "Takt", "Zed", "Zed Dark", "Grape"), s.builtIns.map { it.name })
     }
 
     @Test

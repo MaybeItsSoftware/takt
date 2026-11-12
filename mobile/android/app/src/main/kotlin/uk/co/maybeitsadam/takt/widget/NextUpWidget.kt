@@ -72,7 +72,8 @@ private class WidgetTheme(private val day: ResolvedTheme, private val night: Res
     val ink = of { it.colors.ink }
     val muted = of { it.colors.mutedText }
     val primary = of { it.colors.primary }
-    val panelRadius = day.radii.panel
+    // The Mac's card radius, 4, whatever the theme gives a pane (Zed One's are square).
+    val panelRadius = day.radii.control
     val controlRadius = day.radii.control
     val hairline = day.borders.hairline
     val spacing = day.spacing

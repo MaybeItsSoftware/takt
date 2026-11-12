@@ -12,28 +12,30 @@ import androidx.wear.compose.material3.Typography
 import uk.co.maybeitsadam.takt.watch.R
 
 /**
- * Takt's dark palette, as hex, for the watch. The phone's theme tokens come
- * from the Rust core, which the watch never loads, so these are the house
- * hexes themselves: grape surfaces, azure for action, the status hues.
+ * Zed One Dark, as hex, for the watch: the phone's and the Mac's default
+ * theme (`one_palette()` in core/src/theme/builtins.rs). The phone's theme
+ * tokens come from the Rust core, which the watch never loads, so these are
+ * the hexes themselves. The names keep their roles: [azure] is the accent,
+ * [emerald], [raspberry] and [amber] the status hues.
  */
 object WatchColors {
-    val page = Color(0xFF1C1A23)
-    val raised = Color(0xFF25232F)
-    val hover = Color(0xFF2D2B38)
-    val border = Color(0xFF34313F)
-    val ink = Color(0xFFF5F4F7)
-    val muted = Color(0xFFB6B3BF)
-    val dim = Color(0xFF6E6B7C)
-    val azure = Color(0xFF007FFF)
-    val emerald = Color(0xFF4CC38E)
-    val raspberry = Color(0xFFD62246)
-    val amber = Color(0xFFFFBF00)
+    val page = Color(0xFF282C33)
+    val raised = Color(0xFF2F343E)
+    val hover = Color(0xFF363C46)
+    val border = Color(0xFF464B57)
+    val ink = Color(0xFFDCE0E5)
+    val muted = Color(0xFFA9AFBC)
+    val dim = Color(0xFF878A98)
+    val azure = Color(0xFF74ADE8)
+    val emerald = Color(0xFFA1C181)
+    val raspberry = Color(0xFFD07277)
+    val amber = Color(0xFFDEC184)
 }
 
-/** The radii: 8dp for cards, 6dp for buttons; nothing between. */
+/** The Mac's radii: 6dp for cards, 4dp for buttons; nothing between. */
 object WatchShape {
-    val card = 8.dp
-    val control = 6.dp
+    val card = 6.dp
+    val control = 4.dp
     val hairline = 1.dp
     /** Every tappable thing is at least this tall. */
     val target = 48.dp
@@ -50,7 +52,7 @@ private val scheme = ColorScheme(
     primary = WatchColors.azure,
     primaryDim = WatchColors.azure,
     primaryContainer = WatchColors.raised,
-    onPrimary = Color.White,
+    onPrimary = WatchColors.page,
     onPrimaryContainer = WatchColors.ink,
     secondary = WatchColors.muted,
     secondaryContainer = WatchColors.raised,

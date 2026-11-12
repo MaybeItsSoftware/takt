@@ -69,10 +69,10 @@ import uk.co.maybeitsadam.takt.settings.GoogleSignIn
 import uk.co.maybeitsadam.takt.settings.SignedOutHint
 import uk.co.maybeitsadam.takt.settings.SyncController
 import uk.co.maybeitsadam.takt.settings.SyncUiState
-import uk.co.maybeitsadam.takt.ui.components.Card
 import uk.co.maybeitsadam.takt.ui.components.Format
 import uk.co.maybeitsadam.takt.ui.components.Hairline
 import uk.co.maybeitsadam.takt.ui.components.IconAction
+import uk.co.maybeitsadam.takt.ui.components.MicroLabel
 import uk.co.maybeitsadam.takt.ui.components.MonoText
 import uk.co.maybeitsadam.takt.ui.components.PButton
 import uk.co.maybeitsadam.takt.ui.components.SignInWithAppleButton
@@ -115,10 +115,22 @@ fun SettingsScreen() {
 
 @Composable
 internal fun Section(title: String, footer: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    // The Mac's settings group: a micro-label, then the rows flat on the
+    // paper between two hairlines, no raised card.
     Column(verticalArrangement = Arrangement.spacedBy(Metrics.sm)) {
-        Text(title, style = TaktTheme.type.label, color = TaktTheme.colors.mutedText)
-        Card(Modifier.fillMaxWidth()) { Column(content = content) }
-        if (footer != null) Text(footer, style = TaktTheme.type.small, color = TaktTheme.colors.mutedText)
+        MicroLabel(title, color = TaktTheme.colors.dimText)
+        SettingsRows(content)
+        if (footer != null) Text(footer, style = TaktTheme.type.secondary, color = TaktTheme.colors.dimText)
+    }
+}
+
+/** A settings group's rows, flat between a hairline above and below. */
+@Composable
+internal fun SettingsRows(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Hairline()
+        content()
+        Hairline()
     }
 }
 

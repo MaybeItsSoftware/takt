@@ -1,7 +1,7 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="192dp" android:height="192dp" android:viewportWidth="192" android:viewportHeight="192">
     <!-- The tile as it reads with a block running: a round page, an azure eyebrow, the title, the count. -->
-    <path android:fillColor="#FF1C1A23" android:pathData="M96,0a96,96 0,1 0,0.001 0z" />
+    <path android:fillColor="#FF282C33" android:pathData="M96,0a96,96 0,1 0,0.001 0z" />
     <path android:fillColor="#FF007FFF" android:pathData="M72,58h48a3,3 0,0 1,0 6H72a3,3 0,0 1,0 -6z" />
     <path android:fillColor="#FFF5F4F7" android:pathData="M40,80h112a6,6 0,0 1,0 12H40a6,6 0,0 1,0 -12z" />
     <path android:fillColor="#FFF5F4F7" android:pathData="M56,98h80a6,6 0,0 1,0 12H56a6,6 0,0 1,0 -12z" />
