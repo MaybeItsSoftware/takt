@@ -346,9 +346,15 @@ pub(super) fn tip(
 /// A key, small and dim, beside the control it works: the reference
 /// marking the settings can hide.
 pub(super) fn key_hint(keys: String, t: Tokens) -> AnyElement {
+    // A fixed box with its letters centred in it, so a hint lines up the
+    // same beside a button, at the end of a row or in a menu.
     div()
         .flex_none()
+        .h(px(16.))
         .px(px(4.))
+        .flex()
+        .items_center()
+        .justify_center()
         .rounded(px(4.))
         .border_1()
         .border_color(t.border_variant)

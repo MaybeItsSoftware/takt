@@ -390,7 +390,18 @@ impl Takt {
                                     stop.command()
                                         .filter(|_| !open && stop.id != "title")
                                         .and_then(|c| self.app.key_hint(c)),
-                                    |d, keys| d.child(super::widgets::key_hint(keys, t)),
+                                    |d, keys| {
+                                        // Centred on the row's first line,
+                                        // as the hints in its buttons are.
+                                        d.child(
+                                            div()
+                                                .flex_none()
+                                                .h(px(ROW_LINE))
+                                                .flex()
+                                                .items_center()
+                                                .child(super::widgets::key_hint(keys, t)),
+                                        )
+                                    },
                                 ),
                         )
                         .when_some(
