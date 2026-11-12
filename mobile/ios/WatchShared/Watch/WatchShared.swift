@@ -32,21 +32,23 @@ enum WatchStorage {
   }
 }
 
-/// Takt's palette on the watch: the dark grape surfaces, azure for what you
-/// can act on, and the status hues for what happened. The watch is always
-/// dark, so there is one set rather than a pair.
+/// Zed One Dark on the watch, the Mac's and the phone's default theme
+/// (`one_palette()` in core/src/theme/builtins.rs): its surfaces, its accent
+/// (still called `azure`) for what you can act on, and its status hues for
+/// what happened. The watch is always dark, so there is one set rather than
+/// a pair.
 enum WatchPalette {
-  static let page = Color(hex: 0x1C1A23)
-  static let raised = Color(hex: 0x25232F)
-  static let subtle = Color(hex: 0x2D2B38)
-  static let border = Color(hex: 0x34313F)
-  static let text = Color(hex: 0xF5F4F7)
-  static let muted = Color(hex: 0xB6B3BF)
-  static let dim = Color(hex: 0x6E6B7C)
-  static let azure = Color(hex: 0x007FFF)
-  static let emerald = Color(hex: 0x4CC38E)
-  static let raspberry = Color(hex: 0xD62246)
-  static let amber = Color(hex: 0xFFBF00)
+  static let page = Color(hex: 0x282C33)
+  static let raised = Color(hex: 0x2F343E)
+  static let subtle = Color(hex: 0x363C46)
+  static let border = Color(hex: 0x464B57)
+  static let text = Color(hex: 0xDCE0E5)
+  static let muted = Color(hex: 0xA9AFBC)
+  static let dim = Color(hex: 0x878A98)
+  static let azure = Color(hex: 0x74ADE8)
+  static let emerald = Color(hex: 0xA1C181)
+  static let raspberry = Color(hex: 0xD07277)
+  static let amber = Color(hex: 0xDEC184)
 }
 
 extension Color {

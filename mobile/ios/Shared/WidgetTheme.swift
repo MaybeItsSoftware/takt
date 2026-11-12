@@ -39,23 +39,23 @@ struct WidgetTheme: Codable, Equatable, Sendable {
     try encoder.encode(self).write(to: url, options: .atomic)
   }
 
-  /// The default ("Takt", stored as Priority) and the fallback: the same
-  /// hexes as `shared/themes/priority.json`, its faces, and its iPhone control
-  /// radius.
+  /// The default (Zed One, as on the Mac) and the fallback: the hexes of
+  /// `one_palette()` in core/src/theme/builtins.rs, its faces, and its
+  /// control radius.
   static let fallback = WidgetTheme(
-    identifier: "native.theme.priority",
+    identifier: "native.theme.one",
     lockedAppearance: nil,
     light: [
-      "paper": "#faf8f4", "raised": "#ffffff", "well": "#edebef", "border": "#e6e4ea",
-      "ink": "#444054", "mutedText": "#6e6b7c", "dimText": "#b6b3bf",
-      "primary": "#007fff", "success": "#4cc38e", "danger": "#d62246", "warning": "#ffbf00",
+      "paper": "#fafafa", "raised": "#ebebec", "well": "#dcdcdd", "border": "#c9c9ca",
+      "ink": "#242529", "mutedText": "#58585a", "dimText": "#7e8086",
+      "primary": "#5c78e2", "success": "#669f59", "danger": "#d36151", "warning": "#a48819",
     ],
     dark: [
-      "paper": "#1c1a23", "raised": "#25232f", "well": "#2d2b38", "border": "#34313f",
-      "ink": "#f5f4f7", "mutedText": "#b6b3bf", "dimText": "#6e6b7c",
-      "primary": "#007fff", "success": "#4cc38e", "danger": "#d62246", "warning": "#ffbf00",
+      "paper": "#282c33", "raised": "#2f343e", "well": "#3b414d", "border": "#464b57",
+      "ink": "#dce0e5", "mutedText": "#a9afbc", "dimText": "#878a98",
+      "primary": "#74ade8", "success": "#a1c181", "danger": "#d07277", "warning": "#dec184",
     ],
-    bodyFamily: "IBM Plex Sans", monoFamily: "Lilex", controlRadius: 6, hairline: 1)
+    bodyFamily: "IBM Plex Sans", monoFamily: "Lilex", controlRadius: 4, hairline: 1)
 }
 
 /// The colours, faces and radius a widget view draws with, read from the

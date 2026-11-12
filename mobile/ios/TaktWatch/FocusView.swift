@@ -97,8 +97,8 @@ private struct ControlButton: View {
       }
       .foregroundStyle(hue)
       .frame(maxWidth: .infinity, minHeight: 48)
-      .background(RoundedRectangle(cornerRadius: 6).fill(hue.opacity(0.12)))
-      .overlay(RoundedRectangle(cornerRadius: 6).stroke(hue.opacity(0.4), lineWidth: 1))
+      .background(RoundedRectangle(cornerRadius: 4).fill(hue.opacity(0.12)))
+      .overlay(RoundedRectangle(cornerRadius: 4).stroke(hue.opacity(0.4), lineWidth: 1))
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)

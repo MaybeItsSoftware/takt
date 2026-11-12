@@ -42,7 +42,7 @@ struct TodayView: View {
               .foregroundStyle(WatchPalette.muted)
               .padding(.horizontal, 6)
               .padding(.vertical, 2)
-              .overlay(RoundedRectangle(cornerRadius: 6).stroke(WatchPalette.border, lineWidth: 1))
+              .overlay(RoundedRectangle(cornerRadius: 4).stroke(WatchPalette.border, lineWidth: 1))
               .accessibilityLabel("\(store.openTasks.count) left today")
           }
         }
@@ -96,9 +96,9 @@ private struct TaskRow: View {
           .foregroundStyle(session == nil ? WatchPalette.azure : WatchPalette.text)
           .frame(width: 40, height: 40)
           .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 4)
               .fill(session == nil ? WatchPalette.azure.opacity(0.12) : WatchPalette.azure))
-          .overlay(RoundedRectangle(cornerRadius: 6).stroke(WatchPalette.azure.opacity(0.4), lineWidth: 1))
+          .overlay(RoundedRectangle(cornerRadius: 4).stroke(WatchPalette.azure.opacity(0.4), lineWidth: 1))
           .frame(width: 44, height: 44)
           .contentShape(Rectangle())
       }
@@ -109,10 +109,10 @@ private struct TaskRow: View {
     .padding(.vertical, 6)
     .padding(.horizontal, 8)
     .listRowBackground(
-      RoundedRectangle(cornerRadius: 8)
+      RoundedRectangle(cornerRadius: 6)
         .fill(WatchPalette.raised)
         .overlay(
-          RoundedRectangle(cornerRadius: 8)
+          RoundedRectangle(cornerRadius: 6)
             .stroke(session == nil ? WatchPalette.border : WatchPalette.azure.opacity(0.6), lineWidth: 1)))
     .opacity(isFinishing ? 0.6 : 1)
     .animation(.easeOut(duration: 0.2), value: isFinishing)
