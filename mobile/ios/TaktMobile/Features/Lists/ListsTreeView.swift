@@ -616,13 +616,13 @@ struct ListsPresenters: ViewModifier {
           : "This permanently deletes the list and all of its tasks. You can undo it.")
       }
       .sheet(item: settingsBinding) { item in
-        ListSettingsSheet(listID: item.id).environment(model)
+        ListSettingsSheet(listID: item.id).environment(model).macSheet()
       }
       .sheet(item: sharingBinding) { item in
-        SharedListSheet(listID: item.id).environment(model)
+        SharedListSheet(listID: item.id).environment(model).macSheet()
       }
       .sheet(item: joinBinding) { invite in
-        JoinListSheet(initialText: invite.text).environment(model)
+        JoinListSheet(initialText: invite.text).environment(model).macSheet()
       }
   }
 

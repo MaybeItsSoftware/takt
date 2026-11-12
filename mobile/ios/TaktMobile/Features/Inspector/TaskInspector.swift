@@ -83,8 +83,8 @@ struct TaskInspector: View {
     }
     .onDisappear { inspector.save(model, askingOn: .app) }
     .recurrenceClashDialog(model, on: .inspector)
-    .sheet(isPresented: $showsConditions) { ConditionsSheet().environment(model) }
-    .sheet(isPresented: $choosesConditions) { TaskConditionsSheet(inspector: inspector).environment(model) }
+    .sheet(isPresented: $showsConditions) { ConditionsSheet().environment(model).macSheet() }
+    .sheet(isPresented: $choosesConditions) { TaskConditionsSheet(inspector: inspector).environment(model).macSheet() }
     .fullScreenCover(isPresented: $showsFullscreenNotes) {
       NavigationStack {
         TaskNotesEditor(inspector: inspector, taskTitle: inspector.task?.title)

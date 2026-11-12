@@ -28,22 +28,24 @@ struct RootView: View {
       QuickAddSheet()
         .environment(model)
         .environment(\.isPadLayout, isPad)
+        .macSheet()
     }
     .sheet(item: movingTask) { item in
       MoveToListSheet(taskID: item.id)
         .environment(model)
+        .macSheet()
     }
     .sheet(isPresented: $navigation.isHistoryPresented) {
-      HistorySheet().environment(model)
+      HistorySheet().environment(model).macSheet()
     }
     .sheet(item: $navigation.habitRequest) { request in
-      HabitSheet(request: request).environment(model)
+      HabitSheet(request: request).environment(model).macSheet()
     }
     .sheet(isPresented: $navigation.isSettingsPresented) {
       SettingsScreen().environment(model)
     }
     .sheet(item: pendingBlock) { pending in
-      BlockQualityPrompt(pending: pending).environment(model)
+      BlockQualityPrompt(pending: pending).environment(model).macSheet()
     }
     .fullScreenCover(item: notesEditorTask) { item in
       NavigationStack {

@@ -321,8 +321,8 @@ private struct FocusContextControls: View {
       Text("A place, a tool or a state you need to be in for some tasks, filed under a category — "
         + "Location, Equipment… Location is one place at a time.")
     }
-    .sheet(isPresented: $showsConditions) { ConditionsSheet() }
-    .sheet(isPresented: $choosesConditions) { NowConditionsSheet(focus: focus) }
+    .sheet(isPresented: $showsConditions) { ConditionsSheet().macSheet() }
+    .sheet(isPresented: $choosesConditions) { NowConditionsSheet(focus: focus).macSheet() }
   }
 
   /// Said on an earlier day, here or on another device: probably not where

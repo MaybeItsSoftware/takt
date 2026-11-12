@@ -67,7 +67,7 @@ struct NowConditionsBar: View {
     .accessibilityHint("Changes which conditions hold now")
     .accessibilityIdentifier("today.conditions")
     .sheet(isPresented: $showsSheet) {
-      if let focus = conditions.focus { NowConditionsSheet(focus: focus) }
+      if let focus = conditions.focus { NowConditionsSheet(focus: focus).macSheet() }
     }
   }
 }

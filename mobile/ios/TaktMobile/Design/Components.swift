@@ -560,3 +560,19 @@ private struct SettingsRows: ViewModifier {
       .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(10), bottom: 0, trailing: theme.mac(10)))
   }
 }
+
+extension View {
+  /// A sheet as the Mac draws a dialog: the panel fill under content that
+  /// leaves its own background clear, and the Mac's 8 at the corners.
+  func macSheet() -> some View { modifier(MacSheet()) }
+}
+
+private struct MacSheet: ViewModifier {
+  @Environment(\.theme) private var theme
+
+  func body(content: Content) -> some View {
+    content
+      .presentationCornerRadius(theme.mac.radiusDialog)
+      .presentationBackground(theme.altRow)
+  }
+}
