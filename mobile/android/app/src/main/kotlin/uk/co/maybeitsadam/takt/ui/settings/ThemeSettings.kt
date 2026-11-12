@@ -1,5 +1,7 @@
 package uk.co.maybeitsadam.takt.ui.settings
 
+import androidx.compose.runtime.LaunchedEffect
+import uk.co.maybeitsadam.takt.ui.navigation.LocalShell
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -75,20 +77,18 @@ internal fun ThemeSection(model: SettingsViewModel) {
         }
     }
 
-    CollapsibleSection(
+    // Themes added on another device (the Mac shares every theme file it
+    // loads, Zed's included) arrive by sync: ask for them as this opens.
+    val sync = LocalShell.current.container.sync
+    LaunchedEffect(Unit) { sync.syncNow() }
+
+    Section(
         "Theme",
-        key = "theme",
-        summary = state.specification.name,
-        footer = "A theme is a JSON file: colours for light and dark, and sizes. Anything it leaves out comes from Priority, the default. See docs/themes.md.",
+        footer = "A theme is a JSON file: colours for light and dark, and sizes. Anything it leaves out comes from Zed One, the default. See docs/themes.md.",
     ) {
-        val outcomes = state.library.outcomes.associateBy { it.source }
         state.builtIns.forEachIndexed { index, theme ->
             if (index > 0) Hairline(color = TaktTheme.colors.borderMuted)
             ThemeRow(theme, state, onSelect = model::selectTheme, tag = "settings_theme_${theme.identifier}")
-        }
-        for (file in state.files) {
-            Hairline(color = TaktTheme.colors.borderMuted)
-            UserThemeRow(file, outcomes[file.name], state, model)
         }
         Hairline(color = TaktTheme.colors.borderMuted)
         SwitchRow(
@@ -98,6 +98,26 @@ internal fun ThemeSection(model: SettingsViewModel) {
             onCheckedChange = model::setUseDeviceTheme,
             modifier = Modifier.padding(horizontal = Metrics.md).testTag("settings_theme_device"),
         )
+    }
+
+    // A file can hold a family (a Zed file often does): every theme in it is
+    // listed, not only the last, each selectable on its own.
+    val outcomes = state.library.outcomes.groupBy { it.source }
+    Section(
+        "Your themes",
+        footer = "Themes from your Mac and any you import, shared with every device on your account.",
+    ) {
+        if (state.files.isEmpty()) {
+            Text(
+                "None yet. Themes in the Mac's themes folder, or Zed's, appear here once it has synced.",
+                style = TaktTheme.type.small, color = TaktTheme.colors.mutedText,
+                modifier = Modifier.padding(Metrics.md),
+            )
+        }
+        state.files.forEachIndexed { index, file ->
+            if (index > 0) Hairline(color = TaktTheme.colors.borderMuted)
+            UserThemeRow(file, outcomes[file.name].orEmpty(), state, model)
+        }
         Hairline(color = TaktTheme.colors.borderMuted)
         Row(Modifier.padding(Metrics.md), horizontalArrangement = Arrangement.spacedBy(Metrics.sm)) {
             PButton("Import theme…", modifier = Modifier.testTag("settings_import_theme")) {
@@ -113,23 +133,32 @@ internal fun ThemeSection(model: SettingsViewModel) {
     }
 }
 
-/** A user file: its theme when it loaded, otherwise its name and why not; then its issues and a remove button. */
+/** A user file: every theme it loaded, or its name and why not; then its issues and a remove button. */
 @Composable
-private fun UserThemeRow(file: UserThemeFile, outcome: ThemeFileOutcome?, state: ThemeLibraryState, model: SettingsViewModel) {
-    val theme = outcome?.specification
+private fun UserThemeRow(file: UserThemeFile, outcomes: List<ThemeFileOutcome>, state: ThemeLibraryState, model: SettingsViewModel) {
+    val loaded = outcomes.mapNotNull { it.specification }
     Column {
-        if (theme != null) {
-            ThemeRow(theme, state, onSelect = model::selectTheme, tag = "settings_theme_${theme.identifier}", detail = file.name)
+        if (loaded.isNotEmpty()) {
+            loaded.forEachIndexed { index, theme ->
+                if (index > 0) Hairline(color = TaktTheme.colors.borderMuted, modifier = Modifier.padding(start = Metrics.md))
+                ThemeRow(
+                    theme, state, onSelect = model::selectTheme, tag = "settings_theme_${theme.identifier}",
+                    detail = if (loaded.size > 1) "${file.name} · ${index + 1} of ${loaded.size}" else file.name,
+                )
+            }
         } else {
             Column(Modifier.fillMaxWidth().padding(horizontal = Metrics.md, vertical = Metrics.sm)) {
                 Text(file.name, style = TaktTheme.type.body, color = TaktTheme.colors.ink)
                 Text(
-                    "Not loaded: ${outcome?.skippedReason ?: "it could not be read"}",
+                    "Not loaded: ${outcomes.firstNotNullOfOrNull { it.skippedReason } ?: "it could not be read"}",
                     style = TaktTheme.type.small, color = TaktTheme.colors.danger,
                 )
             }
         }
-        val issues = outcome?.issues.orEmpty().filterNot { theme == null && it.message.startsWith("not loaded:") }
+        val issues = outcomes.flatMap { it.issues }
+            .filter { it.severity == ThemeIssueSeverity.ERROR || loaded.isEmpty() }
+            .filterNot { loaded.isEmpty() && it.message.startsWith("not loaded:") }
+            .distinctBy { it.message }
         if (issues.isNotEmpty()) ThemeIssues(issues)
         Row(
             Modifier.fillMaxWidth().padding(start = Metrics.md, end = Metrics.md, bottom = Metrics.sm),
