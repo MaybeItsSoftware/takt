@@ -12,10 +12,21 @@ on:
 jobs:
   swift-tests:
     runs-on: macos-15
-    timeout-minutes: 15
+    # The core is built for five Apple targets before the package resolves:
+    # from cold that alone outgrew 15 minutes, so it is cached below.
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: core-apple-${{ runner.os }}-${{ hashFiles('core/Cargo.lock', 'sync-server/Cargo.lock') }}
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
