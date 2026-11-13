@@ -77,6 +77,8 @@ const NAMES: &[&str] = &[
     "chevrons-up-down",
     "x",
     "play",
+    "pause",
+    "minimize-2",
     "sunrise",
     "hourglass",
     "text",
@@ -191,6 +193,12 @@ fn body(name: &str) -> Option<&'static str> {
         "x" => r#"<path d="M18 6 6 18M6 6l12 12"/>"#,
         // Centred on the 24 box, as the round icons it stands among are.
         "play" => r#"<path d="M5 3l15 9-15 9z"/>"#,
+        "pause" => {
+            r#"<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>"#
+        }
+        "minimize-2" => {
+            r#"<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/>"#
+        }
         "sunrise" => {
             r#"<path d="M12 2v8"/><path d="m4.93 10.93 1.41 1.41M2 18h2M20 18h2M19.07 10.93l-1.41 1.41M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/>"#
         }

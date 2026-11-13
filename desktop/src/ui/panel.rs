@@ -29,6 +29,7 @@ use crate::state::App;
 use crate::state::focus::{FinderHit, FocusKind};
 use crate::text_field::{FieldKey, TextField};
 use crate::theme::Tokens;
+use gpui::AnimationExt;
 use gpui::{
     AnyElement, App as GpuiApp, Bounds, Context, Corner, Entity, EntityInputHandler, FocusHandle,
     Focusable, KeyDownEvent, Pixels, UTF16Selection, WeakEntity, Window, WindowBounds, WindowKind,
@@ -58,7 +59,20 @@ pub struct FocusPanel {
     pick_scrolled: Option<(usize, usize)>,
     /// Growing out of the pill or shrinking back in: drawn as the pill is.
     morphing: bool,
+    /// What lies under the panel's top line fading in (after growing) or
+    /// out (before shrinking), with a count to start each fade afresh.
+    fade: Fade,
+    fades: usize,
 }
+
+#[derive(Clone, Copy, PartialEq)]
+enum Fade {
+    None,
+    In,
+    Out,
+}
+
+const FADE: std::time::Duration = std::time::Duration::from_millis(120);
 
 /// What the keyboard is doing in the panel.
 enum Mode {
@@ -235,6 +249,8 @@ pub fn open(
                     scrolled: None,
                     pick_scrolled: None,
                     morphing: grow,
+                    fade: Fade::None,
+                    fades: 0,
                     mode: if capturing {
                         Mode::typing()
                     } else {
@@ -262,6 +278,8 @@ pub fn open(
             if let Some(panel) = panel {
                 let _ = panel.update(cx, |panel, _, cx| {
                     panel.morphing = false;
+                    panel.fade = Fade::In;
+                    panel.fades += 1;
                     cx.notify();
                 });
             }
@@ -562,8 +580,9 @@ impl FocusPanel {
                 size: pill_size,
             });
         });
-        // Wears the pill from the first frame of the shrink.
-        self.morphing = true;
+        // What is under the top line fades, then the box shrinks to it.
+        self.fade = Fade::Out;
+        self.fades += 1;
         cx.notify();
         let handle = window.window_handle();
         let (x, y, _, h) = window_move::frame(ns_window);
@@ -573,6 +592,7 @@ impl FocusPanel {
         );
         let to = (x, y + h - ph, pw, ph);
         cx.spawn(async move |_, cx| {
+            cx.background_executor().timer(FADE).await;
             window_move::animate_frame(ns_window, to, MORPH_SECONDS);
             cx.background_executor()
                 .timer(std::time::Duration::from_secs_f64(MORPH_SECONDS))
@@ -865,16 +885,17 @@ impl Render for FocusPanel {
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         if self.morphing {
-            return super::pill::face(app, t)
+            return super::pill::face(app, t, &self.takt)
                 .id("focus-panel")
                 .key_context("FocusPanel")
                 .track_focus(&self.focus)
                 .on_key_down(cx.listener(Self::key_down))
                 .into_any_element();
         }
-        let status = app.focus_status();
         let running = app.focus_session.is_some();
         let prompt = app.focus_prompt.clone();
+        // While a block runs the top line is the pill's own.
+        let top = running.then(|| super::pill::line(app, t, &self.takt, true));
         let entries = self.entries(app);
         let filing_into = self
             .filing_into(app)
@@ -1242,62 +1263,31 @@ impl Render for FocusPanel {
                 )
             }
         };
-        div()
-            .id("focus-panel")
-            .key_context("FocusPanel")
-            .track_focus(&self.focus)
-            .on_key_down(cx.listener(Self::key_down))
-            .size_full()
+        let rest = div()
+            .flex_1()
+            .min_h_0()
             .flex()
             .flex_col()
-            .bg(t.surface)
-            .border_1()
-            .border_color(t.border_variant)
-            .rounded(px(8.))
-            .text_color(t.text)
-            .font_family(super::UI_FONT)
-            .text_size(px(13.))
-            .when(status.is_some(), |d| {
-                d.child(
-                    div()
-                        .p_3()
-                        .border_b_1()
-                        .border_color(t.border_variant)
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .children(
-                            status
-                                .clone()
-                                .map(|(title, _, _)| div().truncate().child(title)),
-                        )
-                        .when_some(status.clone(), |d, (_, clock, over)| {
-                            d.child(
-                                div()
-                                    .font_family(super::MONO_FONT)
-                                    .text_size(px(26.))
-                                    .text_color(if over { t.warning } else { t.accent })
-                                    .child(clock),
-                            )
-                        })
-                        .when(
-                            running && prompt.is_none() && matches!(self.mode, Mode::Rows),
-                            |d| {
-                                d.child(
-                                    div()
-                                        .flex()
-                                        .flex_wrap()
-                                        .gap_2()
-                                        .text_size(px(11.))
-                                        .text_color(t.placeholder)
-                                        .child(hint("\u{2423}", "pause", t))
-                                        .child(hint("d", "finish task", t))
-                                        .child(hint("s", "stop, task stays open", t)),
-                                )
-                            },
-                        ),
-                )
-            })
+            .when(
+                running && prompt.is_none() && matches!(self.mode, Mode::Rows),
+                |d| {
+                    d.child(
+                        div()
+                            .px_3()
+                            .pb_2()
+                            .border_b_1()
+                            .border_color(t.border_variant)
+                            .flex()
+                            .flex_wrap()
+                            .gap_2()
+                            .text_size(px(11.))
+                            .text_color(t.placeholder)
+                            .child(hint("\u{2423}", "pause", t))
+                            .child(hint("d", "finish task", t))
+                            .child(hint("s", "stop, task stays open", t)),
+                    )
+                },
+            )
             .when_some(prompt, |d, prompt| {
                 d.child(
                     div()
@@ -1365,7 +1355,30 @@ impl Render for FocusPanel {
                         .text_color(t.placeholder)
                         .children(hints.into_iter().map(|(keys, label)| hint(keys, label, t))),
                 )
-            })
+            });
+        let rest = match self.fade {
+            Fade::None => rest.into_any_element(),
+            fade => rest
+                .with_animation(
+                    gpui::ElementId::NamedInteger("panel-fade".into(), self.fades as u64),
+                    gpui::Animation::new(FADE),
+                    move |d, v| d.opacity(if fade == Fade::In { v } else { 1. - v }),
+                )
+                .into_any_element(),
+        };
+        let inside = div()
+            .flex()
+            .flex_col()
+            .text_color(t.text)
+            .font_family(super::UI_FONT)
+            .text_size(px(13.))
+            .children(top)
+            .child(rest);
+        super::pill::framed(t, inside)
+            .id("focus-panel")
+            .key_context("FocusPanel")
+            .track_focus(&self.focus)
+            .on_key_down(cx.listener(Self::key_down))
             .into_any_element()
     }
 }
