@@ -42,11 +42,11 @@ pub struct FocusPill {
     return_to: Option<i32>,
 }
 
-/// The pill's buttons, in order: finish, pause or resume, and expand (in
-/// the panel, collapse).
-const FINISH: usize = 0;
-const PAUSE: usize = 1;
-const EXPAND: usize = 2;
+/// The pill's buttons, in order: expand (in the panel, collapse), finish
+/// in the middle, and pause or resume.
+const EXPAND: usize = 0;
+const FINISH: usize = 1;
+const PAUSE: usize = 2;
 
 /// What a button does to the app: `which` is its place, `expanded` whether
 /// it is drawn in the panel.
@@ -141,7 +141,7 @@ pub fn open(
                 ns_window,
                 drag: None,
                 focus: cx.focus_handle(),
-                cursor: PAUSE,
+                cursor: FINISH,
                 return_to: None,
             }
         })
@@ -150,11 +150,11 @@ pub fn open(
 }
 
 impl FocusPill {
-    /// The hotkey with the pill up: it takes the keyboard, on pause, while
-    /// the app in front stays in front.
+    /// The hotkey with the pill up: it takes the keyboard, on finish,
+    /// while the app in front stays in front.
     pub fn take_keyboard(&mut self, return_to: Option<i32>, window: &mut Window) {
         self.return_to = return_to;
-        self.cursor = PAUSE;
+        self.cursor = FINISH;
         window.activate_window();
         window.focus(&self.focus);
     }
@@ -163,8 +163,9 @@ impl FocusPill {
         window.is_window_active() && self.focus.is_focused(window)
     }
 
-    /// Hands the keyboard back to the app it came from.
-    fn give_back(&mut self) {
+    /// Hands the keyboard back to the app it came from: Esc, or the hotkey
+    /// again.
+    pub fn give_back(&mut self) {
         if let Some(ns_window) = self.ns_window {
             window_move::resign_key(ns_window);
         }
@@ -173,12 +174,7 @@ impl FocusPill {
         }
     }
 
-    fn key_down(
-        &mut self,
-        event: &gpui::KeyDownEvent,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn key_down(&mut self, event: &gpui::KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let Some(key) = crate::keys::spell(&crate::keys::Press::from_keystroke(&event.keystroke))
         else {
             return;
@@ -190,7 +186,7 @@ impl FocusPill {
                 None
             }
             "right" | "l" | "tab" => {
-                self.cursor = (self.cursor + 1).min(EXPAND);
+                self.cursor = (self.cursor + 1).min(PAUSE);
                 None
             }
             "enter" => Some(self.cursor),
@@ -324,7 +320,7 @@ pub fn line(
     };
     div()
         .flex_none()
-        .h(px(HEIGHT - 2.))
+        .h(px(HEIGHT - 2. - 2. * INSET))
         .flex()
         .items_center()
         .gap_2()
@@ -350,17 +346,17 @@ pub fn line(
                 .flex_none()
                 .flex()
                 .items_center()
+                .child(if expanded {
+                    button("pill-collapse", "minimize-2", EXPAND)
+                } else {
+                    button("pill-expand", "maximize-2", EXPAND)
+                })
                 .child(button("pill-finish", "check", FINISH))
                 .child(button(
                     "pill-pause",
                     if paused || on_break { "play" } else { "pause" },
                     PAUSE,
-                ))
-                .child(if expanded {
-                    button("pill-collapse", "minimize-2", EXPAND)
-                } else {
-                    button("pill-expand", "maximize-2", EXPAND)
-                }),
+                )),
         )
 }
 
@@ -388,19 +384,26 @@ pub fn face(
 /// than the surface inside it, rather than as a border over the surface,
 /// so the surface's anti-aliased corners can't show past the edge.
 pub fn framed(t: Tokens, inside: gpui::Div) -> gpui::Div {
-    div()
-        .size_full()
-        .p(px(1.))
-        .rounded(px(8.))
-        .bg(t.border_variant)
-        .child(
-            inside
-                .size_full()
-                .overflow_hidden()
-                .rounded(px(7.))
-                .bg(t.surface),
-        )
+    // A clear pixel all round, so the edge never lies on the window's own
+    // edge, where AppKit trims it.
+    div().size_full().p(px(INSET)).child(
+        div()
+            .size_full()
+            .p(px(1.))
+            .rounded(px(8.))
+            .bg(t.border_variant)
+            .child(
+                inside
+                    .size_full()
+                    .overflow_hidden()
+                    .rounded(px(7.))
+                    .bg(t.surface),
+            ),
+    )
 }
+
+/// The clear margin round a floating window's box.
+pub const INSET: f32 = 1.;
 
 impl Render for FocusPill {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
