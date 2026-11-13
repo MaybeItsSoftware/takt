@@ -366,6 +366,47 @@ pub(super) fn key_hint(keys: String, t: Tokens) -> AnyElement {
         .into_any_element()
 }
 
+/// "How did it go?"'s ways out, as keys: each a button with its key, the
+/// selected one lit, and under them what the selected one does.
+pub(super) fn prompt_choices(
+    prompt: &crate::state::focus_prompt::FocusPrompt,
+    t: Tokens,
+) -> gpui::Div {
+    let selected = prompt.selected();
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(6.))
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap(px(6.))
+                .children(prompt.choices().into_iter().map(|choice| {
+                    let on = choice == selected;
+                    div()
+                        .h(px(26.))
+                        .px(px(6.))
+                        .flex()
+                        .items_center()
+                        .gap(px(6.))
+                        .rounded(px(6.))
+                        .border_1()
+                        .border_color(if on { t.focus } else { t.border_variant })
+                        .when(on, |d| d.bg(t.selected))
+                        .text_size(px(12.))
+                        .child(key_hint(choice.key().to_string(), t))
+                        .child(choice.title(prompt))
+                })),
+        )
+        .child(
+            div()
+                .text_size(px(11.))
+                .text_color(t.muted)
+                .child(selected.summary(prompt)),
+        )
+}
+
 /// A spinning loader: something is under way. With reduced motion it
 /// stands still, and the words beside it carry the meaning.
 pub(super) fn spinner(id: &'static str, size: f32, colour: Hsla) -> AnyElement {

@@ -105,10 +105,9 @@ impl Mode {
 /// What Return leaves the panel to do.
 enum Leave {
     Stay,
-    /// Put away, back to the app it was summoned over.
+    /// Put away, back to the app it was summoned over: into the pill
+    /// while a block runs, as when one just began.
     Hide,
-    /// A block began: shrink into the pill.
-    Shrink,
 }
 
 /// What `o` opens in the main window.
@@ -150,19 +149,18 @@ pub const WIDTH: f32 = 340.;
 pub const HEIGHT: f32 = 420.;
 
 /// Where the panel goes when it grows out of the pill at `pill`: the same
-/// top edge, centred on it, kept on its display. With no pill, where the
+/// top-left corner, kept on its display. With no pill, where the
 /// pill would be, at the top centre of the main display.
 fn bounds_from(pill: Option<Bounds<Pixels>>, cx: &GpuiApp) -> Bounds<Pixels> {
     let panel = size(px(WIDTH), px(HEIGHT));
     let pill = pill.unwrap_or_else(|| super::pill::default_bounds(cx));
-    let centre = pill.origin.x + pill.size.width / 2.;
     let display = cx
         .displays()
         .into_iter()
         .map(|d| d.bounds())
         .find(|b| b.contains(&pill.origin))
         .or_else(|| cx.primary_display().map(|d| d.bounds()));
-    let mut origin = point(centre - panel.width / 2., pill.origin.y);
+    let mut origin = pill.origin;
     if let Some(d) = display {
         let right = d.origin.x + d.size.width - panel.width;
         let bottom = d.origin.y + d.size.height - panel.height;
@@ -175,19 +173,36 @@ fn bounds_from(pill: Option<Bounds<Pixels>>, cx: &GpuiApp) -> Bounds<Pixels> {
     }
 }
 
-/// Opens the panel grown out of the pill at `pill` (or where the pill
-/// would be), in front of whatever app is: on its rows, or typing when
-/// `capturing`.
+/// How long the panel takes to grow out of the pill or shrink back into it.
+const MORPH_SECONDS: f64 = 0.18;
+
+/// Opens the panel at the pill at `pill` (or where the pill would be), in
+/// front of whatever app is: on its rows, or typing when `capturing`. With
+/// `grow` (the pill is up) it grows out of the pill rather than appearing.
 pub fn open(
     takt: Entity<Takt>,
     capturing: bool,
     pill: Option<Bounds<Pixels>>,
+    grow: bool,
     cx: &mut GpuiApp,
 ) -> Option<gpui::WindowHandle<FocusPanel>> {
+    let full = bounds_from(pill, cx);
+    let grow = grow && !window_move::reduce_motion();
+    let first = if grow {
+        Bounds {
+            origin: full.origin,
+            size: size(px(super::pill::WIDTH), px(super::pill::HEIGHT)),
+        }
+    } else {
+        full
+    };
+    let mut grown = None;
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(bounds_from(pill, cx))),
+        window_bounds: Some(WindowBounds::Windowed(first)),
         titlebar: None,
         kind: WindowKind::PopUp,
+        // Clear behind its rounded corners, which it draws itself.
+        window_background: gpui::WindowBackgroundAppearance::Transparent,
         is_movable: true,
         is_resizable: false,
         is_minimizable: false,
@@ -199,6 +214,8 @@ pub fn open(
         .open_window(options, |window, cx| {
             if let Some(ns_window) = window_move::ns_window(window) {
                 window_move::no_animation(ns_window);
+                window_move::no_shadow(ns_window);
+                grown = Some(ns_window);
             }
             let panel = cx.new(|cx| {
                 cx.observe(&takt, |_, _, cx| cx.notify()).detach();
@@ -227,6 +244,15 @@ pub fn open(
         })
         .ok();
     cx.activate(true);
+    if let (true, Some(ns_window)) = (grow, grown) {
+        // Down and to the right from the pill's top-left corner: AppKit's
+        // origin is the bottom left, so the top edge stays where it is.
+        let (x, y, _, h) = window_move::frame(ns_window);
+        let (fw, fh) = (f64::from(WIDTH), f64::from(HEIGHT));
+        let to = (x, y + h - fh, fw, fh);
+        cx.spawn(async move |_| window_move::animate_frame(ns_window, to, MORPH_SECONDS))
+            .detach();
+    }
     handle
 }
 
@@ -271,9 +297,16 @@ fn ladder(app: &App, picked: Option<&str>) -> Vec<Entry> {
     listed
 }
 
-/// The running session's queue.
-fn queue(app: &App) -> Vec<Entry> {
-    app.focus_queue()
+/// What comes after the running task: the session's queue, then the rest
+/// of the day's open tasks, the running one in neither.
+fn up_next(app: &App) -> Vec<Entry> {
+    let running = app
+        .focus_session
+        .as_ref()
+        .and_then(|s| s.active_task_id.clone());
+    let mut seen: std::collections::HashSet<String> = running.into_iter().collect();
+    let mut next: Vec<Entry> = app
+        .focus_queue()
         .into_iter()
         .map(|entry| Entry::Task {
             detail: app
@@ -283,7 +316,13 @@ fn queue(app: &App) -> Vec<Entry> {
             id: entry.task.id,
             title: entry.task.title,
         })
-        .collect()
+        .collect();
+    next.extend(ladder(app, None));
+    next.retain(|entry| match entry {
+        Entry::Task { id, .. } => seen.insert(id.clone()),
+        _ => true,
+    });
+    next
 }
 
 /// The lists Add can file into, matching `query` (names starting with it
@@ -324,7 +363,7 @@ impl FocusPanel {
     /// The rows `mode` lists: in the picker, the lists it offers.
     fn entries_of(&self, mode: &Mode, app: &App) -> Vec<Entry> {
         match mode {
-            Mode::Rows if app.focus_session.is_some() => queue(app),
+            Mode::Rows if app.focus_session.is_some() => up_next(app),
             Mode::Rows => ladder(app, self.picked.as_deref()),
             Mode::Pick { field, .. } => {
                 let current = self.filing_into(app).map(|(id, _)| id);
@@ -481,10 +520,51 @@ impl FocusPanel {
     /// summoned over rather than letting the main window take it.
     fn put_away(&self, window: &mut Window, cx: &mut Context<Self>) {
         let back = self.takt.update(cx, |takt, _| takt.panel_return_to.take());
-        if let Some(pid) = back {
-            crate::platform::activate_app(pid);
-        }
-        window.remove_window();
+        self.leave(back, window, cx);
+    }
+
+    /// Goes, handing the keyboard to `back`. While a block runs the pill
+    /// takes its place: the panel shrinks into its top-left corner, where
+    /// the pill then stands. Otherwise, or with reduced motion, it simply
+    /// goes.
+    pub fn leave(&self, back: Option<i32>, window: &mut Window, cx: &mut Context<Self>) {
+        let pill = {
+            let app = &self.takt.read(cx).app;
+            app.focus_session.is_some() && app.prefs.focus_panel
+        };
+        let ns_window = window_move::ns_window(window);
+        let (Some(ns_window), true, false) = (ns_window, pill, window_move::reduce_motion()) else {
+            if let Some(pid) = back {
+                crate::platform::activate_app(pid);
+            }
+            return window.remove_window();
+        };
+        let at = window.bounds();
+        let pill_size = size(px(super::pill::WIDTH), px(super::pill::HEIGHT));
+        self.takt.update(cx, |takt, _| {
+            takt.pill_at = Some(Bounds {
+                origin: at.origin,
+                size: pill_size,
+            });
+        });
+        let handle = window.window_handle();
+        let (x, y, _, h) = window_move::frame(ns_window);
+        let (pw, ph) = (
+            f64::from(super::pill::WIDTH),
+            f64::from(super::pill::HEIGHT),
+        );
+        let to = (x, y + h - ph, pw, ph);
+        cx.spawn(async move |_, cx| {
+            window_move::animate_frame(ns_window, to, MORPH_SECONDS);
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs_f64(MORPH_SECONDS))
+                .await;
+            if let Some(pid) = back {
+                crate::platform::activate_app(pid);
+            }
+            let _ = cx.update_window(handle, |_, window, _| window.remove_window());
+        })
+        .detach();
     }
 
     /// Settles the main window once this window's update is over: `Takt`
@@ -509,39 +589,6 @@ impl FocusPanel {
         self.cursor = 0;
         self.settle(cx);
         began
-    }
-
-    /// A block just began: the panel shrinks into the pill and goes, and the
-    /// pill takes its place. Without the pill, or with reduced motion, it
-    /// simply goes.
-    fn shrink_away(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let pill = self.takt.read(cx).app.prefs.focus_panel;
-        let ns_window = window_move::ns_window(window);
-        let (Some(ns_window), true, false) = (ns_window, pill, window_move::reduce_motion()) else {
-            return self.put_away(window, cx);
-        };
-        let back = self.takt.update(cx, |takt, _| takt.panel_return_to.take());
-        let handle = window.window_handle();
-        // The pill grows out of the panel's top edge, centred on it: the
-        // panel shrinks back to just there.
-        let (x, y, w, h) = window_move::frame(ns_window);
-        let (pw, ph) = (
-            f64::from(super::pill::WIDTH),
-            f64::from(super::pill::HEIGHT),
-        );
-        let to = (x + (w - pw) / 2., y + h - ph, pw, ph);
-        const SECONDS: f64 = 0.18;
-        cx.spawn(async move |_, cx| {
-            window_move::animate_frame(ns_window, to, SECONDS);
-            cx.background_executor()
-                .timer(std::time::Duration::from_secs_f64(SECONDS))
-                .await;
-            if let Some(pid) = back {
-                crate::platform::activate_app(pid);
-            }
-            let _ = cx.update_window(handle, |_, window, _| window.remove_window());
-        })
-        .detach();
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -592,7 +639,7 @@ impl FocusPanel {
                         FocusKind::Timer
                     };
                     if self.start(id, kind, cx) {
-                        return self.shrink_away(window, cx);
+                        return self.put_away(window, cx);
                     }
                 }
             }
@@ -682,7 +729,6 @@ impl FocusPanel {
                 match self.commit(kind, hide, cx) {
                     Leave::Stay => {}
                     Leave::Hide => return self.put_away(window, cx),
-                    Leave::Shrink => return self.shrink_away(window, cx),
                 }
             }
             FieldKey::Cancel => {
@@ -712,7 +758,7 @@ impl FocusPanel {
         match entries.get(self.cursor).cloned() {
             Some(Entry::Task { id, .. }) => {
                 if self.start(id, kind, cx) {
-                    return Leave::Shrink;
+                    return Leave::Hide;
                 }
             }
             Some(Entry::List { id, name }) => {
@@ -1024,7 +1070,7 @@ impl Render for FocusPanel {
                 vec![
                     heading(
                         if running {
-                            "Up next in this session"
+                            "Up next"
                         } else {
                             "Start on\u{2026}"
                         }
@@ -1187,43 +1233,46 @@ impl Render for FocusPanel {
             .text_size(px(13.))
             .when(status.is_some(), |d| {
                 d.child(
-                div()
-                    .p_3()
-                    .border_b_1()
-                    .border_color(t.border_variant)
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .children(status.clone().map(|(title, _, _)| div().truncate().child(title)))
-                    .when_some(status.clone(), |d, (_, clock, over)| {
-                        d.child(
-                            div()
-                                .font_family(super::MONO_FONT)
-                                .text_size(px(26.))
-                                .text_color(if over { t.warning } else { t.accent })
-                                .child(clock),
+                    div()
+                        .p_3()
+                        .border_b_1()
+                        .border_color(t.border_variant)
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .children(
+                            status
+                                .clone()
+                                .map(|(title, _, _)| div().truncate().child(title)),
                         )
-                    })
-                    .when(
-                        running && prompt.is_none() && matches!(self.mode, Mode::Rows),
-                        |d| {
+                        .when_some(status.clone(), |d, (_, clock, over)| {
                             d.child(
                                 div()
-                                    .flex()
-                                    .flex_wrap()
-                                    .gap_2()
-                                    .text_size(px(11.))
-                                    .text_color(t.placeholder)
-                                    .child(hint("\u{2423}", "pause", t))
-                                    .child(hint("d", "finish task", t))
-                                    .child(hint("s", "stop, task stays open", t)),
+                                    .font_family(super::MONO_FONT)
+                                    .text_size(px(26.))
+                                    .text_color(if over { t.warning } else { t.accent })
+                                    .child(clock),
                             )
-                        },
-                    ),
+                        })
+                        .when(
+                            running && prompt.is_none() && matches!(self.mode, Mode::Rows),
+                            |d| {
+                                d.child(
+                                    div()
+                                        .flex()
+                                        .flex_wrap()
+                                        .gap_2()
+                                        .text_size(px(11.))
+                                        .text_color(t.placeholder)
+                                        .child(hint("\u{2423}", "pause", t))
+                                        .child(hint("d", "finish task", t))
+                                        .child(hint("s", "stop, task stays open", t)),
+                                )
+                            },
+                        ),
                 )
             })
             .when_some(prompt, |d, prompt| {
-                let selected = prompt.selected();
                 d.child(
                     div()
                         .p_3()
@@ -1232,31 +1281,45 @@ impl Render for FocusPanel {
                         .gap_2()
                         .border_b_1()
                         .border_color(t.border_variant)
-                        .child(div().child(format!(
-                            "How did it go? \u{d7}{:.1} \u{b7} {:.1} pts",
-                            prompt.multiplier(),
-                            prompt.points()
-                        )))
-                        .child(div().flex().flex_wrap().gap_1().children(
-                            prompt.choices().into_iter().map(|choice| {
+                        .child(div().text_size(px(13.)).child(if prompt.time_is_up {
+                            "Time's up. How did it go?"
+                        } else {
+                            "How did it go?"
+                        }))
+                        .when(prompt.scores, |d| {
+                            d.child(
                                 div()
-                                    .px_2()
-                                    .rounded(px(4.))
-                                    .border_1()
-                                    .border_color(if choice == selected {
-                                        t.focus
-                                    } else {
-                                        t.border_variant
-                                    })
-                                    .text_size(px(12.))
-                                    .child(format!("{} {}", choice.title(&prompt), choice.key()))
-                            }),
-                        ))
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .font_family(super::MONO_FONT)
+                                            .text_size(px(20.))
+                                            .text_color(t.accent)
+                                            .child(format!("\u{d7}{:.1}", prompt.multiplier())),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .text_size(px(11.))
+                                            .text_color(t.muted)
+                                            .child(format!("{:.1} pts", prompt.points())),
+                                    )
+                                    .child(hint("\u{2191}\u{2193}", "score", t)),
+                            )
+                        })
+                        .child(super::widgets::prompt_choices(&prompt, t))
                         .child(
                             div()
+                                .flex()
+                                .flex_wrap()
+                                .gap_x_3()
+                                .gap_y_1()
                                 .text_size(px(11.))
                                 .text_color(t.placeholder)
-                                .child("\u{2191}\u{2193} score \u{b7} \u{2190}\u{2192} choose \u{b7} \u{21a9} takes it"),
+                                .child(hint("\u{2190}\u{2192}", "choose", t))
+                                .child(hint("\u{21a9}", "take it", t)),
                         ),
                 )
             })

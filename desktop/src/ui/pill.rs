@@ -78,6 +78,8 @@ pub fn open(
         window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: None,
         kind: WindowKind::PopUp,
+        // Clear behind its rounded corners, which it draws itself.
+        window_background: gpui::WindowBackgroundAppearance::Transparent,
         is_movable: true,
         is_resizable: false,
         is_minimizable: false,
@@ -89,6 +91,7 @@ pub fn open(
         let ns_window = window_move::ns_window(window);
         if let Some(ns_window) = ns_window {
             window_move::no_animation(ns_window);
+            window_move::no_shadow(ns_window);
         }
         cx.new(|cx| {
             cx.observe(&takt, |_, _, cx| cx.notify()).detach();

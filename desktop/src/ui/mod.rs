@@ -527,10 +527,8 @@ impl Takt {
                 if let Some(handle) = self.panel.take() {
                     let back = self.panel_return_to.take();
                     cx.defer(move |cx| {
-                        if let Some(pid) = back {
-                            crate::platform::activate_app(pid);
-                        }
-                        let _ = handle.update(cx, |_, window, _| window.remove_window());
+                        let _ =
+                            handle.update(cx, |panel, window, cx| panel.leave(back, window, cx));
                     });
                 }
             } else if !open && wanted {
@@ -544,9 +542,10 @@ impl Takt {
                     self.pill_at = Some(at);
                 }
                 let pill = self.pill_at;
+                let grow = self.pill_open(cx);
                 let takt = cx.entity();
                 cx.defer(move |cx| {
-                    let handle = panel::open(takt.clone(), capturing, pill, cx);
+                    let handle = panel::open(takt.clone(), capturing, pill, grow, cx);
                     // The pill hides while the panel grown out of it is up.
                     takt.update(cx, |this, cx| {
                         this.panel = handle;

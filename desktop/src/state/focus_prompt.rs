@@ -24,11 +24,23 @@ impl Choice {
     pub fn title(self, prompt: &FocusPrompt) -> String {
         match self {
             Choice::KeepWorking => "Keep working".into(),
-            Choice::Progress if prompt.complete_task => "Log, keep open".into(),
-            Choice::Progress => "Log progress".into(),
-            Choice::Done if prompt.time_is_up || !prompt.complete_task => "Done".into(),
-            Choice::Done => "Complete".into(),
-            Choice::Break => format!("{}-minute break", prompt.break_minutes),
+            Choice::Progress => "Log time".into(),
+            Choice::Done => "Complete task".into(),
+            Choice::Break => format!("{}-min break", prompt.break_minutes),
+        }
+    }
+
+    /// What taking it does, said under the choices for the one selected.
+    pub fn summary(self, prompt: &FocusPrompt) -> String {
+        let points = prompt.points();
+        match self {
+            Choice::KeepWorking => "Back to the clock. Nothing is logged yet.".into(),
+            Choice::Progress => format!("Logs {points:.1} pts. The task stays open."),
+            Choice::Done => format!("Logs {points:.1} pts and ticks the task off."),
+            Choice::Break => format!(
+                "Logs {points:.1} pts, then {} minutes off.",
+                prompt.break_minutes
+            ),
         }
     }
 

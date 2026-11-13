@@ -110,3 +110,11 @@ pub fn animate_frame(ns_window: usize, to: (f64, f64, f64, f64), seconds: f64) {
         let _: () = msg_send![class!(NSAnimationContext), endGrouping];
     }
 }
+
+/// No AppKit shadow under the window: a rounded panel draws its own
+/// hairline, and the shadow would ring its corners in grey.
+pub fn no_shadow(ns_window: usize) {
+    unsafe {
+        let _: () = msg_send![ns_window as *mut Object, setHasShadow: false];
+    }
+}

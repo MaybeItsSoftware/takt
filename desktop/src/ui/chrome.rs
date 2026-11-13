@@ -1107,7 +1107,6 @@ impl Takt {
         let Some(prompt) = self.app.focus_prompt.clone() else {
             return div();
         };
-        let selected = prompt.selected();
         let note_open = matches!(self.app.editing, Some(Editing::FocusNote));
         let minutes = prompt.seconds / 60;
         div()
@@ -1181,27 +1180,12 @@ impl Takt {
                                 div().child(prompt.note.clone()).into_any_element()
                             }),
                     )
-                    .child(
-                        div()
-                            .flex()
-                            .gap_2()
-                            .children(prompt.choices().into_iter().map(|choice| {
-                                let on = choice == selected;
-                                div()
-                                    .px_2()
-                                    .py_1()
-                                    .rounded(px(4.))
-                                    .border_1()
-                                    .border_color(if on { t.accent } else { t.border_variant })
-                                    .when(on, |d| d.bg(t.selected))
-                                    .child(format!("{}  {}", choice.title(&prompt), choice.key()))
-                            })),
-                    )
+                    .child(super::widgets::prompt_choices(&prompt, t))
                     .child(
                         div()
                             .text_size(px(11.))
                             .text_color(t.placeholder)
-                            .child("←→ choose · ↩ takes it · esc keeps working"),
+                            .child("\u{2190}\u{2192} choose \u{b7} \u{21a9} takes it"),
                     ),
             )
     }
