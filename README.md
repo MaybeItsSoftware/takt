@@ -16,7 +16,7 @@ A ranked Today list, an outline, a board, focus timers, dailies, and a command l
 | **Sync** | [Host it yourself](docs/self-hosting.md) with the server in this repo, free and with every feature, or use Takt's hosted server for £1 a year (Takt Sync, bought in the iPhone or Android app; one purchase covers every device) |
 | **Platforms** | macOS 15.6+, iPhone and iPad, Android and Wear OS, and a terminal CLI |
 | **For AI agents** | [`llms.txt`](site/llms.txt) and an [MCP server](docs/mcp-server.md) over the whole workspace |
-| **Website** | [maybeitssoftware.github.io/takt](https://maybeitssoftware.github.io/takt/) |
+| **Website** | [takt.maybeitssoftware.co.uk](https://takt.maybeitssoftware.co.uk/) |
 
 On the Mac, Takt opens as a desktop window, keeps a menu bar surface for quick capture, and is built to be driven without the mouse. Its own local workspace owns your tasks; Checkvist is an optional import. Takt adds the things a plain list has no representation for — priority ranking, start dates, recurrence, focus sessions, daily habits, and a record of what actually happened each day.
 

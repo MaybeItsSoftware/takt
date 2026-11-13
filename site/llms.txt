@@ -13,7 +13,7 @@
 - AI agents: the CLI `takt` includes an MCP server that exposes the whole
   workspace (tasks, lists, dailies, focus sessions) to an assistant —
   https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md
-- Privacy policy: https://maybeitssoftware.github.io/takt/privacy/
+- Privacy policy: https://takt.maybeitssoftware.co.uk/privacy/
 - Publisher: MaybeItsSoftware
 
 ## Docs

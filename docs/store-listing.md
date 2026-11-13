@@ -4,7 +4,7 @@ What to paste into App Store Connect and the Play Console. Field limits are in
 brackets. Answers to the privacy forms follow from what the apps actually do;
 if sync or analytics change, change these.
 
-- **Privacy policy URL:** https://maybeitssoftware.github.io/takt/privacy/ — `site/privacy/`,
+- **Privacy policy URL:** https://takt.maybeitssoftware.co.uk/privacy/ — `site/privacy/`,
   served by GitHub Pages (`.github/workflows/pages.yml`), so the listings do not
   depend on the sync server. `sync-server/static/privacy.html` is the same text
   with its contact line filled in at serve time; change both together.

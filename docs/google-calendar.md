@@ -151,7 +151,8 @@ Calendar and pick it, or pick any calendar you own.
 
 Google Cloud project `takt-511416`. Both scopes are **sensitive**: the OAuth
 consent screen must list them, and past 100 users the app needs Google's
-verification (a privacy policy, a demo video of the scope in use). Until
+verification (docs/google-verification.md: the privacy policy, scope
+justifications and demo video script). Until
 then only test users can grant them.
 
 Drive linking signs in separately, with `drive.file` alone, through Google's
