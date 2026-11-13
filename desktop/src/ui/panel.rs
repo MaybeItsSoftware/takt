@@ -30,9 +30,9 @@ use crate::state::focus::{FinderHit, FocusKind};
 use crate::text_field::{FieldKey, TextField};
 use crate::theme::Tokens;
 use gpui::{
-    AnyElement, App as GpuiApp, Bounds, Context, Entity, EntityInputHandler, FocusHandle,
+    AnyElement, App as GpuiApp, Bounds, Context, Corner, Entity, EntityInputHandler, FocusHandle,
     Focusable, KeyDownEvent, Pixels, UTF16Selection, WeakEntity, Window, WindowBounds, WindowKind,
-    WindowOptions, div, point, prelude::*, px, size,
+    WindowOptions, anchored, deferred, div, point, prelude::*, px, size,
 };
 use std::ops::Range;
 
@@ -48,6 +48,14 @@ pub struct FocusPanel {
     /// Where Add files, once `Tab` has chosen; else quick capture's list.
     destination: Option<(String, String)>,
     mode: Mode,
+    /// The row typing was on when the list picker opened over it.
+    type_cursor: usize,
+    /// The rows and the picker's, kept scrolled to the keyboard's row.
+    scroll: gpui::ScrollHandle,
+    pick_scroll: gpui::ScrollHandle,
+    /// The row each was last scrolled to, with how many rows there were.
+    scrolled: Option<(usize, usize)>,
+    pick_scrolled: Option<(usize, usize)>,
 }
 
 /// What the keyboard is doing in the panel.
@@ -92,6 +100,15 @@ impl Mode {
             Mode::Rows => String::new(),
         }
     }
+}
+
+/// What Return leaves the panel to do.
+enum Leave {
+    Stay,
+    /// Put away, back to the app it was summoned over.
+    Hide,
+    /// A block began: shrink into the pill.
+    Shrink,
 }
 
 /// What `o` opens in the main window.
@@ -193,6 +210,11 @@ pub fn open(
                     picked: None,
                     capturing,
                     destination: None,
+                    type_cursor: 0,
+                    scroll: gpui::ScrollHandle::new(),
+                    pick_scroll: gpui::ScrollHandle::new(),
+                    scrolled: None,
+                    pick_scrolled: None,
                     mode: if capturing {
                         Mode::typing()
                     } else {
@@ -296,7 +318,12 @@ fn destinations(app: &App, query: &str) -> Vec<(String, String, String)> {
 impl FocusPanel {
     /// The rows as the mode lists them.
     fn entries(&self, app: &App) -> Vec<Entry> {
-        match &self.mode {
+        self.entries_of(&self.mode, app)
+    }
+
+    /// The rows `mode` lists: in the picker, the lists it offers.
+    fn entries_of(&self, mode: &Mode, app: &App) -> Vec<Entry> {
+        match mode {
             Mode::Rows if app.focus_session.is_some() => queue(app),
             Mode::Rows => ladder(app, self.picked.as_deref()),
             Mode::Pick { field, .. } => {
@@ -350,6 +377,8 @@ impl FocusPanel {
             return;
         }
         let back = std::mem::replace(&mut self.mode, Mode::Rows);
+        self.type_cursor = self.cursor;
+        self.pick_scrolled = None;
         self.mode = Mode::Pick {
             back: Box::new(back),
             field: TextField::default(),
@@ -363,15 +392,19 @@ impl FocusPanel {
 
     /// Leaves the picker, filing into `chosen` from now on when there is one.
     fn close_picker(&mut self, chosen: Option<(String, String)>, cx: &GpuiApp) {
+        let chosen_none = chosen.is_none();
         if let Mode::Pick { back, .. } = std::mem::replace(&mut self.mode, Mode::Rows) {
             self.mode = *back;
         }
         if chosen.is_some() {
             self.destination = chosen;
         }
-        // Back on Add, ready to file there, when something was typed.
+        // Back on Add, ready to file there, when something was typed;
+        // left without a choice, where it was.
         let count = self.entries(&self.takt.read(cx).app).len();
-        self.cursor = if self.mode.typed().is_empty() {
+        self.cursor = if chosen_none {
+            self.type_cursor.min(count.saturating_sub(1))
+        } else if self.mode.typed().is_empty() {
             0
         } else {
             count.saturating_sub(1)
@@ -461,16 +494,54 @@ impl FocusPanel {
         cx.defer(move |cx| takt.update(cx, |takt, cx| takt.settle(cx)));
     }
 
-    /// Starts (or queues) a timer or a pomodoro on `id`.
-    fn start(&mut self, id: String, kind: FocusKind, cx: &mut Context<Self>) {
-        self.takt
-            .update(cx, |takt, _| takt.app.focus_from_panel(&id, kind));
+    /// Starts (or queues) a timer or a pomodoro on `id`. True when it
+    /// began a block, rather than queueing one behind the running block.
+    fn start(&mut self, id: String, kind: FocusKind, cx: &mut Context<Self>) -> bool {
+        let began = self.takt.update(cx, |takt, _| {
+            let idle = takt.app.focus_session.is_none();
+            takt.app.focus_from_panel(&id, kind);
+            idle && takt.app.focus_session.is_some()
+        });
         if self.picked.as_deref() == Some(id.as_str()) {
             self.picked = None;
         }
         self.mode = Mode::Rows;
         self.cursor = 0;
         self.settle(cx);
+        began
+    }
+
+    /// A block just began: the panel shrinks into the pill and goes, and the
+    /// pill takes its place. Without the pill, or with reduced motion, it
+    /// simply goes.
+    fn shrink_away(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let pill = self.takt.read(cx).app.prefs.focus_panel;
+        let ns_window = window_move::ns_window(window);
+        let (Some(ns_window), true, false) = (ns_window, pill, window_move::reduce_motion()) else {
+            return self.put_away(window, cx);
+        };
+        let back = self.takt.update(cx, |takt, _| takt.panel_return_to.take());
+        let handle = window.window_handle();
+        // The pill grows out of the panel's top edge, centred on it: the
+        // panel shrinks back to just there.
+        let (x, y, w, h) = window_move::frame(ns_window);
+        let (pw, ph) = (
+            f64::from(super::pill::WIDTH),
+            f64::from(super::pill::HEIGHT),
+        );
+        let to = (x + (w - pw) / 2., y + h - ph, pw, ph);
+        const SECONDS: f64 = 0.18;
+        cx.spawn(async move |_, cx| {
+            window_move::animate_frame(ns_window, to, SECONDS);
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs_f64(SECONDS))
+                .await;
+            if let Some(pid) = back {
+                crate::platform::activate_app(pid);
+            }
+            let _ = cx.update_window(handle, |_, window, _| window.remove_window());
+        })
+        .detach();
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -520,7 +591,9 @@ impl FocusPanel {
                     } else {
                         FocusKind::Timer
                     };
-                    self.start(id, kind, cx);
+                    if self.start(id, kind, cx) {
+                        return self.shrink_away(window, cx);
+                    }
                 }
             }
             "d" | "s" | "space" => {
@@ -606,8 +679,10 @@ impl FocusPanel {
                     FocusKind::Timer
                 };
                 let hide = event.keystroke.modifiers.platform;
-                if self.commit(kind, hide, cx) {
-                    return self.put_away(window, cx);
+                match self.commit(kind, hide, cx) {
+                    Leave::Stay => {}
+                    Leave::Hide => return self.put_away(window, cx),
+                    Leave::Shrink => return self.shrink_away(window, cx),
                 }
             }
             FieldKey::Cancel => {
@@ -631,11 +706,15 @@ impl FocusPanel {
     }
 
     /// Return on a row; `hide` (⌘Return) puts the panel away after an
-    /// Add. True when the panel should go.
-    fn commit(&mut self, kind: FocusKind, hide: bool, cx: &mut Context<Self>) -> bool {
+    /// Add. Whether, and how, the panel should go.
+    fn commit(&mut self, kind: FocusKind, hide: bool, cx: &mut Context<Self>) -> Leave {
         let entries = self.entries(&self.takt.read(cx).app);
         match entries.get(self.cursor).cloned() {
-            Some(Entry::Task { id, .. }) => self.start(id, kind, cx),
+            Some(Entry::Task { id, .. }) => {
+                if self.start(id, kind, cx) {
+                    return Leave::Shrink;
+                }
+            }
             Some(Entry::List { id, name }) => {
                 if let Mode::Type { field, list, .. } = &mut self.mode {
                     *list = Some((id.clone(), name.clone()));
@@ -647,7 +726,7 @@ impl FocusPanel {
             }
             Some(Entry::Add) => {
                 let Mode::Type { field, .. } = &self.mode else {
-                    return false;
+                    return Leave::Stay;
                 };
                 let text = field.text.clone();
                 let into = self.filing_into(&self.takt.read(cx).app);
@@ -659,7 +738,7 @@ impl FocusPanel {
                 match filed {
                     Ok(_) if hide || self.capturing => {
                         self.settle(cx);
-                        return true;
+                        return Leave::Hide;
                     }
                     Ok((id, _)) => {
                         // Back to the rows with it highlighted, to start.
@@ -681,7 +760,7 @@ impl FocusPanel {
             }
             Some(Entry::Into { .. }) | None => {}
         }
-        false
+        Leave::Stay
     }
 
     /// Esc: clears what was typed, then leaves a chosen list, then goes back
@@ -729,9 +808,37 @@ impl Render for FocusPanel {
             .filing_into(app)
             .map(|(_, name)| name)
             .unwrap_or_else(|| "No list".into());
-        let cursor = self.cursor.min(entries.len().saturating_sub(1));
+        let filing_into = filing_into.as_str();
+        let picking = matches!(self.mode, Mode::Pick { .. });
+        // Under the picker, the rows typing had, as they were.
+        let (rows_of, rows_cursor, options) = match &self.mode {
+            Mode::Pick { back, .. } => {
+                (self.entries_of(back, app), self.type_cursor, Some(entries))
+            }
+            _ => (entries, self.cursor, None),
+        };
+        let cursor = rows_cursor.min(rows_of.len().saturating_sub(1));
         let hook = Some((self.this.clone(), self.focus.clone()));
-        let row = |here: bool| {
+        let typed = self.mode.typed();
+        let labels = app.capture_labels(&typed);
+        // Kept scrolled to the keyboard's row, once per move, so the wheel
+        // still scrolls.
+        let at = (cursor, rows_of.len());
+        if self.scrolled != Some(at) {
+            self.scrolled = Some(at);
+            self.scroll.scroll_to_item(cursor);
+        }
+        if let Some(options) = &options {
+            let at = (
+                self.cursor.min(options.len().saturating_sub(1)),
+                options.len(),
+            );
+            if self.pick_scrolled != Some(at) {
+                self.pick_scrolled = Some(at);
+                self.pick_scroll.scroll_to_item(at.0);
+            }
+        }
+        let row = move |here: bool| {
             div()
                 .px_2()
                 .py(px(3.))
@@ -747,69 +854,79 @@ impl Render for FocusPanel {
                 .items_center()
                 .gap_2()
         };
-        let detail = |text: String| {
+        let detail = move |text: String| {
             div()
                 .flex_none()
                 .text_size(px(11.))
                 .text_color(t.placeholder)
                 .child(text)
         };
-        let typed = self.mode.typed();
-        let labels = app.capture_labels(&typed);
-        let rows = entries.into_iter().enumerate().map(|(ix, entry)| {
-            let here = ix == cursor;
-            match entry {
-                Entry::Task {
-                    title, detail: d, ..
-                } => row(here)
-                    .child(div().flex_1().min_w_0().truncate().child(title))
-                    .child(detail(d))
-                    .into_any_element(),
-                Entry::List { name, .. } => row(here)
-                    .child(div().flex_1().min_w_0().truncate().child(name))
-                    .child(detail("list".into()))
-                    .into_any_element(),
-                Entry::Add => row(here)
-                    .child(div().flex_none().text_color(t.accent).child("+"))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .child(format!("Add \u{201c}{typed}\u{201d}")),
-                    )
-                    .children(labels.iter().map(|l| detail(l.clone())))
-                    .child(detail(format!("\u{2192} {filing_into}")))
-                    .into_any_element(),
-                Entry::Into {
-                    id,
-                    name,
-                    folder,
-                    current,
-                } => {
-                    let shown = name.clone();
-                    row(here)
-                        .id(gpui::ElementId::Name(format!("into-{id}").into()))
-                        .cursor_pointer()
-                        .on_click(cx.listener(move |this, _: &gpui::ClickEvent, _, cx| {
-                            this.close_picker(Some((id.clone(), name.clone())), cx);
-                            cx.notify();
-                        }))
-                        .child(
-                            div()
-                                .flex_none()
-                                .w(px(12.))
-                                .text_color(t.accent)
-                                .child(if current { "\u{2713}" } else { "" }),
-                        )
-                        .child(div().flex_1().min_w_0().truncate().child(shown))
-                        .child(detail(folder))
-                        .into_any_element()
-                }
-            }
+        let draw = |entries: Vec<Entry>, cursor: usize, cx: &mut Context<Self>| {
+            entries
+                .into_iter()
+                .enumerate()
+                .map(|(ix, entry)| {
+                    let here = ix == cursor;
+                    match entry {
+                        Entry::Task {
+                            title, detail: d, ..
+                        } => row(here)
+                            .child(div().flex_1().min_w_0().truncate().child(title))
+                            .child(detail(d))
+                            .into_any_element(),
+                        Entry::List { name, .. } => row(here)
+                            .child(div().flex_1().min_w_0().truncate().child(name))
+                            .child(detail("list".into()))
+                            .into_any_element(),
+                        Entry::Add => row(here)
+                            .child(div().flex_none().text_color(t.accent).child("+"))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
+                                    .child(format!("Add \u{201c}{typed}\u{201d}")),
+                            )
+                            .children(labels.iter().map(|l| detail(l.clone())))
+                            .child(detail(format!("\u{2192} {filing_into}")))
+                            .into_any_element(),
+                        Entry::Into {
+                            id,
+                            name,
+                            folder,
+                            current,
+                        } => {
+                            let shown = name.clone();
+                            row(here)
+                                .id(gpui::ElementId::Name(format!("into-{id}").into()))
+                                .cursor_pointer()
+                                .on_click(cx.listener(move |this, _: &gpui::ClickEvent, _, cx| {
+                                    this.close_picker(Some((id.clone(), name.clone())), cx);
+                                    cx.notify();
+                                }))
+                                .child(
+                                    div()
+                                        .flex_none()
+                                        .w(px(12.))
+                                        .text_color(t.accent)
+                                        .child(if current { "\u{2713}" } else { "" }),
+                                )
+                                .child(div().flex_1().min_w_0().truncate().child(shown))
+                                .child(detail(folder))
+                                .into_any_element()
+                        }
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+        let rows = draw(rows_of, cursor, cx);
+        let picker_rows = options.map(|options| {
+            let cursor = self.cursor.min(options.len().saturating_sub(1));
+            draw(options, cursor, cx)
         });
         let list_area = div()
             .id("focus-panel-rows")
+            .track_scroll(&self.scroll)
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
@@ -822,6 +939,85 @@ impl Render for FocusPanel {
                 .text_size(px(11.))
                 .text_color(t.placeholder)
                 .child(text)
+        };
+        // The list Add files into, beside the field; `Tab` or a click drops
+        // its picker down under it, over the rows.
+        let destination = {
+            let chip = div()
+                .id("focus-panel-destination")
+                .flex_none()
+                .cursor_pointer()
+                .px_1()
+                .h(px(22.))
+                .flex()
+                .items_center()
+                .rounded(px(4.))
+                .border_1()
+                .border_color(if picking { t.focus } else { t.border_variant })
+                .text_size(px(11.))
+                .text_color(if picking { t.text } else { t.placeholder })
+                .hover(|d| d.text_color(t.text))
+                .on_click(cx.listener(|this, _: &gpui::ClickEvent, _, cx| {
+                    if matches!(this.mode, Mode::Pick { .. }) {
+                        this.close_picker(None, cx);
+                    } else {
+                        this.open_picker(cx);
+                    }
+                    cx.notify();
+                }))
+                .child(format!("\u{2192} {filing_into} \u{25be}"));
+            let menu = match (&self.mode, picker_rows) {
+                (Mode::Pick { field, .. }, Some(items)) => Some(
+                    div()
+                        .w(px(230.))
+                        .flex()
+                        .flex_col()
+                        .bg(t.surface)
+                        .border_1()
+                        .border_color(t.border)
+                        .rounded(px(6.))
+                        .text_size(px(13.))
+                        .child(
+                            div()
+                                .m_1()
+                                .px_2()
+                                .py(px(2.))
+                                .rounded(px(4.))
+                                .border_1()
+                                .border_color(t.border_variant)
+                                .child(field_text(field, "Find a list\u{2026}", t, hook.clone())),
+                        )
+                        .child(
+                            div()
+                                .id("focus-panel-picker")
+                                .track_scroll(&self.pick_scroll)
+                                .max_h(px(200.))
+                                .overflow_y_scroll()
+                                .px_1()
+                                .pb_1()
+                                .children(items),
+                        ),
+                ),
+                _ => None,
+            };
+            div()
+                .relative()
+                .flex_none()
+                .child(chip)
+                .when_some(menu, |d, menu| {
+                    d.child(
+                        div().absolute().right_0().bottom_0().child(
+                            deferred(
+                                anchored()
+                                    .anchor(Corner::TopRight)
+                                    .offset(point(px(0.), px(4.)))
+                                    .snap_to_window_with_margin(px(6.))
+                                    .child(menu),
+                            )
+                            .with_priority(1),
+                        ),
+                    )
+                })
         };
         let (body, hints): (Vec<AnyElement>, Vec<(&str, &str)>) = match &self.mode {
             Mode::Rows => (
@@ -859,98 +1055,83 @@ impl Render for FocusPanel {
                     ]
                 },
             ),
-            Mode::Pick { field, .. } => (
-                vec![
-                    heading(if typed.is_empty() {
-                        "Add tasks to which list?".into()
-                    } else {
-                        format!("Add \u{201c}{typed}\u{201d} to which list?")
-                    })
-                    .into_any_element(),
-                    div()
-                        .mx_2()
-                        .mt_2()
-                        .px_2()
-                        .py_1()
-                        .rounded(px(4.))
-                        .border_1()
-                        .border_color(t.accent)
-                        .child(field_text(field, "Find a list\u{2026}", t, hook.clone()))
-                        .into_any_element(),
-                    list_area.into_any_element(),
-                ],
-                vec![
-                    ("\u{2191}\u{2193}", "move"),
-                    ("\u{21a9}", "choose"),
-                    ("esc", "back"),
-                ],
-            ),
-            Mode::Type {
-                field,
-                list,
-                problem,
-                ..
-            } => {
+            Mode::Type { .. } | Mode::Pick { .. } => {
+                let (field, list, problem) = match &self.mode {
+                    Mode::Type {
+                        field,
+                        list,
+                        problem,
+                        ..
+                    } => (field, list, problem),
+                    Mode::Pick { back, .. } => match back.as_ref() {
+                        Mode::Type {
+                            field,
+                            list,
+                            problem,
+                            ..
+                        } => (field, list, problem),
+                        _ => unreachable!("the picker opens over typing"),
+                    },
+                    Mode::Rows => unreachable!(),
+                };
                 let placeholder = match list {
                     Some((_, name)) => format!("Find or add in {name}\u{2026}"),
                     None if self.capturing => "Add a task\u{2026} 45m #tag @fri !1".into(),
                     None => "Find a task or list, or add one\u{2026}".into(),
                 };
+                // Under the picker the field shows what was typed, but the
+                // keyboard is the picker's.
+                let field_hook = if picking { None } else { hook.clone() };
                 (
                     vec![
                         div()
                             .mx_2()
                             .mt_2()
-                            .px_2()
-                            .py_1()
-                            .rounded(px(4.))
-                            .border_1()
-                            .border_color(t.accent)
                             .flex()
                             .items_center()
                             .gap_2()
-                            .when_some(list.clone(), |d, (_, name)| {
-                                d.child(
-                                    div()
-                                        .flex_none()
-                                        .px_1()
-                                        .rounded(px(4.))
-                                        .bg(t.selected)
-                                        .text_size(px(11.))
-                                        .child(name),
-                                )
-                            })
-                            .child(div().flex_1().min_w_0().child(field_text(
-                                field,
-                                &placeholder,
-                                t,
-                                hook.clone(),
-                            )))
-                            .into_any_element(),
-                        div()
-                            .px_3()
-                            .pt_1()
-                            .flex()
-                            .justify_between()
-                            .text_size(px(11.))
-                            .child(div().text_color(t.error).children(problem.clone()))
                             .child(
                                 div()
-                                    .id("focus-panel-destination")
-                                    .cursor_pointer()
-                                    .px_1()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .px_2()
+                                    .py_1()
                                     .rounded(px(4.))
                                     .border_1()
-                                    .border_color(t.border_variant)
-                                    .text_color(t.placeholder)
-                                    .hover(|d| d.text_color(t.text))
-                                    .on_click(cx.listener(|this, _: &gpui::ClickEvent, _, cx| {
-                                        this.open_picker(cx);
-                                        cx.notify();
-                                    }))
-                                    .child(format!("Adds to {filing_into} \u{25be}")),
+                                    .border_color(if picking { t.border_variant } else { t.accent })
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .when_some(list.clone(), |d, (_, name)| {
+                                        d.child(
+                                            div()
+                                                .flex_none()
+                                                .px_1()
+                                                .rounded(px(4.))
+                                                .bg(t.selected)
+                                                .text_size(px(11.))
+                                                .child(name),
+                                        )
+                                    })
+                                    .child(div().flex_1().min_w_0().child(field_text(
+                                        field,
+                                        &placeholder,
+                                        t,
+                                        field_hook,
+                                    ))),
                             )
+                            .child(destination)
                             .into_any_element(),
+                        match problem {
+                            Some(problem) => div()
+                                .px_3()
+                                .pt_1()
+                                .text_size(px(11.))
+                                .text_color(t.error)
+                                .child(problem.clone())
+                                .into_any_element(),
+                            None => div().into_any_element(),
+                        },
                         if typed.is_empty() && list.is_none() {
                             heading("Start on\u{2026}".into()).into_any_element()
                         } else {
@@ -958,26 +1139,34 @@ impl Render for FocusPanel {
                         },
                         list_area.into_any_element(),
                     ],
-                    vec![
-                        ("\u{21a9}", "timer / add"),
-                        ("\u{2325}\u{21a9}", "pomodoro"),
-                        ("\u{2191}\u{2193}", "move"),
-                        ("\u{2318}\u{21a9}", "add & hide"),
-                        ("\u{21e5}", "choose list"),
-                        ("\u{2318}O", "open in Takt"),
-                        (
-                            "esc",
-                            if !typed.is_empty() {
-                                "clear"
-                            } else if list.is_some() {
-                                "all lists"
-                            } else if !self.capturing {
-                                "back"
-                            } else {
-                                "hide"
-                            },
-                        ),
-                    ],
+                    if picking {
+                        vec![
+                            ("\u{2191}\u{2193}", "move"),
+                            ("\u{21a9}", "choose list"),
+                            ("esc", "back"),
+                        ]
+                    } else {
+                        vec![
+                            ("\u{21a9}", "timer / add"),
+                            ("\u{2325}\u{21a9}", "pomodoro"),
+                            ("\u{2191}\u{2193}", "move"),
+                            ("\u{2318}\u{21a9}", "add & hide"),
+                            ("\u{21e5}", "choose list"),
+                            ("\u{2318}O", "open in Takt"),
+                            (
+                                "esc",
+                                if !typed.is_empty() {
+                                    "clear"
+                                } else if list.is_some() {
+                                    "all lists"
+                                } else if !self.capturing {
+                                    "back"
+                                } else {
+                                    "hide"
+                                },
+                            ),
+                        ]
+                    },
                 )
             }
         };
@@ -996,7 +1185,8 @@ impl Render for FocusPanel {
             .text_color(t.text)
             .font_family(super::UI_FONT)
             .text_size(px(13.))
-            .child(
+            .when(status.is_some(), |d| {
+                d.child(
                 div()
                     .p_3()
                     .border_b_1()
@@ -1004,10 +1194,7 @@ impl Render for FocusPanel {
                     .flex()
                     .flex_col()
                     .gap_1()
-                    .child(match &status {
-                        Some((title, _, _)) => div().truncate().child(title.clone()),
-                        None => div().text_color(t.muted).child("Nothing running"),
-                    })
+                    .children(status.clone().map(|(title, _, _)| div().truncate().child(title)))
                     .when_some(status.clone(), |d, (_, clock, over)| {
                         d.child(
                             div()
@@ -1028,12 +1215,13 @@ impl Render for FocusPanel {
                                     .text_size(px(11.))
                                     .text_color(t.placeholder)
                                     .child(hint("\u{2423}", "pause", t))
-                                    .child(hint("d", "done", t))
-                                    .child(hint("s", "stop", t)),
+                                    .child(hint("d", "finish task", t))
+                                    .child(hint("s", "stop, task stays open", t)),
                             )
                         },
                     ),
-            )
+                )
+            })
             .when_some(prompt, |d, prompt| {
                 let selected = prompt.selected();
                 d.child(

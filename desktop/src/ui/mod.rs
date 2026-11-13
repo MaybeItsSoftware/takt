@@ -352,9 +352,15 @@ impl Takt {
         match event {
             Event::ShowWindow => self.show_main_window(cx),
             // The one hotkey shows the panel, or puts it away when it is up.
+            // Up but behind another app's window, it is brought forward
+            // and given the keyboard instead.
             Event::FocusPanel => {
-                let open = self.panel_open(cx);
-                self.app.wants_panel = Some(!open);
+                let active = self.panel.as_ref().and_then(|handle| {
+                    handle
+                        .update(cx, |_, window, _| window.is_window_active())
+                        .ok()
+                });
+                self.app.wants_panel = Some(active != Some(true));
             }
             Event::Sync { workspace } => {
                 if workspace {

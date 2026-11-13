@@ -77,3 +77,36 @@ pub fn follow_active_space(ns_window: usize) {
         let _: () = msg_send![ns_window as *mut Object, setCollectionBehavior: behavior];
     }
 }
+
+/// The window's frame on screen: bottom-left corner, then size.
+pub fn frame(ns_window: usize) -> (f64, f64, f64, f64) {
+    let frame: NsRect = unsafe { msg_send![ns_window as *mut Object, frame] };
+    (frame.origin.x, frame.origin.y, frame.size.x, frame.size.y)
+}
+
+/// Whether the user asked the system for less motion.
+pub fn reduce_motion() -> bool {
+    unsafe {
+        let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let reduce: bool = msg_send![workspace, accessibilityDisplayShouldReduceMotion];
+        reduce
+    }
+}
+
+/// Eases the window's frame to `(x, y, width, height)` over `seconds`,
+/// through AppKit's animator. Never from inside a GPUI update; see the
+/// module notes.
+pub fn animate_frame(ns_window: usize, to: (f64, f64, f64, f64), seconds: f64) {
+    let rect = NsRect {
+        origin: NsPoint { x: to.0, y: to.1 },
+        size: NsPoint { x: to.2, y: to.3 },
+    };
+    unsafe {
+        let _: () = msg_send![class!(NSAnimationContext), beginGrouping];
+        let context: *mut Object = msg_send![class!(NSAnimationContext), currentContext];
+        let _: () = msg_send![context, setDuration: seconds];
+        let animator: *mut Object = msg_send![ns_window as *mut Object, animator];
+        let _: () = msg_send![animator, setFrame: rect display: true];
+        let _: () = msg_send![class!(NSAnimationContext), endGrouping];
+    }
+}
