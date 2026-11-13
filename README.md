@@ -640,20 +640,27 @@ for now; what they do there reaches the phones through sync.
 ### The focus panel
 
 `⌃⌥⇧⌘F` summons the focus panel over whatever app you are in, and pressing
-it again puts the panel away; `Esc` does too. It appears and goes at once,
-with no fade. It is the one hotkey for starting, finding and adding tasks:
+it again puts the panel away; `Esc` does too. Up behind another app's
+window, it is brought forward instead. While a block runs and only the pill
+is up, the hotkey gives the pill the keyboard rather than growing it (see
+below). It is the one hotkey for starting, finding and adding tasks:
 Quick Add has no hotkey of its own any more. The status item's menu, `Cmd+8`
 and the app menu's Quick Add open it too. Rebind or disable the hotkey in
 Settings → Keyboard.
 
-The panel is the focus pill grown larger: it opens over the pill's place
-(the top centre of the screen until you drag the pill elsewhere), the pill
-hides while it is up, and putting the panel away shrinks it back to the
-pill.
+The panel is the focus pill grown larger: it grows out of the pill's place
+from its top-left corner (the top centre of the screen until you drag the
+pill elsewhere), and putting it away while a block runs shrinks it back into
+the pill. Starting a block from the panel does the same. With nothing
+running it appears and goes at once. With Reduce Motion on, nothing
+animates.
 
-At the top are the running task and its clock. It opens on its rows: the
-day to start from, or while a block runs the queue behind it. Every action
-is a letter (see below); `/` or `n` start typing.
+While a block runs its top line is the pill's own: the running task, its
+clock and the pill's buttons, with collapse in place of expand. It opens on
+its rows: the day to start from, or while a block runs what is next (the
+queue, then the rest of the day). Every action is a letter (see below); `/`
+or `n` start typing. Each action says what it did for a moment where the
+task's title is ("Started …", "Completed … · +2.0 pts today").
 
 **Typing** lists the day until you type. Type and it finds every open task and list that matches, with a
 last row, **Add "…"**, that files what you typed as a new task (`45m`,
@@ -667,7 +674,8 @@ row):
 | `Cmd+Return` | On Add, file the task and put the panel away |
 | `Option+Return` | Start a pomodoro on the highlighted task |
 | `Cmd+O` | Open the highlighted task, or list, in the main window |
-| `Tab` | Choose the list Add files into: a picker of every list, with its folder, that you type to filter; `↑` / `↓` (or `Tab`) move, `Return` chooses and `Esc` goes back to your typing. Clicking **Adds to …** under the field opens it too. It starts at Quick Add's list, and narrowing to a list chooses that list |
+| `Tab` | Choose the list Add files into: a small picker dropped down under **→ list** beside the field, of every list with its folder, that you type to filter; `↑` / `↓` (or `Tab`) move, `Return` chooses and `Esc` goes back to your typing. Clicking **→ list** opens it too. It starts at Quick Add's list, and narrowing to a list chooses that list |
+| `Cmd+Backspace` | With nothing typed, delete the highlighted task |
 | `Esc` | Clear what you typed, then leave a narrowed list, then back to the rows |
 
 **On the rows, every action is a letter**, and a footer of key hints spells
@@ -681,19 +689,51 @@ them out:
 | `Space` | Pause or resume the running block (on a break, back to work) |
 | `d` | Finish the block, completing its task, and ask how it went |
 | `s` | Stop: the time so far is logged and the task stays open |
+| `Cmd+Backspace` | Delete the highlighted task |
 | `/` or `n` | Type, to find or add a task |
 | `Esc` | Hide the panel: back to the pill while a block runs |
 
-While the block's "how did it go?" question is up, the keys answer it instead.
+While the block's "how did it go?" question is up, the keys answer it
+instead, and no row is lit. Its ways out are buttons that carry their keys,
+and the line under them says what the selected one does:
+
+| Key | Action |
+| --- | --- |
+| `↑` / `↓` (or `k` / `j`, `+` / `-`) | Raise or lower the score, ×0.0 to ×5.0 |
+| `r` | Reset the score to ×1.0 |
+| `←` / `→` (or `h` / `l`) | Choose a way out |
+| `Return` | Take the chosen one |
+| `Esc` | Keep working: back to the clock, nothing logged |
+| `p` | Log time, the task stays open |
+| `d` | Complete the task, logging the time |
+| `b` | When the time is up: log it and take a break |
+| `\` | Take the chosen one, scoring nothing |
+| `n` / `Tab` | In the main window, a note for the task |
+
+Once it is answered, `Return` goes on from the top of what is next.
 
 ### The focus pill
 
 Starting any block, a timer or a pomodoro, puts up **the focus pill**: a small
 strip at the top centre of the main display with the task's title and its
-clock, counting up for a timer and down for a pomodoro or a break. It floats
+clock, counting up for a timer and down for a pomodoro or a break, and three
+buttons: pause or resume, finish, and expand into the focus panel. It floats
 over every app without taking the keyboard from the one you are in. Drag it
-anywhere; click it for the focus panel. It goes when the session ends. Turn it
-off with **Show the focus pill while a block runs** in Settings → Focus.
+anywhere. It goes when the session ends. Turn it off with **Show the focus
+pill while a block runs** in Settings → Focus.
+
+The panel's hotkey with only the pill up gives the pill the keyboard, on
+finish, while the app you are in stays in front; pressing it again hands
+the keyboard back:
+
+| Key | Action |
+| --- | --- |
+| `←` / `→` (or `h` / `l`, `Tab`) | Move between the buttons |
+| `Return` | Press the chosen button |
+| `Space` or `p` | Pause or resume (on a break, back to work) |
+| `d` | Finish: complete the task, and the panel asks how it went |
+| `e` | Expand into the focus panel |
+| `Esc` | Hand the keyboard back |
 
 ## Command palette
 

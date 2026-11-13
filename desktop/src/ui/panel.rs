@@ -645,6 +645,12 @@ impl FocusPanel {
         };
         cx.stop_propagation();
         let prompt = self.takt.read(cx).app.focus_prompt.is_some();
+        // The note is written in the main window, which has its field; here
+        // `n` and `Tab` would type into a field that isn't drawn.
+        if prompt && matches!(key.as_str(), "n" | "tab") {
+            cx.notify();
+            return;
+        }
         if prompt {
             let answered = self.takt.update(cx, |takt, _| {
                 takt.app.focus_prompt_key(&key);
@@ -1404,7 +1410,14 @@ impl Render for FocusPanel {
                                 .text_size(px(11.))
                                 .text_color(t.placeholder)
                                 .child(hint("\u{2190}\u{2192}", "choose", t))
-                                .child(hint("\u{21a9}", "take it", t)),
+                                .child(hint("\u{21a9}", "take it", t))
+                                .when(prompt.scores, |d| {
+                                    d.child(hint("r", "reset score", t)).child(hint(
+                                        "\\",
+                                        "score nothing",
+                                        t,
+                                    ))
+                                }),
                         ),
                 )
             })
