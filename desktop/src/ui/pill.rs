@@ -40,13 +40,15 @@ pub struct FocusPill {
     focus: gpui::FocusHandle,
     cursor: usize,
     return_to: Option<i32>,
+    /// The flash a redraw is due for when it ends.
+    flash_due: Option<i64>,
 }
 
-/// The pill's buttons, in order: expand (in the panel, collapse), finish
-/// in the middle, and pause or resume.
-const EXPAND: usize = 0;
+/// The pill's buttons, in order: pause or resume, finish in the middle,
+/// and expand (in the panel, collapse).
+const PAUSE: usize = 0;
 const FINISH: usize = 1;
-const PAUSE: usize = 2;
+const EXPAND: usize = 2;
 
 /// What a button does to the app: `which` is its place, `expanded` whether
 /// it is drawn in the panel.
@@ -143,6 +145,7 @@ pub fn open(
                 focus: cx.focus_handle(),
                 cursor: FINISH,
                 return_to: None,
+                flash_due: None,
             }
         })
     })
@@ -186,7 +189,7 @@ impl FocusPill {
                 None
             }
             "right" | "l" | "tab" => {
-                self.cursor = (self.cursor + 1).min(PAUSE);
+                self.cursor = (self.cursor + 1).min(EXPAND);
                 None
             }
             "enter" => Some(self.cursor),
@@ -249,6 +252,17 @@ impl FocusPill {
     fn release(&mut self, _: &mut Context<Self>) {
         self.drag = None;
     }
+}
+
+/// A redraw once a flash has been said long enough to go.
+pub fn redraw_after_flash<V: 'static>(cx: &mut Context<V>) {
+    cx.spawn(async move |this, cx| {
+        cx.background_executor()
+            .timer(std::time::Duration::from_millis(3600))
+            .await;
+        let _ = this.update(cx, |_, cx| cx.notify());
+    })
+    .detach();
 }
 
 /// The pill's line: what runs on the left, its clock, and its buttons —
@@ -326,14 +340,21 @@ pub fn line(
         .gap_2()
         .pl_3()
         .pr(px(6.))
-        .child(
-            div()
+        // What was just done is said where the title is, for a moment.
+        .child(match app.current_flash() {
+            Some(flash) => div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .text_color(t.accent)
+                .child(flash.to_string()),
+            None => div()
                 .flex_1()
                 .min_w_0()
                 .truncate()
                 .when(paused || asking, |d| d.text_color(t.muted))
                 .child(title),
-        )
+        })
         .child(
             div()
                 .flex_none()
@@ -346,17 +367,17 @@ pub fn line(
                 .flex_none()
                 .flex()
                 .items_center()
-                .child(if expanded {
-                    button("pill-collapse", "minimize-2", EXPAND)
-                } else {
-                    button("pill-expand", "maximize-2", EXPAND)
-                })
-                .child(button("pill-finish", "check", FINISH))
                 .child(button(
                     "pill-pause",
                     if paused || on_break { "play" } else { "pause" },
                     PAUSE,
-                )),
+                ))
+                .child(button("pill-finish", "check", FINISH))
+                .child(if expanded {
+                    button("pill-collapse", "minimize-2", EXPAND)
+                } else {
+                    button("pill-expand", "maximize-2", EXPAND)
+                }),
         )
 }
 
@@ -407,10 +428,22 @@ pub const INSET: f32 = 1.;
 
 impl Render for FocusPill {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let flash_at = self
+            .takt
+            .read(cx)
+            .app
+            .focus_flash
+            .as_ref()
+            .map(|(_, at)| *at);
+        if flash_at.is_some() && flash_at != self.flash_due {
+            self.flash_due = flash_at;
+            redraw_after_flash(cx);
+        }
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         let this = self.this.clone();
         let chosen = self.has_keyboard(window).then_some(self.cursor);
+
         face(app, t, &self.takt, chosen)
             .id("focus-pill")
             .key_context("FocusPill")

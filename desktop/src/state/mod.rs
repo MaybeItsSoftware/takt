@@ -281,6 +281,9 @@ pub struct App {
     pub pending_focus: Option<(String, focus::FocusKind)>,
     /// "How did it go?", while it is asked.
     pub focus_prompt: Option<focus_prompt::FocusPrompt>,
+    /// What the last focus action did, said for a moment in the pill and
+    /// the panel ("Completed … · +2.0 pts today"), with when it was said.
+    pub focus_flash: Option<(String, i64)>,
     /// The commitment form, while `Editing::Commitment` is open.
     pub commitment_form: Option<commitment_form::CommitmentForm>,
     /// The block (or break) whose end has been announced.
@@ -397,6 +400,7 @@ impl App {
             focus_session: None,
             pending_focus: None,
             focus_prompt: None,
+            focus_flash: None,
             commitment_form: None,
             focus_notified: None,
             focus_checkpointed_at: 0,

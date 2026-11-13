@@ -63,6 +63,8 @@ pub struct FocusPanel {
     /// out (before shrinking), with a count to start each fade afresh.
     fade: Fade,
     fades: usize,
+    /// The flash a redraw is due for when it ends.
+    flash_due: Option<i64>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -250,6 +252,7 @@ pub fn open(
                     pick_scrolled: None,
                     morphing: grow,
                     fade: Fade::None,
+                    flash_due: None,
                     fades: 0,
                     mode: if capturing {
                         Mode::typing()
@@ -643,8 +646,14 @@ impl FocusPanel {
         cx.stop_propagation();
         let prompt = self.takt.read(cx).app.focus_prompt.is_some();
         if prompt {
-            self.takt
-                .update(cx, |takt, _| takt.app.focus_prompt_key(&key));
+            let answered = self.takt.update(cx, |takt, _| {
+                takt.app.focus_prompt_key(&key);
+                takt.app.focus_prompt.is_none()
+            });
+            // Answered: Return goes on to what is next, at the top.
+            if answered {
+                self.cursor = 0;
+            }
             self.settle(cx);
             cx.notify();
             return;
@@ -656,6 +665,7 @@ impl FocusPanel {
         };
         match key.as_str() {
             "escape" | "cmd+w" => return self.put_away(window, cx),
+            "cmd+delete" => self.delete_highlighted(cx),
             "n" | "/" => {
                 self.mode = Mode::typing();
                 self.cursor = 0;
@@ -709,9 +719,42 @@ impl FocusPanel {
         cx.notify();
     }
 
+    /// `⌘⌫`: the highlighted task deleted, as in the main window.
+    fn delete_highlighted(&mut self, cx: &mut Context<Self>) {
+        let entries = self.entries(&self.takt.read(cx).app);
+        let Some(Entry::Task { id, title, .. }) = entries.get(self.cursor).cloned() else {
+            return;
+        };
+        self.takt.update(cx, |takt, _| {
+            takt.app.delete_task(&id);
+            takt.app.today_stale = true;
+            takt.app.flash(format!("Deleted \u{201c}{title}\u{201d}"));
+        });
+        if self.picked.as_deref() == Some(id.as_str()) {
+            self.picked = None;
+        }
+        if matches!(self.mode, Mode::Type { .. }) {
+            self.refind(cx);
+        }
+        let count = self.entries(&self.takt.read(cx).app).len();
+        self.cursor = self.cursor.min(count.saturating_sub(1));
+        self.settle(cx);
+    }
+
     /// A key while typing.
     fn field_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let m = &event.keystroke.modifiers;
+        // `⌘⌫` with nothing typed deletes the highlighted task; with
+        // something typed it clears the line, as a field does.
+        if m.platform
+            && event.keystroke.key == "backspace"
+            && matches!(&self.mode, Mode::Type { field, .. } if field.text.is_empty())
+        {
+            cx.stop_propagation();
+            self.delete_highlighted(cx);
+            cx.notify();
+            return;
+        }
         if m.platform
             && !m.shift
             && event.keystroke.key == "o"
@@ -885,6 +928,17 @@ fn hint(keys: &str, label: &str, t: Tokens) -> AnyElement {
 
 impl Render for FocusPanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let flash_at = self
+            .takt
+            .read(cx)
+            .app
+            .focus_flash
+            .as_ref()
+            .map(|(_, at)| *at);
+        if flash_at.is_some() && flash_at != self.flash_due {
+            self.flash_due = flash_at;
+            super::pill::redraw_after_flash(cx);
+        }
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         if self.morphing {
@@ -899,6 +953,10 @@ impl Render for FocusPanel {
         let prompt = app.focus_prompt.clone();
         // While a block runs the top line is the pill's own.
         let top = running.then(|| super::pill::line(app, t, &self.takt, true, None));
+        // With nothing running, what was just done is said at the top.
+        let said = (!running)
+            .then(|| app.current_flash().map(str::to_string))
+            .flatten();
         let entries = self.entries(app);
         let filing_into = self
             .filing_into(app)
@@ -1015,7 +1073,13 @@ impl Render for FocusPanel {
                 })
                 .collect::<Vec<_>>()
         };
-        let rows = draw(rows_of, cursor, cx);
+        // While "how did it go?" is asked, the keyboard is the question's:
+        // no row is lit.
+        let rows = draw(
+            rows_of,
+            if prompt.is_some() { usize::MAX } else { cursor },
+            cx,
+        );
         let picker_rows = options.map(|options| {
             let cursor = self.cursor.min(options.len().saturating_sub(1));
             draw(options, cursor, cx)
@@ -1137,6 +1201,7 @@ impl Render for FocusPanel {
                         ("p", "queue pomodoro"),
                         ("j k", "move"),
                         ("o", "open in Takt"),
+                        ("\u{2318}\u{232b}", "delete"),
                         ("/", "find or add"),
                         ("esc", "hide"),
                     ]
@@ -1146,6 +1211,7 @@ impl Render for FocusPanel {
                         ("p", "pomodoro"),
                         ("j k", "move"),
                         ("o", "open in Takt"),
+                        ("\u{2318}\u{232b}", "delete"),
                         ("/", "find or add"),
                         ("esc", "hide"),
                     ]
@@ -1376,6 +1442,16 @@ impl Render for FocusPanel {
             .font_family(super::UI_FONT)
             .text_size(px(13.))
             .children(top)
+            .when_some(said, |d, said| {
+                d.child(
+                    div()
+                        .px_3()
+                        .pt_2()
+                        .truncate()
+                        .text_color(t.accent)
+                        .child(said),
+                )
+            })
             .child(rest);
         super::pill::framed(t, inside)
             .id("focus-panel")

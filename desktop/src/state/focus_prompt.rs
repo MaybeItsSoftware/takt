@@ -216,9 +216,11 @@ impl App {
         let Some(prompt) = self.focus_prompt.take() else {
             return;
         };
+        let title = prompt.title.clone();
         let now = now_ms();
         let zone = self.store.zone.clone();
         if choice == Choice::KeepWorking {
+            self.flash(format!("Back to \u{201c}{title}\u{201d}"));
             if !prompt.was_paused {
                 self.write(|s| s.core.resume_focus_session(prompt.session_id.clone(), now));
             }
@@ -283,6 +285,16 @@ impl App {
             if choice == Choice::Done {
                 self.celebrate(&prompt.task_id);
             }
+            self.flash(match choice {
+                Choice::Done => {
+                    format!("Completed \u{201c}{title}\u{201d} \u{b7} +{points:.1} pts today")
+                }
+                Choice::Break => format!(
+                    "+{points:.1} pts today \u{b7} {}-minute break",
+                    prompt.break_minutes
+                ),
+                _ => format!("+{points:.1} pts today \u{b7} \u{201c}{title}\u{201d} stays open"),
+            });
         }
         self.reload_focus();
         self.linger(&prompt.task_id);
@@ -393,10 +405,26 @@ impl App {
         let now = now_ms();
         if session.paused_at_ms.is_some() {
             self.write(|s| s.core.resume_focus_session(session.id.clone(), now));
+            self.flash("Resumed".into());
         } else {
             self.write(|s| s.core.pause_focus_session(session.id.clone(), now));
+            self.flash("Paused".into());
         }
         self.reload_focus();
+    }
+
+    /// Says what a focus action did, for a moment, in the pill and panel.
+    pub fn flash(&mut self, text: String) {
+        self.focus_flash = Some((text, now_ms()));
+    }
+
+    /// The flash, while it is still being said.
+    pub fn current_flash(&self) -> Option<&str> {
+        const SAID_FOR_MS: i64 = 3500;
+        self.focus_flash
+            .as_ref()
+            .filter(|(_, at)| now_ms() - at < SAID_FOR_MS)
+            .map(|(text, _)| text.as_str())
     }
 
     /// The queue behind the block in hand.

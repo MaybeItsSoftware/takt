@@ -236,10 +236,24 @@ impl App {
     /// on screen there.
     pub fn focus_from_panel(&mut self, task_id: &str, kind: FocusKind) {
         let before = self.selected_task.replace(task_id.to_string());
+        let title = self
+            .task(task_id)
+            .map(|t| t.title.clone())
+            .or_else(|| {
+                self.store
+                    .core
+                    .task(task_id.into())
+                    .ok()
+                    .flatten()
+                    .map(|t| t.title)
+            })
+            .unwrap_or_default();
         if self.focus_running() {
             self.add_selected_to_focus_queue(kind);
+            self.flash(format!("Queued \u{201c}{title}\u{201d} next"));
         } else {
             self.start_focus(kind, true);
+            self.flash(format!("Started \u{201c}{title}\u{201d}"));
         }
         if self.task(task_id).is_none() {
             self.selected_task = before;
@@ -316,11 +330,17 @@ impl App {
     /// Stops the session, logging the time so far without ticking the task.
     pub fn stop_focus(&mut self) {
         self.focus_prompt = None;
+        let title = self.running_title();
         if !self.end_block(false) {
             return;
         }
         if let Some(session) = self.focus_session.clone() {
             self.write(|store| store.core.finish_focus_session(session.id, now_ms()));
+        }
+        if let Some(title) = title {
+            self.flash(format!(
+                "Stopped \u{201c}{title}\u{201d} \u{b7} time logged, still open"
+            ));
         }
         self.reload_focus();
         self.message = Some("Focus stopped. The time so far is logged.".into());
