@@ -92,9 +92,11 @@ jobs:
       - name: Lint
         run: swiftlint lint --reporter github-actions-logging
 
-  # The shared Rust core (core/, docs/rust-core-migration.md).
+  # The shared Rust core (core/, docs/rust-core-migration.md). On Linux,
+  # where it bundles its own SQLite: GitHub's Mac runners are scarce, and
+  # the Apple builds are covered by swift-tests.
   core:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -128,9 +130,9 @@ jobs:
 
   # The CLI is the *only* MCP server — the app bundles it and `--mcp-server`
   # hands over to it — so these tests are what hold the server itself correct.
-  # `mcp-smoke` below checks the handover.
+  # `mcp-smoke` below checks the handover. On Linux, like core.
   cli:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
