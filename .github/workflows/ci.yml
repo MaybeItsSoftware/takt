@@ -92,11 +92,12 @@ jobs:
       - name: Lint
         run: swiftlint lint --reporter github-actions-logging
 
-  # The shared Rust core (core/, docs/rust-core-migration.md). On Linux,
-  # where it bundles its own SQLite: GitHub's Mac runners are scarce, and
-  # the Apple builds are covered by swift-tests.
+  # The shared Rust core (core/, docs/rust-core-migration.md). On a Mac,
+  # not Linux: off Apple and Android the core bundles its own SQLite, which
+  # enforces foreign keys and reads WAL files read-only where the system one
+  # the clients ship with does not, so a Linux run tests a database nothing uses.
   core:
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -130,9 +131,9 @@ jobs:
 
   # The CLI is the *only* MCP server — the app bundles it and `--mcp-server`
   # hands over to it — so these tests are what hold the server itself correct.
-  # `mcp-smoke` below checks the handover. On Linux, like core.
+  # `mcp-smoke` below checks the handover. On a Mac, for core's reason.
   cli:
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - name: Checkout
