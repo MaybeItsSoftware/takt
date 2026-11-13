@@ -59,48 +59,130 @@ ordinary tasks the user syncs.
 
 ## The demo video
 
-Unlisted on YouTube, in English, about four minutes. Recorded on the Mac,
-whose sign-in runs in a real browser so the `client_id` shows, with a short
-phone segment. Narrate or caption each step with *why* the scope is needed.
+What Google checks: the app name on the consent screen matches the app, the
+`client_id` in the sign-in address is this project's, and each scope asked
+for is visibly used. About four minutes, unlisted on YouTube. Three clips —
+the Mac, the iPhone, the Android phone — joined into one.
 
-**Before recording:** use a Google test account with a calendar called
-"Takt" and nothing private in it; disconnect Google in Takt (Settings →
-Google) and revoke Takt at myaccount.google.com/permissions so the full
-consent screen appears; set the browser to English; close notifications.
+### Getting ready (once, about 15 minutes)
 
-1. **Title card (5 s)** — "Takt — Google API scope demonstration", the
-   project ID `takt-511416`.
-2. **The app (15 s)** — open https://takt.maybeitssoftware.co.uk/ in the
-   browser, scroll to the privacy link, then open Takt on the Mac.
-3. **Consent (40 s)** — Settings → Google → *Connect Google Calendar, Tasks
-   & Drive*. In the browser, click into the address bar and pause on
-   `client_id=974752893800-…` long enough to read. Choose the account, show
-   the consent screen with the app name and every scope listed, tick them,
-   continue, back in Takt: "Google connected."
-4. **`calendar.readonly` (20 s)** — *Calendar to sync with* lists the
-   account's calendars; choose "Takt". Say: this is the only thing the scope
-   is used for.
-5. **`calendar.events`, Takt → Google (45 s)** — add a task and give it a
-   start time (today, 15:00) and an estimate. Click *Sync Google now*. In
-   Google Calendar the event appears at 15:00. Complete the task in Takt,
-   sync, and the event's title gains `✓ `.
-6. **`calendar.events`, Google → Takt (40 s)** — in Google Calendar drag a
-   second task's event to 16:30 and rename it; sync; the task in Takt moves
-   and renames. Turn on *Sync events too, not just tasks*, add an event in
-   Google, sync, and it arrives in Takt as a task.
-7. **`tasks` (40 s)** — after a sync, open Google Tasks (tasks.google.com or
-   the Calendar side panel): Takt's lists are there. Add a task to one in
-   Google Tasks, sync, and it appears in Takt.
-8. **`drive.file` (30 s)** — on a task, link a file with *Pick from Google
-   Drive…*: Google's Picker opens, pick one file, and it is linked to the
-   task. Say: Takt sees only files picked here.
-9. **Phones (45 s)** — on the iPhone, Settings → Google Calendar → *Connect
-   Google Calendar*: show the sign-in sheet with its URL bar and the consent
-   screen. On Android, Settings → Google Calendar → *Connect Google
-   Calendar*: show Google's consent sheet with Takt's name and the two
-   Calendar scopes.
-10. **Disconnect (15 s)** — Settings → Google → *Disconnect Google Calendar,
-   Tasks & Drive* on the Mac, and Takt gone from
-   myaccount.google.com/permissions.
+1. **A Google test account.** Not your own: everything in it will be on
+   screen. In Google Calendar make a calendar named `Takt`
+   (calendar.google.com → *Other calendars* → **+** → *Create new calendar*).
+   In Google Drive upload any harmless file, e.g. `Demo notes.pdf`.
+2. **Clear Takt's old grant.** Sign in to myaccount.google.com/permissions as
+   that account; if Takt is listed, click it → *Delete all connections*.
+3. **On the Mac, in Takt:** open Settings (`⌘,`) → **Google** in the sidebar.
+   If it says *Disconnect Google Calendar, Tasks & Drive*, click it. Make sure
+   the Google switch at the top and the **Google Calendar**, **Google Tasks**
+   and **Google Drive** switches under *Services* are all on. Close Settings.
+4. **A demo list.** `⌘⇧N`, name it `Demo`, `Return`. Add two tasks (`Return`
+   on the list, type, `Return`): `Write project brief` and
+   `Book dentist appointment`.
+5. **Browser:** Chrome, signed in to the test account only, language
+   English, bookmarks bar hidden. Open these tabs: the Takt homepage,
+   Google Calendar, Google Tasks (tasks.google.com), myaccount.google.com/permissions.
+6. **Quiet the Mac:** Focus → Do Not Disturb on; quit Slack, Mail, Messages.
+7. **Phones:** Takt installed on both, signed out of Google Calendar
+   (Settings → Calendar / Google Calendar → *Disconnect* if shown).
 
-Upload as **Unlisted**, and paste the link into the verification form.
+### Recording the Mac (clip 1)
+
+Start: `⌘⇧5` → *Record Entire Screen* → *Options* → Microphone: your mic if
+you will narrate, *None* if you will caption → *Record*. Stop: the ■ in the
+menu bar. The file lands on the Desktop. Do a full practice run first, then
+redo steps 2–3 of *Getting ready* before the real take.
+
+Say each line in quotes out loud (or leave it out and I can caption it).
+
+1. **Title (5 s).** Show a note or slide reading
+   `Takt — Google OAuth verification demo · project takt-511416`.
+   — "This is Takt, a task manager for Mac, iPhone and Android."
+2. **Homepage (15 s).** Chrome, the Takt homepage tab. Scroll to the bottom,
+   click *Privacy policy*, scroll it briefly to the Google section.
+   — "This is the app's homepage and privacy policy."
+3. **Start the sign-in (20 s).** Switch to Takt. `⌘,` → **Google** →
+   *Connect Google Calendar, Tasks & Drive*. Chrome opens Google's sign-in.
+4. **Show the client ID (10 s).** Click into Chrome's address bar, press
+   `End`, then move the cursor back until `client_id=974752893800-…` is in
+   view. Hold for three seconds.
+   — "The client ID is this project's, 974752893800."
+5. **Consent (25 s).** Click the test account. On the consent screen, hold
+   long enough that *Takt* and every permission can be read. Tick each box,
+   click *Continue*. The browser says it is done; switch back to Takt, which
+   shows *Google connected.*
+   — "Takt asks for Google Calendar and Google Tasks."
+6. **`calendar.readonly` (20 s).** Still on the Google page, click
+   *Calendar to sync with* and choose **Takt**.
+   — "Takt reads the list of calendars only so you can pick one. That is all
+   it uses this permission for."
+7. **A task onto the calendar (45 s).** Close Settings, open the **Demo**
+   list, select `Write project brief` and press `i` to open the inspector. Move to
+   **Start** (`j`/`k`, or click it), `Return`, press `t` for today, `Tab`, type `15:00`,
+   `Tab`, type `1h`, `Return`. Do the same on `Book dentist appointment`
+   with `16:00`. Press `⌘⇧R` to sync. Switch to the Google Calendar tab and
+   refresh: both appear today at 15:00 and 16:00 in the Takt calendar.
+   — "A task with a start time becomes an event in the calendar you chose."
+8. **Completing it (20 s).** Back in Takt, select `Write project brief`,
+   press `Space` to complete it, `⌘⇧R`. In Google Calendar, refresh: the
+   event now reads `✓ Write project brief`.
+   — "Completing the task updates its event."
+9. **Calendar back to Takt (30 s).** In Google Calendar drag
+   `Book dentist appointment` to 17:30, click it, rename it to
+   `Dentist — Dr Lee`, save. Back in Takt, `⌘⇧R`: the task is renamed and its
+   start is 17:30 in the inspector.
+   — "Moving or renaming the event changes the task. That needs edit access
+   to events, calendar.events."
+10. **Events become tasks (25 s).** `⌘,` → **Google** → switch on *Sync
+    events too, not just tasks*. In Google Calendar click tomorrow 10:00 in
+    the Takt calendar, title `Team standup`, *Save*. In Takt `⌘⇧R`: `Team
+    standup` arrives as a task.
+11. **`tasks` (35 s).** Google Tasks tab, refresh: the **Demo** list is
+    there with its tasks. Click *Add a task* in it, type `Buy printer ink`,
+    `Return`. In Takt, `⌘⇧R`: `Buy printer ink` appears in Demo.
+    — "Takt keeps each list in Google Tasks too, and brings back what you
+    add there. It only changes the lists it made."
+12. **`drive.file` (30 s).** Select any task in Demo, press `pl`, choose
+    *Choose files from Google Drive…*. Google's picker opens in Chrome;
+    click `Demo notes.pdf`, *Select*. Back in Takt the file shows as a link
+    beside the task's name.
+    — "Takt sees only the files you pick here."
+13. **Disconnect (15 s).** `⌘,` → **Google** → *Disconnect Google Calendar,
+    Tasks & Drive*. In Chrome, the permissions tab, refresh: Takt is gone, or
+    click it → *Delete all connections*.
+    — "Disconnecting, or removing access here, stops it all."
+
+Stop the recording.
+
+### Recording the phones (clips 2 and 3, about 30 s each)
+
+**iPhone.** Control Centre → *Screen Recording* (add it in Settings →
+Control Centre if missing). In Takt: the lists screen → the gear (*Settings*)
+→ **Google Calendar** → *Connect Google Calendar*. In the sign-in sheet, tap
+the address bar so `client_id` shows, choose the test account, hold on the
+consent screen, *Continue*, and back in Takt. Stop the recording.
+
+**Android.** Swipe down twice → *Screen record* → *Start*. In Takt: open the
+sidebar (☰) → **Settings** → **Calendar** → *Connect Google Calendar*.
+Choose the test account, hold on Google's consent sheet with *Takt* and both
+Calendar permissions, *Allow*, back in Takt showing it connected. Stop.
+
+### Putting it together
+
+AirDrop or copy the two phone clips to the Mac. To join and trim them:
+
+```bash
+# trim a clip: keep from 0:03 to 2:45
+ffmpeg -i mac.mov -ss 00:00:03 -to 00:02:45 -c copy mac-trim.mov
+# join: list the clips in order, then concatenate (re-encoding, since the
+# phones record at other sizes)
+ffmpeg -i mac-trim.mov -i iphone.mov -i android.mp4 -filter_complex \
+  "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[a]; \
+   [1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[b]; \
+   [2:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[c]; \
+   [a][b][c]concat=n=3:v=1:a=0[v]" -map "[v]" takt-google-demo.mp4
+```
+
+(Without narration; add the audio streams if you narrated.) Upload to
+YouTube → *Visibility: Unlisted*, title `Takt — Google OAuth verification`,
+and paste the link into the verification form.
