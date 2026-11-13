@@ -159,74 +159,90 @@ impl FocusPill {
     }
 }
 
+/// The pill as drawn: what runs on the left, its clock on the right, in a
+/// rounded box. The panel wears it while it grows out of the pill or
+/// shrinks back in, so the two meet without a jump.
+pub fn face(app: &crate::state::App, t: Tokens) -> gpui::Div {
+    let now = crate::state::store::now_ms();
+    let session = app.focus_session.clone();
+    let (clock, over) = session
+        .as_ref()
+        .map(|s| reading(s, now))
+        .unwrap_or_default();
+    let on_break = session.as_ref().is_some_and(|s| s.phase == "onBreak");
+    let paused = session.as_ref().is_some_and(|s| s.paused_at_ms.is_some());
+    let asking = app.focus_prompt.is_some();
+    let title = if on_break {
+        "Break".to_string()
+    } else {
+        app.running_title().unwrap_or_else(|| "Focus".into())
+    };
+    let clock_colour = if over {
+        t.warning
+    } else if paused || asking {
+        t.muted
+    } else {
+        t.accent
+    };
+    // The line sits at the top at the pill's own height, so in a taller
+    // box (the panel, mid-morph) it stays put.
+    let line = div()
+        .flex_none()
+        .h(px(HEIGHT - 2.))
+        .flex()
+        .items_center()
+        .gap_2()
+        .px_3()
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .when(paused || asking, |d| d.text_color(t.muted))
+                .child(title),
+        )
+        .when(paused, |d| {
+            d.child(
+                div()
+                    .flex_none()
+                    .text_size(px(10.))
+                    .text_color(t.muted)
+                    .child("paused"),
+            )
+        })
+        .child(
+            div()
+                .flex_none()
+                .font_family(super::MONO_FONT)
+                .text_color(clock_colour)
+                .child(clock),
+        );
+    div()
+        .size_full()
+        .flex()
+        .flex_col()
+        .overflow_hidden()
+        .bg(t.surface)
+        .border_1()
+        .border_color(t.border_variant)
+        .rounded(px(8.))
+        .text_color(t.text)
+        .font_family(super::UI_FONT)
+        .text_size(px(13.))
+        .child(line)
+}
+
 impl Render for FocusPill {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
-        let now = crate::state::store::now_ms();
-        let session = app.focus_session.clone();
-        let (clock, over) = session
-            .as_ref()
-            .map(|s| reading(s, now))
-            .unwrap_or_default();
-        let on_break = session.as_ref().is_some_and(|s| s.phase == "onBreak");
-        let paused = session.as_ref().is_some_and(|s| s.paused_at_ms.is_some());
-        let asking = app.focus_prompt.is_some();
-        let title = if on_break {
-            "Break".to_string()
-        } else {
-            app.running_title().unwrap_or_else(|| "Focus".into())
-        };
-        let clock_colour = if over {
-            t.warning
-        } else if paused || asking {
-            t.muted
-        } else {
-            t.accent
-        };
         let this = self.this.clone();
-        div()
+        face(app, t)
             .id("focus-pill")
-            .size_full()
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_3()
-            .bg(t.surface)
-            .border_1()
-            .border_color(t.border)
-            .rounded(px(8.))
-            .text_color(t.text)
-            .font_family(super::UI_FONT)
-            .text_size(px(13.))
             .cursor_pointer()
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|pill, _: &MouseDownEvent, _, _| pill.press()),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .when(paused || asking, |d| d.text_color(t.muted))
-                    .child(title),
-            )
-            .when(paused, |d| {
-                d.child(
-                    div()
-                        .flex_none()
-                        .text_size(px(10.))
-                        .text_color(t.muted)
-                        .child("paused"),
-                )
-            })
-            .child(
-                div()
-                    .flex_none()
-                    .font_family(super::MONO_FONT)
-                    .text_color(clock_colour)
-                    .child(clock),
             )
             // The drag and the release are heard window-wide: the pointer
             // can outrun the window while it follows.

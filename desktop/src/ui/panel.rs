@@ -56,6 +56,8 @@ pub struct FocusPanel {
     /// The row each was last scrolled to, with how many rows there were.
     scrolled: Option<(usize, usize)>,
     pick_scrolled: Option<(usize, usize)>,
+    /// Growing out of the pill or shrinking back in: drawn as the pill is.
+    morphing: bool,
 }
 
 /// What the keyboard is doing in the panel.
@@ -232,6 +234,7 @@ pub fn open(
                     pick_scroll: gpui::ScrollHandle::new(),
                     scrolled: None,
                     pick_scrolled: None,
+                    morphing: grow,
                     mode: if capturing {
                         Mode::typing()
                     } else {
@@ -250,8 +253,20 @@ pub fn open(
         let (x, y, _, h) = window_move::frame(ns_window);
         let (fw, fh) = (f64::from(WIDTH), f64::from(HEIGHT));
         let to = (x, y + h - fh, fw, fh);
-        cx.spawn(async move |_| window_move::animate_frame(ns_window, to, MORPH_SECONDS))
-            .detach();
+        let panel = handle;
+        cx.spawn(async move |cx| {
+            window_move::animate_frame(ns_window, to, MORPH_SECONDS);
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs_f64(MORPH_SECONDS))
+                .await;
+            if let Some(panel) = panel {
+                let _ = panel.update(cx, |panel, _, cx| {
+                    panel.morphing = false;
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
     }
     handle
 }
@@ -518,7 +533,7 @@ impl FocusPanel {
 
     /// Puts the panel away, handing the keyboard back to the app it was
     /// summoned over rather than letting the main window take it.
-    fn put_away(&self, window: &mut Window, cx: &mut Context<Self>) {
+    fn put_away(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let back = self.takt.update(cx, |takt, _| takt.panel_return_to.take());
         self.leave(back, window, cx);
     }
@@ -527,7 +542,7 @@ impl FocusPanel {
     /// takes its place: the panel shrinks into its top-left corner, where
     /// the pill then stands. Otherwise, or with reduced motion, it simply
     /// goes.
-    pub fn leave(&self, back: Option<i32>, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn leave(&mut self, back: Option<i32>, window: &mut Window, cx: &mut Context<Self>) {
         let pill = {
             let app = &self.takt.read(cx).app;
             app.focus_session.is_some() && app.prefs.focus_panel
@@ -547,6 +562,9 @@ impl FocusPanel {
                 size: pill_size,
             });
         });
+        // Wears the pill from the first frame of the shrink.
+        self.morphing = true;
+        cx.notify();
         let handle = window.window_handle();
         let (x, y, _, h) = window_move::frame(ns_window);
         let (pw, ph) = (
@@ -846,6 +864,14 @@ impl Render for FocusPanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
+        if self.morphing {
+            return super::pill::face(app, t)
+                .id("focus-panel")
+                .key_context("FocusPanel")
+                .track_focus(&self.focus)
+                .on_key_down(cx.listener(Self::key_down))
+                .into_any_element();
+        }
         let status = app.focus_status();
         let running = app.focus_session.is_some();
         let prompt = app.focus_prompt.clone();
@@ -1226,8 +1252,8 @@ impl Render for FocusPanel {
             .flex_col()
             .bg(t.surface)
             .border_1()
-            .border_color(t.border)
-            .rounded(px(10.))
+            .border_color(t.border_variant)
+            .rounded(px(8.))
             .text_color(t.text)
             .font_family(super::UI_FONT)
             .text_size(px(13.))
@@ -1340,6 +1366,7 @@ impl Render for FocusPanel {
                         .children(hints.into_iter().map(|(keys, label)| hint(keys, label, t))),
                 )
             })
+            .into_any_element()
     }
 }
 
