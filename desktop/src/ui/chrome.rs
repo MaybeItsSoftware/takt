@@ -362,7 +362,7 @@ impl Takt {
                 },
                 self.app.task_counts.get(id).copied(),
             ),
-            RowKind::NestedList(_) => ("corner-down-right", None),
+            RowKind::NestedList(id) => ("corner-down-right", self.app.task_counts.get(id).copied()),
             RowKind::Folder(id) => (
                 if self.app.prefs.expanded_folders.contains(id) {
                     "folder-open"

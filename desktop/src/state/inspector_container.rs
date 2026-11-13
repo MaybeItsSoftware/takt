@@ -117,9 +117,9 @@ impl App {
         let mut said = vec![if inbox { "The inbox" } else { "List" }.to_string()];
         let count = self.task_counts.get(id).copied().unwrap_or(0);
         said.push(match count {
-            0 => "no tasks".into(),
-            1 => "1 task".into(),
-            n => format!("{n} tasks"),
+            0 => "no open tasks".into(),
+            1 => "1 open task".into(),
+            n => format!("{n} open tasks"),
         });
         if list.completed_at_ms.is_some() {
             said.push("completed".into());

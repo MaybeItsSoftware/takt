@@ -100,10 +100,13 @@ impl App {
             .filter(|filter| !filter.is_builtin)
             .collect();
         let ids: Vec<String> = self.lists.iter().map(|list| list.id.clone()).collect();
-        if let Ok(index) = core.sidebar_index(ids) {
+        // Open tasks only: not finished ones, not lists, nothing under an
+        // archived or finished nested list. A nested list gets its own count
+        // under its id once something open sits beneath it.
+        if let Ok(index) = core.sidebar_index_with_open_counts(ids) {
             self.nested_lists = index.nested_lists;
             self.task_counts = index
-                .task_counts
+                .open_counts
                 .into_iter()
                 .map(|count| (count.list_id, count.count))
                 .collect();
