@@ -561,6 +561,9 @@ impl FocusPanel {
     /// the pill then stands. Otherwise, or with reduced motion, it simply
     /// goes.
     pub fn leave(&mut self, back: Option<i32>, window: &mut Window, cx: &mut Context<Self>) {
+        if self.fade == Fade::Out {
+            return;
+        }
         let pill = {
             let app = &self.takt.read(cx).app;
             app.focus_session.is_some() && app.prefs.focus_panel
@@ -885,7 +888,7 @@ impl Render for FocusPanel {
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         if self.morphing {
-            return super::pill::face(app, t, &self.takt)
+            return super::pill::face(app, t, &self.takt, None)
                 .id("focus-panel")
                 .key_context("FocusPanel")
                 .track_focus(&self.focus)
@@ -895,7 +898,7 @@ impl Render for FocusPanel {
         let running = app.focus_session.is_some();
         let prompt = app.focus_prompt.clone();
         // While a block runs the top line is the pill's own.
-        let top = running.then(|| super::pill::line(app, t, &self.takt, true));
+        let top = running.then(|| super::pill::line(app, t, &self.takt, true, None));
         let entries = self.entries(app);
         let filing_into = self
             .filing_into(app)

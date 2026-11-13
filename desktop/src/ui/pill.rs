@@ -35,6 +35,43 @@ pub struct FocusPill {
     /// While the button is down: where the pointer and the window started,
     /// and whether it has moved far enough to be a drag.
     drag: Option<Drag>,
+    /// Its hotkey gives it the keyboard: the button the keyboard is on,
+    /// and the app to hand the keyboard back to.
+    focus: gpui::FocusHandle,
+    cursor: usize,
+    return_to: Option<i32>,
+}
+
+/// The pill's buttons, in order: finish, pause or resume, and expand (in
+/// the panel, collapse).
+const FINISH: usize = 0;
+const PAUSE: usize = 1;
+const EXPAND: usize = 2;
+
+/// What a button does to the app: `which` is its place, `expanded` whether
+/// it is drawn in the panel.
+fn action(which: usize, expanded: bool) -> fn(&mut Takt) {
+    match which {
+        FINISH => |takt| {
+            // Answered in the panel: "how did it go?"
+            takt.app.request_focus_completion(true);
+            takt.app.wants_panel = Some(true);
+        },
+        PAUSE => |takt| {
+            let app = &mut takt.app;
+            if app
+                .focus_session
+                .as_ref()
+                .is_some_and(|s| s.phase == "onBreak")
+            {
+                app.end_focus_break();
+            } else {
+                app.toggle_focus_pause();
+            }
+        },
+        _ if expanded => |takt| takt.app.wants_panel = Some(false),
+        _ => |takt| takt.app.wants_panel = Some(true),
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -95,11 +132,17 @@ pub fn open(
         }
         cx.new(|cx| {
             cx.observe(&takt, |_, _, cx| cx.notify()).detach();
+            // The keyboard's button is lit only while it has the keyboard.
+            cx.observe_window_activation(window, |_, _, cx| cx.notify())
+                .detach();
             FocusPill {
                 takt: takt.clone(),
                 this: cx.entity().downgrade(),
                 ns_window,
                 drag: None,
+                focus: cx.focus_handle(),
+                cursor: PAUSE,
+                return_to: None,
             }
         })
     })
@@ -107,6 +150,72 @@ pub fn open(
 }
 
 impl FocusPill {
+    /// The hotkey with the pill up: it takes the keyboard, on pause, while
+    /// the app in front stays in front.
+    pub fn take_keyboard(&mut self, return_to: Option<i32>, window: &mut Window) {
+        self.return_to = return_to;
+        self.cursor = PAUSE;
+        window.activate_window();
+        window.focus(&self.focus);
+    }
+
+    pub fn has_keyboard(&self, window: &Window) -> bool {
+        window.is_window_active() && self.focus.is_focused(window)
+    }
+
+    /// Hands the keyboard back to the app it came from.
+    fn give_back(&mut self) {
+        if let Some(ns_window) = self.ns_window {
+            window_move::resign_key(ns_window);
+        }
+        if let Some(pid) = self.return_to.take() {
+            crate::platform::activate_app(pid);
+        }
+    }
+
+    fn key_down(
+        &mut self,
+        event: &gpui::KeyDownEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(key) = crate::keys::spell(&crate::keys::Press::from_keystroke(&event.keystroke))
+        else {
+            return;
+        };
+        cx.stop_propagation();
+        let which = match key.as_str() {
+            "left" | "h" | "shift+tab" => {
+                self.cursor = self.cursor.saturating_sub(1);
+                None
+            }
+            "right" | "l" | "tab" => {
+                self.cursor = (self.cursor + 1).min(EXPAND);
+                None
+            }
+            "enter" => Some(self.cursor),
+            "space" | "p" => Some(PAUSE),
+            "d" => Some(FINISH),
+            "e" | "o" | "up" | "down" => Some(EXPAND),
+            "escape" => {
+                self.give_back();
+                None
+            }
+            _ => None,
+        };
+        if let Some(which) = which {
+            let act = action(which, false);
+            let takt = self.takt.clone();
+            cx.defer(move |cx| {
+                takt.update(cx, |takt, cx| {
+                    act(takt);
+                    takt.settle(cx);
+                })
+            });
+        }
+        cx.notify();
+    }
+
     fn press(&mut self) {
         let Some(ns_window) = self.ns_window else {
             return;
@@ -150,7 +259,13 @@ impl FocusPill {
 /// finish, pause or resume, and expand (or, `expanded`, in the panel,
 /// collapse). The panel's own top line is this same line, so the two meet
 /// without a jump as one grows out of the other.
-pub fn line(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>, expanded: bool) -> gpui::Div {
+pub fn line(
+    app: &crate::state::App,
+    t: Tokens,
+    takt: &Entity<Takt>,
+    expanded: bool,
+    chosen: Option<usize>,
+) -> gpui::Div {
     let now = crate::state::store::now_ms();
     let session = app.focus_session.clone();
     let (clock, over) = session
@@ -174,8 +289,10 @@ pub fn line(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>, expanded: b
     };
     // Each button acts once the click is over: this window is out of
     // GPUI's list while it handles one, and `Takt` would think it closed.
-    let button = |id: &'static str, name: &'static str, act: fn(&mut Takt)| {
+    let button = |id: &'static str, name: &'static str, which: usize| {
         let takt = takt.clone();
+        let act = action(which, expanded);
+        let on = chosen == Some(which);
         div()
             .id(id)
             .flex_none()
@@ -184,8 +301,14 @@ pub fn line(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>, expanded: b
             .items_center()
             .justify_center()
             .rounded(px(4.))
-            .text_color(t.muted)
-            .hover(|d| d.bg(t.hover).text_color(t.text))
+            .border_1()
+            .border_color(if on {
+                t.focus
+            } else {
+                gpui::transparent_black()
+            })
+            .when(on, |d| d.bg(t.selected))
+            .hover(|d| d.bg(t.hover))
             .cursor_pointer()
             .on_click(move |_, _, cx| {
                 cx.stop_propagation();
@@ -197,7 +320,7 @@ pub fn line(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>, expanded: b
                     })
                 });
             })
-            .child(super::icons::icon(name, 14.).text_color(t.muted))
+            .child(super::icons::icon(name, 14.).text_color(if on { t.text } else { t.muted }))
     };
     div()
         .flex_none()
@@ -227,42 +350,28 @@ pub fn line(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>, expanded: b
                 .flex_none()
                 .flex()
                 .items_center()
-                .child(button("pill-finish", "check", |takt| {
-                    // Answered in the panel: "how did it go?"
-                    takt.app.request_focus_completion(true);
-                    takt.app.wants_panel = Some(true);
-                }))
+                .child(button("pill-finish", "check", FINISH))
                 .child(button(
                     "pill-pause",
                     if paused || on_break { "play" } else { "pause" },
-                    |takt| {
-                        let app = &mut takt.app;
-                        if app
-                            .focus_session
-                            .as_ref()
-                            .is_some_and(|s| s.phase == "onBreak")
-                        {
-                            app.end_focus_break();
-                        } else {
-                            app.toggle_focus_pause();
-                        }
-                    },
+                    PAUSE,
                 ))
                 .child(if expanded {
-                    button("pill-collapse", "minimize-2", |takt| {
-                        takt.app.wants_panel = Some(false)
-                    })
+                    button("pill-collapse", "minimize-2", EXPAND)
                 } else {
-                    button("pill-expand", "maximize-2", |takt| {
-                        takt.app.wants_panel = Some(true)
-                    })
+                    button("pill-expand", "maximize-2", EXPAND)
                 }),
         )
 }
 
 /// The pill as drawn: its line, in its box. The panel wears it while it
 /// grows out of the pill or shrinks back in.
-pub fn face(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>) -> gpui::Div {
+pub fn face(
+    app: &crate::state::App,
+    t: Tokens,
+    takt: &Entity<Takt>,
+    chosen: Option<usize>,
+) -> gpui::Div {
     framed(
         t,
         div()
@@ -271,7 +380,7 @@ pub fn face(app: &crate::state::App, t: Tokens, takt: &Entity<Takt>) -> gpui::Di
             .text_color(t.text)
             .font_family(super::UI_FONT)
             .text_size(px(13.))
-            .child(line(app, t, takt, false)),
+            .child(line(app, t, takt, false, chosen)),
     )
 }
 
@@ -298,8 +407,12 @@ impl Render for FocusPill {
         let app = &self.takt.read(cx).app;
         let t = Tokens::of(&app.theme(), window.appearance(), &app.prefs.appearance);
         let this = self.this.clone();
-        face(app, t, &self.takt)
+        let chosen = self.has_keyboard(window).then_some(self.cursor);
+        face(app, t, &self.takt, chosen)
             .id("focus-pill")
+            .key_context("FocusPill")
+            .track_focus(&self.focus)
+            .on_key_down(cx.listener(Self::key_down))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|pill, _: &MouseDownEvent, _, _| pill.press()),

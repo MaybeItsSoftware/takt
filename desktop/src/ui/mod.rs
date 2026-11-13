@@ -354,7 +354,28 @@ impl Takt {
             // The one hotkey shows the panel, or puts it away when it is up.
             // Up but behind another app's window, it is brought forward
             // and given the keyboard instead.
+            // With only the pill up, it takes the keyboard first, and a
+            // second press grows it.
             Event::FocusPanel => {
+                if !self.panel_open(cx)
+                    && let Some(pill) = self.pill.filter(|_| self.pill_open(cx))
+                {
+                    let keyed = pill
+                        .update(cx, |pill, window, _| pill.has_keyboard(window))
+                        .unwrap_or(false);
+                    if keyed {
+                        self.app.wants_panel = Some(true);
+                    } else {
+                        let back = crate::platform::frontmost_other_app();
+                        cx.defer(move |cx| {
+                            let _ = pill.update(cx, |pill, window, cx| {
+                                pill.take_keyboard(back, window);
+                                cx.notify();
+                            });
+                        });
+                    }
+                    return;
+                }
                 let active = self.panel.as_ref().and_then(|handle| {
                     handle
                         .update(cx, |_, window, _| window.is_window_active())
@@ -524,7 +545,9 @@ impl Takt {
                 .as_ref()
                 .is_some_and(|handle| handle.update(cx, |_, _, _| ()).is_ok());
             if open && !wanted {
-                if let Some(handle) = self.panel.take() {
+                // Kept until its window closes, so the pill stays away
+                // while the panel shrinks into its place.
+                if let Some(handle) = self.panel {
                     let back = self.panel_return_to.take();
                     cx.defer(move |cx| {
                         let _ =

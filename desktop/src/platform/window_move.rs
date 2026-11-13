@@ -118,3 +118,10 @@ pub fn no_shadow(ns_window: usize) {
         let _: () = msg_send![ns_window as *mut Object, setHasShadow: false];
     }
 }
+
+/// The window gives up the keyboard, which goes back to the app in front.
+pub fn resign_key(ns_window: usize) {
+    unsafe {
+        let _: () = msg_send![ns_window as *mut Object, resignKeyWindow];
+    }
+}
