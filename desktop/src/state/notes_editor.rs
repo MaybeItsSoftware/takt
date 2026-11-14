@@ -139,7 +139,7 @@ pub fn parse_obsidian(url: &str) -> Option<(String, String, Option<PathBuf>)> {
 }
 
 /// Percent-decoding, as `obsidian_link_url` encodes.
-fn decode(text: &str) -> String {
+pub(crate) fn decode(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut ix = 0;

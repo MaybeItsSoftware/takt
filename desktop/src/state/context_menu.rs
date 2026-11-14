@@ -349,6 +349,94 @@ impl App {
             .unwrap_or_default()
     }
 
+    /// The menu for one of a task's links: open it, save a Drive file (to
+    /// Downloads, or where the person chooses), show a file or note in
+    /// Finder, or take the link off.
+    pub fn open_link_menu(&mut self, link: &takt_core::links::TaskLink, x: f32, y: f32) {
+        use takt_core::links::LinkKind;
+        let url = &link.url;
+        let item = |title: &str, action: String, destructive: bool| {
+            MenuEntry::Item(MenuItem {
+                title: title.into(),
+                action,
+                keys: String::new(),
+                destructive,
+            })
+        };
+        let mut entries = vec![item("Open", format!("link-open:{url}"), false)];
+        if link.kind == LinkKind::Drive && !link.is_folder {
+            entries.push(item("Save to Downloads", format!("link-save:{url}"), false));
+            entries.push(item("Save to…", format!("link-save-as:{url}"), false));
+        }
+        if self.local_path_of(url).is_some() {
+            entries.push(item("Show in Finder", format!("link-reveal:{url}"), false));
+        }
+        entries.push(MenuEntry::Divider);
+        entries.push(item("Remove link", format!("link-remove:{url}"), true));
+        self.context_menu = Some(ContextMenu {
+            x,
+            y,
+            entries,
+            index: None,
+        });
+    }
+
+    /// The file on this Mac a link names: a `file://` address or path, or
+    /// an Obsidian note found in its vault.
+    fn local_path_of(&self, url: &str) -> Option<std::path::PathBuf> {
+        if let Some(path) = url.strip_prefix("file://") {
+            return Some(std::path::PathBuf::from(super::notes_editor::decode(path)));
+        }
+        if url.starts_with('/') {
+            return Some(std::path::PathBuf::from(url));
+        }
+        super::notes_editor::resolve(url, &self.obsidian_vaults()).and_then(|note| note.path)
+    }
+
+    /// A link's menu item, run: false when the action wasn't one.
+    fn run_link_action(&mut self, action: &str) -> bool {
+        let Some((verb, url)) = action.split_once(':') else {
+            return false;
+        };
+        let url = url.to_string();
+        match verb {
+            "link-open" => super::pickers::open_address(&url),
+            "link-save" => {
+                let client = self.google_client_id();
+                self.message = Some("Saving from Drive…".into());
+                std::thread::spawn(move || {
+                    let said = super::links::save_drive_file(&client, &url, None);
+                    crate::sync::announce(&said, false);
+                });
+            }
+            "link-save-as" => {
+                let name = self
+                    .selected_task
+                    .clone()
+                    .and_then(|id| self.store.core.task_links(id).ok())
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|link| link.url == url)
+                    .map(|link| link.title)
+                    .unwrap_or_default();
+                self.wants_save_as = Some((url, name));
+            }
+            "link-reveal" => {
+                if let Some(path) = self.local_path_of(&url) {
+                    let _ = std::process::Command::new("/usr/bin/open")
+                        .arg("-R")
+                        .arg(path)
+                        .spawn();
+                }
+            }
+            "link-remove" => self.edit_selected(|edit| {
+                edit.metadata.external_links.retain(|link| link != &url);
+            }),
+            _ => return false,
+        }
+        true
+    }
+
     /// Runs what was picked and closes the menu.
     pub fn pick_from_menu(&mut self, action: &str) {
         self.context_menu = None;
@@ -369,6 +457,9 @@ impl App {
             if let Ok(ix) = ix.parse::<usize>() {
                 self.go_to_history_step(ix);
             }
+            return;
+        }
+        if action.starts_with("link-") && self.run_link_action(action) {
             return;
         }
         if let Some(ix) = action.strip_prefix("open-link:") {

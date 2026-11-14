@@ -297,6 +297,10 @@ pub struct App {
     pub settings_page: Option<settings::SettingsPage>,
     /// The floating focus panel asked for (true) or away (false).
     pub wants_panel: Option<bool>,
+    /// A linked Drive file to save where the person chooses, from the
+    /// link's menu, with the name to suggest: the window asks where, then
+    /// the file is fetched.
+    pub wants_save_as: Option<(String, String)>,
     /// The quick capture window, asked for.
     pub wants_capture: bool,
     /// The global shortcuts changed and want registering again.
@@ -408,6 +412,7 @@ impl App {
             celebrating: Default::default(),
             settings_page: None,
             wants_panel: None,
+            wants_save_as: None,
             wants_capture: false,
             hotkeys_changed: false,
             hotkey_problems: Vec::new(),

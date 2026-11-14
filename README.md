@@ -206,7 +206,11 @@ full size, and says whether they are the task's linked Obsidian note.
 and go on to the next / previous row, editing it if it is a field. The mouse
 works as before. A task's links have a row of their own just above the
 notes, each a chip of its kind's icon and its name (a click opens it; a file
-in Drive shows Drive's mark); `Return` on the row, or `pl`, opens the
+in Drive shows Drive's mark). Hovering one previews it — Drive's thumbnail of
+the file, a note's opening lines, a picture on this Mac — and right-clicking
+gives Open, Save to Downloads or Save to… for a Drive file (a Google Doc saved
+as a Word, Excel or PowerPoint file, then shown in Finder to drag on), Show in
+Finder for a note or file, and Remove link; `Return` on the row, or `pl`, opens the
 finder, where you type to search Obsidian and Drive or paste an address, and
 where a link already there can be opened or removed. The task's own keys work from the inspector too — the ones
 shown beside its rows (`nn` the notes, `tt` the tags, `pl` a link, `⌥T` the

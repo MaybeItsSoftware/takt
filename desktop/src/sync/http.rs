@@ -44,6 +44,33 @@ pub fn request(
     Ok(Reply { status, body })
 }
 
+/// A GET whose body is kept as bytes: an image or a file to save. Answers
+/// the status, the body and its `Content-Type`.
+pub fn get_bytes(
+    url: &str,
+    headers: &[(&str, &str)],
+    timeout: Duration,
+) -> Result<(u16, Vec<u8>, String), String> {
+    let agent = ureq::AgentBuilder::new().timeout(timeout).build();
+    let mut request = agent.get(url);
+    for (name, value) in headers {
+        request = request.set(name, value);
+    }
+    let response = match request.call() {
+        Ok(response) => response,
+        Err(ureq::Error::Status(_, response)) => response,
+        Err(ureq::Error::Transport(error)) => {
+            return Err(format!("Couldn't reach the server: {error}"));
+        }
+    };
+    let status = response.status();
+    let kind = response.content_type().to_string();
+    let mut body = Vec::new();
+    std::io::Read::read_to_end(&mut response.into_reader(), &mut body)
+        .map_err(|e| e.to_string())?;
+    Ok((status, body, kind))
+}
+
 /// `text` for a URL's query.
 pub fn escape(text: &str) -> String {
     let mut out = String::new();

@@ -12,6 +12,7 @@ mod chrome;
 mod commitment;
 mod dock;
 pub mod icons;
+mod link_preview;
 mod log_time;
 pub mod menus;
 mod notes_editor;
@@ -533,6 +534,28 @@ impl Takt {
     /// panel opened or put away.
     pub fn open_requested_windows(&mut self, cx: &mut Context<Self>) {
         self.sync_settings_window(cx);
+        // A Drive file to save where the person says: macOS's save panel,
+        // then the fetch on a thread, which shows it in Finder when done.
+        if let Some((url, name)) = self.app.wants_save_as.take() {
+            let start = std::env::var_os("HOME")
+                .map(|home| std::path::PathBuf::from(home).join("Downloads"))
+                .unwrap_or_else(std::env::temp_dir);
+            let suggested = (!name.is_empty()).then_some(name);
+            let chosen = cx.prompt_for_new_path(&start, suggested.as_deref());
+            let client = self.app.google_client_id();
+            cx.spawn(async move |_, cx| {
+                if let Ok(Ok(Some(path))) = chosen.await {
+                    cx.background_executor()
+                        .spawn(async move {
+                            let said =
+                                crate::state::links::save_drive_file(&client, &url, Some(path));
+                            crate::sync::announce(&said, false);
+                        })
+                        .await;
+                }
+            })
+            .detach();
+        }
         if self.app.hotkeys_changed {
             self.app.hotkeys_changed = false;
             if self.platform_live {

@@ -847,6 +847,7 @@ impl Takt {
                 .child(stop.value.clone())
                 .into_any_element();
         }
+        let vaults = self.app.obsidian_vaults();
         div()
             .flex_1()
             .min_w_0()
@@ -863,11 +864,13 @@ impl Takt {
                     glyph = "drive";
                 }
                 let url = link.url.clone();
-                let tip = if link.subtitle.is_empty() {
-                    link.title.clone()
-                } else {
-                    format!("{} · {}", link.title, link.subtitle)
-                };
+                let preview = super::link_preview::tip(
+                    link.clone(),
+                    self.app.google_client_id(),
+                    vaults.clone(),
+                    t,
+                );
+                let menu_link = link.clone();
                 div()
                     .id(("task-link", ix))
                     .max_w(px(220.))
@@ -880,11 +883,23 @@ impl Takt {
                     .border_1()
                     .border_color(t.border_variant)
                     .hover(|d| d.bg(t.hover))
-                    .tooltip(super::widgets::tip(tip, t))
+                    .tooltip(preview)
                     .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                         cx.stop_propagation();
                         crate::state::pickers::open_address(&url);
                     }))
+                    .on_mouse_down(
+                        gpui::MouseButton::Right,
+                        cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
+                            this.app.open_link_menu(
+                                &menu_link,
+                                f32::from(e.position.x),
+                                f32::from(e.position.y),
+                            );
+                            cx.stop_propagation();
+                            cx.notify();
+                        }),
+                    )
                     .child(icon(glyph, 13.).flex_none().text_color(colour))
                     .child(
                         div()

@@ -595,3 +595,86 @@ mod tests {
         assert!(drive_url("it's").contains("it%5C%27s"));
     }
 }
+
+/// Where a saved file goes when the person isn't asked: the Downloads
+/// folder, under a name not already taken there.
+pub fn downloads_path(name: &str) -> PathBuf {
+    let dir = std::env::var_os("HOME")
+        .map(|home| PathBuf::from(home).join("Downloads"))
+        .unwrap_or_else(std::env::temp_dir);
+    free_path(&dir, name)
+}
+
+/// `dir/name`, or `dir/name 2.ext`, `dir/name 3.ext`… when that is taken.
+fn free_path(dir: &std::path::Path, name: &str) -> PathBuf {
+    let first = dir.join(name);
+    if !first.exists() {
+        return first;
+    }
+    let (stem, extension) = match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem, format!(".{ext}")),
+        _ => (name, String::new()),
+    };
+    (2..)
+        .map(|n| dir.join(format!("{stem} {n}{extension}")))
+        .find(|path| !path.exists())
+        .unwrap_or(first)
+}
+
+/// Fetches the Drive file at `url` and writes it to `to`, or into
+/// Downloads under its own name when `to` is none, then shows it selected
+/// in Finder, where it can be dragged on. Blocks; says how it went.
+pub fn save_drive_file(client_id: &str, url: &str, to: Option<PathBuf>) -> String {
+    let Some(id) = google::drive::file_id(url) else {
+        return "That link isn't a Drive file.".into();
+    };
+    let saved = google::drive_access_token(client_id)
+        .and_then(|token| google::drive::download(&token, &id))
+        .map_err(|e| e.message())
+        .and_then(|(name, bytes)| {
+            let path = match to {
+                // Chosen without an extension: the one Drive's copy takes,
+                // so a Google Doc saved as "Brief" still opens as a document.
+                Some(path) if path.extension().is_none() => match name.rsplit_once('.') {
+                    Some((_, ext)) => path.with_extension(ext),
+                    None => path,
+                },
+                Some(path) => path,
+                None => downloads_path(&name),
+            };
+            std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+            Ok(path)
+        });
+    match saved {
+        Ok(path) => {
+            let _ = std::process::Command::new("/usr/bin/open")
+                .arg("-R")
+                .arg(&path)
+                .spawn();
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            format!("Saved {name}.")
+        }
+        Err(error) => format!("Couldn't save it: {error}"),
+    }
+}
+
+#[cfg(test)]
+mod saving_tests {
+    use super::free_path;
+
+    #[test]
+    fn a_taken_name_gets_a_number_before_its_extension() {
+        let dir = std::env::temp_dir().join(format!("takt-free-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(free_path(&dir, "notes.pdf"), dir.join("notes.pdf"));
+        std::fs::write(dir.join("notes.pdf"), b"").unwrap();
+        assert_eq!(free_path(&dir, "notes.pdf"), dir.join("notes 2.pdf"));
+        std::fs::write(dir.join("notes 2.pdf"), b"").unwrap();
+        assert_eq!(free_path(&dir, "notes.pdf"), dir.join("notes 3.pdf"));
+        assert_eq!(free_path(&dir, "README"), dir.join("README"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
