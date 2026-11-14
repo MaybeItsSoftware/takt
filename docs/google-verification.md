@@ -143,9 +143,12 @@ Say each line in quotes out loud (or leave it out and I can caption it).
     — "Takt keeps each list in Google Tasks too, and brings back what you
     add there. It only changes the lists it made."
 12. **`drive.file` (30 s).** Select any task in Demo, press `pl`, choose
-    *Choose files from Google Drive…*. Google's picker opens in Chrome;
-    click `Demo notes.pdf`, *Select*. Back in Takt the file shows as a link
-    beside the task's name.
+    *Choose files from Google Drive…*. Being the first pick since
+    disconnecting, Chrome shows Google's *Allow access* screen for "the
+    specific Google Drive files you use with this app": hold on it for 3 s
+    (this is the `drive.file` consent), *Allow access*, then click
+    `Demo notes.pdf`, *Select*. Back in Takt the file shows as a chip in the
+    links row just above Notes; hover it to show the preview.
     — "Takt sees only the files you pick here."
 13. **Disconnect (15 s).** `⌘,` → **Google** → *Disconnect Google Calendar,
     Tasks & Drive*. In Chrome, the permissions tab, refresh: Takt is gone, or
