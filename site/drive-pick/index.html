@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin">
+<meta name="robots" content="noindex">
+<title>Takt — Choose from Google Drive</title>
+<!--
+  The Mac app's Drive picker. Takt opens this page with, in the fragment
+  (which never reaches the server): a drive.file access token it already
+  holds, the Picker's API key, the Cloud project number as the app id, and
+  the port and state of a listener on the loopback. Google's web Picker
+  shows the person's Drive with that token, so no consent screen comes
+  first; the ids picked go back to the loopback, and only those.
+-->
+<style>
+  :root { color-scheme: light dark; --paper: #f7f7f8; --ink: #1f2026; --muted: #55565b; --border: #dddddf; }
+  @media (prefers-color-scheme: dark) { :root { --paper: #19191d; --ink: #ececf0; --muted: #b7b7bb; --border: #323236; } }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
+         background: var(--paper); color: var(--ink); font: 16px/1.55 -apple-system, system-ui, Roboto, sans-serif; }
+  main { max-width: 26rem; text-align: center; }
+  p { margin: .25rem 0; } .muted { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <p id="said">Opening your Google Drive…</p>
+  <p class="muted" id="more">Choose the files to link to your task in Takt.</p>
+</main>
+<script>
+  const given = new URLSearchParams(location.hash.slice(1));
+  // The token is not left in the address bar or the history.
+  history.replaceState(null, "", location.pathname);
+  const token = given.get("token") || "";
+  const key = given.get("key") || "";
+  const app = given.get("app") || "";
+  const port = given.get("port") || "";
+  const state = given.get("state") || "";
+
+  function say(main, more) {
+    document.getElementById("said").textContent = main;
+    document.getElementById("more").textContent = more;
+  }
+
+  // Only ever back to a listener on this machine.
+  const ok = /^\d{2,5}$/.test(port) && /^[0-9a-f]{32}$/.test(state) && token && key && /^\d+$/.test(app);
+  function back(answer) {
+    if (!ok) return;
+    const query = new URLSearchParams({ state, ...answer });
+    location.replace(`http://127.0.0.1:${port}/picked?${query}`);
+  }
+
+  function build() {
+    const files = new google.picker.DocsView(google.picker.ViewId.DOCS)
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(true)
+      .setMode(google.picker.DocsViewMode.LIST);
+    const recent = new google.picker.DocsView(google.picker.ViewId.RECENTLY_PICKED);
+    new google.picker.PickerBuilder()
+      .addView(files)
+      .addView(recent)
+      .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+      .setOAuthToken(token)
+      .setDeveloperKey(key)
+      .setAppId(app)
+      .setTitle("Link to your task in Takt")
+      .setCallback((data) => {
+        if (data.action === google.picker.Action.PICKED) {
+          say("Linking in Takt…", "You can close this tab.");
+          back({ ids: data.docs.map((doc) => doc.id).join(",") });
+        } else if (data.action === google.picker.Action.CANCEL) {
+          say("Nothing linked.", "You can close this tab.");
+          back({ cancel: "1" });
+        }
+      })
+      .build()
+      .setVisible(true);
+  }
+
+  function start() {
+    if (!ok) {
+      say("Open this from Takt.", "This page chooses Drive files for the Takt app; it does nothing on its own.");
+      return;
+    }
+    gapi.load("picker", { callback: build, onerror: () => back({ error: "picker_unavailable" }) });
+  }
+
+  function failed() {
+    say("Google's picker didn't load.", "Takt will open Google's own picker instead.");
+    back({ error: "picker_unavailable" });
+  }
+</script>
+<script src="https://apis.google.com/js/api.js" onload="start()" onerror="failed()"></script>
+</body>
+</html>

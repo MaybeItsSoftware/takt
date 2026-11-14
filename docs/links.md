@@ -171,6 +171,16 @@ Console steps (project `takt-511416`):
 
 ## Phones
 
+On the Mac, only the first pick goes through Google's consent screen:
+Google's desktop Picker must show it every time. Once a Drive token is
+kept, the Mac opens `site/drive-pick/` (https://takt.maybeitssoftware.co.uk/drive-pick/)
+instead, passing the token, the Picker's API key (`TAKT_GOOGLE_PICKER_KEY`,
+compiled in, limited by Google to that page), the project number and a
+loopback port in the fragment, which never reaches the server. The page runs
+Google's web Picker with that token and sends only the ids picked back to the
+loopback. Someone's own OAuth client, a missing key, or anything failing on
+the page falls back to Google's desktop Picker.
+
 Both phones show a task's links in the inspector, drawn by the core, and open
 them (Android `Intent.ACTION_VIEW`, iOS `openURL`). Adding is by pasting an
 address into the inspector's link field, or into any add field, or with

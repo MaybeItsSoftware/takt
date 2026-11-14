@@ -304,6 +304,12 @@ pub fn pick_drive_files(client_id: &str) -> Result<Vec<String>, String> {
     if client_id.is_empty() {
         return Err("Set the Google OAuth client ID first.".into());
     }
+    // With Drive already granted, Takt's own page shows the Picker with the
+    // token it holds, and no consent screen comes first. Anything amiss
+    // there falls through to Google's picker below.
+    if let Some(ids) = pick_in_hosted_picker(client_id) {
+        return Ok(ids);
+    }
     // Consent is asked for once: forcing it on every pick showed Google's
     // permission screen before the picker each time. Without a kept
     // refresh token it is forced, so one comes back.
@@ -330,6 +336,69 @@ pub fn pick_drive_files(client_id: &str) -> Result<Vec<String>, String> {
     }
     keychain::save(DRIVE_ACCOUNT, &token)?;
     Ok(picked_ids(&callback))
+}
+
+/// Takt's page that shows Google's web Picker (`site/drive-pick/`).
+const HOSTED_PICKER: &str = "https://takt.maybeitssoftware.co.uk/drive-pick/";
+/// The Picker's API key, limited by Google to that page; compiled in from
+/// `~/.config/takt/google-desktop.env` like the client.
+const PICKER_KEY: Option<&str> = option_env!("TAKT_GOOGLE_PICKER_KEY");
+
+/// Drive's picker on Takt's page, when Takt's own client holds a Drive
+/// token to show it with: the ids picked (none when cancelled), or None to
+/// go through Google's picker instead, as the first pick must.
+fn pick_in_hosted_picker(client_id: &str) -> Option<Vec<String>> {
+    let key = PICKER_KEY.filter(|key| !key.is_empty())?;
+    // The page's key and app id are Takt's project's: someone's own client
+    // is another project, which the Picker would refuse.
+    if BUILT_IN_CLIENT_ID != Some(client_id) {
+        return None;
+    }
+    drive_token().filter(|t| t.client_id == client_id && !t.refresh_token.is_empty())?;
+    let access = drive_access_token(client_id).ok()?;
+    let app = client_id.split('-').next().filter(|n| !n.is_empty())?;
+    let listener = TcpListener::bind("127.0.0.1:0").ok()?;
+    let port = listener.local_addr().ok()?.port();
+    let state = uuid::Uuid::new_v4().simple().to_string();
+    let url = format!(
+        "{HOSTED_PICKER}#token={}&key={}&app={app}&port={port}&state={state}",
+        http::escape(&access),
+        http::escape(key),
+    );
+    std::process::Command::new("/usr/bin/open")
+        .arg(&url)
+        .spawn()
+        .ok()?;
+    let came = await_return(
+        &listener,
+        "/picked",
+        &Done {
+            title: "Linked in Takt",
+            body: "The files you picked are linked to your task.",
+        },
+    )
+    .ok()?;
+    let full = format!("http://127.0.0.1{came}");
+    if http::parameter(&full, "state").as_deref() != Some(state.as_str())
+        || http::parameter(&full, "error").is_some()
+    {
+        return None;
+    }
+    Some(hosted_ids(&full))
+}
+
+/// The comma-separated `ids` Takt's page comes back with; none when the
+/// person cancelled.
+fn hosted_ids(callback: &str) -> Vec<String> {
+    http::parameter(callback, "ids")
+        .map(|ids| {
+            ids.split(',')
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The comma-separated `picked_file_ids` the Picker's redirect carries.
@@ -400,6 +469,44 @@ fn escape_html(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// Waits up to five minutes for the browser to come back to `listener` at
+/// `path`, shows it the done page (or what went wrong, from the `error` it
+/// carries), and answers the path it came back to.
+fn await_return(listener: &TcpListener, path: &str, done: &Done) -> Result<String, String> {
+    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+    let deadline = Instant::now() + Duration::from_secs(300);
+    loop {
+        if Instant::now() > deadline {
+            return Err("Google sign-in timed out.".into());
+        }
+        let Ok((mut stream, _)) = listener.accept() else {
+            std::thread::sleep(Duration::from_millis(100));
+            continue;
+        };
+        let _ = stream.set_nonblocking(false);
+        let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+        let mut line = String::new();
+        let _ = BufReader::new(&stream).read_line(&mut line);
+        let came = line
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or_default()
+            .to_string();
+        if !came.starts_with(path) {
+            let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+            continue;
+        }
+        let error = http::parameter(&format!("http://127.0.0.1{came}"), "error");
+        let page = done_page(done, error.as_deref());
+        let _ = write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
+            page.len()
+        );
+        return Ok(came);
+    }
+}
+
 fn authorize(
     client_id: &str,
     scope: &str,
@@ -422,38 +529,7 @@ fn authorize(
         .spawn()
         .map_err(|e| e.to_string())?;
 
-    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
-    let deadline = Instant::now() + Duration::from_secs(300);
-    let target = loop {
-        if Instant::now() > deadline {
-            return Err("Google sign-in timed out.".into());
-        }
-        let Ok((mut stream, _)) = listener.accept() else {
-            std::thread::sleep(Duration::from_millis(100));
-            continue;
-        };
-        let _ = stream.set_nonblocking(false);
-        let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-        let mut line = String::new();
-        let _ = BufReader::new(&stream).read_line(&mut line);
-        let path = line
-            .split_whitespace()
-            .nth(1)
-            .unwrap_or_default()
-            .to_string();
-        if !path.starts_with(CALLBACK_PATH) {
-            let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
-            continue;
-        }
-        let error = http::parameter(&format!("http://127.0.0.1{path}"), "error");
-        let page = done_page(&done, error.as_deref());
-        let _ = write!(
-            stream,
-            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
-            page.len()
-        );
-        break path;
-    };
+    let target = await_return(&listener, CALLBACK_PATH, &done)?;
     let full = format!("http://127.0.0.1{target}");
     if let Some(error) = http::parameter(&full, "error") {
         return Err(format!("Google said no: {error}."));
@@ -562,6 +638,15 @@ mod tests {
         assert!(failed.contains("That didn't work"));
         assert!(failed.contains("&lt;access_denied&gt;"));
         assert!(!failed.contains("<access_denied>"));
+    }
+
+    #[test]
+    fn takt_s_picker_page_names_the_files_or_none_when_cancelled() {
+        assert_eq!(
+            hosted_ids("http://127.0.0.1/picked?state=s&ids=a1%2Cb2"),
+            vec!["a1", "b2"]
+        );
+        assert!(hosted_ids("http://127.0.0.1/picked?state=s&cancel=1").is_empty());
     }
 
     #[test]
