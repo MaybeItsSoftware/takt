@@ -204,8 +204,9 @@ the maximise button on the notes' row (or `nm`, or `Cmd+Ctrl+M` from inside them
 full size, and says whether they are the task's linked Obsidian note.
 `Tab` / `Shift+Tab` keep the field
 and go on to the next / previous row, editing it if it is a field. The mouse
-works as before. A task's links sit beside its name, each as its kind's icon
-(a click opens it), followed by a link button with its key, `pl`: it opens the
+works as before. A task's links have a row of their own just above the
+notes, each a chip of its kind's icon and its name (a click opens it; a file
+in Drive shows Drive's mark); `Return` on the row, or `pl`, opens the
 finder, where you type to search Obsidian and Drive or paste an address, and
 where a link already there can be opened or removed. The task's own keys work from the inspector too — the ones
 shown beside its rows (`nn` the notes, `tt` the tags, `pl` a link, `⌥T` the

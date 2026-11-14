@@ -569,23 +569,14 @@ impl App {
             .task_work_facts(task.id.clone())
             .unwrap_or_default();
         let mut stops = stops(&snapshot, &task, &list, self.focus_session.is_some(), work);
-        // What the agent is told about the task, and about its list: each
-        // its own field, apart from the notes, and none while AI is off.
+        // What the agent is told about the task, its own field apart from
+        // the notes, and none while AI is off. The list's is the list
+        // inspector's to edit.
         if !self.prefs.ai_off
             && let Some(at) = stops.iter().position(|s| s.id == "notes")
         {
             let core = &self.store.core;
             let own = core.task_agent_context(task.id.clone()).unwrap_or_default();
-            let of_list = core
-                .agent_instructions()
-                .unwrap_or_default()
-                .into_iter()
-                .find(|i| {
-                    i.kind == takt_core::agent_instructions::AgentInstructionKind::List
-                        && i.id.as_deref() == Some(task.list_id.as_str())
-                })
-                .map(|i| i.text)
-                .unwrap_or_default();
             stops.insert(
                 at + 1,
                 Stop::new(
@@ -595,23 +586,26 @@ impl App {
                 )
                 .value(Some(own), "Add agent context"),
             );
-            stops.insert(
-                at + 2,
-                Stop::new(
-                    "list-context",
-                    "List agent context",
-                    StopKind::Text { multiline: true },
-                )
-                .value(Some(of_list), &format!("Add agent context for {list}")),
-            );
         }
-        // The links sit beside the name, with the button that adds one.
-        if let Some(stop) = stops.iter_mut().find(|s| s.id == "title") {
-            stop.links = self
+        // The links: a row of their own heading the notes' group, each a
+        // chip, then the button that adds one.
+        if let Some(at) = stops.iter().position(|s| s.id == "notes") {
+            stops[at].group = false;
+            let links = self
                 .store
                 .core
                 .task_links(task.id.clone())
                 .unwrap_or_default();
+            let mut row = Stop::new("links", "", StopKind::Action);
+            row.group = true;
+            row.empty = links.is_empty();
+            row.value = if links.is_empty() {
+                "Add a link".into()
+            } else {
+                String::new()
+            };
+            row.links = links;
+            stops.insert(at, row);
         }
         // In a shared list: who holds it, and who added and finished it.
         if let Some(sharing) = self.task_sharing(&task.id) {
@@ -823,6 +817,7 @@ impl App {
                 }
             }
             "conditions" => self.run("taskConditions", None),
+            "links" => self.begin_add_link(),
             "notes-editor" => self.open_notes_editor(),
             "move" => self.run("taskMove", None),
             "blockers" => self.run("taskAddBlocker", None),

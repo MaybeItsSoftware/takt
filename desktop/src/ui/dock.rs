@@ -221,10 +221,8 @@ impl Takt {
                         } else {
                             t.text
                         };
-                        if stop.id == "title" {
-                            // Inside the row like any other stop: handed to
-                            // the column itself, its flex_1 took the height.
-                            self.title_with_links(stop, tone, t, cx)
+                        if stop.id == "links" {
+                            self.links_row(stop, tone, t, cx)
                         } else {
                             let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
                             div()
@@ -232,6 +230,9 @@ impl Takt {
                                 .min_w_0()
                                 .px_1()
                                 .text_color(tone)
+                                .when(stop.id == "title", |d| {
+                                    d.text_size(px(16.)).font_weight(FontWeight::MEDIUM)
+                                })
                                 .when(!multiline, |d| d.truncate())
                                 .when(multiline && !stop.empty, |d| {
                                     d.flex().flex_col().children(
@@ -827,33 +828,31 @@ impl Takt {
 }
 
 impl Takt {
-    /// The name, then each link as its kind's icon (a click opens it), then
-    /// the button that opens the link finder, with its key.
-    fn title_with_links(
+    /// The task's links, each a chip of its kind's icon and its name (a
+    /// click opens it), wrapping as they need; with none, the row's own
+    /// "Add a link". Return on the row opens the link finder.
+    fn links_row(
         &self,
         stop: &Stop,
         tone: gpui::Hsla,
         t: Tokens,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let hint = self.app.key_hint("taskAddLink");
+        if stop.links.is_empty() {
+            return div()
+                .flex_1()
+                .min_w_0()
+                .px_1()
+                .text_color(tone)
+                .child(stop.value.clone())
+                .into_any_element();
+        }
         div()
             .flex_1()
             .min_w_0()
             .flex()
-            .items_center()
+            .flex_wrap()
             .gap_1()
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .px_1()
-                    .truncate()
-                    .text_color(tone)
-                    .text_size(px(16.))
-                    .font_weight(FontWeight::MEDIUM)
-                    .child(stop.value.clone()),
-            )
             .children(stop.links.iter().enumerate().map(|(ix, link)| {
                 let (mut glyph, colour) = link_glyph(&link.icon, t);
                 // A file kept in Drive shows Drive's mark, in its type's
@@ -870,42 +869,32 @@ impl Takt {
                     format!("{} · {}", link.title, link.subtitle)
                 };
                 div()
-                    .id(("title-link", ix))
-                    .flex_none()
-                    .size(px(20.))
+                    .id(("task-link", ix))
+                    .max_w(px(220.))
+                    .h(px(ROW_LINE))
+                    .px(px(6.))
                     .flex()
                     .items_center()
-                    .justify_center()
+                    .gap_1()
                     .rounded(px(4.))
+                    .border_1()
+                    .border_color(t.border_variant)
                     .hover(|d| d.bg(t.hover))
                     .tooltip(super::widgets::tip(tip, t))
                     .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                         cx.stop_propagation();
                         crate::state::pickers::open_address(&url);
                     }))
-                    .child(icon(glyph, 13.).text_color(colour))
+                    .child(icon(glyph, 13.).flex_none().text_color(colour))
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .text_size(px(12.))
+                            .text_color(t.text)
+                            .child(link.title.clone()),
+                    )
             }))
-            .child(
-                div()
-                    .id("title-add-link")
-                    .flex_none()
-                    .h(px(20.))
-                    .px(px(3.))
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .rounded(px(4.))
-                    .hover(|d| d.bg(t.hover))
-                    .tooltip(super::widgets::tip("Link a note, a file or a page", t))
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        cx.stop_propagation();
-                        this.app.begin_add_link();
-                        this.after_change(cx);
-                        cx.notify();
-                    }))
-                    .child(icon("link", 13.).text_color(t.muted))
-                    .when_some(hint, |d, keys| d.child(super::widgets::key_hint(keys, t))),
-            )
             .into_any_element()
     }
 }
