@@ -855,7 +855,14 @@ impl Takt {
                     .child(stop.value.clone()),
             )
             .children(stop.links.iter().enumerate().map(|(ix, link)| {
-                let (glyph, colour) = link_glyph(&link.icon, t);
+                let (mut glyph, colour) = link_glyph(&link.icon, t);
+                // A file kept in Drive shows Drive's mark, in its type's
+                // colour; Docs, Sheets and Slides already say where they are.
+                if link.kind == takt_core::links::LinkKind::Drive
+                    && matches!(link.icon.as_str(), "image" | "pdf" | "file")
+                {
+                    glyph = "drive";
+                }
                 let url = link.url.clone();
                 let tip = if link.subtitle.is_empty() {
                     link.title.clone()

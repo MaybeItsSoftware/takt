@@ -100,6 +100,7 @@ const NAMES: &[&str] = &[
     "sheet",
     "presentation",
     "form",
+    "drive",
     "image",
     "gem",
     "globe",
@@ -255,6 +256,9 @@ fn body(name: &str) -> Option<&'static str> {
         }
         "form" => {
             r#"<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/>"#
+        }
+        "drive" => {
+            r#"<path d="M8.5 3h7L22 14.5l-3.5 6h-13L2 14.5Z"/><path d="M8.5 3 15 14.5H2"/><path d="m15 14.5 3.5 6"/>"#
         }
         "image" => {
             r#"<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>"#
