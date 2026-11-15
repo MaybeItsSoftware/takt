@@ -369,6 +369,10 @@ private struct TaktSyncSection: View {
   let controller: SyncController
   @State private var purchase = TaktSyncPurchase.shared
 
+  /// Apple's standard licence agreement, which is Takt's terms of use.
+  private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+  private static let privacyURL = URL(string: "https://takt.maybeitssoftware.co.uk/privacy/")!
+
   private var session: SyncSession { controller.session }
   private var subscription: SyncSubscription? { session.account?.subscription }
   private var isActive: Bool { subscription?.active == true || purchase.isActive }
@@ -401,10 +405,23 @@ private struct TaktSyncSection: View {
     } header: {
       Text("Takt Sync").font(theme.type.caption).foregroundStyle(theme.muted).textCase(nil)
     } footer: {
-      Text(
-        "Syncing through Takt's server costs £1 a year, and one purchase covers every device on this account. "
-          + "The server is open source: host it yourself and sync is free, with every feature."
-      )
+      VStack(alignment: .leading, spacing: 6) {
+        Text(
+          "Syncing through Takt's server costs £1 a year, and one purchase covers every device on this account. "
+            + "The server is open source: host it yourself and sync is free, with every feature."
+        )
+        // App Review guideline 3.1.2: the renewal terms and both links, beside the purchase.
+        Text(
+          "Takt Sync renews automatically each year unless you cancel at least 24 hours before it ends. "
+            + "Cancel any time in Settings → your name → Subscriptions."
+        )
+        HStack(spacing: 12) {
+          Link("Terms of Use", destination: Self.termsURL)
+          Link("Privacy Policy", destination: Self.privacyURL)
+        }
+        .foregroundStyle(theme.ink)
+        .underline()
+      }
       .font(theme.type.footnote).foregroundStyle(theme.muted)
     }
     .settingsRows()
