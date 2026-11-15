@@ -811,7 +811,32 @@ private fun TaktSyncSection(sync: SyncController, subscription: uk.co.maybeitsad
         state.problem?.let {
             Text(it, style = TaktTheme.type.small, color = TaktTheme.colors.danger, modifier = Modifier.padding(horizontal = Metrics.md).padding(bottom = Metrics.md))
         }
+        // Play's subscriptions policy: the renewal terms, how to cancel, and the policy, beside the purchase.
+        if (purchase.isAvailable) {
+            Text(
+                "Takt Sync renews automatically each year until you cancel. Cancel any time in Google Play → " +
+                    "Payments & subscriptions → Subscriptions.",
+                style = TaktTheme.type.small, color = TaktTheme.colors.mutedText,
+                modifier = Modifier.padding(horizontal = Metrics.md),
+            )
+            Row(Modifier.padding(Metrics.md), horizontalArrangement = Arrangement.spacedBy(Metrics.md)) {
+                SubscriptionLink("Manage subscription", "https://play.google.com/store/account/subscriptions?package=${context.packageName}")
+                SubscriptionLink("Privacy Policy", "https://takt.maybeitssoftware.co.uk/privacy/")
+            }
+        }
     }
+}
+
+@Composable
+private fun SubscriptionLink(label: String, url: String) {
+    val context = LocalContext.current
+    Text(
+        label, style = TaktTheme.type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+        color = TaktTheme.colors.ink,
+        modifier = Modifier.clickable {
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        },
+    )
 }
 
 private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
