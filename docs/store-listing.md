@@ -67,6 +67,9 @@ OPEN SOURCE
 • Sync through Takt's server: Takt Sync, £1 a year, one purchase for every
   device on your account. Or host the server yourself and sync for free
 
+Takt Sync renews automatically each year until you cancel it in your store
+account. Privacy policy: https://takt.maybeitssoftware.co.uk/privacy/
+
 No ads, no tracking, no analytics.
 ```
 

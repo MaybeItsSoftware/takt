@@ -28,6 +28,9 @@ paragraphs = [re.sub(r"\n(?!•) *", " ", p.strip()) for p in description.strip(
 # Apple turns away a listing that names other platforms (guideline 2.3.10).
 paragraphs = [p.replace(", and an ongoing notification on Android", "") for p in paragraphs]
 assert not any("Android" in p for p in paragraphs), "the App Store description mentions Android"
+# Guideline 3.1.2: an app with a subscription links its terms of use from its
+# metadata; Takt's are Apple's standard licence agreement.
+paragraphs.append("Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
 privacy = re.search(r"\*\*Privacy policy URL:\*\* (\S+)", doc).group(1)
 values = {
     "name.txt": (field("Name"), 30),
