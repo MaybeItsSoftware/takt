@@ -96,9 +96,11 @@ impl Takt {
             .flex()
             .items_center()
             .child(div().w(px(10. + 4. + 12.)).flex_none())
+            // Shorter than the row, so its border stands clear of a
+            // selected row's box above or below rather than touching it.
             .child(
                 div()
-                    .h(px(ROW_HEIGHT))
+                    .h(px(ROW_HEIGHT - 6.))
                     .flex_1()
                     .min_w_0()
                     .pl(px(6.))
