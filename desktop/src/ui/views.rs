@@ -62,9 +62,7 @@ impl Takt {
             cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
                 range
                     .map(|ix| match display[ix] {
-                        Display::Draft(depth) => this
-                            .field_row(t, "New task", 28. + depth as f32 * 18., true)
-                            .into_any_element(),
+                        Display::Draft(depth) => this.draft_row(depth, t),
                         Display::Task(row) => {
                             let row = this.app.rows[row].clone();
                             let counted = counts.get(&row.task.id).copied();
@@ -84,6 +82,35 @@ impl Takt {
             .flex_col()
             .child(heading)
             .child(list)
+            .into_any_element()
+    }
+
+    /// The task being drafted, laid out as `outline_row` lays a task: the
+    /// indent, fold-arrow and status-mark gutters outside the box, so the
+    /// box lines up with its siblings' and its text with their titles.
+    fn draft_row(&self, depth: i64, t: Tokens) -> AnyElement {
+        div()
+            .h(px(ROW_HEIGHT))
+            .mx_1()
+            .pl(px(2. + depth as f32 * 18.))
+            .flex()
+            .items_center()
+            .child(div().w(px(10. + 4. + 12.)).flex_none())
+            .child(
+                div()
+                    .h(px(ROW_HEIGHT))
+                    .flex_1()
+                    .min_w_0()
+                    .pl(px(6.))
+                    .pr_3()
+                    .flex()
+                    .items_center()
+                    .rounded(px(4.))
+                    .border_1()
+                    .border_color(t.accent)
+                    .bg(t.background)
+                    .child(self.field_inline(t, "New task")),
+            )
             .into_any_element()
     }
 
@@ -299,13 +326,29 @@ impl Takt {
                                     .flex()
                                     .flex_col()
                                     .gap_1()
-                                    .children(cards.iter().enumerate().map(|(ix, task)| {
-                                        self.card(column_ix * 100_000 + ix, task, t, cx)
-                                    }))
-                                    .children(
-                                        self.drafting(CardPlace::Column(column_ix))
-                                            .then(|| self.draft_card(t)),
-                                    ),
+                                    .children({
+                                        let place = CardPlace::Column(column_ix);
+                                        let after = self.draft_after(place);
+                                        let mut drawn: Vec<AnyElement> = Vec::new();
+                                        for (ix, task) in cards.iter().enumerate() {
+                                            drawn.push(self.card(
+                                                column_ix * 100_000 + ix,
+                                                task,
+                                                t,
+                                                cx,
+                                            ));
+                                            if after.as_deref() == Some(task.id.as_str()) {
+                                                drawn.push(self.draft_card(t));
+                                            }
+                                        }
+                                        let below = after.as_deref().is_some_and(|id| {
+                                            cards.iter().any(|task| task.id == id)
+                                        });
+                                        if self.drafting(place) && !below {
+                                            drawn.push(self.draft_card(t));
+                                        }
+                                        drawn
+                                    }),
                             ),
                     )
                     .child(board_links::measure(
@@ -351,7 +394,18 @@ impl Takt {
         matches!(&self.app.editing, Some(Editing::NewCard { place: p, .. }) if *p == place)
     }
 
-    /// The new card being typed, at the foot of its column or quadrant.
+    /// The card a draft in `place` is drawn below, if any.
+    fn draft_after(&self, place: CardPlace) -> Option<String> {
+        match &self.app.editing {
+            Some(Editing::NewCard {
+                place: p, after, ..
+            }) if *p == place => after.clone(),
+            _ => None,
+        }
+    }
+
+    /// The new card being typed, below the selected card or at the foot of
+    /// its column or quadrant.
     fn draft_card(&self, t: Tokens) -> AnyElement {
         div()
             .px_2()

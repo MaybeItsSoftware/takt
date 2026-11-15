@@ -386,8 +386,8 @@ pub enum CardPlace {
 }
 
 impl App {
-    /// Enter on the board or the matrix: a draft card at the foot of the
-    /// focused column, or at the centre of the selected card's quadrant, in
+    /// Enter on the board or the matrix: a draft card below the selected
+    /// card in the focused column (at its foot when none is selected there), or at the centre of the selected card's quadrant, in
     /// the selected card's list (or the list on screen).
     pub fn begin_new_card(&mut self) {
         let selected = self.selected().cloned();
@@ -408,14 +408,40 @@ impl App {
             })),
             _ => CardPlace::Column(self.board.column),
         };
-        self.editing = Some(super::Editing::NewCard { list_id, place });
+        // Below the selected card when it is a top-level card of this list
+        // in that column: cards stand in their list's order, so the new one
+        // goes in beside it. A subtask standing as a card of its own would
+        // make the new one its sibling, so that drafts at the foot instead.
+        let after = match place {
+            CardPlace::Column(column) => selected.filter(|task| {
+                task.parent_task_id.is_none()
+                    && task.list_id == list_id
+                    && self
+                        .board
+                        .cards
+                        .get(column)
+                        .is_some_and(|cards| cards.iter().any(|card| card.id == task.id))
+            }),
+            CardPlace::Quadrant(_) => None,
+        }
+        .map(|task| task.id);
+        self.editing = Some(super::Editing::NewCard {
+            list_id,
+            place,
+            after,
+        });
     }
 
     /// Adds the drafted card, files it where it was drafted, closes the
     /// draft and selects it. False when the text was kept back, its problem
     /// in the status bar.
     pub fn create_card(&mut self, title: &str) -> bool {
-        let Some(super::Editing::NewCard { list_id, place }) = self.editing.clone() else {
+        let Some(super::Editing::NewCard {
+            list_id,
+            place,
+            after,
+        }) = self.editing.clone()
+        else {
             return true;
         };
         let title = title.trim();
@@ -427,7 +453,7 @@ impl App {
             Ok(new) => takt_core::tasks::NewTask {
                 parent_task_id: None,
                 at_top: false,
-                adjacent_task_id: None,
+                adjacent_task_id: after,
                 ..new
             },
             Err(problem) => {

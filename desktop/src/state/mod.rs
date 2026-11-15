@@ -146,11 +146,14 @@ pub enum Editing {
         /// Inserted after this sibling; at the start when absent.
         after: Option<String>,
     },
-    /// A new card, drafted at the foot of a board column or a matrix
-    /// quadrant (`None`: the unplaced ones).
+    /// A new card, drafted below the selected card in its board column
+    /// (at the foot when none is), or in a matrix quadrant (`None`: the
+    /// unplaced ones).
     NewCard {
         list_id: String,
         place: board::CardPlace,
+        /// The card it goes below, in the same column and list.
+        after: Option<String>,
     },
     /// Renaming a list or folder in the sidebar.
     SidebarName {
