@@ -2,6 +2,7 @@
     <string name="app_name">Takt</string>
     <string name="quick_add">Add a task</string>
     <string name="quick_add_long">Add a task to Takt</string>
+    <string name="quick_capture_label">Add to Takt</string>
     <string name="widget_name">Next up</string>
     <string name="widget_description">The next task and how much of today is left.</string>
     <string name="focus_channel">Focus block</string>

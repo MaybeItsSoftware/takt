@@ -7,13 +7,11 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import uk.co.maybeitsadam.takt.MainActivity
 import uk.co.maybeitsadam.takt.R
-import uk.co.maybeitsadam.takt.ui.ShellIntents
 
 /**
- * The Quick Settings tile: one tap opens the app on the quick-add sheet and
- * collapses the shade. The tile is an action, not a switch, so it always
+ * The Quick Settings tile: one tap opens the quick capture card over
+ * whatever is on screen and collapses the shade. The tile is an action, not a switch, so it always
  * reads as inactive.
  */
 class QuickAddTileService : TileService() {
@@ -35,9 +33,8 @@ class QuickAddTileService : TileService() {
     // The Intent overload only runs below API 34, where it is the only one there is.
     @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun open() {
-        val intent = Intent(this, MainActivity::class.java)
-            .setAction(ShellIntents.ACTION_QUICK_ADD)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val intent = Intent(this, QuickCaptureActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val pending = PendingIntent.getActivity(
                 this, REQUEST_QUICK_ADD, intent,

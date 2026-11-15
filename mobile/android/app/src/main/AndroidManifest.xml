@@ -53,6 +53,28 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- Adding a task from anywhere: a card over whatever is on screen.
+             Its own launcher entry, so a side-key double press or a back tap
+             set to open an app can open it; its own task, so the app
+             underneath stays where it was. -->
+        <activity
+            android:name=".quickadd.QuickCaptureActivity"
+            android:exported="true"
+            android:label="@string/quick_capture_label"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher"
+            android:theme="@style/Theme.Takt.QuickCapture"
+            android:taskAffinity="uk.co.maybeitssoftware.takt.capture"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize|stateAlwaysVisible">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".focus.FocusService"
             android:exported="false"

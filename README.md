@@ -696,6 +696,7 @@ them out:
 | `s` | Stop: the time so far is logged and the task stays open |
 | `Cmd+Backspace` | Delete the highlighted task |
 | `/` or `n` | Type, to find or add a task |
+| `Cmd+V` | Paste into the field, to find or add what was copied, as if `/` came first |
 | `Esc` | Hide the panel: back to the pill while a block runs |
 
 While the block's "how did it go?" question is up, the keys answer it
@@ -897,6 +898,14 @@ Waiting on and rule columns are not stages and stay.
 Right-clicking a pane's empty space offers a new task, a new column on the
 board, the other views and showing or hiding completed tasks; a task's own
 menu shows each action's key on the right, as bound.
+
+
+### Adding a task from anywhere on the phone
+
+| Where | How |
+| --- | --- |
+| iPhone | **Add task to Takt** asks for the task in a small system popup over whatever app is open, without opening Takt, and files it in the Inbox (`45m #work @fri !1` read as in Quick Add). Put it on the Action Button (Settings → Action Button → Shortcut → Takt → Add task), on Back Tap (Settings → Accessibility → Touch → Back Tap, with a one-step shortcut running it), or ask Siri. The side button's double press is the Wallet's and can't be changed. The **Add task** control in Control Centre and on the Lock Screen opens Takt on its add sheet. |
+| Android | **Add to Takt** is a card over whatever is on screen with the keyboard up: Return files the task in the Inbox and the card goes, leaving the app underneath where it was. It has its own entry in the app drawer, so a phone that opens an app on a side-key double press (Samsung: Settings → Advanced features → Side key) or a back double tap (Pixel: Settings → System → Gestures → Quick Tap) can open it. The Quick Settings tile and the icon's long-press **Add a task** open it too. |
 
 ### Filter lists
 
