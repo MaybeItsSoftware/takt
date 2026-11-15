@@ -63,9 +63,10 @@ class TaskActions(
 
     fun select(id: String) = vm.select(id)
 
-    /** Tap: select; tap the selected row again: open the inspector. */
+    /** Tap: select the row and open its inspector. */
     fun tap(id: String) {
-        if (vm.selectedId.value == id) container.inspector.open(id) else vm.select(id)
+        vm.select(id)
+        container.inspector.open(id)
     }
 
     fun openInspector(id: String) = container.inspector.open(id)

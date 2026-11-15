@@ -74,6 +74,13 @@ What's wrong, beyond the counts:
 
    Anything rarer is in the long-press menu: move, invalidate, delete, start
    focus, habit.
+
+   A tap opens the task's inspector, on every surface and both phones:
+   Today, a list's outline, the board, the matrix, search and filter lists.
+   Completing is the swipe (or the menu), never a tap, so looking at a task
+   can't finish it. In search and filter lists, going to the task in its list
+   is the long-press. On the iPad a tap selects, and the inspector column
+   beside the list follows.
 4. **Every edit can be undone from where you are.** After complete, delete,
    move, schedule and plan, a snackbar names what happened and offers Undo.
    An undo offers Redo. This is Android's existing behaviour, now on the

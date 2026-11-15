@@ -343,7 +343,7 @@ private fun ResultRow(
         Modifier
             .fillMaxWidth()
             .background(if (isSelected) colors.hover else colors.paper)
-            .combinedClickable(onClickLabel = "Reveal in list", onLongClickLabel = "Open details", onLongClick = onInspect, onClick = onOpen)
+            .combinedClickable(onClickLabel = "Open details", onLongClickLabel = "Reveal in list", onLongClick = onOpen, onClick = onInspect)
             .semantics { contentDescription = "Search result ${task.title}" }
             .testTag("search_result"),
     ) {

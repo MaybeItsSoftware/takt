@@ -40,7 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -202,6 +204,7 @@ fun TodayScreen() {
                                 isLeaving = isLeaving,
                                 canStart = true,
                                 onTick = { finish(card, kind, index) },
+                                onOpen = { container.inspector.open(card.id) },
                                 onStart = { gate { vm.start(card) } },
                                 menu = { dismiss ->
                                     CardMenu(
@@ -370,6 +373,7 @@ private fun DayCardRow(
     isLeaving: Boolean,
     canStart: Boolean,
     onTick: () -> Unit,
+    onOpen: () -> Unit,
     onStart: () -> Unit,
     menu: @Composable (dismiss: () -> Unit) -> Unit,
     handle: Modifier?,
@@ -377,7 +381,8 @@ private fun DayCardRow(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Column(modifier.background(if (isDragging) TaktTheme.colors.raised else rowFill)) {
-        // No check circle: tapping the row finishes it, crossed out and then
+        // No check circle: tapping the row opens its inspector, and a swipe
+        // right (or the options' Complete) finishes it, crossed out and then
         // gone; play starts a block on it; the options sit just before play
         // and the drag handle on the leading edge.
         val verb = if (card.dailyId != null) "Log today" else "Complete"
@@ -402,11 +407,14 @@ private fun DayCardRow(
                     .clip(Metrics.row)
                     .combinedClickable(
                         enabled = !isLeaving,
-                        onClick = onTick,
-                        onClickLabel = "$verb ${card.title}",
+                        onClick = onOpen,
+                        onClickLabel = "Open details",
                         onLongClick = { menuOpen = true },
                         onLongClickLabel = "Task actions",
                     )
+                    .semantics {
+                        customActions = listOf(CustomAccessibilityAction(verb) { onTick(); true })
+                    }
                     .padding(vertical = Metrics.xs, horizontal = Metrics.xs),
             ) {
                 Text(

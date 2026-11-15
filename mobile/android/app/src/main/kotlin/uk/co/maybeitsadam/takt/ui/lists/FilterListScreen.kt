@@ -117,7 +117,7 @@ private fun FilterTaskRow(
         Modifier
             .fillMaxWidth()
             .background(colors.paper)
-            .combinedClickable(onClickLabel = "Reveal in list", onLongClickLabel = "Open details", onLongClick = onInspect, onClick = onOpen)
+            .combinedClickable(onClickLabel = "Open details", onLongClickLabel = "Reveal in list", onLongClick = onOpen, onClick = onInspect)
             .semantics { contentDescription = "Filter list task ${task.title}" }
             .testTag("filter_list_task"),
     ) {
