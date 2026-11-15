@@ -7,7 +7,7 @@
 #   design/store/raw/android/0N-*.png → design/store/android/ 1080×1920 (Play phone)
 #   design/logo/takt-mark.svg         → design/store/play-feature.png 1024×500
 #
-# Each image is chalk paper, a headline in IBM Plex Sans above the screen, and
+# Each image is One Light paper (the default theme's), a headline in IBM Plex Sans above the screen, and
 # the screen itself with a hairline, running off the foot of the frame. The
 # headlines are below, keyed by the raw file's number. Needs magick and
 # rsvg-convert.
@@ -18,7 +18,7 @@ fonts=mobile/android/app/src/main/res/font
 headline_font=$fonts/ibmplexsans_semibold.ttf
 body_font=$fonts/ibmplexsans_regular.ttf
 store=${TAKT_STORE_DIR:-design/store}
-paper="#faf8f4" ink="#444054" muted="#6e6b7c" hairline="#e6e4ea"
+paper="#fafafa" ink="#242529" muted="#58585a" hairline="#dfdfe0"
 
 headline() {
   case "$1" in
