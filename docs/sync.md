@@ -690,6 +690,11 @@ hosts themselves charges nothing.
 - **The apps on a 402** stop syncing and say so — "Hosted sync needs Takt
   Sync (£1 a year). Subscribe in the iPhone or Android app, or self-host" —
   and try again only after the backoff, or at once after a purchase.
+- **Setting it on the hosted server.** `scripts/configure_billing.sh` copies
+  `REVENUECAT_WEBHOOK_SECRET`, `COMP_ACCOUNTS` and `REQUIRE_SUBSCRIPTION`
+  from `~/.config/takt/revenuecat.env` onto `takt-sync`, leaving the rest of
+  its environment as it is, and checks that the webhook answers. The phone
+  builds read their RevenueCat keys from the same file.
 
 ## Server storage (Postgres)
 
