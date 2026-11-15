@@ -676,6 +676,21 @@ impl FocusPanel {
                 self.mode = Mode::typing();
                 self.cursor = 0;
             }
+            // Pasting is typing: the field opens with what was copied in
+            // it, finding it or ready to add it, as if `/` came first.
+            "cmd+v" => {
+                if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
+                    let line = text.lines().map(str::trim).find(|l| !l.is_empty());
+                    if let Some(line) = line {
+                        self.mode = Mode::typing();
+                        self.cursor = 0;
+                        if let Some(field) = self.mode.field() {
+                            field.insert(line);
+                        }
+                        self.after_edit(cx);
+                    }
+                }
+            }
             "o" => {
                 let running = self
                     .takt
@@ -1014,9 +1029,14 @@ impl Render for FocusPanel {
                 .items_center()
                 .gap_2()
         };
+        // Beside a name, never over it: the name keeps at least half the
+        // row, and a long list or folder name is cut short instead.
         let detail = move |text: String| {
             div()
-                .flex_none()
+                .flex_shrink()
+                .min_w_0()
+                .max_w(gpui::relative(0.45))
+                .truncate()
                 .text_size(px(11.))
                 .text_color(t.placeholder)
                 .child(text)
