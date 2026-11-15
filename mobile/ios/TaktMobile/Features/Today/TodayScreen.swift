@@ -148,6 +148,7 @@ struct TodayScreen: View {
           isLeaving: leavingCards[card.id] != nil, waiting: model.waitingBadge(card.id),
           isSessionRunning: today.day.session?.phase == .running,
           onTick: { finish(card, index: index) },
+          onOpen: { model.navigation.inspect(card.id, isPad: isPad) },
           onStart: { today.start(card, model: model) },
           menu: { cardMenu(card) })
           .equatable()
@@ -331,6 +332,7 @@ struct DayCardRow<Menu: View>: View, Equatable {
   /// than starting it. Part of equality, or the menu keeps its old label.
   var isSessionRunning = false
   let onTick: () -> Void
+  let onOpen: () -> Void
   let onStart: () -> Void
   @ViewBuilder let menu: () -> Menu
 
@@ -361,13 +363,14 @@ struct DayCardRow<Menu: View>: View, Equatable {
 
   /// The Mac's day row (`views::day_row`): the status mark outside a box
   /// that starts at the title — title, chips, then "list · reason" in dim
-  /// secondary text — 30 Mac pixels high. A tap on the box finishes the
-  /// task; the options and play sit after it as icons at rest.
+  /// secondary text — 30 Mac pixels high. A tap on the box opens the
+  /// task's inspector, and a swipe right (or the options' Done) finishes it;
+  /// the options and play sit after it as icons at rest.
   var body: some View {
     HStack(spacing: 0) {
       Color.clear.frame(width: theme.mac(2 + 10 + 4), height: 1)
       TaskCheckbox(status: isLeaving ? .completed : .open, isList: card.isList, showsBox: false)
-      Button(action: onTick) {
+      Button(action: onOpen) {
         HStack(spacing: theme.mac(8)) {
           Text(card.title)
             .font(theme.type.body)
@@ -394,7 +397,8 @@ struct DayCardRow<Menu: View>: View, Equatable {
       .buttonStyle(.plain)
       .disabled(isLeaving)
       .accessibilityLabel(accessibilityText)
-      .accessibilityHint(card.dailyID != nil ? "Logs it for today" : "Completes it")
+      .accessibilityHint("Opens its details")
+      .accessibilityAction(named: card.dailyID != nil ? "Log today" : "Complete", onTick)
       .accessibilityIdentifier("today.check.\(card.title)")
       SwiftUI.Menu(content: menu) {
         Image(systemName: "ellipsis")

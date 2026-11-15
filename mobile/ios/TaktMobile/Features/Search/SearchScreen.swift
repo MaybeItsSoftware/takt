@@ -162,7 +162,8 @@ struct SearchScreen: View {
     let starts = model.startsLabel(task.id, status: task.status)
     let waiting = model.waitingBadge(task.id, status: task.status)
     return Button {
-      reveal(result)
+      isFieldFocused = false
+      model.navigation.inspect(task.id, isPad: isPad)
     } label: {
       HStack(alignment: .top, spacing: theme.space.sm) {
         TaskCheckbox(status: task.status, isList: task.isList).padding(.top, theme.space.xxs)
@@ -203,6 +204,7 @@ struct SearchScreen: View {
     .listRowBackground(theme.paper)
     .listRowSeparatorTint(theme.borderMuted)
     .contextMenu {
+      Button { reveal(result) } label: { Label("Show in its list", systemImage: "list.bullet") }
       TaskContextMenu(
         context: TaskMenuContext(
           taskID: task.id, title: task.title, status: task.status, isList: task.isList,

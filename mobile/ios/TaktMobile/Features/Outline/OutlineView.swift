@@ -22,7 +22,9 @@ struct OutlineView: View {
   var body: some View {
     @Bindable var navigation = model.navigation
     ScrollViewReader { proxy in
-      List(selection: $navigation.selectedTaskID) {
+      // On the iPad a tap selects and the inspector column follows; on the
+      // iPhone a tap opens the inspector (each row's own tap, below).
+      List(selection: isPad ? $navigation.selectedTaskID : .constant(nil)) {
         if outline.composer?.anchorRowID == nil, outline.composer != nil {
           composerRow
         }
@@ -115,6 +117,14 @@ struct OutlineView: View {
       }
     }
     .tag(row.id)
+    .contentShape(Rectangle())
+    // Below the row's own buttons (the fold, the check), and switched off on
+    // the iPad, where the list's selection does the work.
+    .gesture(
+      TapGesture().onEnded {
+        if outline.editingTaskID != row.id { model.navigation.inspect(row.id, isPad: isPad) }
+      },
+      including: isPad ? .subviews : .all)
     .listRowInsets(EdgeInsets(top: 0, leading: theme.mac(4), bottom: 0, trailing: theme.mac(4)))
     // The selection is painted by the row, a box round its title as the
     // Mac's is; the list's own row stays the paper.
