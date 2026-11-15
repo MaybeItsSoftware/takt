@@ -503,14 +503,15 @@ impl App {
         if let Some(id) = created {
             self.lingering.clear();
             self.reload_rows();
+            self.layout_board();
             self.selected_task = Some(id);
             self.editing = None;
         }
         true
     }
 
-    /// Opens a draft row: `o` below the selection, `shift+o` above, `tab`
-    /// as its first child.
+    /// Opens a draft row: below the selection, above it, or (`tab`) as its
+    /// last subtask.
     pub fn begin_new_task(&mut self, placement: NewPlacement) {
         let selected = self.selected().cloned();
         let Some(list_id) = selected
@@ -531,9 +532,25 @@ impl App {
                 let previous = self.previous_sibling(&task);
                 (task.parent_task_id.clone(), previous)
             }
-            (NewPlacement::Child, Some(task)) => (Some(task.id.clone()), None),
+            (NewPlacement::Child, Some(task)) => {
+                let last = self.last_child(&task.id);
+                (Some(task.id.clone()), last)
+            }
             (_, None) => (entered, self.rows.last().map(|row| row.task.id.clone())),
         };
+        // A subtask of the selected card is drafted on the board, under the
+        // card; anything else there is a new card.
+        if self.view_mode == ViewMode::Board
+            && placement == NewPlacement::Child
+            && parent_id.is_some()
+        {
+            self.editing = Some(Editing::NewTask {
+                list_id,
+                parent_id,
+                after,
+            });
+            return;
+        }
         if matches!(self.view_mode, ViewMode::Board | ViewMode::Matrix) {
             self.begin_new_card();
             return;
@@ -552,6 +569,17 @@ impl App {
             parent_id,
             after,
         });
+    }
+
+    /// The last of a task's direct subtasks, folded or not: a new subtask
+    /// goes after it, so it stays where it is drawn rather than jumping to
+    /// the top of the branch.
+    pub fn last_child(&self, parent: &str) -> Option<String> {
+        self.all_rows
+            .iter()
+            .rev()
+            .find(|row| row.task.parent_task_id.as_deref() == Some(parent))
+            .map(|row| row.task.id.clone())
     }
 
     fn previous_sibling(&self, task: &TaskRow) -> Option<String> {
@@ -740,7 +768,7 @@ impl App {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewPlacement {
     Below,
     Above,

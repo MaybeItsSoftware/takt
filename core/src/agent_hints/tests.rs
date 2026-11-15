@@ -109,7 +109,7 @@ fn a_new_task_is_the_add_key_and_a_subtask_the_subtask_key() {
             json!({"title": "Milk", "parent_task_id": TASK})
         )
         .as_deref(),
-        Some("[option+shift+enter] then type “Milk”")
+        Some("[tab] then type “Milk”")
     );
     assert_eq!(
         render("task_add", json!({"content": "Milk"})).as_deref(),

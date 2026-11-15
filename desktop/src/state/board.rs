@@ -408,28 +408,37 @@ impl App {
             })),
             _ => CardPlace::Column(self.board.column),
         };
-        // Below the selected card when it is a top-level card of this list
-        // in that column: cards stand in their list's order, so the new one
-        // goes in beside it. A subtask standing as a card of its own would
-        // make the new one its sibling, so that drafts at the foot instead.
+        // Below the selected card, or the card a selected subtask is drawn
+        // on, when it is a top-level card of this list in that column: cards
+        // stand in their list's order, so the new one goes in beside it. A
+        // subtask standing as a card of its own would make the new one its
+        // sibling, so that drafts at the foot instead.
         let after = match place {
-            CardPlace::Column(column) => selected.filter(|task| {
-                task.parent_task_id.is_none()
-                    && task.list_id == list_id
-                    && self
-                        .board
-                        .cards
-                        .get(column)
-                        .is_some_and(|cards| cards.iter().any(|card| card.id == task.id))
-            }),
+            CardPlace::Column(column) => selected
+                .and_then(|task| self.card_in_column(&task.id, column))
+                .and_then(|id| self.task(&id).cloned())
+                .filter(|card| card.parent_task_id.is_none() && card.list_id == list_id)
+                .map(|card| card.id),
             CardPlace::Quadrant(_) => None,
-        }
-        .map(|task| task.id);
+        };
         self.editing = Some(super::Editing::NewCard {
             list_id,
             place,
             after,
         });
+    }
+
+    /// The card in `column` that `id` is, or is drawn on as a subtask.
+    pub fn card_in_column(&self, id: &str, column: usize) -> Option<String> {
+        let cards = self.board.cards.get(column)?;
+        let mut at = Some(id.to_string());
+        while let Some(id) = at {
+            if cards.iter().any(|card| card.id == id) {
+                return Some(id);
+            }
+            at = self.task(&id).and_then(|task| task.parent_task_id.clone());
+        }
+        None
     }
 
     /// Adds the drafted card, files it where it was drafted, closes the

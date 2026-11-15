@@ -129,7 +129,8 @@ fn task() -> Vec<Spec> {
             .note("Return always adds, as in Checkvist: below the selected task, at the foot of the day on Today"),
         c("taskNewAbove", "Add a task above", "Task", &["shift+enter", "option+enter"])
             .note("⇧↩ is Checkvist's"),
-        c("taskNewChild", "Add a subtask", "Task", &["option+shift+enter"]),
+        c("taskNewChild", "Add a subtask", "Task", &["tab", "option+shift+enter"])
+            .note("Tab on its own; while typing a new task Tab nests it under the one above"),
         // Space always completes, as in Checkvist; Return always adds. One
         // meaning each, on every surface, so neither has to be looked up.
         c("taskComplete", "Complete or reopen the task", "Task", &["space", "x"]),
@@ -220,7 +221,7 @@ fn task() -> Vec<Spec> {
         // siblings, ←→ out of or into the one above, as an outliner does); ⇧⌥
         // carries it somewhere else (←→ a board column, ↑↓ another list). ⌃ is
         // left alone: macOS gives ⌃ and the arrows to Spaces and Mission Control.
-        c("taskIndent", "Indent the task", "Task", &["tab", "option+right", "cmd+option+right"])
+        c("taskIndent", "Indent the task", "Task", &["option+right", "cmd+option+right"])
             .note("Under the task above it"),
         c("taskOutdent", "Outdent the task", "Task", &["shift+tab", "option+left", "cmd+option+left"]),
         // ⌥↑ and ⌥↓ are Zed's move line; ⌘↑ and ⌘↓ go to the ends, as they do

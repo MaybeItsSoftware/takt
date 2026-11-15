@@ -1335,32 +1335,63 @@ impl Takt {
                 true
             }
             FieldKey::Tab { shift } => {
-                // In a draft: Tab files it under the task above, ⇧Tab
-                // brings it back out a level.
-                if let Some(Editing::NewTask {
-                    list_id,
-                    parent_id,
-                    after,
-                }) = self.app.editing.clone()
-                {
-                    let next = if shift {
-                        parent_id.clone().map(|parent| {
-                            let grand = self
-                                .app
-                                .task(&parent)
-                                .and_then(|task| task.parent_task_id.clone());
-                            (grand, Some(parent))
-                        })
-                    } else {
-                        after.clone().map(|above| (Some(above), None))
-                    };
-                    if let Some((parent_id, after)) = next {
+                // In a draft: Tab files it under the task above, last among
+                // its subtasks, ⇧Tab brings it back out a level. On the
+                // board the task above is the card the draft sits under,
+                // and out of the top level it is a new card again.
+                match self.app.editing.clone() {
+                    Some(Editing::NewTask {
+                        list_id,
+                        parent_id,
+                        after,
+                    }) => {
+                        let next = if shift {
+                            parent_id.clone().map(|parent| {
+                                let grand = self
+                                    .app
+                                    .task(&parent)
+                                    .and_then(|task| task.parent_task_id.clone());
+                                (grand, Some(parent))
+                            })
+                        } else {
+                            after.clone().map(|above| {
+                                let last = self.app.last_child(&above);
+                                (Some(above), last)
+                            })
+                        };
+                        match next {
+                            Some((None, Some(card))) if self.app.view_mode == ViewMode::Board => {
+                                self.app.editing = Some(Editing::NewCard {
+                                    list_id,
+                                    place: crate::state::board::CardPlace::Column(
+                                        self.app.board.column,
+                                    ),
+                                    after: Some(card),
+                                });
+                            }
+                            Some((parent_id, after)) => {
+                                self.app.editing = Some(Editing::NewTask {
+                                    list_id,
+                                    parent_id,
+                                    after,
+                                });
+                            }
+                            None => {}
+                        }
+                    }
+                    Some(Editing::NewCard {
+                        list_id,
+                        after: Some(card),
+                        ..
+                    }) if !shift => {
+                        let last = self.app.last_child(&card);
                         self.app.editing = Some(Editing::NewTask {
                             list_id,
-                            parent_id,
-                            after,
+                            parent_id: Some(card),
+                            after: last,
                         });
                     }
+                    _ => {}
                 }
                 true
             }

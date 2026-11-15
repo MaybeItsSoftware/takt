@@ -331,6 +331,7 @@ impl Takt {
                                     .children({
                                         let place = CardPlace::Column(column_ix);
                                         let after = self.draft_after(place);
+                                        let under = self.subtask_draft_card(column_ix);
                                         let mut drawn: Vec<AnyElement> = Vec::new();
                                         for (ix, task) in cards.iter().enumerate() {
                                             drawn.push(self.card(
@@ -341,6 +342,9 @@ impl Takt {
                                             ));
                                             if after.as_deref() == Some(task.id.as_str()) {
                                                 drawn.push(self.draft_card(t));
+                                            }
+                                            if under.as_deref() == Some(task.id.as_str()) {
+                                                drawn.push(self.draft_subtask(t));
                                             }
                                         }
                                         let below = after.as_deref().is_some_and(|id| {
@@ -394,6 +398,37 @@ impl Takt {
 
     fn drafting(&self, place: CardPlace) -> bool {
         matches!(&self.app.editing, Some(Editing::NewCard { place: p, .. }) if *p == place)
+    }
+
+    /// The card in `column` a subtask being drafted on the board belongs
+    /// to: the draft is drawn under it.
+    fn subtask_draft_card(&self, column: usize) -> Option<String> {
+        if self.app.view_mode != ViewMode::Board {
+            return None;
+        }
+        match &self.app.editing {
+            Some(Editing::NewTask {
+                parent_id: Some(parent),
+                ..
+            }) => self.app.card_in_column(parent, column),
+            _ => None,
+        }
+    }
+
+    /// A subtask being typed on the board, set in under its card.
+    fn draft_subtask(&self, t: Tokens) -> AnyElement {
+        div()
+            .ml(px(16.))
+            .px_2()
+            .py_1()
+            .rounded(px(4.))
+            .bg(t.background)
+            .border_1()
+            .border_color(t.accent)
+            .flex()
+            .items_center()
+            .child(self.field_inline(t, "New subtask"))
+            .into_any_element()
     }
 
     /// The card a draft in `place` is drawn below, if any.

@@ -135,7 +135,7 @@ So none of it is reachable only by something you already have to know.
 | `Alt+Up` / `Alt+Down` | Move the task up or down past its neighbour: on the board, the card above or below in its column, or the row above or below on its card |
 | `Cmd+N` / `Cmd+Shift+N` / `Cmd+Alt+N` | New task / list / folder |
 | `F2` / `Shift+R` | In the sidebar, rename the list or folder you are on |
-| `Shift+Return` / `Alt+Shift+Return` | New task above the selection (Checkvist's) / new subtask |
+| `Shift+Return` / `Tab` or `Alt+Shift+Return` | New task above the selection (Checkvist's) / new subtask, last under the selected task or card |
 | `Cmd+F` / `Cmd+Shift+F` | Search |
 | `Cmd+P` / `gl` | Go to a list — opened empty, it lists the ones you were in most recently first. Every list and nested list, matched by the letters you type (`wsr` finds "Write the spring report"), with its folder beside it. Clicking the list's name at the top of the pane opens it too |
 | `Cmd+Ctrl+I` / `Cmd+Ctrl+D` | The right dock on its Inspector tab / the bottom dock on its Done tab, or put it away |
@@ -290,8 +290,9 @@ title stays as it was while the due day and priority change (` ^mon` moves its s
 the ones the task has. Escape puts the title back; clicking away saves.
 
 In the row that opens for a new task (`Return`, `Shift+Return`), `Tab` makes it a
-subtask of the task above and `Shift+Tab` takes it back out, before you type or
-after. `↑` and `↓` close the row, dropping what was typed as `Escape` does, and
+subtask of the task above, last among its subtasks, and `Shift+Tab` takes it back
+out, before you type or after. On the board the same goes for a new card: `Tab`
+makes it a subtask of the card it opened under, and `Shift+Tab` a card again. `↑` and `↓` close the row, dropping what was typed as `Escape` does, and
 carry on to the task above or below where it sat. `Return` files the task and
 closes the row, leaving you in normal mode with the new task selected; press
 `Return` again for the next one. While the row is open the inspector shows the
