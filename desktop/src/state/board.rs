@@ -496,6 +496,10 @@ impl App {
             CardPlace::Quadrant(Some(quadrant)) => self.place_in_quadrant(quadrant),
             CardPlace::Quadrant(None) => {}
         }
+        if self.scope == super::Scope::Today {
+            self.plan_new_task_for_today(&id);
+            self.read_scope_into_rows();
+        }
         self.layout_board();
         self.selected_task = Some(id);
         self.reload_today();

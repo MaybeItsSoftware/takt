@@ -728,7 +728,17 @@ impl Takt {
 
     pub(super) fn today(&self, t: Tokens, cx: &mut Context<Self>) -> AnyElement {
         let today = &self.app.today;
-        if today.day.is_empty() && today.ladder.is_empty() {
+        // A task being typed here: under the task it will be a subtask of,
+        // else at the foot of the day, where a planned task joins it.
+        let draft = match &self.app.editing {
+            Some(Editing::NewTask { parent_id, .. }) => Some(parent_id.clone()),
+            _ => None,
+        };
+        let draft_under = |id: &str| matches!(&draft, Some(Some(parent)) if parent == id);
+        let parent_drawn = matches!(&draft, Some(Some(parent))
+            if today.rows().any(|row| &row.task.id == parent));
+        let draft_at_foot = draft.is_some() && !parent_drawn;
+        if today.day.is_empty() && today.ladder.is_empty() && draft.is_none() {
             return self.empty(t, "Nothing planned or due today.");
         }
         let section = |label: String| {
@@ -745,7 +755,13 @@ impl Takt {
         rows.push(section(format!("Today · {}", today.day.len())).into_any_element());
         for row in &today.day {
             rows.push(self.day_row(index, row, t, cx));
+            if draft_under(&row.task.id) {
+                rows.push(self.draft_row(1, t));
+            }
             index += 1;
+        }
+        if draft_at_foot {
+            rows.push(self.draft_row(0, t));
         }
         if !today.ladder.is_empty() {
             rows.push(
@@ -753,6 +769,9 @@ impl Takt {
             );
             for row in &today.ladder {
                 rows.push(self.day_row(index, row, t, cx));
+                if draft_under(&row.task.id) {
+                    rows.push(self.draft_row(1, t));
+                }
                 index += 1;
             }
         }

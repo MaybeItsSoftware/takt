@@ -946,6 +946,41 @@ impl Takt {
             ));
             press(self, "escape", window, cx);
         }
+        // In Today's plan: Return drafts in place rather than opening a
+        // list, and the new task is planned for today.
+        self.app.overlay = None;
+        self.app.editing = None;
+        self.app.region = crate::state::Region::Tasks;
+        self.app.select_today();
+        if let Ok(today) = crate::state::today::compute(
+            self.app.store.core.clone(),
+            self.app.store.workspace_id.clone(),
+            self.app.store.zone.clone(),
+        ) {
+            self.app.apply_today(Ok(today));
+        }
+        press(self, "enter", window, cx);
+        let drafted = self.app.scope == crate::state::Scope::Today
+            && matches!(self.app.editing, Some(Editing::NewTask { .. }));
+        self.field = TextField::new("smoke today");
+        press(self, "enter", window, cx);
+        let stayed = self.app.scope == crate::state::Scope::Today;
+        let made = self.app.selected_task.clone();
+        let planned = crate::state::today::compute(
+            self.app.store.core.clone(),
+            self.app.store.workspace_id.clone(),
+            self.app.store.zone.clone(),
+        )
+        .is_ok_and(|today| {
+            today
+                .day
+                .iter()
+                .any(|row| Some(&row.task.id) == made.as_ref())
+        });
+        said.push(format!(
+            "today drafts in place {drafted}, stays {stayed}, planned {planned}"
+        ));
+        press(self, "escape", window, cx);
         // On the board: a card in the focused column, three times over.
         self.app.overlay = None;
         self.app.editing = None;

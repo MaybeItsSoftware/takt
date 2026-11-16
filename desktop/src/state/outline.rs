@@ -487,11 +487,19 @@ impl App {
             self.editing = None;
             return true;
         }
+        // Today's draft is filed in its list without a place among the
+        // rows on screen (they are the plan, from every list): a task at the
+        // top, as quick capture files one, a subtask last under its parent.
+        let today = self.scope == Scope::Today;
         let new = match self.new_task_from(title, &list_id) {
             Ok(new) => takt_core::tasks::NewTask {
                 parent_task_id: parent_id.clone(),
-                at_top: after.is_none(),
-                adjacent_task_id: after.clone(),
+                at_top: if today {
+                    parent_id.is_none()
+                } else {
+                    after.is_none()
+                },
+                adjacent_task_id: if today { None } else { after.clone() },
                 ..new
             },
             Err(problem) => {
@@ -502,6 +510,9 @@ impl App {
         let created = self.write(|store| store.core.create_task(new, now_ms()));
         if let Some(id) = created {
             self.lingering.clear();
+            if today {
+                self.plan_new_task_for_today(&id);
+            }
             self.reload_rows();
             self.layout_board();
             self.selected_task = Some(id);
@@ -555,11 +566,31 @@ impl App {
             self.begin_new_card();
             return;
         }
-        // Only a list's outline draws the draft row: from anywhere else the
-        // typing would go into a field nobody can see. Today's plan is not
-        // one, so the draft opens in the task's own list.
+        // Today's plan draws a draft row of its own, so the new task is
+        // typed where you are rather than in another list: it is filed where
+        // quick capture files (a subtask, with Tab, under the selected task
+        // in that task's list) and planned for today.
         if self.scope == Scope::Today {
-            self.select_list(&list_id);
+            let parent = match placement {
+                NewPlacement::Child => self.selected().cloned(),
+                _ => None,
+            };
+            let (list_id, parent_id) = match parent {
+                Some(task) => (task.list_id, Some(task.id)),
+                None => match self.quick_capture_destination() {
+                    Some((id, _)) => (id, None),
+                    None => {
+                        self.message = Some("Make a list first.".into());
+                        return;
+                    }
+                },
+            };
+            self.editing = Some(Editing::NewTask {
+                list_id,
+                parent_id,
+                after: None,
+            });
+            return;
         }
         if self.view_mode != ViewMode::Outline {
             self.select_view_mode(ViewMode::Outline);
@@ -569,6 +600,17 @@ impl App {
             parent_id,
             after,
         });
+    }
+
+    /// Puts a task made in Today on today's plan, so it is drawn where it
+    /// was typed. Its own undo step, after the one that made it.
+    pub fn plan_new_task_for_today(&mut self, id: &str) {
+        self.write(|store| {
+            store
+                .core
+                .set_planned_for_today(true, vec![id.to_string()], now_ms())
+        });
+        self.reload_today();
     }
 
     /// The last of a task's direct subtasks, folded or not: a new subtask
