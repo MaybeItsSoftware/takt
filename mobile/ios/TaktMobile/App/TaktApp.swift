@@ -169,6 +169,10 @@ enum DeepLink {
         model.navigation.open(.list(list.id), isPad: isPad)
       }
     #if DEBUG
+    // `takt://settings/sync` opens Settings on the Sync screen, for screenshots.
+    case "settings":
+      model.navigation.isSettingsPresented = true
+      if url.pathComponents.dropFirst().first == "sync" { model.navigation.isSyncSettingsPresented = true }
     case "demo": model.seedDemo()
     case "seed": model.seedTasks()
     #endif

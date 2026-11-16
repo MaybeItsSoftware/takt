@@ -61,6 +61,12 @@ private struct SyncSettingsForm: View {
         signedIn
       } else {
         signedOut
+        #if DEBUG
+        // `-previewTaktSync YES` shows the purchase signed out, for App Review's screenshot.
+        if UserDefaults.standard.bool(forKey: "previewTaktSync") {
+          TaktSyncSection(theme: theme, controller: controller)
+        }
+        #endif
       }
     }
     .macSettingsList()
@@ -110,7 +116,9 @@ private struct SyncSettingsForm: View {
       try? await session.refreshAccount()
     }
 
-    if session.account?.subscription?.required == true || session.phase == .needsSubscription {
+    // On Takt's own server the purchase is always offered, charging or not, so
+    // it can be bought (and found by App Review) before it's required.
+    if showsTaktSync {
       TaktSyncSection(theme: theme, controller: controller)
     }
 
@@ -359,6 +367,11 @@ private struct SyncSettingsForm: View {
 
   private func header(_ text: String) -> some View {
     SettingsGroupLabel(text)
+  }
+
+  private var showsTaktSync: Bool {
+    session.account?.subscription?.required == true || session.phase == .needsSubscription
+      || session.credentials?.serverURL.host == SyncServer.defaultURL.host
   }
 }
 
