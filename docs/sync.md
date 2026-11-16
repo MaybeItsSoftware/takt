@@ -695,6 +695,16 @@ hosts themselves charges nothing.
   from `~/.config/takt/revenuecat.env` onto `takt-sync`, leaving the rest of
   its environment as it is, and checks that the webhook answers. The phone
   builds read their RevenueCat keys from the same file.
+- **RevenueCat's side.** Project `projc201565e`, with the apps
+  `app3b3ef9c134` (App Store) and `appc8a22a6ddb` (Play), both
+  `uk.co.maybeitssoftware.takt`. Their products are `takt_sync_yearly` and
+  `takt_sync_yearly:yearly` (Play's `productId:basePlanId`; the base plan is
+  `yearly`), both attached to the entitlement `sync`, which is the one the
+  server counts. The webhook "Takt sync server" posts every event to
+  `/v1/webhooks/revenuecat`; its Authorization header (`Bearer` and the
+  secret) is set in the dashboard, since RevenueCat's API can't set it. The
+  project's onboarding left a Test Store app and an unused entitlement,
+  `uk_co_maybeitssoftware_takt_pro`.
 
 ## Server storage (Postgres)
 
