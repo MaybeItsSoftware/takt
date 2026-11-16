@@ -417,7 +417,10 @@ private fun SignedInSync(sync: SyncController, status: SyncUiState, credentials:
         }
     }
 
-    if (account?.subscription?.required == true || status == SyncUiState.NeedsSubscription) {
+    // On Takt's own server the purchase is always offered, charging or not, so
+    // it can be bought (and found by review) before it's required.
+    val onHostedServer = android.net.Uri.parse(credentials.serverURL).host == HOSTED_SYNC_HOST
+    if (account?.subscription?.required == true || status == SyncUiState.NeedsSubscription || onHostedServer) {
         TaktSyncSection(sync, account?.subscription, credentials)
     }
 
@@ -755,6 +758,9 @@ private fun Field(
  * Takt Sync on Takt's hosted server: whether this account has it, and the
  * £1-a-year purchase. A self-hosted server never asks, and never shows it.
  */
+/** Takt's hosted sync server, where Takt Sync is sold. */
+private const val HOSTED_SYNC_HOST = "api.takt.maybeitssoftware.co.uk"
+
 @Composable
 private fun TaktSyncSection(sync: SyncController, subscription: uk.co.maybeitsadam.takt.core.SyncSubscription?, credentials: SyncCredentials) {
     val container = uk.co.maybeitsadam.takt.ui.navigation.LocalShell.current.container
