@@ -123,7 +123,10 @@ board, a theme.
 - Collects data: yes. Shares data: no.
 - Encrypted in transit: yes.
 - Users can request deletion: yes, in the app (Settings → Sync → Delete
-  account), and the same steps are on the privacy page.
+  account), or by email without the app.
+- **Delete account URL:** https://takt.maybeitssoftware.co.uk/delete-account/
+  (`site/delete-account/`). Play rejects a URL that 404s, and wants the page to
+  name the app, give the steps, and say what is deleted and what is kept.
 
 | Data type | Collected | Optional? | Purpose |
 | --- | --- | --- | --- |
