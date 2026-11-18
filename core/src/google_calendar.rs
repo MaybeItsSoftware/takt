@@ -19,7 +19,7 @@
 //! Sending stays with each client, as Checkvist's does: OAuth, the token and
 //! the HTTP stack are the platform's.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
@@ -50,6 +50,10 @@ pub const PREF_CALENDAR: &str = "googleCalendar.calendarId";
 pub const PREF_IMPORT: &str = "googleCalendar.importEvents";
 pub const PREF_AGENDA: &str = "googleCalendar.agendaCalendars";
 pub const PREF_LEASE: &str = "googleCalendar.lease";
+/// Whether a timed task is put on the two-way calendar as an event. Off
+/// (unset) by default: the Mac's Google Tasks mirror carries every task,
+/// and Google Calendar shows them from there.
+pub const PREF_TASK_EVENTS: &str = "googleCalendar.taskEvents";
 
 // MARK: - Requests and answers
 
@@ -798,6 +802,23 @@ pub fn decide(
     out
 }
 
+/// With task events off, only a task whose event was made in Google (it
+/// came in through "Sync events too") keeps wanting one. Every other task
+/// wants none, so the merge deletes the event Takt made for it and drops
+/// the link, and the Google Tasks mirror takes the task back.
+fn keep_only_imported_events(tasks: &mut [LocalTask], links: &[Link]) {
+    let imported: HashSet<&str> = links
+        .iter()
+        .filter(|l| l.event_id != google_calendar_event_id(l.task_id.clone()))
+        .map(|l| l.task_id.as_str())
+        .collect();
+    for task in tasks.iter_mut() {
+        if !imported.contains(task.id.as_str()) {
+            task.shape = None;
+        }
+    }
+}
+
 // MARK: - Writes to send
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -1222,8 +1243,11 @@ impl CoreWorkspace {
     ) -> Result<GoogleCalendarReconcile, CoreError> {
         journal::journalled(&mut self.lock(), "Google Calendar", |tx| {
             let import = settings(tx)?.import_events;
-            let tasks = local_tasks(tx, None)?;
+            let mut tasks = local_tasks(tx, None)?;
             let links = links(tx, &calendar_id)?;
+            if preference(tx, PREF_TASK_EVENTS)?.as_deref() != Some("true") {
+                keep_only_imported_events(&mut tasks, &links);
+            }
             let decisions = decide(&tasks, &links, &events, full, import, now_ms);
             let by_id: HashMap<&str, &LocalTask> =
                 tasks.iter().map(|t| (t.id.as_str(), t)).collect();
@@ -1540,6 +1564,27 @@ impl CoreWorkspace {
 }
 
 impl CoreWorkspace {
+    /// Whether timed tasks go on the two-way calendar as events (off by
+    /// default). Rust only, like the switch's only home, the Mac.
+    pub fn google_calendar_task_events(&self) -> Result<bool, CoreError> {
+        Ok(preference(&self.lock(), PREF_TASK_EVENTS)?.as_deref() == Some("true"))
+    }
+
+    /// Turns task events on or off. Off, the next pass deletes the events
+    /// Takt made for tasks; on, it makes them again.
+    pub fn set_google_calendar_task_events(&self, on: bool, now_ms: i64) -> Result<(), CoreError> {
+        let mut connection = self.lock();
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        crate::setup::set_preference(
+            &transaction,
+            PREF_TASK_EVENTS,
+            Some(if on { "true" } else { "false" }),
+            now_ms,
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
     /// The tasks that have an event on the two-way calendar now (linked,
     /// not detached). The Mac's Google Tasks mirror leaves them out, so a
     /// timed task shows once in Google Calendar, as its event, rather than

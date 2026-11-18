@@ -57,6 +57,8 @@ fn enable(core: &CoreWorkspace, import: bool) {
         NOW - 4 * HOUR,
     )
     .unwrap();
+    core.set_google_calendar_task_events(true, NOW - 4 * HOUR)
+        .unwrap();
 }
 
 fn event(
@@ -569,6 +571,69 @@ fn events_made_in_google_become_tasks_only_when_asked() {
             .pushes
             .is_empty()
     );
+}
+
+#[test]
+fn by_default_tasks_make_no_events_and_takts_old_ones_are_deleted() {
+    let (core, inbox) = open();
+    enable(&core, false);
+    core.set_google_calendar_task_events(false, NOW - 4 * HOUR)
+        .unwrap();
+    // Off by default, and the switch reads back.
+    let (fresh, _) = open();
+    assert!(!fresh.google_calendar_task_events().unwrap());
+    assert!(!core.google_calendar_task_events().unwrap());
+
+    let id = add(&core, &inbox, "Call", Some(NOW + HOUR), None);
+    assert!(reconcile(&core, vec![], true, NOW).pushes.is_empty());
+
+    // An event made while task events were on goes when they are off.
+    core.set_google_calendar_task_events(true, NOW).unwrap();
+    let first = reconcile(&core, vec![], true, NOW);
+    send_all(&core, &first.pushes, NOW);
+    assert_eq!(
+        core.google_calendar_linked_task_ids().unwrap(),
+        std::slice::from_ref(&id)
+    );
+    core.set_google_calendar_task_events(false, NOW + 1)
+        .unwrap();
+    let standing = event(
+        &first.pushes[0].event_id,
+        "Call",
+        NOW + HOUR,
+        NOW + 90 * 60 * 1000,
+        NOW,
+        Some(&id),
+    );
+    let off = reconcile(&core, vec![standing], false, NOW + 2);
+    assert_eq!(off.pushes.len(), 1);
+    assert_eq!(off.pushes[0].kind, GoogleCalendarPushKind::Delete);
+    send_all(&core, &off.pushes, NOW + 2);
+    // Unlinked, so the Google Tasks mirror carries it again.
+    assert!(core.google_calendar_linked_task_ids().unwrap().is_empty());
+}
+
+#[test]
+fn an_event_made_in_google_keeps_following_its_task_with_task_events_off() {
+    let (core, _) = open();
+    enable(&core, true);
+    core.set_google_calendar_task_events(false, NOW - 4 * HOUR)
+        .unwrap();
+    let made = event("googleid", "Dentist", NOW + HOUR, NOW + 2 * HOUR, NOW, None);
+    let pass = reconcile(&core, vec![made.clone()], true, NOW);
+    assert_eq!(pass.tasks_imported, 1);
+    let task_id = pass.pushes[0].task_id.clone();
+    send_all(&core, &pass.pushes, NOW);
+    // Moved in Google: the task follows, and nothing is deleted.
+    let mut moved = made;
+    moved.task_id = Some(task_id.clone());
+    moved.start_ms = Some(NOW + 3 * HOUR);
+    moved.end_ms = Some(NOW + 4 * HOUR);
+    moved.updated_ms = Some(NOW + 10);
+    let next = reconcile(&core, vec![moved], false, NOW + 20);
+    assert!(next.pushes.is_empty());
+    assert_eq!(next.tasks_updated, 1);
+    assert_eq!(core.google_calendar_linked_task_ids().unwrap(), [task_id]);
 }
 
 #[test]

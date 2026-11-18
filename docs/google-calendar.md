@@ -1,8 +1,19 @@
 # Google Calendar
 
-Takt puts timed tasks on a Google calendar you choose and keeps the two in
-step: move or rename the event in Google and the task moves or renames; edit,
-complete or delete the task and the event follows. On the phones, Today also
+Takt can put timed tasks on a Google calendar you choose and keep the two
+in step: move or rename the event in Google and the task moves or renames;
+edit, complete or delete the task and the event follows.
+
+**Task events are off by default** (the synced preference
+`googleCalendar.taskEvents`, set only on the Mac: *Put timed tasks on the
+calendar as events*). Off, tasks reach Google Calendar through the Mac's
+Google Tasks mirror (docs/google-tasks.md) instead, on their day but without
+their time, since Google Tasks keeps no time. Turning it off makes each pass
+treat every task as wanting no event, so the events Takt made for tasks are
+deleted and their links dropped, which puts the tasks back in the Tasks
+mirror. The one exception is an event made in Google and imported as a task
+(below), told apart by not having the derived id: it stays an event and keeps
+following its task. On the phones, Today also
 shows the day's events from the calendars you pick, interleaved with timed
 tasks.
 
@@ -13,7 +24,7 @@ the requests the core builds.
 
 ## Which tasks become events
 
-An **open** task becomes an event in the two-way calendar when it has a time:
+With task events on, an **open** task becomes an event in the two-way calendar when it has a time:
 
 | Task has | Event |
 | --- | --- |
@@ -123,7 +134,9 @@ Sync tokens are per device and per calendar, in the local
   deleted. `state` is `linked` or `detached`.
 - `calendar_sync_tokens(calendarId PK, syncToken, updatedAt)` — local.
 - Synced preferences: `googleCalendar.calendarId` (the two-way calendar;
-  none means two-way is off), `googleCalendar.importEvents`,
+  none means two-way is off), `googleCalendar.taskEvents` (`true` puts
+  tasks on it as events; unset or `false`, the default, does not),
+  `googleCalendar.importEvents`,
   `googleCalendar.agendaCalendars` (a JSON array of ids shown in Today) and
   `googleCalendar.lease`.
 
