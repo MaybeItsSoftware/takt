@@ -651,6 +651,13 @@ impl App {
             .is_some()
         {
             self.pending_delete = None;
+            // Today draws from its held ranking, not the store: take the
+            // task out of it now, so it goes at once, and rank again for
+            // the subtasks that went with it.
+            self.today.day.retain(|row| row.task.id != task.id);
+            self.today.ladder.retain(|row| row.task.id != task.id);
+            self.reload_today();
+            self.reload_done();
             self.reload_rows();
             let index = index.min(self.rows.len().saturating_sub(1));
             self.select_row(index);
