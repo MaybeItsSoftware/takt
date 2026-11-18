@@ -35,9 +35,9 @@ pub struct Today {
     /// Each daily due today, by its task: ticking that task logs the day
     /// rather than finishing it.
     pub daily_by_task: HashMap<String, DailyToday>,
-    /// The local day this was ranked for (`yyyy-MM-dd`): when the clock
-    /// passes into the next, the day is ranked again.
-    pub day_key: String,
+    /// The minute this was ranked in: when the clock moves on, the day is
+    /// ranked again, so a start arriving or midnight passing shows.
+    pub ranked_minute: i64,
     pub ladder_count: u64,
     pub blocked_count: usize,
 }
@@ -158,7 +158,7 @@ pub fn compute(
         dailies,
         ladder,
         daily_by_task,
-        day_key: takt_core::dailies::day_key(now, &zone),
+        ranked_minute: now / 60_000,
         ladder_count: next.ranked_count,
         blocked_count: next.blocked.len(),
     })
@@ -192,14 +192,16 @@ impl App {
         }
     }
 
-    /// True, and the day marked stale, when midnight has passed since the
-    /// day was ranked: what is due, planned and ticked all turn over.
-    pub fn check_day_turned(&mut self) -> bool {
-        let key = takt_core::dailies::day_key(now_ms(), &self.store.zone);
-        if self.today.day_key.is_empty() || self.today.day_key == key || self.today_stale {
+    /// True, and the day marked stale, when a minute has passed since the
+    /// day was ranked: a start arriving puts its task on the day, and
+    /// midnight turns over what is due, planned and ticked. Ranking runs in
+    /// the background in about 20 ms, so once a minute costs nothing.
+    pub fn check_clock_moved(&mut self) -> bool {
+        let minute = now_ms() / 60_000;
+        if self.today.ranked_minute == 0 || self.today.ranked_minute == minute || self.today_stale {
             return false;
         }
-        self.today.day_key = key;
+        self.today.ranked_minute = minute;
         self.reload_today();
         true
     }

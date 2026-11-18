@@ -274,7 +274,7 @@ impl Takt {
                         this.app.reload_today();
                         this.rank_today(cx);
                         cx.notify();
-                    } else if this.app.check_day_turned() {
+                    } else if this.app.check_clock_moved() {
                         this.rank_today(cx);
                         cx.notify();
                     } else if this.app.tick_focus() {
