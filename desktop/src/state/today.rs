@@ -28,8 +28,8 @@ pub struct DayRow {
 #[derive(Debug, Clone, Default)]
 pub struct Today {
     pub day: Vec<DayRow>,
-    /// The dailies still owed today that the day isn't already showing, as
-    /// the phones' dailies strip has them.
+    /// Every daily still owed today, planned or not, unless it is the one
+    /// being timed.
     pub dailies: Vec<DayRow>,
     pub ladder: Vec<DayRow>,
     /// Each daily due today, by its task: ticking that task logs the day
@@ -117,11 +117,12 @@ pub fn compute(
         })
         .collect();
     let done_today = |id: &str| daily_by_task.get(id).is_some_and(|d| d.done);
-    // Finished is finished: a daily met today leaves the day, as on the
-    // phones.
+    // Every daily due today is drawn in the dailies section, planned or
+    // not, so the habits sit together rather than split across the day;
+    // only the one being timed stays in the day.
     let day: Vec<DayRow> = day
         .into_iter()
-        .filter(|row| !done_today(&row.task.id))
+        .filter(|row| row.reason == "running" || !daily_by_task.contains_key(&row.task.id))
         .collect();
     let in_day: std::collections::HashSet<String> =
         day.iter().map(|row| row.task.id.clone()).collect();
