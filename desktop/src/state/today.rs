@@ -28,14 +28,33 @@ pub struct DayRow {
 #[derive(Debug, Clone, Default)]
 pub struct Today {
     pub day: Vec<DayRow>,
+    /// The dailies still owed today that the day isn't already showing, as
+    /// the phones' dailies strip has them.
+    pub dailies: Vec<DayRow>,
     pub ladder: Vec<DayRow>,
+    /// Each daily due today, by its task: ticking that task logs the day
+    /// rather than finishing it.
+    pub daily_by_task: HashMap<String, DailyToday>,
+    /// The local day this was ranked for (`yyyy-MM-dd`): when the clock
+    /// passes into the next, the day is ranked again.
+    pub day_key: String,
     pub ladder_count: u64,
     pub blocked_count: usize,
 }
 
+/// A daily due today: which it is, and whether today is ticked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DailyToday {
+    pub daily_id: String,
+    pub done: bool,
+}
+
 impl Today {
     pub fn rows(&self) -> impl Iterator<Item = &DayRow> {
-        self.day.iter().chain(self.ladder.iter())
+        self.day
+            .iter()
+            .chain(self.dailies.iter())
+            .chain(self.ladder.iter())
     }
 }
 
@@ -58,7 +77,7 @@ pub fn compute(
         mode: stored.mode,
     };
     let next = core
-        .next_up(now, zone, context, None, Some(LADDER_LIMIT))
+        .next_up(now, zone.clone(), context, None, Some(LADDER_LIMIT))
         .map_err(|e| e.to_string())?;
     let mut ids: Vec<String> = next.day_plan.iter().map(|entry| entry.id.clone()).collect();
     ids.extend(next.ranked.iter().map(|scored| scored.candidate.id.clone()));
@@ -79,12 +98,51 @@ pub fn compute(
             })
         })
         .collect();
-    let in_day: std::collections::HashSet<&str> =
-        day.iter().map(|row| row.task.id.as_str()).collect();
+    let owed = core
+        .dailies_on(now, zone.clone())
+        .map_err(|e| e.to_string())?;
+    let daily_by_task: HashMap<String, DailyToday> = owed
+        .iter()
+        .map(|daily| {
+            (
+                daily.task.id.clone(),
+                DailyToday {
+                    daily_id: daily.daily.id.clone(),
+                    done: daily
+                        .contribution
+                        .as_ref()
+                        .is_some_and(|c| c.completed_at_ms.is_some()),
+                },
+            )
+        })
+        .collect();
+    let done_today = |id: &str| daily_by_task.get(id).is_some_and(|d| d.done);
+    // Finished is finished: a daily met today leaves the day, as on the
+    // phones.
+    let day: Vec<DayRow> = day
+        .into_iter()
+        .filter(|row| !done_today(&row.task.id))
+        .collect();
+    let in_day: std::collections::HashSet<String> =
+        day.iter().map(|row| row.task.id.clone()).collect();
+    let dailies: Vec<DayRow> = owed
+        .into_iter()
+        .filter(|daily| !done_today(&daily.task.id) && !in_day.contains(&daily.task.id))
+        .map(|daily| DayRow {
+            task: daily.task,
+            reason: "daily".into(),
+            explanation: None,
+        })
+        .collect();
+    let shown: std::collections::HashSet<String> = in_day
+        .iter()
+        .cloned()
+        .chain(dailies.iter().map(|row| row.task.id.clone()))
+        .collect();
     let ladder = next
         .ranked
         .iter()
-        .filter(|scored| !in_day.contains(scored.candidate.id.as_str()))
+        .filter(|scored| !shown.contains(&scored.candidate.id))
         .take(LADDER_LIMIT as usize)
         .filter_map(|scored| {
             Some(DayRow {
@@ -96,7 +154,10 @@ pub fn compute(
         .collect();
     Ok(Today {
         day,
+        dailies,
         ladder,
+        daily_by_task,
+        day_key: takt_core::dailies::day_key(now, &zone),
         ladder_count: next.ranked_count,
         blocked_count: next.blocked.len(),
     })
@@ -128,6 +189,18 @@ impl App {
             }
             Err(error) => self.message = Some(error),
         }
+    }
+
+    /// True, and the day marked stale, when midnight has passed since the
+    /// day was ranked: what is due, planned and ticked all turn over.
+    pub fn check_day_turned(&mut self) -> bool {
+        let key = takt_core::dailies::day_key(now_ms(), &self.store.zone);
+        if self.today.day_key.is_empty() || self.today.day_key == key || self.today_stale {
+            return false;
+        }
+        self.today.day_key = key;
+        self.reload_today();
+        true
     }
 
     /// The rows Today draws, in order: what the keys move through there.

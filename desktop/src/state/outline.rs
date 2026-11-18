@@ -368,12 +368,62 @@ impl App {
         let Some(task) = self.selected().cloned() else {
             return;
         };
+        if task.status == "open" && self.toggle_daily(&task.id) {
+            return;
+        }
         let status = if task.status == "open" {
             "completed"
         } else {
             "open"
         };
         self.set_status(&task.id, status);
+    }
+
+    /// A daily due today is ticked for the day, or unticked, and its task
+    /// left open: the phones do the same. False when the task is no daily
+    /// due today.
+    fn toggle_daily(&mut self, task_id: &str) -> bool {
+        let Some(daily) = self.today.daily_by_task.get(task_id).cloned() else {
+            return false;
+        };
+        let zone = self.store.zone.clone();
+        let now = now_ms();
+        let done = if daily.done {
+            self.write(|store| {
+                store
+                    .core
+                    .clear_contribution(daily.daily_id.clone(), now, zone)
+            })
+        } else {
+            self.write(|store| {
+                store
+                    .core
+                    .log_contribution(daily.daily_id.clone(), 0, true, now, zone)
+                    .map(|_| ())
+            })
+        };
+        if done.is_some() {
+            if !daily.done {
+                self.start_celebration(task_id);
+                // Drawn ticked until the day is ranked again.
+                for row in self
+                    .today
+                    .day
+                    .iter_mut()
+                    .chain(self.today.dailies.iter_mut())
+                    .chain(self.today.ladder.iter_mut())
+                    .filter(|row| row.task.id == task_id)
+                {
+                    row.task.status = "completed".into();
+                }
+            }
+            if let Some(entry) = self.today.daily_by_task.get_mut(task_id) {
+                entry.done = !daily.done;
+            }
+            self.reload_today();
+            self.reload_done();
+        }
+        true
     }
 
     /// Marks the selection cancelled ("invalidated"), or opens it again.
@@ -426,6 +476,7 @@ impl App {
             .today
             .day
             .iter_mut()
+            .chain(self.today.dailies.iter_mut())
             .chain(self.today.ladder.iter_mut())
         {
             if row.task.id == id {
@@ -655,6 +706,7 @@ impl App {
             // task out of it now, so it goes at once, and rank again for
             // the subtasks that went with it.
             self.today.day.retain(|row| row.task.id != task.id);
+            self.today.dailies.retain(|row| row.task.id != task.id);
             self.today.ladder.retain(|row| row.task.id != task.id);
             self.reload_today();
             self.reload_done();

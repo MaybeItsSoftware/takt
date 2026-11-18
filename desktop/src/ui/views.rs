@@ -738,7 +738,11 @@ impl Takt {
         let parent_drawn = matches!(&draft, Some(Some(parent))
             if today.rows().any(|row| &row.task.id == parent));
         let draft_at_foot = draft.is_some() && !parent_drawn;
-        if today.day.is_empty() && today.ladder.is_empty() && draft.is_none() {
+        if today.day.is_empty()
+            && today.dailies.is_empty()
+            && today.ladder.is_empty()
+            && draft.is_none()
+        {
             return self.empty(t, "Nothing planned or due today.");
         }
         let section = |label: String| {
@@ -762,6 +766,15 @@ impl Takt {
         }
         if draft_at_foot {
             rows.push(self.draft_row(0, t));
+        }
+        if !today.dailies.is_empty() {
+            rows.push(
+                section(format!("Dailies · {} left", today.dailies.len())).into_any_element(),
+            );
+            for row in &today.dailies {
+                rows.push(self.day_row(index, row, t, cx));
+                index += 1;
+            }
         }
         if !today.ladder.is_empty() {
             rows.push(
