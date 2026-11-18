@@ -7,7 +7,7 @@
 
 use super::App;
 use super::store::now_ms;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use takt_core::focus::FocusContext;
 use takt_core::records::TaskRow;
@@ -50,6 +50,35 @@ pub struct DailyToday {
 }
 
 impl Today {
+    /// Each row of `old` that is lingering and missing from `self`, put
+    /// back in its section at the place it had.
+    pub fn keep_lingering(&mut self, old: &Today, lingering: &HashSet<String>) {
+        if lingering.is_empty() {
+            return;
+        }
+        let present: HashSet<String> = self.rows().map(|row| row.task.id.clone()).collect();
+        for (section, before) in [
+            (&mut self.day, &old.day),
+            (&mut self.dailies, &old.dailies),
+            (&mut self.ladder, &old.ladder),
+        ] {
+            for (at, row) in before.iter().enumerate() {
+                if lingering.contains(&row.task.id) && !present.contains(&row.task.id) {
+                    section.insert(at.min(section.len()), row.clone());
+                }
+            }
+        }
+    }
+
+    /// Drops the finished rows among `ids`, whose lingering is over.
+    pub fn let_go(&mut self, ids: &[String]) -> bool {
+        let before = self.rows().count();
+        for section in [&mut self.day, &mut self.dailies, &mut self.ladder] {
+            section.retain(|row| row.task.status == "open" || !ids.contains(&row.task.id));
+        }
+        self.rows().count() != before
+    }
+
     pub fn rows(&self) -> impl Iterator<Item = &DayRow> {
         self.day
             .iter()
@@ -173,7 +202,11 @@ impl App {
 
     pub fn apply_today(&mut self, today: Result<Today, String>) {
         match today {
-            Ok(today) => {
+            Ok(mut today) => {
+                // A task just finished is out of the new ranking, but it
+                // stays drawn where it was until its seconds are up, so its
+                // celebration plays and a slip can be undone.
+                today.keep_lingering(&self.today, &self.lingering);
                 let keep = self
                     .selected_task
                     .as_deref()
@@ -209,5 +242,69 @@ impl App {
     /// The rows Today draws, in order: what the keys move through there.
     pub fn today_ids(&self) -> Vec<String> {
         self.today.rows().map(|row| row.task.id.clone()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(id: &str, status: &str) -> DayRow {
+        DayRow {
+            task: TaskRow {
+                id: id.into(),
+                list_id: "l".into(),
+                parent_task_id: None,
+                title: id.into(),
+                notes: String::new(),
+                status: status.into(),
+                sort_order: 0,
+                due_at_ms: None,
+                estimate_seconds: None,
+                source_system: None,
+                source_id: None,
+                item_kind: None,
+                is_promoted: None,
+                archived_at_ms: None,
+                completed_at_ms: None,
+                created_at_ms: 0,
+                updated_at_ms: 0,
+            },
+            reason: "planned".into(),
+            explanation: None,
+        }
+    }
+
+    fn ids(rows: &[DayRow]) -> Vec<&str> {
+        rows.iter().map(|row| row.task.id.as_str()).collect()
+    }
+
+    #[test]
+    fn a_finished_task_stays_in_its_place_through_a_rerank_until_let_go() {
+        let old = Today {
+            day: vec![row("a", "open"), row("b", "completed"), row("c", "open")],
+            ..Default::default()
+        };
+        let mut new = Today {
+            day: vec![row("a", "open"), row("c", "open")],
+            ..Default::default()
+        };
+        let lingering: HashSet<String> = ["b".to_string()].into();
+        new.keep_lingering(&old, &lingering);
+        assert_eq!(ids(&new.day), ["a", "b", "c"]);
+        // Reranked again while it lingers: still once.
+        new.keep_lingering(&new.clone(), &lingering);
+        assert_eq!(ids(&new.day), ["a", "b", "c"]);
+        assert!(new.let_go(&["b".to_string()]));
+        assert_eq!(ids(&new.day), ["a", "c"]);
+    }
+
+    #[test]
+    fn a_task_opened_again_is_not_let_go() {
+        let mut today = Today {
+            day: vec![row("b", "open")],
+            ..Default::default()
+        };
+        assert!(!today.let_go(&["b".to_string()]));
     }
 }

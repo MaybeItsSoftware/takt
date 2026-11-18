@@ -405,6 +405,7 @@ impl App {
         if done.is_some() {
             if !daily.done {
                 self.start_celebration(task_id);
+                self.linger(task_id);
                 // Drawn ticked until the day is ranked again.
                 for row in self
                     .today
@@ -829,6 +830,11 @@ impl App {
         for id in &due {
             self.lingering_since.remove(id);
             self.lingering.remove(id);
+        }
+        if self.today.let_go(&due) && self.scope == super::Scope::Today {
+            let at = self.selected_index();
+            self.reload_rows();
+            self.keep_selection_in_place(at);
         }
         if self.prefs.hide_completed {
             let at = self.selected_index();
