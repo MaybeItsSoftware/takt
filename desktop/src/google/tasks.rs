@@ -12,7 +12,7 @@
 use super::{GoogleError, TASKS_SCOPES, access_token, failure, send};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use takt_core::google_tasks::{
     GoogleTasksLedgerEntry, GoogleTasksListMapping, GoogleTasksLocalList, GoogleTasksLocalTask,
@@ -199,10 +199,19 @@ fn snapshot(
             depth
         }
     };
+    // A task with an event on the two-way calendar already shows in Google
+    // Calendar; a Google Task as well drew it twice. Left out here, the
+    // mirror deletes its Google Task, and it comes back if the event goes.
+    let on_calendar: HashSet<String> = core
+        .google_calendar_linked_task_ids()
+        .map_err(err)?
+        .into_iter()
+        .collect();
     let mut tasks: Vec<(usize, i64, GoogleTasksLocalTask)> = rows
         .iter()
         .filter(|r| {
-            r.item_kind.as_deref() != Some("list")
+            !on_calendar.contains(&r.id)
+                && r.item_kind.as_deref() != Some("list")
                 && r.status != "cancelled"
                 && r.archived_at_ms.is_none()
         })
