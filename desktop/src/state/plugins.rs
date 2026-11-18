@@ -115,7 +115,9 @@ impl Plugin {
     /// The plugin a settings row belongs to, by the row's id.
     pub fn of_row(id: &str) -> Option<Plugin> {
         Some(match id {
-            "google-calendar-choose" | "google-import-events" => Plugin::GoogleCalendar,
+            "google-calendar-choose" | "google-task-events" | "google-import-events" => {
+                Plugin::GoogleCalendar
+            }
             "google-tasks-title-times" => Plugin::GoogleTasks,
             "links-vault-add" | "links-vault-forget" => Plugin::Obsidian,
             "celebration" | "celebration-sound" => Plugin::Celebration,
@@ -326,7 +328,7 @@ mod tests {
     #[test]
     fn rows_belong_to_their_plugin() {
         assert_eq!(
-            Plugin::of_row("google-import-events"),
+            Plugin::of_row("google-task-events"),
             Some(Plugin::GoogleCalendar)
         );
         assert_eq!(

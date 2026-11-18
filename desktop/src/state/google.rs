@@ -295,6 +295,16 @@ impl App {
                 chosen.unwrap_or_else(|| "None".into()),
             ),
             (
+                "google-task-events",
+                "Google",
+                "Put timed tasks on the calendar as events",
+                on(self
+                    .store
+                    .core
+                    .google_calendar_task_events()
+                    .unwrap_or(false)),
+            ),
+            (
                 "google-import-events",
                 "Google",
                 "Sync events too, not just tasks",
@@ -366,6 +376,16 @@ impl App {
             "google-disconnect" => {
                 google::disconnect();
                 self.message = Some("Google disconnected.".into());
+            }
+            "google-task-events" => {
+                let core = &self.store.core;
+                let next = !core.google_calendar_task_events().unwrap_or(false);
+                if let Err(error) =
+                    core.set_google_calendar_task_events(next, super::store::now_ms())
+                {
+                    self.message = Some(error.to_string());
+                }
+                self.google_now();
             }
             "google-import-events" => {
                 let mut settings = self.calendar_settings();

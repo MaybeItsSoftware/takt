@@ -229,7 +229,7 @@ pub enum Control {
     Shortcut(String),
 }
 
-const SWITCHES: [&str; 18] = [
+const SWITCHES: [&str; 19] = [
     "menu-bar",
     "sync-self-hosted",
     "google-own-client",
@@ -246,6 +246,7 @@ const SWITCHES: [&str; 18] = [
     "remind-due-today",
     "remind-dailies",
     "celebration-sound",
+    "google-task-events",
     "google-import-events",
     "google-tasks-title-times",
 ];
@@ -389,8 +390,11 @@ impl SettingRow {
             "google-calendar-choose" => {
                 "The Google calendar timed tasks go to, and that changes come back from."
             }
+            "google-task-events" => {
+                "Off (the default), timed tasks go to Google Tasks, which Google Calendar shows on their day but without their time, and the events Takt made for them are deleted. On, each becomes an event at its time, and moving or renaming it there moves or renames the task."
+            }
             "google-import-events" => {
-                "Off (the default), only your timed tasks go to the calendar, and moving or renaming one there moves or renames the task. On, events you add in the calendar come in as tasks as well."
+                "Off (the default), events you add in the calendar stay events. On, they come in as tasks as well, and moving or renaming one there moves or renames the task."
             }
             "google-sync-now" => "Pass the calendar and tasks mirrors now.",
             "google-tasks-title-times" => {
