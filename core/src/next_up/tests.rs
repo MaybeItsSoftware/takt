@@ -111,6 +111,10 @@ fn the_day_is_running_then_planned_then_deadlines_then_starts() {
             start_at_ms: Some(NOW - 24 * HOUR),
             ..candidate("startedYesterday")
         },
+        Candidate {
+            start_at_ms: Some(NOW + HOUR),
+            ..candidate("startsLaterToday")
+        },
         candidate("someday"),
         candidate("elsewhere"),
     ];

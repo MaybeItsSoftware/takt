@@ -160,8 +160,11 @@ pub fn plan<'a>(
     let mut starting: Vec<(&Candidate, i64)> = candidates
         .iter()
         .filter_map(|c| {
+            // Started today: a start still to come later today keeps the
+            // task off the day until it arrives, rather than drawing it
+            // greyed out all morning.
             c.start_at_ms
-                .filter(|at| local(*at, tz).date_naive() == today)
+                .filter(|at| *at <= now_ms && local(*at, tz).date_naive() == today)
                 .map(|at| (c, at))
         })
         .collect();
