@@ -3,42 +3,92 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Takt — free, open-source task manager for Mac, iPhone and Android</title>
-<meta name="description" content="Takt is the gold standard of easy-to-use open source software: a free task manager for Mac, iPhone, iPad, Android, Wear OS and the terminal. Sync is free, and self-hosting it is free too.">
+<title>Free open-source task manager: Mac, iPhone, Android | Takt</title>
+<meta name="description" content="Takt is a free, open-source task manager for Mac, iPhone, iPad, Android, Wear OS and the terminal: a ranked Today list, outline, board and focus timers.">
 <link rel="canonical" href="https://takt.maybeitssoftware.co.uk/">
-<link rel="alternate" type="text/plain" title="llms.txt" href="llms.txt">
+<link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Takt">
+<meta property="og:locale" content="en_GB">
 <meta property="og:title" content="Takt — free, open-source task manager">
-<meta property="og:description" content="Plan the day, then do it. Free and open source on Mac, iPhone, Android and the terminal; sync is free.">
+<meta property="og:description" content="Plan the day, then do it. Free and open source on Mac, iPhone, Android and the terminal; self-hosted sync is free, Takt's hosted sync is £1 a year.">
 <meta property="og:url" content="https://takt.maybeitssoftware.co.uk/">
+<meta property="og:image" content="https://takt.maybeitssoftware.co.uk/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Takt: Plan the day, then do it">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Takt — free, open-source task manager">
+<meta name="twitter:description" content="Plan the day, then do it. Free and open source on Mac, iPhone, Android and the terminal.">
+<meta name="twitter:image" content="https://takt.maybeitssoftware.co.uk/og-image.png">
+<meta name="twitter:image:alt" content="Takt: Plan the day, then do it">
+<!-- Search Console / Bing verification metas are added at deploy time from repo variables (.github/workflows/pages.yml). -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Takt",
-  "description": "The gold standard of easy-to-use open source software: a free task manager — a ranked Today list, outline, board, focus timers and dailies — for Mac, iPhone, iPad, Android, Wear OS and the terminal, with free sync.",
-  "applicationCategory": "ProductivityApplication",
-  "operatingSystem": "macOS, iOS, iPadOS, Android, Wear OS",
-  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-  "isAccessibleForFree": true,
-  "offers": [
-    { "@type": "Offer", "name": "Takt apps", "price": "0", "priceCurrency": "GBP" },
-    { "@type": "Offer", "name": "Sync between devices", "price": "0", "priceCurrency": "GBP" },
-    { "@type": "Offer", "name": "Self-hosted sync", "price": "0", "priceCurrency": "GBP" }
-  ],
-  "publisher": { "@type": "Organization", "name": "MaybeItsSoftware" },
-  "sameAs": ["https://github.com/MaybeItsSoftware/takt"],
-  "privacyPolicy": "https://takt.maybeitssoftware.co.uk/privacy/"
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareSourceCode",
-  "name": "Takt",
-  "codeRepository": "https://github.com/MaybeItsSoftware/takt",
-  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-  "programmingLanguage": ["Rust", "Swift", "Kotlin"]
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://takt.maybeitssoftware.co.uk/#website",
+      "url": "https://takt.maybeitssoftware.co.uk/",
+      "name": "Takt",
+      "inLanguage": "en-GB",
+      "publisher": { "@id": "https://maybeitssoftware.co.uk/#org" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://takt.maybeitssoftware.co.uk/#app",
+      "name": "Takt",
+      "alternateName": "Takt: tasks and focus",
+      "url": "https://takt.maybeitssoftware.co.uk/",
+      "description": "The gold standard of easy-to-use open source software: a free task manager — a ranked Today list, outline, board, focus timers and dailies — for Mac, iPhone, iPad, Android, Wear OS and the terminal. Self-hosted sync is free; sync through Takt's hosted server (Takt Sync) is £1 a year.",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "macOS 15.6+, iOS, iPadOS, Android, Wear OS",
+      "image": "https://takt.maybeitssoftware.co.uk/og-image.png",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "isAccessibleForFree": true,
+      "offers": [
+        { "@type": "Offer", "name": "Takt apps", "price": "0", "priceCurrency": "GBP" },
+        { "@type": "Offer", "name": "Self-hosted sync", "price": "0", "priceCurrency": "GBP" },
+        { "@type": "Offer", "name": "Takt Sync (hosted sync, yearly subscription)", "price": "1", "priceCurrency": "GBP",
+          "priceSpecification": { "@type": "UnitPriceSpecification", "price": "1", "priceCurrency": "GBP", "billingDuration": "P1Y" } }
+      ],
+      "publisher": { "@id": "https://maybeitssoftware.co.uk/#org" },
+      "author": { "@id": "https://maybeitssoftware.co.uk/#org" },
+      "creator": { "@id": "https://maybeitssoftware.co.uk/#adam" },
+      "sameAs": ["https://github.com/MaybeItsSoftware/takt"],
+      "privacyPolicy": "https://takt.maybeitssoftware.co.uk/privacy/"
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://takt.maybeitssoftware.co.uk/#source",
+      "name": "Takt",
+      "codeRepository": "https://github.com/MaybeItsSoftware/takt",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "programmingLanguage": ["Rust", "Swift", "Kotlin"],
+      "targetProduct": { "@id": "https://takt.maybeitssoftware.co.uk/#app" },
+      "author": { "@id": "https://maybeitssoftware.co.uk/#org" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://maybeitssoftware.co.uk/#org",
+      "name": "MaybeItsSoftware",
+      "url": "https://maybeitssoftware.co.uk/",
+      "logo": "https://takt.maybeitssoftware.co.uk/icon-512.png",
+      "sameAs": ["https://github.com/MaybeItsSoftware"]
+    },
+    {
+      "@type": "Person",
+      "@id": "https://maybeitssoftware.co.uk/#adam",
+      "name": "Adam Cleary",
+      "url": "https://maybeitssoftware.co.uk/",
+      "sameAs": ["https://github.com/MaybeItsAdam"]
+    }
+  ]
 }
 </script>
 <style>
@@ -60,7 +110,7 @@
 </head>
 <body>
 <main>
-  <h1>Takt</h1>
+  <h1>Takt: a free, open-source task manager</h1>
   <p class="lede">Plan the day, then do it. Takt is the gold standard of easy-to-use open source software — a free task manager for Mac, iPhone, iPad, Android, Wear OS and the terminal.</p>
 
   <p>Source code: <a href="https://github.com/MaybeItsSoftware/takt">github.com/MaybeItsSoftware/takt</a>, under the <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU AGPL-3.0</a>.</p>
@@ -78,15 +128,15 @@
   <h2>Price</h2>
   <div class="price">
     <div>The apps, on every platform</div><div class="amount">£0</div>
-    <div>Sync between your devices</div><div class="amount">£0</div>
     <div>Self-hosting the sync server</div><div class="amount">£0</div>
+    <div>Takt Sync: sync through Takt's hosted server, every device on your account</div><div class="amount">£1 a year</div>
   </div>
-  <p>No ads, no in-app purchases, no analytics or tracking. <a href="https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md">How to self-host sync</a>.</p>
+  <p>Everything works on one device, free, with no account. Takt Sync is the one in-app purchase, bought in the iPhone or Android app. No ads, no analytics or tracking. <a href="https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md">How to self-host sync</a>.</p>
 
   <h2>For AI agents</h2>
-  <p>A plain-text summary is at <a href="llms.txt">llms.txt</a>. The <a href="https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md">MCP server docs</a> list every tool.</p>
+  <p>A plain-text summary is at <a href="/llms.txt">llms.txt</a>. The <a href="https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md">MCP server docs</a> list every tool.</p>
 
-  <footer>MaybeItsSoftware · <a href="privacy/">Privacy policy</a></footer>
+  <footer>By <a href="https://maybeitssoftware.co.uk/">MaybeItsSoftware</a> · <a href="/privacy/">Privacy policy</a> · <a href="/delete-account/">Delete your account</a></footer>
 </main>
 </body>
 </html>

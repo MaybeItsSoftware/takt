@@ -26,6 +26,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Optional HTML-tag verification for Google Search Console and Bing
+      # Webmaster Tools, from repository variables (Settings → Secrets and
+      # variables → Actions → Variables). Unset means nothing is added; use
+      # them only if the domain isn't verified by DNS.
+      - name: Search console verification
+        env:
+          GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+          BING_SITE_VERIFICATION: ${{ vars.BING_SITE_VERIFICATION }}
+        run: |
+          python3 - <<'PY'
+          import html, os
+          tags = ''
+          for env, name in (('GOOGLE_SITE_VERIFICATION', 'google-site-verification'), ('BING_SITE_VERIFICATION', 'msvalidate.01')):
+              value = os.environ.get(env, '').strip()
+              if value:
+                  tags += f'<meta name="{name}" content="{html.escape(value)}">\n'
+          if tags:
+              path = 'site/index.html'
+              page = open(path).read()
+              open(path, 'w').write(page.replace('<meta charset="utf-8">\n', '<meta charset="utf-8">\n' + tags, 1))
+          PY
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

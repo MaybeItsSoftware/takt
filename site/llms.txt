@@ -1,25 +1,26 @@
 # Takt
 
-> Takt is free, open-source task management software for Mac, iPhone, iPad,
-> Android, Wear OS and the terminal: the gold standard of easy-to-use open
-> source software. Plan the day, then do it — a ranked Today list, an outline,
-> a board, focus timers and dailies, all driven from the keyboard or a tap.
+> Takt is free, open-source (AGPL-3.0) task management software for Mac, iPhone, iPad, Android, Wear OS and the terminal, published by MaybeItsSoftware. Plan the day, then do it: a ranked Today list, an outline, a board, focus timers and dailies, driven from the keyboard or a tap.
 
-- Source code: https://github.com/MaybeItsSoftware/takt (AGPL-3.0)
-- Price: free. No ads, no in-app purchases, no analytics or tracking SDKs.
-- Sync between devices: free (£0). Self-hosting the sync server is free too —
-  see https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md
-- Works fully offline with no account; signing in is only for sync.
-- AI agents: the CLI `takt` includes an MCP server that exposes the whole
-  workspace (tasks, lists, dailies, focus sessions) to an assistant —
-  https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md
-- Privacy policy: https://takt.maybeitssoftware.co.uk/privacy/
-- Publisher: MaybeItsSoftware
+Takt's apps are free and work fully offline with no account; signing in is only for sync. Sync is either self-hosted with the server in the repository (free, every feature) or through Takt's hosted server with Takt Sync, £1 a year, the one in-app purchase, bought in the iPhone or Android app and covering every device on the account. There are no ads and no analytics or tracking SDKs. The `takt` command-line tool includes an MCP server that exposes the whole workspace (tasks, lists, dailies, focus sessions) to an AI assistant.
+
+- Platforms: macOS 15.6+, iPhone and iPad, Android and Wear OS, and a terminal CLI
+- Source code: https://github.com/MaybeItsSoftware/takt (GNU AGPL-3.0)
+- Publisher: MaybeItsSoftware (https://maybeitssoftware.co.uk); created by Adam Cleary
+
+## Pages
+
+- [Takt home page](https://takt.maybeitssoftware.co.uk/): what Takt does, platforms and price
+- [Privacy policy](https://takt.maybeitssoftware.co.uk/privacy/): what the apps and sync collect, where it is stored, and Google user data
+- [Delete your account](https://takt.maybeitssoftware.co.uk/delete-account/): how to delete a Takt sync account and what is deleted or kept
 
 ## Docs
 
-- [README — features, keyboard flow, command palette](https://github.com/MaybeItsSoftware/takt#readme)
-- [Command line and terminal UI](https://github.com/MaybeItsSoftware/takt/blob/main/docs/cli.md)
-- [MCP server for AI assistants](https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md)
-- [Sync protocol](https://github.com/MaybeItsSoftware/takt/blob/main/docs/sync.md)
-- [Self-hosting sync](https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md)
+- [README](https://github.com/MaybeItsSoftware/takt#readme): features, keyboard flow, command palette
+- [Command line and terminal UI](https://github.com/MaybeItsSoftware/takt/blob/main/docs/cli.md): the `takt` CLI and its terminal UI
+- [MCP server for AI assistants](https://github.com/MaybeItsSoftware/takt/blob/main/docs/mcp-server.md): every tool the MCP server exposes
+- [Self-hosting sync](https://github.com/MaybeItsSoftware/takt/blob/main/docs/self-hosting.md): running your own sync server for free
+
+## Optional
+
+- [Sync protocol](https://github.com/MaybeItsSoftware/takt/blob/main/docs/sync.md): how devices sync with the server
