@@ -48,9 +48,12 @@ use widgets::*;
 const UI_FONT: &str = "IBM Plex Sans";
 const MONO_FONT: &str = "Lilex";
 const ROW_HEIGHT: f32 = 26.;
-/// An outline row's selection, hover and draft box: inset from the row so
-/// two boxes one above the other keep a gap between them.
-const ROW_BOX_HEIGHT: f32 = ROW_HEIGHT - 4.;
+/// A task's row, in the outline, Today and the draft row alike, so a task
+/// stands as tall wherever it is drawn.
+const TASK_ROW_HEIGHT: f32 = 34.;
+/// A task row's selection, hover and draft box: inset from the row so two
+/// boxes one above the other keep a gap between them.
+const TASK_BOX_HEIGHT: f32 = TASK_ROW_HEIGHT - 4.;
 const TITLE_BAR_HEIGHT: f32 = 34.;
 /// How narrow and how wide the side docks may be dragged.
 const SIDEBAR_MIN: f32 = 180.;

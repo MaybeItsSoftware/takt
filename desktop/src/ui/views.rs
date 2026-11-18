@@ -90,7 +90,7 @@ impl Takt {
     /// box lines up with its siblings' and its text with their titles.
     fn draft_row(&self, depth: i64, t: Tokens) -> AnyElement {
         div()
-            .h(px(ROW_HEIGHT))
+            .h(px(TASK_ROW_HEIGHT))
             .mx_1()
             .pl(px(2. + depth as f32 * 18.))
             .flex()
@@ -100,7 +100,7 @@ impl Takt {
             // selected row above or below rather than touching it.
             .child(
                 div()
-                    .h(px(ROW_BOX_HEIGHT))
+                    .h(px(TASK_BOX_HEIGHT))
                     .flex_1()
                     .min_w_0()
                     .pl(px(6.))
@@ -137,7 +137,7 @@ impl Takt {
         let celebrating = self.app.celebrating(&row.task.id);
         let element = div()
             .id(("outline-row", ix))
-            .h(px(ROW_BOX_HEIGHT))
+            .h(px(TASK_BOX_HEIGHT))
             .flex_1()
             .min_w_0()
             .pl(px(6.))
@@ -196,7 +196,7 @@ impl Takt {
         // row, so the selection and hover box starts at the title rather
         // than around the blank space before it.
         div()
-            .h(px(ROW_HEIGHT))
+            .h(px(TASK_ROW_HEIGHT))
             .mx_1()
             .pl(px(2. + row.depth as f32 * 18.))
             .flex()
@@ -827,7 +827,7 @@ impl Takt {
             .unwrap_or_else(|| reason_title(&row.reason).into());
         let element = div()
             .id(("day-row", ix))
-            .h(px(ROW_HEIGHT + 4.))
+            .h(px(TASK_BOX_HEIGHT))
             .flex_1()
             .min_w_0()
             .pl(px(6.))
@@ -882,7 +882,7 @@ impl Takt {
         // As an outline row at the top level: the status mark sits outside
         // the box, so the selection starts at the title, level with a list's.
         div()
-            .h(px(ROW_HEIGHT + 4.))
+            .h(px(TASK_ROW_HEIGHT))
             .mx_1()
             .pl(px(2. + 10. + 4.))
             .flex()
