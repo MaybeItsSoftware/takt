@@ -1539,5 +1539,20 @@ impl CoreWorkspace {
     }
 }
 
+impl CoreWorkspace {
+    /// The tasks that have an event on the two-way calendar now (linked,
+    /// not detached). The Mac's Google Tasks mirror leaves them out, so a
+    /// timed task shows once in Google Calendar, as its event, rather than
+    /// a second time as a Google Task. Rust only: no phone mirrors Tasks.
+    pub fn google_calendar_linked_task_ids(&self) -> Result<Vec<String>, CoreError> {
+        crate::records::all(
+            &self.read(),
+            "SELECT taskId FROM calendar_event_links WHERE state = 'linked' ORDER BY taskId",
+            [],
+            |row| row.get(0),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests;

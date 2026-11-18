@@ -512,6 +512,22 @@ fn deleting_the_event_in_google_leaves_the_task_alone() {
 }
 
 #[test]
+fn only_tasks_with_an_event_standing_count_as_linked() {
+    let (core, inbox) = open();
+    enable(&core, false);
+    let id = add(&core, &inbox, "Call", Some(NOW + HOUR), None);
+    add(&core, &inbox, "Untimed", None, None);
+    assert!(core.google_calendar_linked_task_ids().unwrap().is_empty());
+    let first = reconcile(&core, vec![], true, NOW);
+    send_all(&core, &first.pushes, NOW);
+    assert_eq!(core.google_calendar_linked_task_ids().unwrap(), [id]);
+    let mut cancelled = event(&first.pushes[0].event_id, "", 0, 0, NOW + 1, None);
+    cancelled.status = "cancelled".into();
+    reconcile(&core, vec![cancelled], false, NOW + 1000);
+    assert!(core.google_calendar_linked_task_ids().unwrap().is_empty());
+}
+
+#[test]
 fn an_insert_another_device_already_made_is_adopted_not_duplicated() {
     let (core, inbox) = open();
     enable(&core, false);
