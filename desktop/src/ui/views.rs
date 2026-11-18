@@ -756,7 +756,10 @@ impl Takt {
         };
         let mut index = 0usize;
         let mut rows: Vec<AnyElement> = Vec::new();
-        rows.push(section(format!("Today · {}", today.day.len())).into_any_element());
+        // An empty day drops its heading, unless a task is being typed into it.
+        if !today.day.is_empty() || draft_at_foot {
+            rows.push(section(format!("Today · {}", today.day.len())).into_any_element());
+        }
         for row in &today.day {
             rows.push(self.day_row(index, row, t, cx));
             if draft_under(&row.task.id) {
