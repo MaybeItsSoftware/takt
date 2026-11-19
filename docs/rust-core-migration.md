@@ -69,7 +69,9 @@ covered the old copies pass against it.
    before every Swift job and lints and tests it in a `core` job. There is
    no root Cargo workspace: `cli/target/release` is where the installed
    `takt` symlink points, and a workspace would move every crate's `target`
-   to the root.
+   to the root. Nor do the crates share one target directory: measured on
+   2026-11-19, it saved 0.6 of the 6.8 GB the CLI, core and desktop gates
+   leave behind, and those builds took half as long again rather than less.
 2. **Schema and migrations. Done 2026-10-08.** `core/src/schema` holds the
    twenty migrations. Their SQL was captured from GRDB's migrator as it ran,
    so it was not retyped. The three steps that walk existing rows (v11, v12,
