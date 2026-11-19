@@ -52,3 +52,32 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@v4
+      # Google's OAuth verification registers the copy of this policy on
+      # www.maybeitssoftware.co.uk/takt/privacy (the mis-website repo), so a
+      # change here has to be copied there too. That site's build fails on a
+      # difference; this only warns, since the copy is always updated second.
+      - name: Check the mis-website copy of the privacy policy
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import re, urllib.request
+          def normalise(html):
+              body = html[html.index('<h1>'):]
+              body = body.split('</main>')[0]
+              body = body.replace('href="../delete-account/"', 'href="https://takt.maybeitssoftware.co.uk/delete-account/"')
+              return re.sub(r'>\s+<', '><', re.sub(r'\s+', ' ', body)).strip()
+          ours = normalise(open('site/privacy/index.html').read())
+          url = 'https://www.maybeitssoftware.co.uk/takt/privacy'
+          try:
+              page = urllib.request.urlopen(url, timeout=20).read().decode()
+              # Next.js renders the policy inside <article class="privacyContent">.
+              copy = page[page.index('<article'):page.index('</article>')]
+              theirs = normalise(copy[copy.index('>') + 1:])
+          except Exception as error:
+              print(f'::warning::Could not read {url} to compare the privacy policy: {error}')
+              raise SystemExit(0)
+          if ours != theirs:
+              print(f'::warning title=Privacy policy copy is stale::{url} differs from site/privacy/index.html. Google OAuth verification checks that URL: copy the policy into app/takt/privacy/page.tsx in mis-website.')
+          else:
+              print('The mis-website copy of the privacy policy matches.')
+          PY
