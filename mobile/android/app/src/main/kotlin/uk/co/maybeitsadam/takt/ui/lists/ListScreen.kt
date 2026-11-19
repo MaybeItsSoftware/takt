@@ -153,7 +153,9 @@ internal fun ListContent(route: ListRoute, showBack: Boolean, onClose: () -> Uni
             ViewModeToggle(mode, vm::setViewMode)
             ListOverflow(vm, hideCompleted, canEditList, list?.completedAt != null, onArchive = onClose) { dialog = it }
         }
-        QuickAddBar(route.listId, Modifier.fillMaxWidth())
+        // Inset as the rows' cards are, so its edges line up with theirs
+        // rather than running to the screen's.
+        QuickAddBar(route.listId, Modifier.fillMaxWidth().padding(horizontal = Metrics.md, vertical = Metrics.xs))
         Box(Modifier.fillMaxSize()) {
             when (mode) {
                 ListViewMode.OUTLINE -> OutlinePane(vm, actions)
