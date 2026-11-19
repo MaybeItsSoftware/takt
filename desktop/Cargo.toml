@@ -40,6 +40,19 @@ block = "0.1"
 [profile.release]
 strip = true
 
+# Dependencies build without debug info and Takt's own crates with it: the
+# rest was a third of this crate's debug target directory (measured
+# 2026-11-19), and a backtrace still names every frame. The core and the
+# sync rules are path dependencies, which `"*"` covers unless they are named.
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package.takt-core]
+debug = true
+
+[profile.dev.package.takt-sync-rules]
+debug = true
+
 # `objc`'s macros test a `cargo-clippy` feature in the calling crate.
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }

@@ -38,3 +38,9 @@ tower = { version = "0.5", features = ["util"] }
 
 [profile.release]
 strip = true
+
+# Dependencies build without debug info and the workspace's own crates (the
+# server and the rules) with it, as in core/, cli/ and desktop/: a backtrace
+# still names every frame.
+[profile.dev.package."*"]
+debug = false

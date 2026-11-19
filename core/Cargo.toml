@@ -57,3 +57,13 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
+
+# Dependencies build without debug info and Takt's own crates with it: the
+# rest was a quarter of a debug build's target directory and of its build
+# time (measured 2026-11-19), and a backtrace still names every frame. The
+# sync rules are a path dependency, which `"*"` covers unless it is named.
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package.takt-sync-rules]
+debug = true

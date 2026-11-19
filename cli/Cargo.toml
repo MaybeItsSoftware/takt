@@ -26,3 +26,17 @@ uuid = { version = "1.24.1", features = ["v4"] }
 
 [profile.release]
 strip = true
+
+# Dependencies build without debug info and Takt's own crates with it: the
+# rest was a quarter of a debug build's target directory and of its build
+# time (measured 2026-11-19), and a backtrace still names every frame. The
+# core and the sync rules are path dependencies, which `"*"` covers unless
+# they are named.
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package.takt-core]
+debug = true
+
+[profile.dev.package.takt-sync-rules]
+debug = true
