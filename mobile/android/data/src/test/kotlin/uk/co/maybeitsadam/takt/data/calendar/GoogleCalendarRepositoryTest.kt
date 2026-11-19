@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import uk.co.maybeitsadam.takt.data.TestWorkspace
+import uk.co.maybeitsadam.takt.data.workspace.setPreference
 import uniffi.takt_core.GoogleCalendarAgendaKind
 import uniffi.takt_core.GoogleCalendarHttpRequest
 import uniffi.takt_core.GoogleCalendarSettings
@@ -36,9 +37,12 @@ class GoogleCalendarRepositoryTest {
         return repository.createTask(listId = inbox.id, title = title, startAt = clock.instant().plusSeconds(3_600)).id
     }
 
-    private suspend fun TestWorkspace.enable(agenda: List<String> = emptyList()) =
+    /** Two-way on, with timed tasks put on it as events (off by default). */
+    private suspend fun TestWorkspace.enable(agenda: List<String> = emptyList()) {
         GoogleCalendarRepository(repository, FakeGoogle { error("no requests") }) { clock.instant() }
             .setSettings(GoogleCalendarSettings(calendar, false, agenda))
+        repository.setPreference("googleCalendar.taskEvents", "true")
+    }
 
     @Test
     fun aPassIsIdleWhileTwoWaySyncIsOff(): Unit = runBlocking {
