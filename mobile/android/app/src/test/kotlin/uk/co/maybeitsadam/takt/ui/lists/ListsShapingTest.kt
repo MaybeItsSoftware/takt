@@ -407,6 +407,40 @@ class ListsShapingTest {
         assertEquals("Open tasks", calls.summary)
     }
 
+    @Test fun prioritisedListsHeadYourListsInRankOrderAndStayInTheirFolders() {
+        val inbox = list("inbox", "Inbox", role = TaskListRole.INBOX)
+        val inFolder = list("x", "X", folder = "f").copy(priorityRank = 2)
+        val loose = list("y", "Y", order = 1).copy(priorityRank = 1)
+        val plain = list("p", "P", order = 2)
+        val folder = ListFolder("f", "w", null, "Folder", 0, t0, t0)
+        val lists = listOf(inbox, inFolder, loose, plain)
+        val data = SidebarData(
+            listOf(folder),
+            lists,
+            lists.associate { it.id to WorkspaceListTree(it.id, emptyList()) },
+            filterLists = listOf(filterList("a", "Errands")),
+        )
+        val state = ListsTreeShaping.shape(data, emptySet(), showArchived = false)
+        assertEquals(
+            listOf(
+                "row:everything", "list:inbox", "filter:a", "row:priorities", "priority:y", "priority:x",
+                "folder:f", "list:x", "list:y", "list:p",
+            ),
+            state.rows.map { it.key },
+        )
+        val first = state.rows.first { it.key == "priority:y" } as TreeRow.ListRow
+        assertEquals(1, first.priority)
+        assertEquals(2, first.priorityCount)
+        assertEquals(2, (state.rows.first { it.key == "list:x" } as TreeRow.ListRow).priority)
+        assertNull((state.rows.first { it.key == "list:p" } as TreeRow.ListRow).priority)
+
+        // Nothing prioritised, no heading.
+        val none = ListsTreeShaping.shape(
+            data.copy(lists = listOf(inbox, plain)), emptySet(), showArchived = false,
+        )
+        assertFalse(none.rows.any { it.key == "row:priorities" })
+    }
+
     @Test fun aFilterListsMatchesAreGroupedByListInTheirOrder() {
         val work = list("work", "Work")
         val home = list("home", "Home")

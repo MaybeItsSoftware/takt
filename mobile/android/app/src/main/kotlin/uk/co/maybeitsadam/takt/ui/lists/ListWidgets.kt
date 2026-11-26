@@ -71,6 +71,8 @@ internal object ListIcons {
     val Filter by lazy { PIcons.icon("Filter", "M10,18h4v-2h-4v2zM3,6v2h18V6H3zM6,13h12v-2H6v2z") }
     val Nested by lazy { PIcons.icon("Nested", "M4,5h2v2H4zM9,5h11v2H9zM8,11h2v2H8zM13,11h7v2h-7zM8,17h2v2H8zM13,17h7v2h-7z") }
     val FolderOpen by lazy { PIcons.icon("FolderOpen", "M20,6h-8l-2,-2H4c-1.1,0 -1.99,0.9 -1.99,2L2,18c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V8c0,-1.1 -0.9,-2 -2,-2zM20,18H4V8h16v10z") }
+    /** Material's star outline: a prioritised list. */
+    val Priority by lazy { PIcons.icon("Priority", "M22,9.24l-7.19,-0.62L12,2 9.19,8.63 2,9.24l5.46,4.73L5.82,21 12,17.27 18.18,21l-1.63,-7.03L22,9.24zM12,15.4l-3.76,2.27 1,-4.28 -3.32,-2.88 4.38,-0.38L12,6.1l1.71,4.04 4.38,0.38 -3.32,2.88 1,4.28L12,15.4z") }
     val Restore by lazy { PIcons.icon("Restore", "M13,3c-4.97,0 -9,4.03 -9,9H1l4,4 4,-4H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9z") }
 }
 

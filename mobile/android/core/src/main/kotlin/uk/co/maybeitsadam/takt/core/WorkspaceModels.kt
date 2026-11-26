@@ -50,8 +50,25 @@ data class TaskList(
     val completedAt: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    /**
+     * Its place among the prioritised lists, 1 the most important; null when
+     * it is not prioritised. As stored: [prioritised] gives the order.
+     */
+    val priorityRank: Int? = null,
 ) {
     val isSystemList: Boolean get() = systemRole != null
+
+    companion object {
+        /**
+         * The prioritised lists among [lists], most important first, as the
+         * core orders them (`records::prioritised_lists`): by rank, a tie a
+         * sync merge left broken by sidebar order. Their place is their
+         * index plus one.
+         */
+        fun prioritised(lists: List<TaskList>): List<TaskList> = lists
+            .filter { it.priorityRank != null && !it.isArchived && it.completedAt == null }
+            .sortedWith(compareBy<TaskList>({ it.priorityRank }, { it.sortOrder }, { it.createdAt }, { it.id }))
+    }
 }
 
 enum class TaskStatus(val raw: String) {

@@ -54,6 +54,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -373,6 +374,15 @@ private fun TreeRowView(
                 }
             }
         }
+        is TreeRow.PrioritiesHeader -> Text(
+            "Priorities",
+            style = TaktTheme.type.secondary,
+            color = TaktTheme.colors.dimText,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = SIDEBAR_INSET, end = Metrics.md, top = Metrics.sm, bottom = Metrics.xs)
+                .semantics { heading() },
+        )
         is TreeRow.ArchivedHeader -> TreeLine(
             title = "Archived", icon = PIcons.Archive, depth = 0, count = row.count, selected = false, muted = true,
             disclosure = row.isExpanded, onClick = { vm.toggleArchived() },
@@ -465,6 +475,8 @@ private fun ListMenu(row: TreeRow.ListRow, isShared: Boolean, vm: ListsViewModel
         block()
     }
     if (row.isInbox) {
+        PriorityMenu(row, vm, close)
+        PMenuDivider()
         PMenuItem("The Inbox is permanent", enabled = false, onClick = close)
         return
     }
@@ -472,6 +484,8 @@ private fun ListMenu(row: TreeRow.ListRow, isShared: Boolean, vm: ListsViewModel
     PMenuItem("Move to folder…", PIcons.Folder, onClick = run { show(ListsDialog.MoveList(row.id, row.name, row.folderId)) })
     PMenuItem("Move up", Icons.Filled.KeyboardArrowUp, enabled = row.canMoveUp, onClick = run { vm.moveListBy(row.id, -1) })
     PMenuItem("Move down", Icons.Filled.KeyboardArrowDown, enabled = row.canMoveDown, onClick = run { vm.moveListBy(row.id, 1) })
+    PMenuDivider()
+    PriorityMenu(row, vm, close)
     PMenuDivider()
     PMenuItem(if (row.isCompleted) "Reopen list" else "Complete list", Icons.Filled.Check, onClick = run { vm.setCompleted(row.id, !row.isCompleted) })
     PMenuItem("Archive", PIcons.Archive, onClick = run { vm.setArchived(row.id, true) })
@@ -481,6 +495,28 @@ private fun ListMenu(row: TreeRow.ListRow, isShared: Boolean, vm: ListsViewModel
         PMenuItem("Convert to task", ListIcons.Nested, onClick = run { vm.convertListToTask(row.id) })
         PMenuItem("Delete…", Icons.Filled.Delete, destructive = true, onClick = run { show(ListsDialog.DeleteList(row.id, row.name)) })
     }
+}
+
+/** Prioritise a list, or move it up or down the priorities or take it out of them. */
+@Composable
+private fun PriorityMenu(row: TreeRow.ListRow, vm: ListsViewModel, close: () -> Unit) {
+    fun run(block: () -> Unit): () -> Unit = {
+        close()
+        block()
+    }
+    val place = row.priority
+    if (place == null) {
+        if (!row.isCompleted) {
+            PMenuItem("Prioritise", ListIcons.Priority, onClick = run { vm.setPriority(row.id, row.priorityCount + 1) })
+        }
+        return
+    }
+    PMenuItem("Move up the priorities", Icons.Filled.KeyboardArrowUp, enabled = place > 1, onClick = run { vm.setPriority(row.id, place - 1) })
+    PMenuItem(
+        "Move down the priorities", Icons.Filled.KeyboardArrowDown, enabled = place < row.priorityCount,
+        onClick = run { vm.setPriority(row.id, place + 1) },
+    )
+    PMenuItem("Stop prioritising", ListIcons.Priority, onClick = run { vm.setPriority(row.id, null) })
 }
 
 @Composable

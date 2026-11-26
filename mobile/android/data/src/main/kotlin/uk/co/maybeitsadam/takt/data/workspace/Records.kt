@@ -56,6 +56,7 @@ internal fun Row.toList() = TaskList(
     isArchived = bool("isArchived"), systemRole = TaskListRole.of(stringOrNull("systemRole")),
     visibleRootTaskId = stringOrNull("visibleRootTaskId"), completedAt = instantOrNull("completedAt"),
     createdAt = instant("createdAt"), updatedAt = instant("updatedAt"),
+    priorityRank = if ("priorityRank" in columnNames) intOrNull("priorityRank") else null,
 )
 
 internal fun Row.toTask() = WorkspaceTask(
@@ -147,6 +148,7 @@ internal fun ListRow.toList() = TaskList(
     sortOrder = sortOrder.toInt(), isArchived = isArchived, systemRole = TaskListRole.of(systemRole),
     visibleRootTaskId = visibleRootTaskId, completedAt = completedAtMs?.instant(),
     createdAt = createdAtMs.instant(), updatedAt = updatedAtMs.instant(),
+    priorityRank = priorityRank?.toInt(),
 )
 
 internal fun TaskRow.toTask() = WorkspaceTask(

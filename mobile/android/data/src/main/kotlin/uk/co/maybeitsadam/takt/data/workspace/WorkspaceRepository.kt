@@ -220,6 +220,16 @@ class WorkspaceRepository(
         coreWrite { it.setListArchived(id, archived, now.toEpochMilli()) }
     }
 
+    /**
+     * Puts a list at [position] among the prioritised lists (1 the most
+     * important; past the end, last), or takes it out of them with null, as
+     * one undo step. An archived or completed list cannot be prioritised.
+     * The Rust core's `lists::set_list_priority`.
+     */
+    suspend fun setListPriority(position: Int?, id: String, now: Instant = now()) {
+        coreWrite { it.setListPriority(id, position?.toLong(), now.toEpochMilli()) }
+    }
+
     /** Deletes a list and its tasks as one undo step; the Inbox is permanent. The Rust core's `lists::delete_list`. */
     suspend fun deleteList(id: String) {
         coreWrite { it.deleteList(id) }

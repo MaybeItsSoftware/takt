@@ -41,7 +41,18 @@ sealed interface TreeRow {
         val canMoveUp: Boolean,
         val canMoveDown: Boolean,
         override val key: String = "list:$id",
+        /** Its place among the prioritised lists, 1 the most important. */
+        val priority: Int? = null,
+        /** How many lists are prioritised, so the menu knows the last. */
+        val priorityCount: Int = 0,
     ) : TreeRow
+
+    /** The heading over the prioritised lists, drawn above the tree. */
+    @Immutable
+    data class PrioritiesHeader(val count: Int) : TreeRow {
+        override val key = "row:priorities"
+        override val depth = 0
+    }
 
     /** A saved filter list: a question asked of every task, not a place they live. */
     @Immutable
@@ -168,7 +179,9 @@ object ListsTreeShaping {
         val listSiblings = others.groupBy { it.folderId }
         val folderSiblings = data.folders.groupBy { it.parentFolderId }
 
-        val rows = ArrayList<TreeRow>(outline.size + archived.size + 1)
+        val prioritised = TaskList.prioritised(active)
+        val priorities = prioritised.withIndex().associate { (index, list) -> list.id to index + 1 }
+        val rows = ArrayList<TreeRow>(outline.size + archived.size + prioritised.size + 2)
         for (row in outline) {
             when (val kind = row.kind) {
                 WorkspaceSidebarRowKind.Everything ->
@@ -182,6 +195,7 @@ object ListsTreeShaping {
                         isInbox = list.systemRole == TaskListRole.INBOX, isCompleted = list.completedAt != null,
                         folderId = list.folderId,
                         canMoveUp = position > 0, canMoveDown = position >= 0 && position < siblings.size - 1,
+                        priority = priorities[list.id], priorityCount = prioritised.size,
                     )
                 }
                 is WorkspaceSidebarRowKind.FilterList -> {
@@ -206,6 +220,30 @@ object ListsTreeShaping {
                     )
                 }
             }
+        }
+        if (prioritised.isNotEmpty()) {
+            // Under Everything, the Inbox and the filter lists, which gather
+            // tasks from others, and above your own lists, each of which is
+            // in its folder as well.
+            val at = rows.indexOfFirst { row ->
+                when (row) {
+                    is TreeRow.Everything, is TreeRow.FilterListRow -> false
+                    is TreeRow.ListRow -> !row.isInbox
+                    is TreeRow.NestedRow -> row.listId != inbox?.id
+                    else -> true
+                }
+            }.let { if (it < 0) rows.size else it }
+            val heading = listOf(TreeRow.PrioritiesHeader(prioritised.size)) + prioritised.map { list ->
+                val siblings = listSiblings[list.folderId].orEmpty()
+                val position = siblings.indexOfFirst { it.id == list.id }
+                TreeRow.ListRow(
+                    id = list.id, name = list.name, depth = 0, openCount = counts[list.id] ?: 0,
+                    isInbox = list.systemRole == TaskListRole.INBOX, isCompleted = false, folderId = list.folderId,
+                    canMoveUp = position > 0, canMoveDown = position >= 0 && position < siblings.size - 1,
+                    key = "priority:${list.id}", priority = priorities[list.id], priorityCount = prioritised.size,
+                )
+            }
+            rows.addAll(at, heading)
         }
         if (archived.isNotEmpty()) {
             rows += TreeRow.ArchivedHeader(archived.size, showArchived)

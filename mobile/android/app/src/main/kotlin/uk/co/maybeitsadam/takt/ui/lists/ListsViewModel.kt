@@ -70,6 +70,9 @@ class ListsViewModel(private val container: AppContainer) : ViewModel() {
 
     fun moveListBy(id: String, by: Int) = undo.perform { it.moveListWithinFolder(id, by) }
 
+    /** Puts a list at [position] among the prioritised lists, or takes it out with null. */
+    fun setPriority(id: String, position: Int?) = undo.perform { it.setListPriority(position, id) }
+
     fun moveFolderTo(id: String, parentId: String?) = undo.perform { it.placeFolder(id, null, parentId) }
 
     fun moveFolderBy(id: String, by: Int) = undo.perform { it.moveFolderWithinSiblings(id, by) }
