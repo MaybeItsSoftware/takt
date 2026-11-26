@@ -112,7 +112,7 @@ Supabase project's OAuth 2.1 server (beta):
 |---|---|
 | `SUPABASE_URL` | Required. `https://<ref>.supabase.co`. |
 | `SYNC_SERVER_URL` | Required. The sync server, e.g. `https://api.takt.maybeitssoftware.co.uk`. |
-| `PUBLIC_URL` | This server's address as clients see it. Without it, it is taken from each request's `Host`, as `https`. Set it once a custom domain is mapped. |
+| `PUBLIC_URL` | This server's address as clients see it: `https://mcp.takt.maybeitssoftware.co.uk`, which the deploy script sets. Without it, it is taken from each request's `Host`, as `https`. |
 | `REQUIRE_SUBSCRIPTION` | Off unless `true`. Off means anyone signed in is served, which is what a self-hosted copy wants. |
 | `SUPABASE_JWT_SECRET` | Only for a project still signing with the legacy HS256 secret. |
 | `DATA_DIR` | Where the workspaces are kept; `/data` in the container. |
@@ -137,13 +137,13 @@ them is secret.
      `https://takt.maybeitssoftware.co.uk`, and add
      `https://takt.maybeitssoftware.co.uk/oauth/consent/` to the redirect
      URLs.
-4. Optionally, map `mcp.takt.maybeitssoftware.co.uk` to the service
-   (`gcloud beta run domain-mappings create --service takt-mcp --domain …`
-   plus the DNS record it prints), then redeploy with
-   `TAKT_MCP_PUBLIC_URL=https://mcp.takt.maybeitssoftware.co.uk`.
+4. `mcp.takt.maybeitssoftware.co.uk` is mapped to the service
+   (`gcloud beta run domain-mappings create --service takt-mcp --domain …`,
+   with a CNAME to `ghs.googlehosted.com` at Spaceship), and the deploy
+   script sets it as `PUBLIC_URL` on every deploy.
 5. In Claude: Settings → Connectors → Add custom connector, with
-   `<service URL>/mcp` and, under Advanced settings, the OAuth client ID
-   above (no secret).
+   `https://mcp.takt.maybeitssoftware.co.uk/mcp` and, under Advanced
+   settings, the OAuth client ID above (no secret).
 
 ## Checking it
 
@@ -159,3 +159,13 @@ the real sync server and `takt-mcp`, with HS256 test tokens
 - writes from the server, read back by a fresh instance;
 - a real 1,400-row workspace pushed by a "Mac" and then read and written
   through the server, with no stray rows or tombstones.
+
+## Tool annotations
+
+Every tool carries MCP `annotations`, which clients and the Claude
+connector directory read: a `title`, `readOnlyHint` (true of the core's
+read list, `core/src/agent_tools.rs`), `destructiveHint` on writes (false
+only for those that just add, `ADDITIVE_TOOLS` in `cli/src/mcp.rs`, since
+any other write changes or removes what is there) and `openWorldHint`
+(true only of the Checkvist tools, which the hosted server doesn't offer).
+A CLI test fails on a tool without them.

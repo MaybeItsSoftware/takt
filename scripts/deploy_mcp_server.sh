@@ -14,8 +14,11 @@
 # One instance at most: each account's workspace lives in an instance, and
 # two instances would be the same device of the account twice over.
 #
+# Its public address is the mapped custom domain; --set-env-vars replaces
+# every variable, so it is set on every deploy rather than once.
+#
 #   ./scripts/deploy_mcp_server.sh
-#   TAKT_MCP_PUBLIC_URL=https://mcp.takt.maybeitssoftware.co.uk ./scripts/deploy_mcp_server.sh
+#   TAKT_MCP_PUBLIC_URL=https://other.example ./scripts/deploy_mcp_server.sh
 set -euo pipefail
 
 project="${TAKT_GCP_PROJECT:-takt-511416}"
@@ -25,6 +28,7 @@ supabase="${TAKT_SUPABASE_URL:-https://rsckzmldfpfjdrvulwke.supabase.co}"
 sync="${TAKT_SYNC_URL:-https://api.takt.maybeitssoftware.co.uk}"
 # Days are counted in the server's zone; the account's own isn't known.
 zone="${TAKT_MCP_TZ:-Europe/London}"
+public="${TAKT_MCP_PUBLIC_URL:-https://mcp.takt.maybeitssoftware.co.uk}"
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 stage="$(mktemp -d)"
@@ -35,10 +39,7 @@ for dir in cli core sync-server/rules; do
 done
 cp "$root/cli/remote/Dockerfile" "$stage/Dockerfile"
 
-env="SUPABASE_URL=$supabase,SYNC_SERVER_URL=$sync,REQUIRE_SUBSCRIPTION=true,TZ=$zone,RUST_LOG=info"
-if [ -n "${TAKT_MCP_PUBLIC_URL:-}" ]; then
-  env="$env,PUBLIC_URL=$TAKT_MCP_PUBLIC_URL"
-fi
+env="SUPABASE_URL=$supabase,SYNC_SERVER_URL=$sync,REQUIRE_SUBSCRIPTION=true,TZ=$zone,RUST_LOG=info,PUBLIC_URL=$public"
 
 gcloud run deploy "$service" --source "$stage" --project "$project" --region "$region" \
   --allow-unauthenticated --max-instances 1 --memory 1Gi --cpu 1 --timeout 300 \
