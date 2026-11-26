@@ -50,6 +50,23 @@ struct WorkspaceStructure: Sendable, Equatable {
     return folders.first { $0.id == id }
   }
 
+  /// The prioritised lists, most important first, as the core orders them
+  /// (`records::prioritised_lists`): by rank, a tie a sync merge left broken
+  /// by sidebar order. Their place is their index plus one.
+  var prioritisedLists: [TaskList] {
+    lists
+      .filter { $0.priorityRank != nil && $0.completedAt == nil }
+      .sorted {
+        ($0.priorityRank ?? 0, $0.sortOrder, $0.createdAt, $0.id)
+          < ($1.priorityRank ?? 0, $1.sortOrder, $1.createdAt, $1.id)
+      }
+  }
+
+  /// A list's place among the prioritised lists, 1 the most important.
+  func priority(of listID: String) -> Int? {
+    prioritisedLists.firstIndex { $0.id == listID }.map { $0 + 1 }
+  }
+
   var promotedLists: [WorkspaceTask] {
     sidebar.nestedLists.map(\.task).filter { $0.isPromoted == true && $0.status == .open }
   }

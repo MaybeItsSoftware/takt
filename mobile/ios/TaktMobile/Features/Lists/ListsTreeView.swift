@@ -144,6 +144,24 @@ struct ListsTreeRows: View {
           }
       }
     }
+    if !structure.prioritisedLists.isEmpty {
+      // The lists that matter most, in order, above the tree; each is in
+      // its folder too. Up next leads each board column with them.
+      Section {
+        ForEach(structure.prioritisedLists) { list in
+          scopeRow(
+            .list(list.id), title: list.name, symbol: "star",
+            count: structure.sidebar.taskCounts[list.id], tint: ListColor.color(hex: list.colorHex),
+            identifier: "lists.priority.\(list.name)"
+          )
+          .contextMenu { listMenu(list) }
+        }
+        .onMove { source, destination in reorderPriorities(source: source, destination: destination) }
+      } header: {
+        SectionHeading("Priorities", count: structure.prioritisedLists.count)
+          .listRowInsets(EdgeInsets())
+      }
+    }
     Section {
       ForEach(rootFolders) { folder in
         folderBranch(folder, depth: 0)
@@ -278,7 +296,7 @@ struct ListsTreeRows: View {
 
   private func scopeRow(
     _ scope: ListScope, title: String, symbol: String, count: Int?, tint: Color? = nil, completed: Bool = false,
-    depth: Int = 0, subtitle: String? = nil
+    depth: Int = 0, subtitle: String? = nil, identifier: String? = nil
   ) -> some View {
     let label = TreeRowLabel(
       depth: depth, symbol: symbol, title: title, count: count, tint: tint, completed: completed, subtitle: subtitle)
@@ -293,7 +311,7 @@ struct ListsTreeRows: View {
       }
     }
     .treeRow(selected: isPad && model.navigation.sidebarSelection == .scope(scope))
-    .accessibilityIdentifier("lists.row.\(title)")
+    .accessibilityIdentifier(identifier ?? "lists.row.\(title)")
   }
 
   // MARK: - Menus
@@ -315,6 +333,8 @@ struct ListsTreeRows: View {
       Button { model.moveList(list.id, by: -1) } label: { Label("Move up", systemImage: "arrow.up") }
       Button { model.moveList(list.id, by: 1) } label: { Label("Move down", systemImage: "arrow.down") }
       Divider()
+      priorityMenu(list)
+      Divider()
       Button { model.toggleCompleted(list: list.id) } label: {
         Label(list.completedAt == nil ? "Complete list" : "Reopen list", systemImage: "checkmark.square")
       }
@@ -332,7 +352,38 @@ struct ListsTreeRows: View {
       }
     } else {
       Button { model.navigation.listSettingsID = list.id } label: { Label("List settings…", systemImage: "paintpalette") }
+      priorityMenu(list)
     }
+  }
+
+  /// Prioritise, or move up, move down and stop prioritising one that is.
+  @ViewBuilder
+  private func priorityMenu(_ list: TaskList) -> some View {
+    if let place = structure.priority(of: list.id) {
+      if place > 1 {
+        Button { model.movePriority(of: list.id, by: -1) } label: {
+          Label("Move up the priorities", systemImage: "arrow.up.circle")
+        }
+      }
+      if place < structure.prioritisedLists.count {
+        Button { model.movePriority(of: list.id, by: 1) } label: {
+          Label("Move down the priorities", systemImage: "arrow.down.circle")
+        }
+      }
+      Button { model.setPriority(nil, list: list.id) } label: { Label("Stop prioritising", systemImage: "star.slash") }
+    } else if list.completedAt == nil {
+      Button { model.prioritise(list: list.id) } label: { Label("Prioritise", systemImage: "star") }
+    }
+  }
+
+  /// A drag within the Priorities: the moved list goes to where it was
+  /// dropped, the others renumbered around it.
+  private func reorderPriorities(source: IndexSet, destination: Int) {
+    guard let from = source.first else { return }
+    let lists = structure.prioritisedLists
+    // `onMove`'s destination counts the moved row still in place.
+    let target = destination > from ? destination : destination + 1
+    model.setPriority(target, list: lists[from].id)
   }
 
   @ViewBuilder

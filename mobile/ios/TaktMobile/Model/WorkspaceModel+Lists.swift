@@ -40,6 +40,27 @@ extension WorkspaceModel {
     }
   }
 
+  /// Puts a list among the prioritised lists at `position`, 1 the most
+  /// important, or takes it out with nil. Up next leads each board column
+  /// with them, in order.
+  func setPriority(_ position: Int?, list listID: String) {
+    if perform({ try $0.setListPriority(position, id: listID) }) {
+      announce(position == nil ? "No longer prioritised" : "Priority \(position ?? 0)")
+    }
+  }
+
+  /// Prioritises a list, last among the priorities.
+  func prioritise(list listID: String) {
+    setPriority(structure.prioritisedLists.count + 1, list: listID)
+  }
+
+  /// Moves a prioritised list `offset` places up (negative) or down them.
+  func movePriority(of listID: String, by offset: Int) {
+    guard let place = structure.priority(of: listID) else { return }
+    let target = min(max(place + offset, 1), structure.prioritisedLists.count)
+    if target != place { setPriority(target, list: listID) }
+  }
+
   func toggleCompleted(list listID: String) {
     guard let list = structure.list(listID) else { return }
     perform { try $0.setListCompleted(list.completedAt == nil, id: listID) }
