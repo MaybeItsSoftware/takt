@@ -182,7 +182,7 @@ struct OutlineView: View {
   private var composerRow: some View {
     let depth = outline.composer?.depth ?? 0
     return HStack(spacing: theme.mac(8)) {
-      TaskCheckbox(status: .open)
+      TaskCheckbox(status: .open, showsBox: false)
       TextField("New task", text: Binding(
         get: { outline.composer?.text ?? "" },
         set: { outline.composer?.text = $0 }))
@@ -223,7 +223,7 @@ struct OutlineView: View {
 
   private func renameRow(_ row: OutlineRow) -> some View {
     HStack(spacing: theme.mac(8)) {
-      TaskCheckbox(status: row.status, isList: row.isList)
+      TaskCheckbox(status: row.status, isList: row.isList, showsBox: false)
       TextField("Title", text: $outline.editingText)
         .font(theme.type.body)
         .focused($focusedField, equals: .rename)
@@ -361,7 +361,9 @@ struct OutlineRowView: View, Equatable {
       Button {
         model.completeCelebrating(row.id)
       } label: {
-        TaskCheckbox(status: row.status, isList: row.isList)
+        // No square on an open row: a list reads as the Mac's, and a
+        // swipe is what completes it, as on Today.
+        TaskCheckbox(status: row.status, isList: row.isList, showsBox: false)
           .celebrationIcon(row.id)
           .hitTarget()
       }

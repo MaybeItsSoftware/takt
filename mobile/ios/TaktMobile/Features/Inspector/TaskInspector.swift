@@ -360,9 +360,10 @@ struct TaskInspector: View {
           .foregroundStyle(theme.primary)
           .accessibilityIdentifier("inspector.manageConditions")
       }
-      if groups.isEmpty {
+      if groups.isEmpty && inspector.inherited.isEmpty {
         Text("Anytime, anywhere").font(theme.type.caption).foregroundStyle(theme.dim)
       }
+      inheritedConditions
       ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
         VStack(alignment: .leading, spacing: theme.space.xs) {
           Text(index == 0 ? "Requires" : "And requires")
@@ -407,6 +408,30 @@ struct TaskInspector: View {
         Text("Every group must hold; any one condition within a group will do.")
           .font(theme.type.footnote).foregroundStyle(theme.dim)
       }
+    }
+  }
+
+  /// What the task needs because of its lists, each marked with the list it
+  /// comes from. Read-only: it is changed from the list's menu.
+  private var inheritedConditions: some View {
+    ForEach(inspector.inherited) { source in
+      VStack(alignment: .leading, spacing: theme.space.xs) {
+        Text("From \(source.listName)").font(theme.type.caption).foregroundStyle(theme.muted)
+        FlowLayout(spacing: theme.space.xs) {
+          ForEach(Array(source.groups.enumerated()), id: \.offset) { index, group in
+            if index > 0 { Text("and").font(theme.type.caption).foregroundStyle(theme.muted) }
+            ForEach(Array(group.enumerated()), id: \.element) { position, id in
+              if position > 0 { Text("or").font(theme.type.caption).foregroundStyle(theme.muted) }
+              Tag(text: inspector.requirementLabel(id), tint: theme.muted)
+            }
+          }
+        }
+      }
+      .padding(theme.space.sm)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .overlay(RoundedRectangle(cornerRadius: theme.radius.control).strokeBorder(theme.borderMuted, lineWidth: theme.stroke))
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("inspector.inheritedConditions.\(source.listID)")
     }
   }
 

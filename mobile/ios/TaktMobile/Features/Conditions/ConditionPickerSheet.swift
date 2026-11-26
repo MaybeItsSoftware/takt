@@ -125,6 +125,7 @@ struct NowConditionsSheet: View {
       count: { value.usage[$0.condition.id] },
       onToggle: { focus.toggleCondition($0.condition, among: value.conditions) },
       onCreate: create,
+      isFixed: { $0.condition.isDevice },
       leading: {
         if !focus.conditionIDs.isEmpty || !focus.offIDs.isEmpty {
           Button("Clear") { focus.clearConditions() }
@@ -214,6 +215,69 @@ struct TaskConditionsSheet: View {
   }
 }
 
+/// The conditions a list needs, which every task in it, and in the nested
+/// lists under it, inherits: the task picker's ticks and "not"s, written to
+/// the list. `listID` is a standalone list or a nested list's task id.
+struct ListConditionsSheet: View {
+  @Environment(WorkspaceModel.self) private var model
+  let listID: String
+  let listName: String
+  @State private var catalogue = StoreQuery(ConditionsCatalogue.empty)
+  @State private var groups: [[String]] = []
+  @State private var query = ""
+
+  var body: some View {
+    let value = catalogue.value
+    let offered = value.conditions.filter { !$0.isArchived || TaskRequirementToggle.requires($0.id, in: groups) }
+    let name: (String) -> String = { id in value.conditions.first { $0.id == id }?.name ?? "Missing condition" }
+    let negated = { (id: String) in TaskRequirementToggle.requirement(of: id, in: groups)?.isNegated == true }
+    let list = ConditionPicker.list(
+      offered: TaskConditionSection.sections(offered), searchable: offered, all: value.conditions,
+      query: query, isOn: { TaskRequirementToggle.requires($0, in: groups) }, exclusiveRadio: false)
+    ConditionPickerSheet(
+      title: "\(listName) needs",
+      subtitle: groups.isEmpty
+        ? "Every task in it will need what you tick here."
+        : "Every task in it needs " + ConditionPicker.requirementSummary(groups, name: name),
+      identifier: "listConditions",
+      query: $query,
+      offeredCount: offered.count,
+      list: list,
+      emptyText: "No conditions yet. Type one — Home, Campus, Laptop — to make it and require it.",
+      detail: { row in
+        [
+          ConditionPicker.alternatives(to: row.condition.id, in: groups, name: name).map { "or \($0)" },
+          row.condition.isArchived ? "Archived" : nil,
+        ].compactMap { $0 }.joined(separator: " · ")
+      },
+      count: { _ in nil },
+      onToggle: { toggle($0.condition.id) },
+      onCreate: { name in
+        query = ""
+        if let made = model.createCondition(named: name, category: nil) { toggle(made.id) }
+      },
+      label: { row in negated(row.condition.id) ? "not \(row.condition.name)" : row.condition.name },
+      onNegate: { row in save(TaskRequirementToggle.negating(row.condition.id, in: groups)) })
+    .task(id: model.revision) {
+      groups = model.listRequirementGroups(listID)
+      let workspaceID = model.workspace.id
+      await catalogue.load(model.store) { store in try ConditionsCatalogue.load(store: store, workspaceID: workspaceID) }
+    }
+  }
+
+  private func toggle(_ id: String) {
+    let places = Set(catalogue.value.conditions.filter(\.isLocation).map(\.id))
+    save(TaskRequirementToggle.toggling(id, in: groups, places: places))
+  }
+
+  /// Saved straight away, as a task's requirements are; shown at once
+  /// rather than after the reread the write sets off.
+  private func save(_ next: [[String]]?) {
+    groups = next ?? []
+    model.setListRequirements(groups, list: listID)
+  }
+}
+
 /// The sheet both pickers are: a title, a search field that is also how a
 /// condition is made, and the rows under their headings — each a
 /// whole-width toggle at the touch target.
@@ -235,6 +299,9 @@ private struct ConditionPickerSheet<Leading: View, Notice: View>: View {
   var label: (ConditionPickerRow) -> String = { $0.condition.name }
   /// Ticks a row as not holding, from a swipe; nil where that means nothing.
   var onNegate: ((ConditionPickerRow) -> Void)?
+  /// Whether a row shows its state without a tap changing it: a device
+  /// condition, when saying where you are, holds by the device in your hand.
+  var isFixed: (ConditionPickerRow) -> Bool = { _ in false }
   @ViewBuilder var leading: () -> Leading
   @ViewBuilder var notice: () -> Notice
 
@@ -346,6 +413,7 @@ private struct ConditionPickerSheet<Leading: View, Notice: View>: View {
   private func rowView(_ row: ConditionPickerRow) -> some View {
     let line = [row.category, detail(row)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     let tasks = count(row) ?? 0
+    let fixed = isFixed(row)
     return Button { onToggle(row) } label: {
       HStack(spacing: theme.space.md) {
         indicator(isOn: row.isOn, round: row.isExclusive)
@@ -370,6 +438,7 @@ private struct ConditionPickerSheet<Leading: View, Notice: View>: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .disabled(fixed)
     .listRowBackground(theme.paper)
     .listRowSeparatorTint(theme.borderMuted)
     .accessibilityElement(children: .combine)

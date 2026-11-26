@@ -27,6 +27,9 @@ final class InspectorModel {
   /// an alert over everything.
   private(set) var error: String?
   private(set) var conditions: [TaskCondition] = []
+  /// What the task needs because of the lists it is in, outermost first:
+  /// shown read-only, since it is changed on the list.
+  private(set) var inherited: [TaskInheritedRequirement] = []
   private(set) var kanbanColumn: String?
   private(set) var boardColumns: [WorkspaceKanbanColumn] = WorkspaceKanbanColumn.blitzitDefaults
   private(set) var matrix = TaskMatrixPosition(urgency: nil, importance: nil)
@@ -95,6 +98,7 @@ final class InspectorModel {
     guard let task else { return }
     listName = model.listName(for: task.listId)
     conditions = (try? store.conditions(in: model.workspace.id)) ?? []
+    inherited = (try? store.inheritedRequirements(taskId: taskID)) ?? []
     let metadata = try? store.boardMetadata(for: [taskID])
     kanbanColumn = metadata?.columns[taskID]
     matrix = metadata?.positions[taskID] ?? TaskMatrixPosition(urgency: nil, importance: nil)

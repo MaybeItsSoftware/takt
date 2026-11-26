@@ -155,6 +155,9 @@ final class AppNavigation {
   var listSettingsID: String?
   /// The list whose sharing sheet is up (`SharedListSheet`).
   var sharingListID: String?
+  /// The list whose conditions sheet is up (`ListConditionsSheet`): a
+  /// standalone list, or a nested list's task id, with its name.
+  var conditionsList: ListConditionsTarget?
   /// The join sheet, with the invite it was opened with (a followed link).
   var joinInvite: JoinInvite?
   /// A command for the outline on screen, from the toolbar or a hardware key.

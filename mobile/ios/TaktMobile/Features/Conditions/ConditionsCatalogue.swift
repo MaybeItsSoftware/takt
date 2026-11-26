@@ -57,3 +57,36 @@ extension WorkspaceModel {
     }
   }
 }
+
+extension ConditionDeviceKind {
+  /// The SF Symbol a device condition is drawn with.
+  var symbol: String {
+    switch self {
+    case .laptop: "laptopcomputer"
+    case .phone: "iphone"
+    case .tablet: "ipad"
+    }
+  }
+}
+
+@MainActor
+extension WorkspaceModel {
+  /// Marks a condition as meaning a kind of device, or (nil) an ordinary
+  /// condition again. Marking it takes it out of what is said to hold, since
+  /// from then on each device decides that by what it is.
+  func setConditionDevice(_ condition: TaskCondition, kind: ConditionDeviceKind?) {
+    perform { store in try store.setConditionDeviceKind(id: condition.id, kind: kind?.rawValue) }
+  }
+
+  /// What a list requires — a standalone list, or a nested list's task id —
+  /// as requirement groups.
+  func listRequirementGroups(_ listID: String) -> [[String]] {
+    (try? store.listRequirementGroups(listId: listID)) ?? []
+  }
+
+  /// Sets what a list requires; every task in it, and in nested lists under
+  /// it, inherits it.
+  func setListRequirements(_ groups: [[String]], list listID: String) {
+    perform { store in try store.setListRequirements(listId: listID, groups: groups) }
+  }
+}

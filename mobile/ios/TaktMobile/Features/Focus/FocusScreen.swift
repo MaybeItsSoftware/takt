@@ -405,6 +405,8 @@ private struct FocusContextControls: View {
   /// A condition you can say holds; a pin under Location, where choosing one
   /// replaces the last. One a setting provides is on with where it comes
   /// from ("from Home"); tapping it switches it off for now.
+  /// A device condition is shown holding or not on this device, and cannot
+  /// be tapped: it is the device in your hand, not something said.
   private func chip(_ condition: TaskCondition, isExclusive: Bool) -> some View {
     let isOn = focus.heldIDs.contains(condition.id)
     let note = focus.holdingNote(condition.id)
@@ -413,6 +415,7 @@ private struct FocusContextControls: View {
     } label: {
       HStack(spacing: theme.space.xs) {
         if isExclusive { Image(systemName: "mappin").imageScale(.small) }
+        if let device = condition.device { Image(systemName: device.symbol).imageScale(.small) }
         Text(condition.name)
         if let note {
           Text(note).font(theme.type.caption).foregroundStyle(theme.muted)
@@ -428,6 +431,7 @@ private struct FocusContextControls: View {
         .strokeBorder(isOn ? theme.primary.opacity(0.5) : theme.border, lineWidth: theme.stroke))
     }
     .buttonStyle(.plain)
+    .disabled(condition.isDevice)
     .accessibilityAddTraits(isOn ? .isSelected : [])
     .accessibilityValue(note ?? "")
     .accessibilityIdentifier("focus.condition.\(condition.name)")

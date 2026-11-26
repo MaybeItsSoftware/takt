@@ -1,6 +1,7 @@
 import TaktSync
 import TaktWorkspace
 import SwiftUI
+import UIKit
 
 @main
 struct TaktApp: App {
@@ -61,6 +62,9 @@ final class Boot {
   let failure: String?
 
   init() {
+    // Before the workspace opens: the first thing it reads, the list tree's
+    // blocked tasks, already asks what holds.
+    ThisDevice.install()
     do {
       let model = try WorkspaceModel.live()
       self.model = model
@@ -70,6 +74,17 @@ final class Boot {
       self.model = nil
       self.failure = error.localizedDescription
     }
+  }
+}
+
+/// What kind of device this is, said to the core so a condition marked
+/// Phone or Tablet holds here and one marked Laptop does not. The answer is
+/// the process's, not the workspace's, so the app and every intent that
+/// reads what holds say it before they do.
+@MainActor
+enum ThisDevice {
+  static func install() {
+    ConditionDeviceKind.setThisDevice(UIDevice.current.userInterfaceIdiom == .pad ? .tablet : .phone)
   }
 }
 

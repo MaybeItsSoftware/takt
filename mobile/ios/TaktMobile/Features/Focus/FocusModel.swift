@@ -125,8 +125,11 @@ final class FocusModel {
   }
 
   /// "from Home" on a condition a setting provides, "off for now" on one
-  /// switched off; nil on one said directly or not at all.
+  /// switched off, "this device" or "not this device" on a device condition;
+  /// nil on one said directly or not at all.
   func holdingNote(_ id: String) -> String? {
+    if holdings[id]?.isDevice == true { return "this device" }
+    if conditionsKnown.first(where: { $0.id == id })?.isDevice == true { return "not this device" }
     guard let holding = holdings[id], !holding.isSet, !holding.providedBy.isEmpty else { return nil }
     if holding.isOff { return "off for now" }
     let names = holding.providedBy.compactMap { provider in conditionsKnown.first { $0.id == provider }?.name }
@@ -285,6 +288,8 @@ final class FocusModel {
   /// and brings back what the last one's overrides switched off. Turning
   /// off one a setting provides switches it off for now.
   func toggleCondition(_ condition: TaskCondition, among conditions: [TaskCondition]? = nil) {
+    // A device condition holds by the device in your hand, not by anything said.
+    guard !condition.isDevice else { return }
     if let conditions { allConditions = conditions }
     let known = conditions ?? conditionsKnown
     let next = FocusConditionHoldings.switching(

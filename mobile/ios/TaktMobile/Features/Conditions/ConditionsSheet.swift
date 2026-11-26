@@ -76,7 +76,8 @@ struct ConditionsSheet: View {
         } header: {
           label("Add")
         } footer: {
-          Text("Location is where you are: choosing one in Focus replaces the last. Any other category — Equipment, Energy — combines. Focus offers only what an open task needs.")
+          Text("Location is where you are: choosing one in Focus replaces the last. Any other category — Equipment, Energy — combines. Focus offers only what an open task needs. "
+            + "A condition marked with a device (hold it for its menu) holds on that kind of device by itself.")
             .font(theme.type.footnote)
             .foregroundStyle(theme.dim)
         }
@@ -142,7 +143,7 @@ struct ConditionsSheet: View {
       startRename(condition)
     } label: {
       HStack(spacing: theme.space.sm) {
-        Image(systemName: condition.isLocation ? "mappin" : "circle.dotted")
+        Image(systemName: condition.device?.symbol ?? (condition.isLocation ? "mappin" : "circle.dotted"))
           .foregroundStyle(condition.isArchived ? theme.dim : theme.purple)
           .frame(width: 20)
         VStack(alignment: .leading, spacing: 1) {
@@ -182,6 +183,11 @@ struct ConditionsSheet: View {
       } label: {
         Label("Category", systemImage: "folder")
       }
+      Menu {
+        deviceChoices(condition)
+      } label: {
+        Label("Device", systemImage: "laptopcomputer.and.iphone")
+      }
       if condition.isArchived {
         Button { model.saveCondition(condition, isArchived: false) } label: {
           Label("Restore", systemImage: "arrow.uturn.backward")
@@ -198,6 +204,11 @@ struct ConditionsSheet: View {
         model.saveCondition(condition, isArchived: !condition.isArchived)
       }
       Button("New category") { startNamingCategory(for: condition) }
+      ForEach(ConditionDeviceKind.allCases) { kind in
+        Button(condition.device == kind ? "Not a \(kind.rawValue) condition" : "Means a \(kind.rawValue)") {
+          model.setConditionDevice(condition, kind: condition.device == kind ? nil : kind)
+        }
+      }
     }
   }
 
@@ -206,6 +217,20 @@ struct ConditionsSheet: View {
     parts.append(uses == 0 ? "No tasks" : uses == 1 ? "1 task" : "\(uses) tasks")
     if condition.isArchived { parts.append("Archived") }
     return parts.joined(separator: " · ")
+  }
+
+  /// None, or the kind of device it means: a device condition holds on a
+  /// device of that kind by itself and is never said to hold.
+  @ViewBuilder
+  private func deviceChoices(_ condition: TaskCondition) -> some View {
+    Button { model.setConditionDevice(condition, kind: nil) } label: {
+      if condition.isDevice { Text("None") } else { Label("None", systemImage: "checkmark") }
+    }
+    ForEach(ConditionDeviceKind.allCases) { kind in
+      Button { model.setConditionDevice(condition, kind: kind) } label: {
+        if condition.device == kind { Label(kind.title, systemImage: "checkmark") } else { Text(kind.title) }
+      }
+    }
   }
 
   /// The categories in use (Location first), "No category", and "New

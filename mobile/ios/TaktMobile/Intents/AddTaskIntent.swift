@@ -26,6 +26,9 @@ struct AddTaskIntent: AppIntent {
   }
 
   func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+    // It can run without the app having launched, and the widget snapshot
+    // it writes ranks against what holds on this device.
+    await ThisDevice.install()
     let store = try IntentStore.open()
     let workspace = try store.bootstrapIfNeeded()
     let listID: String

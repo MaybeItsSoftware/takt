@@ -287,6 +287,9 @@ struct ListsTreeRows: View {
         Button { model.togglePromoted(item.id) } label: { Label("Pin to lists", systemImage: "pin") }
         Button { model.toggleListKind(item.id) } label: { Label("Convert to task", systemImage: "checkmark.square") }
         Button { model.setNestedListArchived(true, taskID: item.id) } label: { Label("Archive", systemImage: "archivebox") }
+        Button {
+          model.navigation.conditionsList = ListConditionsTarget(id: item.id, name: item.task.title)
+        } label: { Label("Conditions…", systemImage: "checklist") }
         Button { _ = model.extractBranch(item.id) } label: {
           Label("Extract to its own list", systemImage: "arrow.up.right.square")
         }
@@ -321,6 +324,7 @@ struct ListsTreeRows: View {
     if list.systemRole == nil {
       Button { model.navigation.namePrompt = .renameList(list.id) } label: { Label("Rename", systemImage: "pencil") }
       Button { model.navigation.listSettingsID = list.id } label: { Label("List settings…", systemImage: "paintpalette") }
+      conditionsButton(list)
       Button { model.navigation.namePrompt = .newNestedList(listID: list.id, parentTaskID: nil) } label: {
         Label("New nested list", systemImage: "list.bullet.indent")
       }
@@ -352,7 +356,17 @@ struct ListsTreeRows: View {
       }
     } else {
       Button { model.navigation.listSettingsID = list.id } label: { Label("List settings…", systemImage: "paintpalette") }
+      conditionsButton(list)
       priorityMenu(list)
+    }
+  }
+
+  /// What every task in the list needs, chosen as a task's needs are.
+  private func conditionsButton(_ list: TaskList) -> some View {
+    Button {
+      model.navigation.conditionsList = ListConditionsTarget(id: list.id, name: list.name)
+    } label: {
+      Label(list.requirementGroups == nil ? "Conditions…" : "Conditions (set)…", systemImage: "checklist")
     }
   }
 
@@ -640,6 +654,13 @@ struct ListSettingsSheet: View {
 }
 
 /// A list or folder waiting on delete confirmation.
+/// A list whose conditions are being chosen: a standalone list, or a
+/// nested list by its task id.
+struct ListConditionsTarget: Identifiable, Equatable {
+  let id: String
+  let name: String
+}
+
 struct PendingDeletion: Identifiable, Equatable {
   let id: String
   let isFolder: Bool
@@ -675,6 +696,13 @@ struct ListsPresenters: ViewModifier {
       .sheet(item: joinBinding) { invite in
         JoinListSheet(initialText: invite.text).environment(model).macSheet()
       }
+      .sheet(item: conditionsBinding) { target in
+        ListConditionsSheet(listID: target.id, listName: target.name).environment(model).macSheet()
+      }
+  }
+
+  private var conditionsBinding: Binding<ListConditionsTarget?> {
+    Binding(get: { model.navigation.conditionsList }, set: { model.navigation.conditionsList = $0 })
   }
 
   private var deletionBinding: Binding<Bool> {
