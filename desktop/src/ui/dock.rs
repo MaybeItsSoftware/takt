@@ -223,6 +223,9 @@ impl Takt {
                         };
                         if stop.id == "links" {
                             self.links_row(stop, tone, t, cx)
+                        } else if matches!(stop.id, "agent-context" | "list-context") && !stop.empty
+                        {
+                            context_chip(stop.value.clone(), t, cx)
                         } else {
                             let multiline = matches!(stop.kind, StopKind::Text { multiline: true });
                             div()
@@ -925,6 +928,45 @@ impl Takt {
             }))
             .into_any_element()
     }
+}
+
+/// Agent context, written for the agent rather than to be read here: a
+/// chip saying how long it is, which copies it on a click. Return on the
+/// row still opens it to edit.
+fn context_chip(text: String, t: Tokens, cx: &mut Context<Takt>) -> AnyElement {
+    let words = text.split_whitespace().count();
+    let label = if words == 1 {
+        "1 word".to_string()
+    } else {
+        format!("{words} words")
+    };
+    div()
+        .flex_1()
+        .min_w_0()
+        .flex()
+        .child(
+            div()
+                .id("agent-context-chip")
+                .h(px(ROW_LINE))
+                .px(px(6.))
+                .flex()
+                .items_center()
+                .gap_1()
+                .rounded(px(6.))
+                .border_1()
+                .border_color(t.border_variant)
+                .hover(|d| d.bg(t.hover))
+                .cursor_pointer()
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    cx.stop_propagation();
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.clone()));
+                    this.app.message = Some("Agent context copied.".into());
+                    cx.notify();
+                }))
+                .child(icon("copy", 13.).flex_none().text_color(t.muted))
+                .child(div().text_size(px(12.)).text_color(t.text).child(label)),
+        )
+        .into_any_element()
 }
 
 /// The icon for a link's kind (`TaskLink::icon`), and its colour.
