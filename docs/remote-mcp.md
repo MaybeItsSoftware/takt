@@ -83,8 +83,15 @@ Supabase project's OAuth 2.1 server (beta):
   `…/oauth-protected-resource/mcp`) names `<project>/auth/v1` as the
   authorization server. Clients then read Supabase's metadata at
   `<project>/.well-known/oauth-authorization-server/auth/v1`.
-- **Registration.** Clients register themselves with dynamic client
-  registration, which must be switched on in the project.
+- **Registration.** Dynamic client registration is left off: Supabase warns
+  that it lets anyone register a client, phishing apps included. Each
+  assistant is instead registered by hand under **Authentication → OAuth
+  Apps** as a public client (PKCE, no secret). Claude's is `Claude`, client
+  ID `26b3e190-a85d-400f-adf6-1035031799cc`, with redirect URIs
+  `https://claude.ai/api/mcp/auth_callback` and
+  `https://claude.com/api/mcp/auth_callback`. Without a registration
+  endpoint in Supabase's metadata, the client ID is entered with the
+  connector.
 - **Consent.** Supabase sends the browser to the project's *authorization
   path*, relative to its Site URL: `/oauth/consent/` on
   `https://takt.maybeitssoftware.co.uk`, served by GitHub Pages from
@@ -122,9 +129,10 @@ them is secret.
    `./scripts/deploy_sync_server.sh`.
 2. Deploy this one: `./scripts/deploy_mcp_server.sh`.
 3. In the Supabase dashboard:
-   - **Authentication → OAuth Server**: enable the OAuth 2.1 server, allow
-     dynamic client registration, and set the authorization path to
-     `/oauth/consent/`.
+   - **Authentication → OAuth Server**: enable the OAuth 2.1 server and set
+     the authorization path to `/oauth/consent/`. Leave dynamic client
+     registration off.
+   - **Authentication → OAuth Apps**: a public app per assistant, as above.
    - **Authentication → URL Configuration**: make sure the Site URL is
      `https://takt.maybeitssoftware.co.uk`, and add
      `https://takt.maybeitssoftware.co.uk/oauth/consent/` to the redirect
@@ -134,7 +142,8 @@ them is secret.
    plus the DNS record it prints), then redeploy with
    `TAKT_MCP_PUBLIC_URL=https://mcp.takt.maybeitssoftware.co.uk`.
 5. In Claude: Settings → Connectors → Add custom connector, with
-   `<service URL>/mcp`.
+   `<service URL>/mcp` and, under Advanced settings, the OAuth client ID
+   above (no secret).
 
 ## Checking it
 
