@@ -349,7 +349,25 @@ impl Takt {
                 .field_row(t, "Name", row.depth as f32 * SIDEBAR_INDENT, true)
                 .into_any_element();
         }
+        if row.kind == RowKind::PrioritiesHeading {
+            // A heading, as Zed sets one over a group of its panel's rows:
+            // small, muted, not a row the cursor or a click lands on.
+            return div()
+                .id(("sidebar-row", ix))
+                .h(px(ROW_HEIGHT))
+                .w_full()
+                .pl(px(SIDEBAR_INSET))
+                .pr_3()
+                .flex()
+                .items_end()
+                .pb(px(2.))
+                .text_size(px(11.))
+                .text_color(t.placeholder)
+                .child("Priorities")
+                .into_any_element();
+        }
         let (icon, count) = match &row.kind {
+            RowKind::PrioritiesHeading => ("list", None),
             RowKind::Today => ("sun", None),
             RowKind::Everything => ("infinity", None),
             RowKind::List(id) => (

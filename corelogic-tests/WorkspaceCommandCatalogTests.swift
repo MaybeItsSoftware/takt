@@ -73,6 +73,9 @@ final class WorkspaceCommandCatalogTests: XCTestCase {
         // Sharing a list, and handing a task in one to someone: rare, and
         // done from the palette, the list's menu or the inspector.
         .listShare, .listJoin, .listMembers, .listLeave, .listStopSharing, .taskAssign,
+        // Prioritising a list and taking it out again: rare, from the
+        // palette or the list's menu. Moving it within them has keys.
+        .listPrioritise, .listUnprioritise,
         .windowUseClaudeCode, .windowUseCodex,
         .windowOpenKeymap, .windowReloadKeymap, .windowShowDiagnostics,
         .windowOpenThemesFolder, .windowReloadThemes, .windowExportTheme,
@@ -341,6 +344,9 @@ final class WorkspaceCommandCollisionTests: XCTestCase {
       "sidebar:up", "sidebar:down", "sidebar:left", "sidebar:right",
       "sidebar:k", "sidebar:j", "sidebar:f2", "sidebar:cmd+up", "sidebar:cmd+down",
       "sidebar:option+up", "sidebar:option+down",
+      // ⌥⇧↑ ⌥⇧↓ move the list up and down your priorities, where elsewhere
+      // they move a task to the list above or below.
+      "sidebar:option+shift+up", "sidebar:option+shift+down",
       // In the sidebar ⌥⌘↑/↓ reorder the folder; elsewhere they change list.
       "sidebar:cmd+option+up", "sidebar:cmd+option+down",
       "sidebar:home", "sidebar:end", "sidebar:pageup", "sidebar:pagedown",

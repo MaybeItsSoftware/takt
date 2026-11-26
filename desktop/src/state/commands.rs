@@ -254,6 +254,10 @@ impl App {
             "folderExpandAll" => self.set_all_folders_expanded(true),
             "listMoveUp" => self.move_current_list(-1),
             "listMoveDown" => self.move_current_list(1),
+            "listPrioritise" => self.prioritise_current_list(PriorityChange::Add),
+            "listPriorityUp" => self.prioritise_current_list(PriorityChange::By(-1)),
+            "listPriorityDown" => self.prioritise_current_list(PriorityChange::By(1)),
+            "listUnprioritise" => self.prioritise_current_list(PriorityChange::Remove),
             "folderMoveUp" => self.move_current_folder(-1),
             "folderMoveDown" => self.move_current_folder(1),
 
@@ -809,6 +813,56 @@ impl App {
         }
     }
 
+    /// Puts the current list among the prioritised lists, moves it within
+    /// them, or takes it out, as one undo step; the sidebar's Priorities
+    /// and Up next follow.
+    fn prioritise_current_list(&mut self, change: PriorityChange) {
+        let Scope::List { list_id, .. } = self.scope.clone() else {
+            self.message = Some("Choose a list to prioritise.".into());
+            return;
+        };
+        let name = self
+            .list(&list_id)
+            .map(|list| list.name.clone())
+            .unwrap_or_default();
+        let rank = self.list_priority(&list_id);
+        let count = self.prioritised_list_ids.len() as i64;
+        let position = match (change, rank) {
+            (PriorityChange::Add, Some(rank)) => {
+                self.message = Some(format!("{name} is already priority {rank}."));
+                return;
+            }
+            (PriorityChange::Add, None) => Some(count + 1),
+            (PriorityChange::By(_) | PriorityChange::Remove, None) => {
+                self.message = Some(format!("{name} isn't prioritised."));
+                return;
+            }
+            (PriorityChange::By(by), Some(rank)) => {
+                let to = (rank + by).clamp(1, count);
+                if to == rank {
+                    return;
+                }
+                Some(to)
+            }
+            (PriorityChange::Remove, Some(_)) => None,
+        };
+        if self
+            .write(|store| {
+                store
+                    .core
+                    .set_list_priority(list_id.clone(), position, now_ms())
+            })
+            .is_some()
+        {
+            self.reload_sidebar();
+            self.reload_today();
+            self.message = Some(match position {
+                Some(position) => format!("{name} is priority {position}."),
+                None => format!("{name} is no longer prioritised."),
+            });
+        }
+    }
+
     fn move_current_folder(&mut self, by: i32) {
         let Scope::Folder(id) = self.scope.clone() else {
             return;
@@ -968,6 +1022,10 @@ pub const PORTED: &[&str] = &[
     "folderExpandAll",
     "listMoveUp",
     "listMoveDown",
+    "listPrioritise",
+    "listPriorityUp",
+    "listPriorityDown",
+    "listUnprioritise",
     "folderMoveUp",
     "folderMoveDown",
     "windowUndo",
@@ -1116,4 +1174,14 @@ mod tests {
             );
         }
     }
+}
+
+/// What [`App::prioritise_current_list`] does with the list.
+#[derive(Debug, Clone, Copy)]
+enum PriorityChange {
+    /// Last among the prioritised lists.
+    Add,
+    /// Places up (negative) or down the priorities.
+    By(i64),
+    Remove,
 }

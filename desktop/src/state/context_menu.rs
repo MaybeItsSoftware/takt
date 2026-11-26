@@ -178,6 +178,17 @@ impl App {
                 entries.push(self.item("listSettings", "List settings…"));
                 entries.push(self.item("listMoveUp", "Move up"));
                 entries.push(self.item("listMoveDown", "Move down"));
+                if let RowKind::List(id) = &row.kind {
+                    entries.push(MenuEntry::Divider);
+                    if self.list_priority(id).is_some() {
+                        entries.push(self.item("listPriorityUp", "Move up the priorities"));
+                        entries.push(self.item("listPriorityDown", "Move down the priorities"));
+                        entries.push(self.item("listUnprioritise", "Stop prioritising"));
+                    } else {
+                        entries.push(self.item("listPrioritise", "Prioritise"));
+                    }
+                    entries.push(MenuEntry::Divider);
+                }
                 entries.push(self.item("listComplete", "Complete the list"));
                 entries.push(self.item("listArchive", "Archive"));
                 entries.push(MenuEntry::Divider);

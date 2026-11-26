@@ -477,6 +477,15 @@ fn lists() -> Vec<Spec> {
         c("listMoveDown", "Move the sidebar row down", "Lists", &["option+down"])
             .on(Sidebar)
             .note("Whatever you are on — a list, a folder, or a nested list"),
+        c("listPrioritise", "Prioritise the list", "Lists", &[])
+            .note("Last among your priorities, at the top of the lists. Up next leads each board column with them, in order"),
+        c("listPriorityUp", "Move the list up your priorities", "Lists", &["option+shift+up"])
+            .on(Sidebar)
+            .note("A prioritised list, one place more important"),
+        c("listPriorityDown", "Move the list down your priorities", "Lists", &["option+shift+down"])
+            .on(Sidebar)
+            .note("A prioritised list, one place less important"),
+        c("listUnprioritise", "Stop prioritising the list", "Lists", &[]),
         c("listNewTaskDestination", "Choose where new tasks go", "Lists", &["cmd+option+[", "cmd+option+]"])
             .motion()
             .note("In a folder, which of its lists a new task lands in"),

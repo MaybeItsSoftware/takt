@@ -159,6 +159,22 @@ rename, `h` / `l` / `-` collapse, expand and go up, `gg` / `Shift+G` the ends,
 `{` / `}` the previous / next folder and `:` the palette. Right-clicking a row
 opens the same panel's menu, each item with its sidebar key beside it.
 
+**Priorities** are the lists that matter most, in order. **Prioritise the
+list** (from the palette or a list's right-click menu) puts the list you are
+on last among them; `Alt+Shift+↑` / `Alt+Shift+↓` in the sidebar move it up
+and down them, and **Stop prioritising the list** takes it out. They are
+drawn under a Priorities heading above your own lists, each still in its
+folder too. Next up follows them within each board column: after anything
+overdue, due today or at risk of its deadline, a task in a column further
+right on its board comes first (Today, and a daily due today, first of all),
+and within a column a task in a prioritised list comes before the rest, the
+first priority before the second. So a prioritised list's backlog never
+jumps a Today task, but it does lead the other backlogs. Archiving,
+completing or deleting a list takes it out of the priorities. The iPhone and
+Android show the same Priorities at the head of their lists and offer the
+same actions on a list's menu; `takt ws prioritise-list` and the MCP tool
+`workspace_list_priority_set` set them too.
+
 The **inspector** is modal, as vim is. With the keyboard in it, `j` / `k` (or
 `↓` / `↑`) move a row cursor down every row, in sections set apart by a
 gap (no headings) by what you do with a task, and within When, Filed and Needs each row is its label beside its

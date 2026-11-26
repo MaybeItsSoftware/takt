@@ -1601,6 +1601,7 @@ impl Takt {
         match kind {
             RowKind::Today => "Today".into(),
             RowKind::Everything => "Everything".into(),
+            RowKind::PrioritiesHeading => "Priorities".into(),
             RowKind::List(id) => self
                 .app
                 .list(id)

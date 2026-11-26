@@ -51,6 +51,7 @@ public enum WorkspaceCommandID: String, CaseIterable, Sendable {
   case listDelete, folderNew, folderMoveUp, folderMoveDown, folderSelectPrevious
   case listShare, listJoin, listMembers, listLeave, listStopSharing, taskAssign
   case folderSelectNext, listMoveUp, listMoveDown, listNewTaskDestination
+  case listPrioritise, listPriorityUp, listPriorityDown, listUnprioritise
   case folderCollapseAll, folderExpandAll
   case filterListNew, filterListEdit, listIcon
 

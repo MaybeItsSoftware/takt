@@ -219,6 +219,9 @@ pub struct App {
     pub task_counts: std::collections::HashMap<String, i64>,
     /// The lists shared with other accounts, read with the sidebar.
     pub shared_list_ids: std::collections::HashSet<String>,
+    /// The prioritised lists, most important first: the sidebar's
+    /// Priorities, and the order Up next leads each column with.
+    pub prioritised_list_ids: Vec<String>,
     pub sidebar_rows: Vec<SidebarRow>,
     /// A right-click menu, while one is open.
     pub context_menu: Option<context_menu::ContextMenu>,
@@ -369,6 +372,7 @@ impl App {
             filter_lists: Vec::new(),
             task_counts: Default::default(),
             shared_list_ids: Default::default(),
+            prioritised_list_ids: Vec::new(),
             sidebar_rows: Vec::new(),
             context_menu: None,
             sidebar_cursor: None,

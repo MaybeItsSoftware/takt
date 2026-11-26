@@ -19,7 +19,13 @@ pub enum RowKind {
     NestedList(String),
     Folder(String),
     FilterList(String),
+    /// The Priorities heading over the prioritised lists: a label, which
+    /// the cursor passes over.
+    PrioritiesHeading,
 }
+
+/// The Priorities heading's row id.
+pub const PRIORITIES_HEADING: &str = "heading:priorities";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidebarRow {
@@ -87,6 +93,12 @@ impl App {
             Err(error) => self.message = Some(error.to_string()),
         }
         self.folders = core.folders(workspace.clone()).unwrap_or_default();
+        self.prioritised_list_ids = core
+            .prioritised_lists(workspace.clone())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|list| list.id)
+            .collect();
         self.shared_list_ids = core
             .shared_lists()
             .unwrap_or_default()
@@ -140,7 +152,7 @@ impl App {
             self.prefs.expanded_folders.iter().cloned().collect()
         };
         let inbox = self.inbox().map(|inbox| inbox.id.clone());
-        sidebar_outline_rows_with_filter_lists(
+        let mut rows: Vec<SidebarRow> = sidebar_outline_rows_with_filter_lists(
             inbox.clone(),
             lists.clone(),
             folders.clone(),
@@ -189,13 +201,71 @@ impl App {
                 depth: row.depth,
             })
         })
-        .collect()
+        .collect();
+        // The Priorities go under the stock lists and the filter lists,
+        // which gather tasks from others, at the head of your own.
+        let priorities = self.priority_rows();
+        if !priorities.is_empty() {
+            let at = rows
+                .iter()
+                .position(|row| {
+                    let of_inbox = inbox.as_deref().is_some_and(|inbox| {
+                        row.id == format!("list:{inbox}")
+                            || row.id.starts_with(&format!("nested:{inbox}:"))
+                    });
+                    !of_inbox
+                        && !matches!(
+                            row.kind,
+                            RowKind::Today | RowKind::Everything | RowKind::FilterList(_)
+                        )
+                })
+                .unwrap_or(rows.len());
+            rows.splice(at..at, priorities);
+        }
+        rows
     }
 
-    /// Every list, folders opened through, in the order the sidebar draws.
+    /// The Priorities heading and a row for each prioritised list, in
+    /// order; nothing when no list is prioritised. Each list keeps its row
+    /// in its folder as well, as a pinned nested list does.
+    fn priority_rows(&self) -> Vec<SidebarRow> {
+        let mut rows: Vec<SidebarRow> = self
+            .prioritised_list_ids
+            .iter()
+            .filter(|id| self.list(id).is_some())
+            .map(|id| SidebarRow {
+                id: format!("priority:{id}"),
+                kind: RowKind::List(id.clone()),
+                depth: 0,
+            })
+            .collect();
+        if !rows.is_empty() {
+            rows.insert(
+                0,
+                SidebarRow {
+                    id: PRIORITIES_HEADING.into(),
+                    kind: RowKind::PrioritiesHeading,
+                    depth: 0,
+                },
+            );
+        }
+        rows
+    }
+
+    /// A list's place among the prioritised lists, 1 the most important.
+    pub fn list_priority(&self, list_id: &str) -> Option<i64> {
+        self.prioritised_list_ids
+            .iter()
+            .position(|id| id == list_id)
+            .map(|index| index as i64 + 1)
+    }
+
+    /// Every list, folders opened through, in the order the sidebar draws,
+    /// each once: in its folder, not again among the Priorities.
     pub fn lists_in_sidebar_order(&self) -> Vec<String> {
         self.sidebar_rows_expanding(true)
             .into_iter()
+            .filter(|row| !row.id.starts_with("priority:"))
             .filter_map(|row| match row.kind {
                 RowKind::List(id) => Some(id),
                 _ => None,
@@ -252,20 +322,32 @@ impl App {
         let current = self
             .sidebar_cursor_row()
             .and_then(|row| self.sidebar_rows.iter().position(|r| r.id == row.id));
-        let index = match (step, current) {
+        let index = match (&step, current) {
             (CursorStep::First, _) => 0,
             (CursorStep::Last, _) => count - 1,
             (CursorStep::By(offset), None) => {
-                if offset < 0 {
+                if *offset < 0 {
                     count - 1
                 } else {
                     0
                 }
             }
             (CursorStep::By(offset), Some(current)) => {
-                takt_core::shaping::cursor_step(current as i64, offset, count as i64) as usize
+                takt_core::shaping::cursor_step(current as i64, *offset, count as i64) as usize
             }
         };
+        let mut index = index;
+        // The cursor passes over the Priorities heading, onward the way it
+        // was going; down from the very top, or up past the head, it stops
+        // on the row beyond.
+        if self.sidebar_rows[index].kind == RowKind::PrioritiesHeading {
+            let upward = matches!(step, CursorStep::By(offset) if offset < 0);
+            index = if upward && index > 0 {
+                index - 1
+            } else {
+                (index + 1).min(count - 1)
+            };
+        }
         let row = self.sidebar_rows[index].clone();
         self.apply_sidebar_cursor(&row);
     }
@@ -273,6 +355,7 @@ impl App {
     /// Selects what the row points at and puts the cursor on it.
     pub fn apply_sidebar_cursor(&mut self, row: &SidebarRow) {
         match &row.kind {
+            RowKind::PrioritiesHeading => return,
             RowKind::Today => self.select_today(),
             RowKind::Everything => self.select_everything(),
             RowKind::List(id) => self.select_list(id),
