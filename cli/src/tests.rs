@@ -719,6 +719,31 @@ fn prioritise_list_sends_a_position_or_null_and_needs_one_of_them() {
 }
 
 #[test]
+fn require_list_and_device_send_what_their_tools_take() {
+    let (name, args) = resolved(&[
+        "priority",
+        "ws",
+        "require-list",
+        "L",
+        "Campus|Library",
+        "not Quiet",
+    ]);
+    assert_eq!(name, "workspace_list_conditions_set");
+    assert_eq!(args["list_id"], json!("L"));
+    assert_eq!(
+        args["requires"],
+        json!([["Campus", "Library"], ["not Quiet"]])
+    );
+    let (name, args) = resolved(&["priority", "ws", "device", "Laptop", "laptop"]);
+    assert_eq!(name, "workspace_condition_device_set");
+    assert_eq!(args["device"], json!("laptop"));
+    let (_, args) = resolved(&["priority", "ws", "device", "Laptop", "--clear"]);
+    assert_eq!(args["device"], Value::Null);
+    assert!(Cli::try_parse_from(["priority", "ws", "device", "Laptop"]).is_err());
+    assert!(Cli::try_parse_from(["priority", "ws", "device", "Laptop", "watch"]).is_err());
+}
+
+#[test]
 fn update_sends_tags_including_an_empty_string_that_clears_them() {
     let (name, args) = resolved(&["priority", "update", "5", "--tags", "work,urgent"]);
     assert_eq!(name, "task_update");
@@ -811,6 +836,9 @@ const EVERY_SUBCOMMAND: &[&[&str]] = &[
     &["ws", "move-list", "L"],
     &["ws", "prioritise-list", "L", "1"],
     &["ws", "prioritise-list", "L", "--remove"],
+    &["ws", "require-list", "L", "Campus|Library", "not Quiet"],
+    &["ws", "device", "Laptop", "laptop"],
+    &["ws", "device", "Laptop", "--clear"],
     &["ws", "rm-list", "L"],
     &["ws", "commit", "T", "-r", "weekdays"],
     &["ws", "columns"],
@@ -962,7 +990,7 @@ fn every_advertised_tool_is_actually_implemented() {
 }
 
 #[test]
-fn the_tool_surface_is_fifty_five_uniquely_named_tools() {
+fn the_tool_surface_is_fifty_seven_uniquely_named_tools() {
     let definitions = tool_definitions();
     let mut names: Vec<&str> = definitions
         .iter()
@@ -972,7 +1000,7 @@ fn the_tool_surface_is_fifty_five_uniquely_named_tools() {
     names.sort_unstable();
     names.dedup();
     assert_eq!(names.len(), total, "duplicate tool name");
-    assert_eq!(total, 55);
+    assert_eq!(total, 57);
 
     for definition in &definitions {
         assert!(

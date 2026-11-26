@@ -11,6 +11,9 @@ Takt ships an MCP stdio server so an AI assistant can work directly with your Ch
   `Content-Length` over 64 MiB, or one that isn't a number, gets a `-32700`
   parse error rather than a body that size.
 - Dependencies: none beyond Takt itself — the server ships inside the app
+- For assistants that can't run a local process (Claude or ChatGPT on the
+  web and on phones) there is a hosted server instead, signed in to your
+  Takt account: see [`remote-mcp.md`](remote-mcp.md)
 
 ## What It Can Do
 
@@ -60,8 +63,8 @@ workspace's uppercase UUIDs, not Checkvist's integers:
 |---|---|---|
 | `focus_status` | What the focus timer is doing: the task, paused or running, elapsed and planned seconds, and the queue behind it | read |
 | `focus_history` | Focused time already recorded over the last N logical days, newest first | read |
-| `workspace_tree` | Folders, lists (with `folder_id`, open-task counts, visible root, `priority_rank`) and nested lists | read |
-| `workspace_tasks` | One list's task tree: ids, titles, notes, status, kind, kanban column, external links, `requires` (its conditions by name), `blocked: true` on a task waiting on an open task | read |
+| `workspace_tree` | Folders, lists (with `folder_id`, open-task counts, visible root, `priority_rank`, `requires` when the list requires conditions) and nested lists (with their `requires`) | read |
+| `workspace_tasks` | One list's task tree: ids, titles, notes, status, kind, kanban column, external links, `requires` (its conditions by name), `requires_from_list` (what the lists it is in require of it, outermost first), `blocked: true` on a task waiting on an open task | read |
 | `workspace_task_dependencies` | What a task waits on (`blocked_by`) and what waits on it (`blocking`), each with id, title, status and list, and whether it is blocked now | read |
 | `workspace_task_add` | Create a task or nested list, at a list's top level or under a parent, with notes, links and a column | write |
 | `workspace_task_update` | Title, notes, links, status, column, kind (task ⇄ nested list), sidebar pin, `waiting_on`, `follow_up_at` (both file the task in Waiting on) and `follow_up_every_days` (chase again that many days after each follow-up is done), `due`, `start`, `priority`, `estimate_minutes` and `assignee` (a shared list's member by email, account id or `me`); null clears any of them | write |
@@ -71,8 +74,10 @@ workspace's uppercase UUIDs, not Checkvist's integers:
 | `workspace_task_blocker_add` | Make `task_id` wait on `blocked_by_task_id` (any list) until it is done; a cycle is refused | write |
 | `workspace_task_blocker_remove` | Stop `task_id` waiting on `blocked_by_task_id` | write |
 | `workspace_task_commit` | Commit to `task_id` on a `rule` (`daily` by default): a subtask carrying a habit, in Today on its days until the task is done; `title` defaults to "Work on …", `stacks_missed` keeps a missed day owed | write |
-| `workspace_conditions` | Conditions under their categories in the app's order (settings first), each with its open-task count and what it provides; the context (what was said, everything that `holds` with where it comes from, what is `off_for_now`, when it was said and whether that was an earlier day, the time available, goal, expiry, last context); with `condition`, the open tasks needing it | read |
+| `workspace_conditions` | Conditions under their categories in the app's order (Device first, then settings), each with its open-task count, what it provides and, for a device condition, its `device` kind; `this_device` (laptop); the context (what was said, everything that `holds` with where it comes from, what is `off_for_now`, when it was said and whether that was an earlier day, the time available, goal, expiry, last context); with `condition`, the open tasks needing it | read |
 | `workspace_task_conditions_set` | What a task requires: each item a condition or an array of alternatives, by name or id, and `not Home` or `!Home` for one that must not hold; `create_missing` makes new ones | write |
+| `workspace_list_conditions_set` | What a list (or nested list) requires of every task in it and in the lists nested under it, written as for `workspace_task_conditions_set`; one undo step | write |
+| `workspace_condition_device_set` | Make a condition a device condition (`device`: `laptop`, `phone` or `tablet`), which holds by itself on a device of that kind and nowhere else, or an ordinary one again (`null`); one undo step | write |
 | `workspace_condition_provides_set` | What a condition provides (`condition`, `provides`, by name or id; `create_missing` makes new ones): while it holds, they hold too. Not itself; one undo step | write |
 | `workspace_day_start_set` | How each day starts: `resets`, `hour` (0–23, when the day changes — the daily log's too), `conditions` (by name or id, one place at most). At that hour what holds goes back to them, once a day on whichever device looks first; fields left out keep what they were, none only reports. Not an undo step | write |
 | `workspace_context_set` | What holds now: `set`, `clear`, `on`, `off` (a place replaces the last place; `off` on a provided condition switches it off until what provides it changes), `mode`, `available_minutes`, `expires_in_minutes`. Not an undo step; the app picks it up at once, and sync carries it to the other devices | write |
@@ -282,7 +287,7 @@ python3 scripts/mcp_smoke_check.py   # needs a Debug app build
 ```
 
 It drives both spellings above and checks they answer `initialize` and expose
-the same 55 tools — in particular that an old-style invocation, with
+the same 57 tools — in particular that an old-style invocation, with
 credentials in `env`, still reaches a working server. It reads no real data and
 needs no Checkvist credentials.
 

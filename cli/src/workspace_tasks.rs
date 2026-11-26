@@ -133,6 +133,9 @@ struct TaskRow {
     /// The conditions it requires, by name: every group must hold, any one
     /// condition in a group will do. Filled in by [`task_rows`].
     requires: Vec<Vec<String>>,
+    /// What the lists it is in require of it, outermost first: each
+    /// `{list_id, list, nested, requires}`. Filled in by [`task_rows`].
+    requires_from_list: Vec<Value>,
 }
 
 impl TaskRow {
@@ -163,6 +166,7 @@ impl TaskRow {
             follow_up_every_days: row.get(23)?,
             follow_up_count: row.get(24)?,
             requires: Vec::new(),
+            requires_from_list: Vec::new(),
         })
     }
 
@@ -245,6 +249,9 @@ impl TaskRow {
         }
         if !self.requires.is_empty() {
             object.insert("requires".into(), json!(self.requires));
+        }
+        if !self.requires_from_list.is_empty() {
+            object.insert("requires_from_list".into(), json!(self.requires_from_list));
         }
         if let Some(rule) = self
             .recurrence_rule
@@ -465,10 +472,25 @@ impl Workspace {
         )?;
         let shared = shared_lists(&connection)?;
         let priorities = list_priorities(&connection, &workspace.0)?;
+        let names = conditions::condition_names(&connection)?;
+        let list_requires = |id: &str| -> Result<Value> {
+            let groups = takt_core::conditions::list_requirement_groups(&connection, id)
+                .map_err(map_core_error)?;
+            Ok(if groups.is_empty() {
+                Value::Null
+            } else {
+                json!(conditions::named_groups(&names, groups))
+            })
+        };
         let mut lists = lists;
         for list in &mut lists {
             let id = list["id"].as_str().unwrap_or_default().to_owned();
             list["priority_rank"] = json!(priorities.get(&id));
+            // What every task in it requires; absent for nothing.
+            let requires = list_requires(&id)?;
+            if !requires.is_null() {
+                list["requires"] = requires;
+            }
             list["shared"] = shared
                 .iter()
                 .find(|shared| shared.list_id == id)
@@ -504,6 +526,15 @@ impl Workspace {
                 }))
             },
         )?;
+
+        let mut nested = nested;
+        for list in &mut nested {
+            let id = list["id"].as_str().unwrap_or_default().to_owned();
+            let requires = list_requires(&id)?;
+            if !requires.is_null() {
+                list["requires"] = requires;
+            }
+        }
 
         Ok(json!({
             "workspace_id": workspace.0,

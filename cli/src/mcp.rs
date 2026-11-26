@@ -15,7 +15,7 @@
 //! `scripts/mcp_smoke_check.py` checks the handover; `cargo test` checks the
 //! behaviour.
 
-use crate::tools::Tools;
+use crate::tools::{ToolOutcome, Tools};
 use serde_json::{Map, Value, json};
 use std::io::{BufRead, BufReader, Read, Stdin, Write};
 
@@ -81,15 +81,9 @@ impl Server {
             match self.read_message() {
                 Ok(None) => return,
                 Ok(Some(message)) => {
-                    let id = message.get("id").cloned();
-                    if let Err(error) = self.handle(&message)
-                        && let Some(id) = id.filter(|id| !id.is_null())
+                    if let Some(reply) = respond(&self.tools, &message, &mut self.protocol_version)
                     {
-                        self.send(json!({
-                            "jsonrpc": JSONRPC_VERSION,
-                            "id": id,
-                            "error": { "code": error.code, "message": error.message },
-                        }));
+                        self.send(reply);
                     }
                 }
                 Err(error) => {
@@ -102,110 +96,6 @@ impl Server {
                     }));
                 }
             }
-        }
-    }
-
-    fn handle(&mut self, message: &Value) -> Result<(), JsonRpcError> {
-        let Some(object) = message.as_object() else {
-            return Err(JsonRpcError::new(
-                JSONRPC_INVALID_REQUEST,
-                "Request must be an object.",
-            ));
-        };
-        if object.get("jsonrpc").and_then(Value::as_str) != Some(JSONRPC_VERSION) {
-            return Err(JsonRpcError::new(
-                JSONRPC_INVALID_REQUEST,
-                "Unsupported JSON-RPC version.",
-            ));
-        }
-        let Some(method) = object.get("method").and_then(Value::as_str) else {
-            return Err(JsonRpcError::new(
-                JSONRPC_INVALID_REQUEST,
-                "Missing method.",
-            ));
-        };
-
-        let params = object.get("params");
-        // A message without an id is a notification: it is acted on, but never
-        // answered.
-        let id = object.get("id").filter(|id| !id.is_null()).cloned();
-
-        let result = match method {
-            "notifications/initialized" => return Ok(()),
-            "initialize" => {
-                if let Some(requested) = params
-                    .and_then(|params| params.get("protocolVersion"))
-                    .and_then(Value::as_str)
-                    .filter(|version| !version.is_empty())
-                {
-                    self.protocol_version = requested.to_string();
-                }
-                json!({
-                    "protocolVersion": self.protocol_version,
-                    "serverInfo": { "name": SERVER_NAME, "version": SERVER_VERSION },
-                    // `logging` because `logging/setLevel` is answered below;
-                    // a client only sends it to a server that advertises it.
-                    "capabilities": { "tools": {}, "logging": {} },
-                })
-            }
-            "ping" | "logging/setLevel" => json!({}),
-            "tools/list" => json!({ "tools": tool_definitions() }),
-            "resources/list" => json!({ "resources": [] }),
-            "prompts/list" => json!({ "prompts": [] }),
-            "tools/call" => {
-                let Some(params) = params.and_then(Value::as_object) else {
-                    return Err(JsonRpcError::new(
-                        JSONRPC_INVALID_PARAMS,
-                        "tools/call params must be an object.",
-                    ));
-                };
-                let name = params
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .filter(|name| !name.is_empty())
-                    .ok_or_else(|| JsonRpcError::new(JSONRPC_INVALID_PARAMS, "Missing tool name."))?
-                    .to_string();
-                let arguments = match params.get("arguments") {
-                    None | Some(Value::Null) => Map::new(),
-                    Some(Value::Object(arguments)) => arguments.clone(),
-                    Some(_) => {
-                        return Err(JsonRpcError::new(
-                            JSONRPC_INVALID_PARAMS,
-                            "Tool arguments must be an object.",
-                        ));
-                    }
-                };
-                self.call_tool(&name, &arguments)
-            }
-            other => {
-                return Err(JsonRpcError::new(
-                    JSONRPC_METHOD_NOT_FOUND,
-                    format!("Method not found: {other}"),
-                ));
-            }
-        };
-
-        if let Some(id) = id {
-            self.send(json!({ "jsonrpc": JSONRPC_VERSION, "id": id, "result": result }));
-        }
-        Ok(())
-    }
-
-    /// A tool failure is a *result* with `isError`, not a JSON-RPC error: the
-    /// client is supposed to show the assistant what went wrong so it can try
-    /// something else, which a protocol-level error does not do.
-    fn call_tool(&self, name: &str, arguments: &Map<String, Value>) -> Value {
-        match self.tools.call(name, arguments) {
-            Ok(outcome) => json!({
-                "content": [{ "type": "text", "text": tool_result_text(&outcome.title, &outcome.payload) }],
-            }),
-            Err(error) => json!({
-                "content": [{
-                    "type": "text",
-                    "text": tool_result_text(&format!("Error: {error}"), &error.detail()),
-                }],
-                "isError": true,
-            }),
         }
     }
 
@@ -232,6 +122,156 @@ impl Server {
         }
         let _ = stdout.flush();
     }
+}
+
+/// What answers `tools/list` and `tools/call`. Over stdio that is the whole
+/// tool table ([`Tools`]); the hosted server (`remote/`) answers with the
+/// tools that only need the synced workspace, and syncs around each call.
+pub trait ToolHost {
+    fn definitions(&self) -> Vec<Value>;
+    /// A `tools/call` result: a failure is a result with `isError`, as
+    /// [`call_result`] makes it.
+    fn call_tool(&self, name: &str, arguments: &Map<String, Value>) -> Value;
+}
+
+impl ToolHost for Tools {
+    fn definitions(&self) -> Vec<Value> {
+        tool_definitions()
+    }
+
+    fn call_tool(&self, name: &str, arguments: &Map<String, Value>) -> Value {
+        call_result(Tools::call(self, name, arguments))
+    }
+}
+
+/// A tool failure is a *result* with `isError`, not a JSON-RPC error: the
+/// client is supposed to show the assistant what went wrong so it can try
+/// something else, which a protocol-level error does not do.
+pub fn call_result(result: crate::error::Result<ToolOutcome>) -> Value {
+    match result {
+        Ok(outcome) => json!({
+            "content": [{ "type": "text", "text": tool_result_text(&outcome.title, &outcome.payload) }],
+        }),
+        Err(error) => error_result(&format!("Error: {error}"), &error.detail()),
+    }
+}
+
+/// A failed `tools/call` result with `title` and `detail`.
+pub fn error_result(title: &str, detail: &Value) -> Value {
+    json!({
+        "content": [{ "type": "text", "text": tool_result_text(title, detail) }],
+        "isError": true,
+    })
+}
+
+/// The reply to one JSON-RPC message, whatever carried it: none for a
+/// notification, and none for a request so malformed it has no id to answer.
+/// `protocol_version` is what `initialize` agreed, kept by the caller.
+pub fn respond(
+    host: &impl ToolHost,
+    message: &Value,
+    protocol_version: &mut String,
+) -> Option<Value> {
+    let id = message.get("id").filter(|id| !id.is_null()).cloned();
+    match answer(host, message, protocol_version) {
+        Ok(Some(result)) => {
+            id.map(|id| json!({ "jsonrpc": JSONRPC_VERSION, "id": id, "result": result }))
+        }
+        Ok(None) => None,
+        Err(error) => id.map(|id| {
+            json!({
+                "jsonrpc": JSONRPC_VERSION,
+                "id": id,
+                "error": { "code": error.code, "message": error.message },
+            })
+        }),
+    }
+}
+
+/// The result of one message, before it is wrapped as a reply; `Ok(None)`
+/// for a notification.
+fn answer(
+    host: &impl ToolHost,
+    message: &Value,
+    protocol_version: &mut String,
+) -> Result<Option<Value>, JsonRpcError> {
+    let Some(object) = message.as_object() else {
+        return Err(JsonRpcError::new(
+            JSONRPC_INVALID_REQUEST,
+            "Request must be an object.",
+        ));
+    };
+    if object.get("jsonrpc").and_then(Value::as_str) != Some(JSONRPC_VERSION) {
+        return Err(JsonRpcError::new(
+            JSONRPC_INVALID_REQUEST,
+            "Unsupported JSON-RPC version.",
+        ));
+    }
+    let Some(method) = object.get("method").and_then(Value::as_str) else {
+        return Err(JsonRpcError::new(
+            JSONRPC_INVALID_REQUEST,
+            "Missing method.",
+        ));
+    };
+
+    let params = object.get("params");
+    // A message without an id is a notification: it is acted on, but never
+    // answered ([`respond`] drops the reply).
+    let result = match method {
+        "notifications/initialized" => return Ok(None),
+        "initialize" => {
+            if let Some(requested) = params
+                .and_then(|params| params.get("protocolVersion"))
+                .and_then(Value::as_str)
+                .filter(|version| !version.is_empty())
+            {
+                *protocol_version = requested.to_string();
+            }
+            json!({
+                "protocolVersion": protocol_version,
+                "serverInfo": { "name": SERVER_NAME, "version": SERVER_VERSION },
+                // `logging` because `logging/setLevel` is answered below;
+                // a client only sends it to a server that advertises it.
+                "capabilities": { "tools": {}, "logging": {} },
+            })
+        }
+        "ping" | "logging/setLevel" => json!({}),
+        "tools/list" => json!({ "tools": host.definitions() }),
+        "resources/list" => json!({ "resources": [] }),
+        "prompts/list" => json!({ "prompts": [] }),
+        "tools/call" => {
+            let Some(params) = params.and_then(Value::as_object) else {
+                return Err(JsonRpcError::new(
+                    JSONRPC_INVALID_PARAMS,
+                    "tools/call params must be an object.",
+                ));
+            };
+            let name = params
+                .get("name")
+                .and_then(Value::as_str)
+                .filter(|name| !name.is_empty())
+                .ok_or_else(|| JsonRpcError::new(JSONRPC_INVALID_PARAMS, "Missing tool name."))?
+                .to_string();
+            let arguments = match params.get("arguments") {
+                None | Some(Value::Null) => Map::new(),
+                Some(Value::Object(arguments)) => arguments.clone(),
+                Some(_) => {
+                    return Err(JsonRpcError::new(
+                        JSONRPC_INVALID_PARAMS,
+                        "Tool arguments must be an object.",
+                    ));
+                }
+            };
+            host.call_tool(&name, &arguments)
+        }
+        other => {
+            return Err(JsonRpcError::new(
+                JSONRPC_METHOD_NOT_FOUND,
+                format!("Method not found: {other}"),
+            ));
+        }
+    };
+    Ok(Some(result))
 }
 
 /// One message off the stream, and the framing it arrived in. `Ok(None)` is a
@@ -1104,6 +1144,44 @@ fn workspace_tool_definitions() -> Vec<Value> {
                     "create_missing": { "type": "boolean", "description": "Default: false." },
                 },
                 "required": ["task_id", "requires"],
+                "additionalProperties": false,
+            },
+        }),
+        json!({
+            "name": "workspace_list_conditions_set",
+            "description": "Set what a list requires of every task in it, and of the tasks in lists nested under it: they are offered only while it holds, on top of what each task requires itself. list_id is a list's id or a nested list's (workspace_tree). requires is written exactly as for workspace_task_conditions_set — each item one requirement that must hold, a condition or an array of alternatives, \"not Home\" or \"!Home\" for a condition that must not hold — and replaces what the list required; an empty array requires nothing. workspace_tasks reports what a task inherits as requires_from_list, and workspace_tree each list's requires. With create_missing, a name no condition has yet becomes a new condition first. One undo step.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "list_id": id("From workspace_tree: a list, or a nested list."),
+                    "requires": {
+                        "type": "array",
+                        "items": { "anyOf": [
+                            { "type": "string" },
+                            { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+                        ] },
+                    },
+                    "create_missing": { "type": "boolean", "description": "Default: false." },
+                },
+                "required": ["list_id", "requires"],
+                "additionalProperties": false,
+            },
+        }),
+        json!({
+            "name": "workspace_condition_device_set",
+            "description": "Make a condition a device condition, or an ordinary one again. What holds is one answer shared by every device, so an ordinary condition cannot mean \"the device I am on\"; a device condition can. It holds by itself on a device of its kind — laptop (the Mac, and this server, which runs on it), phone (an iPhone or Android phone) or tablet (an iPad or Android tablet) — and nowhere else, is never said to hold or switched off, and nothing provides it (links to it are dropped, and it leaves what holds and how each day starts). It can still provide others. workspace_conditions shows it under Device with its kind, and in holds with from [\"device\"]. condition by name or id; device \"laptop\", \"phone\", \"tablet\", or null for an ordinary condition. One undo step.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "condition": { "type": "string", "description": "By name or id." },
+                    "device": {
+                        "anyOf": [
+                            { "type": "string", "enum": ["laptop", "phone", "tablet"] },
+                            { "type": "null" },
+                        ],
+                    },
+                },
+                "required": ["condition", "device"],
                 "additionalProperties": false,
             },
         }),

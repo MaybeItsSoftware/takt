@@ -1,32 +1,20 @@
-mod checkvist;
-mod cli;
-mod config;
-mod error;
-mod local;
-mod lock;
-mod mcp;
-#[cfg(test)]
-mod tests;
-mod tools;
-mod tui;
-mod workspace;
-mod workspace_tasks;
-#[cfg(test)]
-mod workspace_tests;
-
-use checkvist::{CheckvistClient, CheckvistConfig};
 use clap::Parser;
-use config::Config;
-use error::ToolError;
-use local::LocalState;
-use tools::Tools;
-use workspace::Workspace;
+use takt_cli::checkvist::{CheckvistClient, CheckvistConfig};
+use takt_cli::config::Config;
+use takt_cli::error::ToolError;
+use takt_cli::local::LocalState;
+use takt_cli::tools::Tools;
+use takt_cli::workspace::Workspace;
+use takt_cli::{cli, mcp, tui};
 
 fn main() -> std::process::ExitCode {
     // The CLI's own config, not the app's — see `config.rs`. Loaded before
     // anything else because both the API client and the local-state reader
     // resolve their settings out of it, behind the environment.
     let config = Config::load();
+    // Device conditions hold on a device of their kind; the CLI and the
+    // MCP server run on the Mac, so this is a laptop, as the app is.
+    takt_core::conditions::set_this_device_kind(Some("laptop".into()));
     let tools = Tools {
         client: CheckvistClient::new(CheckvistConfig::resolve(&config)),
         local: LocalState::resolve(&config),

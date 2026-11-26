@@ -480,6 +480,34 @@ pub enum WsCommand {
         #[arg(long)]
         create: bool,
     },
+    /// Set what a list requires of every task in it, and of the tasks in
+    /// lists nested under it, written as for `require`. None requires
+    /// nothing.
+    RequireList {
+        /// A list's id, or a nested list's.
+        list_id: String,
+        #[arg(num_args = 0.., value_name = "CONDITION[|CONDITION…]")]
+        requirements: Vec<String>,
+        /// Make a condition for a name nothing has yet.
+        #[arg(long)]
+        create: bool,
+    },
+    /// Make a condition a device condition — it holds on a device of that
+    /// kind (laptop, phone or tablet) and nowhere else — or an ordinary one
+    /// again with --clear. The Mac and this command are laptops.
+    Device {
+        /// The condition, by name or id.
+        condition: String,
+        #[arg(
+            required_unless_present = "clear",
+            conflicts_with = "clear",
+            value_parser = ["laptop", "phone", "tablet"]
+        )]
+        kind: Option<String>,
+        /// Make it an ordinary condition again.
+        #[arg(long)]
+        clear: bool,
+    },
     /// Set what a condition provides: while it holds, they hold too
     /// ("Home Floor\ space Quiet"). None provides nothing.
     Provides {
@@ -1233,23 +1261,35 @@ fn resolve_workspace(
             create,
         } => {
             arguments.insert("task_id".into(), json!(task_id));
-            let groups: Vec<Vec<String>> = requirements
-                .iter()
-                .map(|group| {
-                    group
-                        .split('|')
-                        .map(str::trim)
-                        .filter(|name| !name.is_empty())
-                        .map(str::to_string)
-                        .collect()
-                })
-                .filter(|group: &Vec<String>| !group.is_empty())
-                .collect();
-            arguments.insert("requires".into(), json!(groups));
+            arguments.insert("requires".into(), json!(requirement_groups(requirements)));
             if *create {
                 arguments.insert("create_missing".into(), json!(true));
             }
             "workspace_task_conditions_set"
+        }
+        WsCommand::RequireList {
+            list_id,
+            requirements,
+            create,
+        } => {
+            arguments.insert("list_id".into(), json!(list_id));
+            arguments.insert("requires".into(), json!(requirement_groups(requirements)));
+            if *create {
+                arguments.insert("create_missing".into(), json!(true));
+            }
+            "workspace_list_conditions_set"
+        }
+        WsCommand::Device {
+            condition,
+            kind,
+            clear,
+        } => {
+            arguments.insert("condition".into(), json!(condition));
+            arguments.insert(
+                "device".into(),
+                if *clear { Value::Null } else { json!(kind) },
+            );
+            "workspace_condition_device_set"
         }
         WsCommand::Provides {
             condition,
@@ -1444,6 +1484,23 @@ fn resolve_workspace(
     })
 }
 
+/// Requirements as typed on the command line: one argument per group, its
+/// alternatives joined with `|` ("Home|Campus").
+fn requirement_groups(requirements: &[String]) -> Vec<Vec<String>> {
+    requirements
+        .iter()
+        .map(|group| {
+            group
+                .split('|')
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .filter(|group: &Vec<String>| !group.is_empty())
+        .collect()
+}
+
 fn insert_if_some(arguments: &mut Map<String, Value>, key: &str, value: Option<&str>) {
     if let Some(value) = value {
         arguments.insert(key.into(), json!(value));
@@ -1535,7 +1592,11 @@ pub fn render(tool: &str, outcome: &ToolOutcome, as_json: bool) {
                 println!("Provides {}", names.join(" · "));
             }
         }
-        "workspace_task_conditions_set" => {
+        "workspace_condition_device_set" => match payload["condition"]["device"].as_str() {
+            Some(kind) => println!("Holds on a {kind}, and nowhere else."),
+            None => println!("An ordinary condition: said to hold, or not."),
+        },
+        "workspace_task_conditions_set" | "workspace_list_conditions_set" => {
             let requires = payload["requires"].as_array().cloned().unwrap_or_default();
             if requires.is_empty() {
                 println!("Requires nothing: offered whatever holds.");
@@ -2230,11 +2291,24 @@ fn render_context(context: &Value) {
         line.push_str("  — said on an earlier day; still true?");
     }
     println!("{line}");
+    // A device condition holds because of the machine this runs on, not
+    // because anything was said or provides it.
+    let by_device = |c: &&Value| c["from"] == json!(["device"]);
+    let devices: Vec<String> = context["holds"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(by_device)
+        .map(|c| text_of(&c["name"]))
+        .collect();
+    if !devices.is_empty() {
+        println!("This device: {}", devices.join(" · "));
+    }
     let holds: Vec<String> = context["holds"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|c| c["said"] != json!(true))
+        .filter(|c| c["said"] != json!(true) && !by_device(c))
         .map(|c| {
             let from: Vec<String> = c["from"]
                 .as_array()

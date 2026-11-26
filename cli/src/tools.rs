@@ -761,6 +761,47 @@ impl Tools {
                 Ok(outcome(title, payload))
             }
 
+            "workspace_list_conditions_set" => {
+                let list_id = required_string(arguments, "list_id")?;
+                let groups = as_requirement_groups(arguments.get("requires"))?;
+                let create = as_bool(arguments.get("create_missing"), false)?;
+                let payload = self
+                    .workspace
+                    .set_list_conditions(&list_id, groups, create)?;
+                let title = if payload["changed"] == json!(false) {
+                    "The list already required exactly that"
+                } else {
+                    "List conditions saved"
+                };
+                Ok(outcome(title, payload))
+            }
+
+            "workspace_condition_device_set" => {
+                let condition = required_string(arguments, "condition")?;
+                let device = match arguments.get("device") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::String(kind)) => Some(kind.clone()),
+                    Some(_) => {
+                        return Err(ToolError::new(
+                            "device is \"laptop\", \"phone\", \"tablet\" or null.",
+                        ));
+                    }
+                };
+                let payload = self
+                    .workspace
+                    .set_condition_device(&condition, device.as_deref())?;
+                let name = payload["condition"]["name"].as_str().unwrap_or("It");
+                let title = match (
+                    payload["changed"] == json!(false),
+                    payload["condition"]["device"].as_str(),
+                ) {
+                    (true, _) => format!("{name} was already that"),
+                    (false, Some(kind)) => format!("{name} holds on a {kind}"),
+                    (false, None) => format!("{name} is an ordinary condition again"),
+                };
+                Ok(outcome(title, payload))
+            }
+
             "workspace_condition_provides_set" => {
                 let condition = required_string(arguments, "condition")?;
                 let provides = as_string_list(arguments.get("provides"))?.ok_or_else(|| {

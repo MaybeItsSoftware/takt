@@ -6,9 +6,23 @@ license = "AGPL-3.0-only"
 description = "Command-line access to Takt's Checkvist lists, dailies, day log and workspace, and the MCP server the app bundles."
 publish = false
 
+[lib]
+name = "takt_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "takt"
 path = "src/main.rs"
+
+# The hosted MCP server (`src/remote/`, docs/remote-mcp.md), built only with
+# `--features remote` so the `takt` the app bundles carries no web server.
+[[bin]]
+name = "takt-mcp"
+path = "src/bin/takt-mcp.rs"
+required-features = ["remote"]
+
+[features]
+remote = ["dep:axum", "dep:tokio", "dep:jsonwebtoken"]
 
 [dependencies]
 chrono = "0.4.45"
@@ -22,7 +36,11 @@ rpassword = "7.5.4"
 rusqlite = "0.32"
 serde_json = "1.0.151"
 ureq = { version = "2", features = ["json"] }
-uuid = { version = "1.24.1", features = ["v4"] }
+uuid = { version = "1.24.1", features = ["v4", "v5"] }
+# The hosted MCP server's, behind the `remote` feature.
+axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"], optional = true }
+jsonwebtoken = { version = "9", optional = true }
 
 [profile.release]
 strip = true

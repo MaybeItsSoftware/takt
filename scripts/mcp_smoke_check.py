@@ -32,7 +32,7 @@ import subprocess
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-EXPECTED_TOOL_COUNT = 55
+EXPECTED_TOOL_COUNT = 57
 PROTOCOL_VERSION = "2024-11-05"
 
 

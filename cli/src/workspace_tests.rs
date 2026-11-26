@@ -2455,3 +2455,188 @@ fn a_list_is_prioritised_moved_and_unprioritised_in_one_step_each() {
             .contains("position is required")
     );
 }
+
+#[test]
+fn a_list_requires_conditions_of_every_task_in_it_and_its_nested_lists() {
+    let fixture = Fixture::new();
+    fixture
+        .db()
+        .execute_batch(&format!(
+            "INSERT INTO task_conditions (id, workspaceId, name, isLocation, isArchived, createdAt, updatedAt, category, sortOrder) VALUES
+               ('campus', '{WORKSPACE}', 'Campus', 1, 0, '{EARLIER}', '{EARLIER}', 'Location', 0),
+               ('quiet', '{WORKSPACE}', 'Quiet', 0, 0, '{EARLIER}', '{EARLIER}', NULL, 1),
+               ('mat', '{WORKSPACE}', 'Mat', 0, 0, '{EARLIER}', '{EARLIER}', NULL, 2);"
+        ))
+        .unwrap();
+    let nested = fixture.add(PROJECTS, "Essays", None);
+    fixture.call(
+        "workspace_task_update",
+        json!({ "task_id": nested, "kind": "list" }),
+    );
+    let task = fixture.add(PROJECTS, "Draft", Some(&nested));
+    fixture.call(
+        "workspace_task_conditions_set",
+        json!({ "task_id": task, "requires": ["Mat"] }),
+    );
+
+    let set = fixture.call(
+        "workspace_list_conditions_set",
+        json!({ "list_id": PROJECTS, "requires": ["Campus"] }),
+    );
+    assert_eq!(set["changed"], json!(true));
+    assert_eq!(set["requires"], json!([["Campus"]]));
+    assert_eq!(fixture.journal().last().unwrap().0, "MCP: Edit Conditions");
+    fixture.call(
+        "workspace_list_conditions_set",
+        json!({ "list_id": nested, "requires": ["not Quiet"] }),
+    );
+
+    // The tree says what each list requires; a task, what it inherits
+    // apart from what it requires itself.
+    let tree = fixture.call("workspace_tree", json!({}));
+    let projects = tree["lists"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|list| list["id"] == json!(PROJECTS))
+        .unwrap();
+    assert_eq!(projects["requires"], json!([["Campus"]]));
+    assert_eq!(tree["nested_lists"][0]["requires"], json!([["not Quiet"]]));
+    let tasks = fixture.call("workspace_tasks", json!({ "list_id": PROJECTS }));
+    let draft = tasks["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|task| {
+            std::iter::once(task.clone())
+                .chain(task["children"].as_array().cloned().unwrap_or_default())
+        })
+        .find(|row| row["title"] == json!("Draft"))
+        .unwrap();
+    assert_eq!(draft["requires"], json!([["Mat"]]));
+    assert_eq!(draft["requires_from_list"][0]["list"], json!("Projects"));
+    assert_eq!(
+        draft["requires_from_list"][0]["requires"],
+        json!([["Campus"]])
+    );
+    assert_eq!(draft["requires_from_list"][1]["list"], json!("Essays"));
+    assert_eq!(draft["requires_from_list"][1]["nested"], json!(true));
+
+    // Conditions count the tasks that inherit them.
+    let needing = fixture.call("workspace_conditions", json!({ "condition": "Campus" }));
+    let titles: Vec<&str> = needing["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|task| task["title"].as_str().unwrap())
+        .collect();
+    assert!(titles.contains(&"Draft"), "{titles:?}");
+
+    let cleared = fixture.call(
+        "workspace_list_conditions_set",
+        json!({ "list_id": PROJECTS, "requires": [] }),
+    );
+    assert_eq!(cleared["requires"], json!([]));
+    assert!(
+        fixture
+            .try_call(
+                "workspace_list_conditions_set",
+                json!({ "list_id": "nope", "requires": [] }),
+            )
+            .unwrap_err()
+            .contains("No list")
+    );
+}
+
+#[test]
+fn a_device_condition_holds_on_this_laptop_and_is_never_said() {
+    // The server runs on the Mac; main says so, and so does this test.
+    takt_core::conditions::set_this_device_kind(Some("laptop".into()));
+    let fixture = Fixture::new();
+    fixture
+        .db()
+        .execute_batch(&format!(
+            "INSERT INTO task_conditions (id, workspaceId, name, isLocation, isArchived, createdAt, updatedAt, category, sortOrder, providesJSON) VALUES
+               ('home', '{WORKSPACE}', 'Home', 1, 0, '{EARLIER}', '{EARLIER}', 'Location', 0, '[\"laptop\"]'),
+               ('laptop', '{WORKSPACE}', 'Laptop', 0, 0, '{EARLIER}', '{EARLIER}', NULL, 1, NULL),
+               ('phone', '{WORKSPACE}', 'Phone', 0, 0, '{EARLIER}', '{EARLIER}', NULL, 2, NULL);"
+        ))
+        .unwrap();
+    fixture.call("workspace_context_set", json!({ "on": ["Home"] }));
+
+    let set = fixture.call(
+        "workspace_condition_device_set",
+        json!({ "condition": "Laptop", "device": "laptop" }),
+    );
+    assert_eq!(set["changed"], json!(true));
+    assert_eq!(set["condition"]["device"], json!("laptop"));
+    assert_eq!(fixture.journal().last().unwrap().0, "MCP: Edit Condition");
+    fixture.call(
+        "workspace_condition_device_set",
+        json!({ "condition": "Phone", "device": "phone" }),
+    );
+    assert!(
+        fixture
+            .try_call(
+                "workspace_condition_device_set",
+                json!({ "condition": "Home", "device": "watch" }),
+            )
+            .unwrap_err()
+            .contains("laptop")
+    );
+
+    let read = fixture.call("workspace_conditions", json!({}));
+    assert_eq!(read["this_device"], json!("laptop"));
+    assert_eq!(read["sections"][0]["category"], json!("Device"));
+    assert_eq!(read["sections"][0]["device"], json!(true));
+    assert_eq!(
+        read["sections"][0]["conditions"][0]["device"],
+        json!("laptop")
+    );
+    // Nothing provides a device condition any more.
+    let home = read["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|section| section["conditions"].as_array().unwrap().clone())
+        .find(|condition| condition["name"] == json!("Home"))
+        .unwrap();
+    assert_eq!(home["provides"], json!([]));
+    // The laptop holds because this is one; the phone does not.
+    let holds: Vec<(String, Value)> = read["context"]["holds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| (c["name"].as_str().unwrap().to_string(), c["from"].clone()))
+        .collect();
+    assert!(
+        holds.contains(&("Laptop".into(), json!(["device"]))),
+        "{holds:?}"
+    );
+    assert!(!holds.iter().any(|(name, _)| name == "Phone"));
+    // Saying it holds, or turning it off, changes nothing.
+    let said = fixture.call(
+        "workspace_context_set",
+        json!({ "on": ["Phone"], "off": ["Laptop"] }),
+    );
+    assert!(
+        said["on"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["name"] != json!("Phone"))
+    );
+    assert!(
+        said["holds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == json!("Laptop"))
+    );
+
+    let cleared = fixture.call(
+        "workspace_condition_device_set",
+        json!({ "condition": "laptop", "device": null }),
+    );
+    assert!(cleared["condition"]["device"].is_null());
+}

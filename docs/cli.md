@@ -290,6 +290,8 @@ takt ws require <TASK_ID> 'not Home'          # only away from Home ("!Home" too
 takt ws here Campus --for 60                  # at Campus (the last place goes off), an hour free
 takt ws here --clear                          # anywhere
 takt ws provides Home 'Floor space' Quiet     # while Home holds, so do they; none clears
+takt ws require-list <LIST_ID> Campus         # every task in the list (and its nested lists) needs Campus; none clears
+takt ws device Laptop laptop                  # holds on a laptop (the Mac), never said; --clear makes it ordinary
 takt ws here --off Quiet                      # a provided one off until Home goes
 takt ws day-start Home --hour 4               # each day starts at 04:00 with Home on
 takt ws day-start --nothing                   # each day starts with nothing on

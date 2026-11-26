@@ -33,6 +33,9 @@ const CONTEXT_MIGRATION: &str = "v27_condition_order_and_context";
 /// What lets a condition provide others.
 const PROVIDES_MIGRATION: &str = "v34_condition_provides";
 
+/// What adds device conditions and lists that require conditions.
+const LIST_CONDITIONS_MIGRATION: &str = "v41_device_and_list_conditions";
+
 /// A new context-set request: every field optional, applied in this order —
 /// `set` (or `clear`) replaces the conditions on, then `off` and `on`.
 #[derive(Debug, Default)]
@@ -119,21 +122,66 @@ fn negation<'a>(all: &[ConditionRow], wanted: &'a str) -> (&'a str, bool) {
     }
 }
 
-/// Fills in each row's `requires` with condition names, a condition
-/// required not to hold as "not Home".
-pub(super) fn name_requirements(connection: &Connection, rows: &mut [TaskRow]) -> Result<()> {
-    if rows.iter().all(|row| row.planning_json.is_none()) {
-        return Ok(());
-    }
-    let names: HashMap<String, String> = connection
+/// Every condition's name by id, archived ones included.
+pub(super) fn condition_names(connection: &Connection) -> Result<HashMap<String, String>> {
+    connection
         .prepare("SELECT id, name FROM task_conditions")
         .and_then(|mut statement| {
             statement
                 .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
                 .collect()
         })
-        .map_err(map_query_error)?;
+        .map_err(map_query_error)
+}
+
+/// Requirement groups with condition names for ids, a condition required
+/// not to hold as "not Home".
+pub(super) fn named_groups(
+    names: &HashMap<String, String>,
+    groups: Vec<Vec<String>>,
+) -> Vec<Vec<String>> {
+    groups
+        .into_iter()
+        .map(|group| {
+            group
+                .into_iter()
+                .map(|member| {
+                    let requirement = core::Requirement::parse(&member);
+                    match names.get(requirement.condition_id) {
+                        Some(name) if requirement.negated => format!("not {name}"),
+                        Some(name) => name.clone(),
+                        None => member.clone(),
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Fills in each row's `requires` with condition names, and its
+/// `requires_from_list` with what the lists it is in require of it, list
+/// by list from the outermost.
+pub(super) fn name_requirements(connection: &Connection, rows: &mut [TaskRow]) -> Result<()> {
+    let inheriting = core::inherited_groups(connection).map_err(map_core_error)?;
+    if rows.iter().all(|row| row.planning_json.is_none()) && inheriting.is_empty() {
+        return Ok(());
+    }
+    let names = condition_names(connection)?;
     for row in rows {
+        if inheriting.contains_key(&row.id) {
+            row.requires_from_list = core::inherited_requirements(connection, &row.id)
+                .map_err(map_core_error)?
+                .into_iter()
+                .map(|inherited| {
+                    json!({
+                        "list_id": inherited.list_id,
+                        "list": inherited.list_name,
+                        "nested": inherited.is_nested,
+                        "requires": named_groups(&names, inherited.groups),
+                    })
+                })
+                .collect();
+        }
         let Some(planning) = row
             .planning_json
             .as_deref()
@@ -141,24 +189,7 @@ pub(super) fn name_requirements(connection: &Connection, rows: &mut [TaskRow]) -
         else {
             continue;
         };
-        row.requires = planning
-            .requirement_groups
-            .unwrap_or_default()
-            .into_iter()
-            .map(|group| {
-                group
-                    .into_iter()
-                    .map(|member| {
-                        let requirement = core::Requirement::parse(&member);
-                        match names.get(requirement.condition_id) {
-                            Some(name) if requirement.negated => format!("not {name}"),
-                            Some(name) => name.clone(),
-                            None => member.clone(),
-                        }
-                    })
-                    .collect()
-            })
-            .collect();
+        row.requires = named_groups(&names, planning.requirement_groups.unwrap_or_default());
     }
     Ok(())
 }
@@ -215,7 +246,13 @@ fn context_json(
                 "id": holding.condition_id,
                 "name": name(&holding.condition_id),
                 "said": holding.is_set,
-                "from": holding.provided_by.iter().map(|id| name(id)).collect::<Vec<_>>(),
+                // A device condition holds because this is that device.
+                "from": holding
+                    .is_device
+                    .then(|| "device".to_string())
+                    .into_iter()
+                    .chain(holding.provided_by.iter().map(|id| name(id)))
+                    .collect::<Vec<_>>(),
             })
         })
         .collect();
@@ -246,6 +283,42 @@ fn context_json(
     }))
 }
 
+/// Requirement groups as typed — names or ids, "!Home" or "not Home" for a
+/// condition that must not hold — as stored members; with `create_missing`
+/// a name nothing has yet becomes a new condition first.
+fn resolve_groups(
+    tx: &rusqlite::Transaction,
+    workspace_id: &str,
+    groups: &[Vec<String>],
+    create_missing: bool,
+    now: i64,
+) -> Result<Vec<Vec<String>>> {
+    let mut ids: Vec<Vec<String>> = Vec::new();
+    for group in groups {
+        let mut resolved = Vec::new();
+        for wanted in group {
+            let all = conditions_of(tx, workspace_id)?;
+            let (wanted, negated) = negation(&all, wanted);
+            let id = match resolve(&all, wanted) {
+                Ok(found) => found.id.clone(),
+                Err(_) if create_missing && !wanted.trim().is_empty() => {
+                    core::create_condition_in_category(tx, workspace_id, wanted, None, now)
+                        .map_err(map_core_error)?
+                }
+                Err(error) => return Err(error),
+            };
+            let member = core::member(&id, negated);
+            if !resolved.contains(&member) {
+                resolved.push(member);
+            }
+        }
+        if !resolved.is_empty() {
+            ids.push(resolved);
+        }
+    }
+    Ok(ids)
+}
+
 impl Workspace {
     /// Every condition under its heading, in the tab's order, with how many
     /// open tasks need it and how many of those it is holding back; what
@@ -269,19 +342,29 @@ impl Workspace {
                     "category": section.title,
                     "one_at_a_time": section.is_exclusive,
                     "setting": section.is_setting,
-                    "conditions": section.conditions.iter().map(|c| json!({
-                        "id": c.id,
-                        "name": c.name,
-                        "place": c.is_location,
-                        "archived": c.is_archived,
-                        "open_tasks": usage.get(&c.id).copied().unwrap_or(0),
-                        "provides": names_of(&all, &c.provides),
-                    })).collect::<Vec<_>>(),
+                    "device": section.is_device,
+                    "conditions": section.conditions.iter().map(|c| {
+                        let mut condition = json!({
+                            "id": c.id,
+                            "name": c.name,
+                            "place": c.is_location,
+                            "archived": c.is_archived,
+                            "open_tasks": usage.get(&c.id).copied().unwrap_or(0),
+                            "provides": names_of(&all, &c.provides),
+                        });
+                        if let Some(kind) = &c.device_kind {
+                            condition["device"] = json!(kind);
+                        }
+                        condition
+                    }).collect::<Vec<_>>(),
                 })
             })
             .collect();
         let mut payload = json!({
             "workspace_id": workspace_id,
+            // Device conditions hold by themselves on a device of their
+            // kind; this server runs on the Mac, a laptop.
+            "this_device": core::this_device_kind(),
             "count": all.len(),
             "sections": sections,
             "context": context_json(&connection, &workspace_id, &all)?,
@@ -328,29 +411,7 @@ impl Workspace {
                     |row| row.get(0),
                 )
                 .map_err(map_query_error)?;
-            let mut ids: Vec<Vec<String>> = Vec::new();
-            for group in &groups {
-                let mut resolved = Vec::new();
-                for wanted in group {
-                    let all = conditions_of(tx, &workspace_id)?;
-                    let (wanted, negated) = negation(&all, wanted);
-                    let id = match resolve(&all, wanted) {
-                        Ok(found) => found.id.clone(),
-                        Err(_) if create_missing && !wanted.trim().is_empty() => {
-                            core::create_condition_in_category(tx, &workspace_id, wanted, None, now)
-                                .map_err(map_core_error)?
-                        }
-                        Err(error) => return Err(error),
-                    };
-                    let member = core::member(&id, negated);
-                    if !resolved.contains(&member) {
-                        resolved.push(member);
-                    }
-                }
-                if !resolved.is_empty() {
-                    ids.push(resolved);
-                }
-            }
+            let ids = resolve_groups(tx, &workspace_id, &groups, create_missing, now)?;
             let changed = core::set_task_requirements(tx, task_id, ids, now).map_err(|error| {
                 match error {
                     takt_core::CoreError::InvalidCondition => ToolError::new(
@@ -364,6 +425,102 @@ impl Workspace {
             Ok(json!({
                 "task": { "id": task.id, "title": task.title },
                 "requires": task.requires,
+                "changed": changed,
+            }))
+        })
+    }
+
+    /// Sets what a list — standalone, or nested — requires of every task in
+    /// it and in the lists nested under it, written as for
+    /// [`Self::set_task_conditions`]. Empty requires nothing.
+    pub fn set_list_conditions(
+        &self,
+        list_id: &str,
+        groups: Vec<Vec<String>>,
+        create_missing: bool,
+    ) -> Result<Value> {
+        {
+            let connection = self.open()?;
+            if !has_migration(&connection, LIST_CONDITIONS_MIGRATION)? {
+                return Err(ToolError::new(format!(
+                    "This workspace predates lists that require conditions \
+                     ({LIST_CONDITIONS_MIGRATION}). Open an up-to-date Takt once to migrate it."
+                )));
+            }
+        }
+        self.journalled("Edit Conditions", |tx, _now| {
+            let now = Utc::now().timestamp_millis();
+            let (workspace_id, _) = super::workspace_row(tx)?;
+            let name: String = tx
+                .query_row(
+                    "SELECT name FROM task_lists WHERE id = ?1 AND workspaceId = ?2
+                     UNION ALL
+                     SELECT t.title FROM tasks t JOIN task_lists l ON l.id = t.listId
+                     WHERE t.id = ?1 AND l.workspaceId = ?2 AND t.itemKind = 'list'",
+                    [list_id, workspace_id.as_str()],
+                    |row| row.get(0),
+                )
+                .map_err(|_| {
+                    ToolError::new(format!(
+                        "No list or nested list with id {list_id}. workspace_tree lists them."
+                    ))
+                })?;
+            let ids = resolve_groups(tx, &workspace_id, &groups, create_missing, now)?;
+            let changed = core::set_list_requirements(tx, list_id, ids, now).map_err(|error| {
+                match error {
+                    takt_core::CoreError::InvalidCondition => ToolError::new(
+                        "A condition is archived, or a group repeats a condition or another group. \
+                         workspace_conditions lists them.",
+                    ),
+                    other => map_core_error(other),
+                }
+            })?;
+            let saved = core::list_requirement_groups(tx, list_id).map_err(map_core_error)?;
+            Ok(json!({
+                "list": { "id": list_id, "name": name },
+                "requires": named_groups(&condition_names(tx)?, saved),
+                "changed": changed,
+            }))
+        })
+    }
+
+    /// Makes a condition a device condition of `kind` — laptop, phone or
+    /// tablet — which holds by itself on a device of that kind and nowhere
+    /// else, or an ordinary condition again with none.
+    pub fn set_condition_device(&self, condition: &str, kind: Option<&str>) -> Result<Value> {
+        {
+            let connection = self.open()?;
+            if !has_migration(&connection, LIST_CONDITIONS_MIGRATION)? {
+                return Err(ToolError::new(format!(
+                    "This workspace predates device conditions ({LIST_CONDITIONS_MIGRATION}). \
+                     Open an up-to-date Takt once to migrate it."
+                )));
+            }
+        }
+        let kind = match kind {
+            None => None,
+            Some(kind) => Some(core::normalized_device_kind(kind).ok_or_else(|| {
+                ToolError::new(format!(
+                    "device is \"laptop\", \"phone\" or \"tablet\" (or null), not \"{kind}\"."
+                ))
+            })?),
+        };
+        self.journalled("Edit Condition", |tx, _now| {
+            let now = Utc::now().timestamp_millis();
+            let (workspace_id, _) = super::workspace_row(tx)?;
+            let all = conditions_of(tx, &workspace_id)?;
+            let found = resolve(&all, condition)?.clone();
+            let changed =
+                core::set_condition_device(tx, &found.id, kind, now).map_err(map_core_error)?;
+            let saved = takt_core::rows::condition(tx, &found.id)
+                .map_err(map_core_error)?
+                .unwrap_or(found);
+            Ok(json!({
+                "condition": {
+                    "id": saved.id,
+                    "name": saved.name,
+                    "device": saved.device_kind,
+                },
                 "changed": changed,
             }))
         })
