@@ -352,6 +352,23 @@ journal and outbox trigger. A client older than v40 drops the column on
 pull, as it drops any it does not have, shows no priorities and ranks Up
 next as it always did; its own edits to a list leave the rank alone.
 
+`v41_device_and_list_conditions` adds two columns. `task_conditions.deviceKind`
+is "laptop", "phone" or "tablet" for a device condition, NULL otherwise.
+Since `focus_contexts` is one answer per account, a device condition is never
+written into it: `focus_context::save` drops one from what is said to hold,
+switched off or offered back, and each client adds the device conditions of
+its own kind to what holds (`core/src/conditions/device.rs`), so the same
+row reads "Laptop holds" on the Mac and "Laptop does not" on the phone.
+`task_lists.requirementGroupsJSON` is what every task in a list requires,
+stored as a task's `requirementGroups` are; its tasks and those of nested
+lists under it inherit it (`core/src/conditions/inherited.rs`). It names
+conditions, which are each person's own, so in a shared list it is a
+personal column like `task_metadata.planningJSON`. It reinstalls every
+journal and outbox trigger. A client older than v41 drops both columns on
+pull: it treats a device condition as an ordinary one (and may say it
+holds, which newer clients ignore) and checks a task against its own
+requirements only.
+
 The following are not synced: the undo journal (`undo_control`, `change_log`), the FTS index
 (rebuilt by its own triggers as synced rows land), `grdb_migrations`, and the
 sync tables themselves. Day-log files stay per device. Theme *files* do
@@ -608,7 +625,7 @@ before this), or a shared list's. Design and reasoning are in
 its `tasks`, their `task_metadata`, `task_dependencies` between two of its
 tasks, and its `agent_instructions` (`list:<id>`). Nothing else. Their
 *personal columns* — `task_lists`: `workspaceId`, `folderId`, `sortOrder`,
-`visibleRootTaskId`, `priorityRank`; `task_metadata`: `matrixUrgency`, `matrixImportance`,
+`visibleRootTaskId`, `priorityRank`, `requirementGroupsJSON`; `task_metadata`: `matrixUrgency`, `matrixImportance`,
 `matrixRank`, `kanbanColumn`, `focusRank`, `planningJSON`, `agentContext` —
 never go there. They go to the pusher's own space as a **companion row**,
 table `<table>#personal` with the same id, and a pull writes them over the
@@ -689,7 +706,11 @@ hosts themselves charges nothing.
   Each member of a shared list needs their own subscription to sync it; the
   others' devices are unaffected by one member lapsing.
 - **`GET /v1/account`** adds `"subscription": {"required", "active",
-  "expiresAt", "comp"}`.
+  "entitled", "expiresAt", "comp"}`. `active` is whether the account may
+  sync here now (always true on a server that doesn't charge); `entitled` is
+  whether it has Takt Sync, bought and current or given, whatever the server
+  charges. The hosted MCP server (`docs/remote-mcp.md`) is a paid feature
+  even while sync is free, and reads `entitled`.
 - **`POST /v1/webhooks/revenuecat`**, authorised by the header RevenueCat is
   configured to send (`REVENUECAT_WEBHOOK_SECRET`, bare or as a Bearer
   token; 404 without it). Each event is applied once, by its id

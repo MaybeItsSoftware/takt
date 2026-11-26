@@ -87,6 +87,11 @@ pub struct Subscription {
     pub required: bool,
     /// Whether this account may sync here now.
     pub active: bool,
+    /// Whether the account has Takt Sync, bought and current or given,
+    /// whether or not this server charges for sync. The hosted MCP server
+    /// (`cli/src/remote`) is a paid feature even while sync is free, and
+    /// reads this.
+    pub entitled: bool,
     pub expires_at: Option<DateTime<Utc>>,
     /// Granted by hand rather than bought.
     pub comp: bool,
@@ -111,6 +116,7 @@ pub async fn subscription(state: &AppState, account: Uuid) -> Result<Subscriptio
     Ok(Subscription {
         required: state.billing.required,
         active: !state.billing.required || listed || bought,
+        entitled: listed || bought,
         expires_at,
         comp: listed || comp,
     })

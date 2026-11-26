@@ -1129,6 +1129,8 @@ async fn a_free_server_never_asks(pool: PgPool) {
     let (_, account) = server.call("GET", "/v1/account", Some(&token), None).await;
     assert_eq!(account["subscription"]["required"], json!(false));
     assert_eq!(account["subscription"]["active"], json!(true));
+    // Free sync isn't Takt Sync: a paid feature elsewhere still says no.
+    assert_eq!(account["subscription"]["entitled"], json!(false));
     // And the webhook isn't there without a secret.
     assert_eq!(
         server
@@ -1164,6 +1166,7 @@ async fn a_charging_server_lets_in_only_the_subscribed(pool: PgPool) {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(account["subscription"]["required"], json!(true));
     assert_eq!(account["subscription"]["active"], json!(false));
+    assert_eq!(account["subscription"]["entitled"], json!(false));
 
     // The webhook wants its secret.
     assert_eq!(
@@ -1179,6 +1182,8 @@ async fn a_charging_server_lets_in_only_the_subscribed(pool: PgPool) {
         StatusCode::OK
     );
     server.changes(&token, "since=0").await;
+    let (_, account) = server.call("GET", "/v1/account", Some(&token), None).await;
+    assert_eq!(account["subscription"]["entitled"], json!(true));
 
     // Cancelling keeps the paid year; a late, older expiry changes nothing;
     // the real expiry ends it; the same event twice is applied once.
@@ -1268,4 +1273,5 @@ async fn a_restore_moves_the_purchase_and_comps_are_left_alone(pool: PgPool) {
     server.changes(&new, "since=0").await;
     let (_, account) = server.call("GET", "/v1/account", Some(&new), None).await;
     assert_eq!(account["subscription"]["comp"], json!(true));
+    assert_eq!(account["subscription"]["entitled"], json!(true));
 }
