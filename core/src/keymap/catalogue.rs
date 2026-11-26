@@ -295,14 +295,14 @@ fn plan() -> Vec<Spec> {
         )
         .note("In the outline, or on the board card or row you are on"),
         c("planGrowTask", "Show the task's subtasks", "Plan", &["."])
-            .note("Grows a folded card or branch"),
+            .note("Grows a folded branch. On the board: opens a card to all its subtasks, then a subtask row to its own"),
         c(
             "planShrinkTask",
             "Hide the task's subtasks",
             "Plan",
             &["comma"],
         )
-        .note("On a task with none, folds the task it sits under"),
+        .note("On a task with none, folds the task it sits under. On the board: shuts a subtask row, then the card back to its preview, then folds it"),
         c(
             "planFoldAll",
             "Hide every task's subtasks",

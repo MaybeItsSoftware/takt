@@ -73,6 +73,19 @@ impl CoreWorkspace {
         crate::conditions::required_condition_ids(&self.read(), &workspace_id)
     }
 
+    /// The lists a task inherits requirements from, outermost first.
+    pub fn inherited_requirements(
+        &self,
+        task_id: String,
+    ) -> Result<Vec<crate::conditions::InheritedRequirement>, CoreError> {
+        crate::conditions::inherited_requirements(&self.read(), &task_id)
+    }
+
+    /// What a list, standalone or nested, requires of its tasks.
+    pub fn list_requirement_groups(&self, list_id: String) -> Result<Vec<Vec<String>>, CoreError> {
+        crate::conditions::list_requirement_groups(&self.read(), &list_id)
+    }
+
     /// How many open tasks require each condition, for those any does.
     pub fn condition_usage(
         &self,

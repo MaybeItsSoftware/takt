@@ -79,6 +79,11 @@ pub struct ConditionRow {
     /// Desk), by id, sorted. Empty before v34 and for one that provides
     /// nothing. See `conditions::provides`.
     pub provides: Vec<String>,
+    /// "laptop", "phone" or "tablet" for a device condition, which holds on
+    /// a device of that kind and nowhere else and is never said to hold;
+    /// none for any other condition. See `conditions::device`.
+    #[uniffi(default = None)]
+    pub device_kind: Option<String>,
 }
 
 /// A row of `task_metadata`. `TaskMetadata`.
@@ -269,6 +274,8 @@ impl ConditionRow {
                 .unwrap_or(None)
                 .map(|json| crate::conditions::provided_ids(&json))
                 .unwrap_or_default(),
+            // Absent before v41.
+            device_kind: row.get("deviceKind").unwrap_or(None),
         })
     }
 }

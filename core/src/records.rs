@@ -54,6 +54,11 @@ pub struct ListRow {
     /// the order with any gap or tie a merge left closed up.
     #[uniffi(default = None)]
     pub priority_rank: Option<i64>,
+    /// What every task in it requires, as a task's requirement groups are
+    /// kept: every group met, any member of one, "!id" for a condition not
+    /// holding. Empty for none. See `conditions::inherited`.
+    #[uniffi(default = [])]
+    pub requirement_groups: Vec<Vec<String>>,
 }
 
 /// A row of `list_folders`. `ListFolder`.
@@ -214,6 +219,12 @@ impl ListRow {
             // A database from before `v40_list_priority` (the CLI reads
             // without migrating) has no ranks.
             priority_rank: row.get("priorityRank").unwrap_or(None),
+            // Likewise none before `v41_device_and_list_conditions`.
+            requirement_groups: row
+                .get::<_, Option<String>>("requirementGroupsJSON")
+                .unwrap_or(None)
+                .map(|json| crate::conditions::stored_groups(&json))
+                .unwrap_or_default(),
         })
     }
 }

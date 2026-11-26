@@ -172,6 +172,7 @@ pub fn move_condition_category(
         || target < 0
         || target >= sections.len() as i64
         || sections[target as usize].is_setting != sections[position].is_setting
+        || sections[target as usize].is_device != sections[position].is_device
     {
         return Ok(false);
     }
@@ -197,6 +198,14 @@ pub fn rename_condition_category(
     if is_location_category(from_normalized.as_deref())
         && !is_location_category(normalized_category(to).as_deref())
     {
+        return Err(CoreError::InvalidCondition);
+    }
+    // Device is a device kind's heading, not a category to rename.
+    let is_device_heading = |category: Option<&str>| {
+        normalized_category(category)
+            .is_some_and(|c| c.eq_ignore_ascii_case(super::DEVICE_CATEGORY))
+    };
+    if is_device_heading(from) || is_device_heading(to) {
         return Err(CoreError::InvalidCondition);
     }
     let members: Vec<ConditionRow> = rows::conditions(transaction, workspace_id)?
@@ -237,7 +246,7 @@ pub fn rename_condition_category(
 /// `groups` with `from` read as `into`, negated where it was ("!from" becomes
 /// "!into"): a group naming both the same way names it once, and a group that
 /// comes out the same as an earlier one goes.
-fn merged_groups(groups: &[Vec<String>], from: &str, into: &str) -> Vec<Vec<String>> {
+pub(crate) fn merged_groups(groups: &[Vec<String>], from: &str, into: &str) -> Vec<Vec<String>> {
     let mut result: Vec<Vec<String>> = Vec::new();
     let mut seen: BTreeSet<Vec<String>> = BTreeSet::new();
     for group in groups {
@@ -309,6 +318,7 @@ pub fn merge_conditions(
         )?;
         changed += 1;
     }
+    super::merge_list_groups(transaction, &workspace_id, from, into, now_ms)?;
     super::merge_links(transaction, &workspace_id, from, into, now_ms)?;
     crate::focus_context::replace_condition(transaction, &workspace_id, from, into, now_ms)?;
     transaction.execute(
@@ -326,22 +336,26 @@ pub struct ConditionUsage {
 }
 
 /// The plans of the workspace's open tasks — not completed, not archived, in
-/// a list that is not archived — with each task's id, title and list.
+/// a list that is not archived — with each task's id, title and list. The
+/// requirement groups are the effective ones: a task's own and what it
+/// inherits from its lists (`conditions::inherited`), so a task with no plan
+/// of its own that inherits one is here too.
 fn open_plans(
     connection: &Connection,
     workspace_id: &str,
 ) -> Result<Vec<(RequiringTask, Planning)>, CoreError> {
+    let inherited = super::inherited_groups(connection)?;
     let mut statement = connection.prepare(
-        "SELECT t.id, t.title, l.id, l.name, m.planningJSON FROM task_metadata m
-         JOIN tasks t ON t.id = m.taskId
+        "SELECT t.id, t.title, l.id, l.name, m.planningJSON FROM tasks t
          JOIN task_lists l ON l.id = t.listId
+         LEFT JOIN task_metadata m ON m.taskId = t.id
          WHERE l.workspaceId = ?1 AND l.isArchived = 0
            AND t.status = 'open' AND t.archivedAt IS NULL
-           AND m.planningJSON IS NOT NULL
+           AND (m.planningJSON IS NOT NULL OR ?2)
          ORDER BY l.sortOrder, t.sortOrder, t.id",
     )?;
     let rows = statement
-        .query_map([workspace_id], |row| {
+        .query_map(params![workspace_id, !inherited.is_empty()], |row| {
             Ok((
                 RequiringTask {
                     task_id: row.get(0)?,
@@ -349,14 +363,24 @@ fn open_plans(
                     list_id: row.get(2)?,
                     list_name: row.get(3)?,
                 },
-                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(4)?,
             ))
         })?
         .collect::<Result<Vec<_>, _>>()?;
     // One unreadable plan should not hide every condition.
     Ok(rows
         .into_iter()
-        .filter_map(|(task, json)| Planning::from_json(&json).ok().map(|plan| (task, plan)))
+        .filter_map(|(task, json)| {
+            let mut plan = match json {
+                Some(json) => Planning::from_json(&json).ok()?,
+                None => Planning::default(),
+            };
+            if let Some(more) = inherited.get(&task.task_id) {
+                let own = plan.requirement_groups.unwrap_or_default();
+                plan.requirement_groups = Some(super::with_inherited(&own, more));
+            }
+            Some((task, plan))
+        })
         .collect())
 }
 
@@ -452,6 +476,47 @@ pub fn condition_waiting_counts(missing: Vec<Vec<Vec<String>>>) -> Vec<Condition
     result
 }
 
+/// Refuses requirement groups a task or list cannot be given: an empty
+/// group, one repeating a condition or another group, or a condition outside
+/// `workspace_id`, or archived unless it is among `previous` (what was
+/// required already).
+pub(crate) fn check_groups(
+    transaction: &Transaction,
+    workspace_id: &str,
+    groups: &[Vec<String>],
+    previous: &[&str],
+) -> Result<(), CoreError> {
+    let mut distinct: BTreeSet<Vec<String>> = BTreeSet::new();
+    for group in groups {
+        let unique: BTreeSet<&String> = group.iter().collect();
+        if group.is_empty() || unique.len() != group.len() {
+            return Err(CoreError::InvalidCondition);
+        }
+        let mut key = group.clone();
+        key.sort();
+        if !distinct.insert(key) {
+            return Err(CoreError::InvalidCondition);
+        }
+        for member in group {
+            let id = condition_id_of(member);
+            let condition: Option<(String, bool)> = transaction
+                .query_row(
+                    "SELECT workspaceId, isArchived FROM task_conditions WHERE id = ?1",
+                    [id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()?;
+            let usable = condition.is_some_and(|(workspace, archived)| {
+                workspace == workspace_id && (!archived || previous.contains(&id))
+            });
+            if !usable {
+                return Err(CoreError::InvalidCondition);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Sets what a task requires — every group must hold, any one condition in a
 /// group will do, "!id" for a condition not holding — leaving the rest of
 /// its plan alone. Empty requires nothing. Each condition must be in the task's workspace and not archived
@@ -489,34 +554,7 @@ pub fn set_task_requirements(
         .flatten()
         .map(|member| condition_id_of(member))
         .collect();
-    let mut distinct: BTreeSet<Vec<String>> = BTreeSet::new();
-    for group in &groups {
-        let unique: BTreeSet<&String> = group.iter().collect();
-        if group.is_empty() || unique.len() != group.len() {
-            return Err(CoreError::InvalidCondition);
-        }
-        let mut key = group.clone();
-        key.sort();
-        if !distinct.insert(key) {
-            return Err(CoreError::InvalidCondition);
-        }
-        for member in group {
-            let id = condition_id_of(member);
-            let condition: Option<(String, bool)> = transaction
-                .query_row(
-                    "SELECT workspaceId, isArchived FROM task_conditions WHERE id = ?1",
-                    [id],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
-                )
-                .optional()?;
-            let usable = condition.is_some_and(|(workspace, archived)| {
-                workspace == workspace_id && (!archived || previous.contains(&id))
-            });
-            if !usable {
-                return Err(CoreError::InvalidCondition);
-            }
-        }
-    }
+    check_groups(transaction, &workspace_id, &groups, &previous)?;
     let wanted = (!groups.is_empty()).then_some(groups);
     if planning
         .requirement_groups

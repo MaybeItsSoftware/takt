@@ -355,6 +355,14 @@ fn lists_folders_and_columns() {
         Some("[cmd+shift+delete]")
     );
     assert_eq!(
+        render(
+            "workspace_list_priority_set",
+            json!({"list_id": OTHER, "position": null})
+        )
+        .as_deref(),
+        Some("in the sidebar, [cmd+shift+p] then “Stop prioritising the list”")
+    );
+    assert_eq!(
         render("workspace_task_to_list", json!({"task_id": TASK})).as_deref(),
         Some("[ex]")
     );
@@ -500,6 +508,14 @@ fn conditions_are_cc_and_the_context_its_tab() {
         Some("[cc] then tick what it needs")
     );
     assert_eq!(
+        render(
+            "workspace_list_conditions_set",
+            json!({"list_id": OTHER, "requires": ["Campus"]})
+        )
+        .as_deref(),
+        Some("[oo] on the list, then tick what its tasks need")
+    );
+    assert_eq!(
         render("workspace_context_set", json!({"on": ["Campus"]})).as_deref(),
         Some("[cmd+option+8] then Space on each condition that holds")
     );
@@ -527,6 +543,7 @@ fn sample(tool: &str) -> Value {
             json!({"filter_list_id": OTHER})
         }
         "workspace_list_move" | "workspace_list_delete" => json!({"list_id": OTHER}),
+        "workspace_list_priority_set" => json!({"list_id": OTHER, "position": 1}),
         "workspace_board_column_set" => json!({"title": "C"}),
         "workspace_board_column_delete" => json!({"column_id": OTHER}),
         "agent_instructions_set" => json!({"scope": "list", "id": OTHER, "text": "x"}),
@@ -536,6 +553,8 @@ fn sample(tool: &str) -> Value {
         "workspace_condition_provides_set" => {
             json!({"condition": "Home", "provides": ["Quiet"]})
         }
+        "workspace_list_conditions_set" => json!({"list_id": OTHER, "requires": ["Campus"]}),
+        "workspace_condition_device_set" => json!({"condition": "Laptop", "device": "laptop"}),
         "daily_add" => json!({"title": "D"}),
         "daily_update" | "daily_tick" => json!({"daily_id": "d"}),
         _ => json!({"task_id": TASK}),

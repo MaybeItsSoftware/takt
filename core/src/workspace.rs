@@ -636,6 +636,34 @@ impl CoreWorkspace {
         })
     }
 
+    /// Makes a condition the device condition of `kind` ("laptop", "phone"
+    /// or "tablet"), or with none an ordinary one again, as one "Edit
+    /// Condition" step. False when it already was.
+    pub fn set_condition_device_kind(
+        &self,
+        id: String,
+        kind: Option<String>,
+        now_ms: i64,
+    ) -> Result<bool, CoreError> {
+        journal::journalled(&mut self.lock(), "Edit Condition", |tx| {
+            conditions::set_condition_device(tx, &id, kind.as_deref(), now_ms)
+        })
+    }
+
+    /// Sets what a list (standalone, or nested) requires of every task in
+    /// it, as one "Edit Conditions" step. False when it already required
+    /// exactly that.
+    pub fn set_list_requirements(
+        &self,
+        list_id: String,
+        groups: Vec<Vec<String>>,
+        now_ms: i64,
+    ) -> Result<bool, CoreError> {
+        journal::journalled(&mut self.lock(), "Edit Conditions", |tx| {
+            conditions::set_list_requirements(tx, &list_id, groups, now_ms)
+        })
+    }
+
     /// Sets what a task requires, as one "Edit Conditions" step. False when
     /// it already required exactly that.
     pub fn set_task_requirements(

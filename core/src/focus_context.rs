@@ -137,7 +137,14 @@ pub fn save(
     now_ms: i64,
 ) -> Result<bool, CoreError> {
     let current = load(transaction, workspace_id)?;
-    let ids = sorted(context.condition_ids.clone());
+    // A device condition is never said to hold or switched off: each device
+    // adds its own (`conditions::device`), so one said here would follow
+    // the answer to every other device.
+    let known = crate::rows::conditions(transaction, workspace_id)?;
+    let ids = sorted(crate::conditions::without_devices(
+        &known,
+        &context.condition_ids,
+    ));
     let set_at = if ids.is_empty() {
         None
     } else {
@@ -149,12 +156,12 @@ pub fn save(
     let overrides = has_overrides(transaction)?;
     let off_ids = if overrides {
         crate::conditions::kept_overrides(
-            &crate::rows::conditions(transaction, workspace_id)?,
+            &known,
             current
                 .as_ref()
                 .map_or(&[][..], |current| &current.condition_ids),
             &ids,
-            &context.off_ids,
+            &crate::conditions::without_devices(&known, &context.off_ids),
         )
     } else {
         Vec::new()
@@ -163,7 +170,10 @@ pub fn save(
         condition_ids: ids,
         off_ids,
         conditions_set_at_ms: set_at,
-        suggested_ids: sorted(context.suggested_ids.clone()),
+        suggested_ids: sorted(crate::conditions::without_devices(
+            &known,
+            &context.suggested_ids,
+        )),
         mode: if context.mode == "finish" {
             "finish".to_string()
         } else {
@@ -243,6 +253,53 @@ pub(crate) fn replace_condition(
             params![set_at.map(stored), workspace_id],
         )?;
     }
+    Ok(())
+}
+
+/// A condition taken out of the context — on, switched off and offered
+/// back alike — when it becomes a device condition, which no context can
+/// hold. The answer is otherwise the same one, so it keeps its stamp.
+pub(crate) fn forget_condition(
+    transaction: &Transaction,
+    workspace_id: &str,
+    id: &str,
+) -> Result<(), CoreError> {
+    let Some(context) = load(transaction, workspace_id)? else {
+        return Ok(());
+    };
+    let kept = |ids: &[String]| -> Vec<String> {
+        ids.iter().filter(|known| *known != id).cloned().collect()
+    };
+    let (on, off, offered) = (
+        kept(&context.condition_ids),
+        kept(&context.off_ids),
+        kept(&context.suggested_ids),
+    );
+    if on == context.condition_ids && off == context.off_ids && offered == context.suggested_ids {
+        return Ok(());
+    }
+    let off_column = if has_overrides(transaction)? {
+        ", offIdsJSON = ?4"
+    } else {
+        ""
+    };
+    transaction.execute(
+        &format!(
+            "UPDATE focus_contexts SET conditionIdsJSON = ?1, suggestedIdsJSON = ?2,
+               conditionsSetAt = CASE WHEN ?1 = '[]' THEN NULL ELSE conditionsSetAt END{off_column}
+             WHERE workspaceId = ?3"
+        ),
+        rusqlite::params_from_iter(
+            [
+                swift_json_strings(&on),
+                swift_json_strings(&offered),
+                workspace_id.to_string(),
+                swift_json_strings(&off),
+            ]
+            .into_iter()
+            .take(if off_column.is_empty() { 3 } else { 4 }),
+        ),
+    )?;
     Ok(())
 }
 

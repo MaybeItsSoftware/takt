@@ -76,6 +76,8 @@ pub struct Candidate {
     pub sort_order: i64,
     pub created_at_ms: i64,
     pub due_date: Option<String>,
+    /// What it requires: its own groups and those it inherits from the lists
+    /// it is in (`conditions::inherited`).
     pub requirement_groups: Vec<Vec<String>>,
     pub logged_seconds: i64,
     pub minimum_block_seconds: Option<i64>,
@@ -323,6 +325,8 @@ pub fn candidates(
         })
     })?;
     let list_priorities = list_priorities(connection)?;
+    // What each task inherits from the lists it is in, checked with its own.
+    let inherited_requirements = crate::conditions::inherited_groups(connection)?;
     let mut column_ranks: HashMap<String, HashMap<String, i64>> = HashMap::new();
     let mut result = Vec::new();
     for row in rows {
@@ -394,7 +398,13 @@ pub fn candidates(
             sort_order: row.sort_order,
             created_at_ms: millis(Some(&row.created_at)).unwrap_or(0),
             due_date,
-            requirement_groups: planning.requirement_groups.unwrap_or_default(),
+            requirement_groups: match inherited_requirements.get(&row.id) {
+                Some(more) => crate::conditions::with_inherited(
+                    &planning.requirement_groups.unwrap_or_default(),
+                    more,
+                ),
+                None => planning.requirement_groups.unwrap_or_default(),
+            },
             logged_seconds: work.get(&row.id).copied().unwrap_or(0),
             minimum_block_seconds: planning.minimum_block_seconds,
             requires_single_sitting: planning.requires_single_sitting.unwrap_or(false),

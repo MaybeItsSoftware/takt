@@ -19,9 +19,13 @@ use crate::lists::new_id;
 use crate::rows::ConditionRow;
 use crate::time::{non_empty_name, stored};
 
+mod device;
+mod inherited;
 mod organise;
 mod provides;
 mod requirement;
+pub use device::*;
+pub use inherited::*;
 pub use organise::*;
 pub use provides::*;
 pub use requirement::*;
@@ -45,9 +49,13 @@ pub fn normalized_category(category: Option<&str>) -> Option<String> {
     }
 }
 
-/// The category a condition is shown under: its own, or Location for a place
+/// The category a condition is shown under: Device for a device condition,
+/// whatever it is filed under; otherwise its own, or Location for a place
 /// that has none.
 pub fn effective_category(condition: &ConditionRow) -> Option<String> {
+    if is_device(condition) {
+        return Some(DEVICE_CATEGORY.to_string());
+    }
     normalized_category(condition.category.as_deref())
         .or_else(|| condition.is_location.then(|| LOCATION_CATEGORY.to_string()))
 }
@@ -226,7 +234,8 @@ pub fn set_condition_category(
 
 /// The ids of the conditions any open task in the workspace requires, either
 /// way (a negated requirement names its condition too): not completed, not
-/// archived, and in a list that is not archived.
+/// archived, and in a list that is not archived. What a live list requires
+/// counts, as its tasks inherit it.
 pub fn required_condition_ids(
     connection: &Connection,
     workspace_id: &str,
@@ -256,6 +265,15 @@ pub fn required_condition_ids(
             );
         }
     }
+    // What a list requires, its open tasks require.
+    for groups in list_requirements(connection, workspace_id)?.into_values() {
+        ids.extend(
+            groups
+                .iter()
+                .flatten()
+                .map(|member| condition_id_of(member).to_string()),
+        );
+    }
     Ok(ids.into_iter().collect())
 }
 
@@ -273,6 +291,11 @@ pub struct ConditionSection {
     /// Location heading, and any heading a condition under which provides
     /// something ("Tools on hand"). Settings come first.
     pub is_setting: bool,
+    /// Whether it is the Device heading: device conditions, which hold on a
+    /// device of their kind by themselves and are never switched by hand.
+    /// It comes first of all.
+    #[uniffi(default = false)]
+    pub is_device: bool,
     /// In the order they were given.
     pub conditions: Vec<ConditionRow>,
 }
@@ -306,6 +329,7 @@ pub fn condition_sections(conditions: Vec<ConditionRow>) -> Vec<ConditionSection
         .map(|(category, conditions)| ConditionSection {
             is_exclusive: category == LOCATION_CATEGORY,
             is_setting: conditions.iter().any(is_setting),
+            is_device: conditions.iter().any(is_device),
             title: category.clone(),
             category: Some(category),
             conditions,
@@ -317,6 +341,7 @@ pub fn condition_sections(conditions: Vec<ConditionRow>) -> Vec<ConditionSection
             title: UNCATEGORISED_TITLE.to_string(),
             is_exclusive: false,
             is_setting: other.iter().any(is_setting),
+            is_device: false,
             conditions: other,
         });
     }
@@ -339,6 +364,7 @@ pub fn condition_sections(conditions: Vec<ConditionRow>) -> Vec<ConditionSection
             None => 2,
         };
         (
+            !section.is_device,
             !section.is_setting,
             placed,
             fallback,
@@ -392,8 +418,10 @@ pub fn available_condition_sections(
 #[uniffi::export]
 pub fn condition_categories(conditions: Vec<ConditionRow>) -> Vec<String> {
     let mut named: BTreeMap<String, String> = BTreeMap::new();
+    // Device is where a device kind files a condition, not a category to
+    // choose.
     for category in conditions.iter().filter_map(effective_category) {
-        if category != LOCATION_CATEGORY {
+        if category != LOCATION_CATEGORY && category != DEVICE_CATEGORY {
             named.entry(category.to_lowercase()).or_insert(category);
         }
     }
@@ -611,6 +639,7 @@ mod tests {
             category: category.map(Into::into),
             sort_order: None,
             provides: Vec::new(),
+            device_kind: None,
         }
     }
 
@@ -725,6 +754,7 @@ mod tests {
             category: None,
             sort_order: None,
             provides: Vec::new(),
+            device_kind: None,
         };
         assert_eq!(condition_section_title(place.clone()), "Location");
         let loose = ConditionRow {

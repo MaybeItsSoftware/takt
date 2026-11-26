@@ -1,0 +1,23 @@
+-- v41_device_and_list_conditions: conditions that mean the device in your
+-- hand, and conditions a whole list requires.
+--
+-- `task_conditions.deviceKind` is "laptop", "phone" or "tablet" for a
+-- device condition, NULL for any other. What holds is one synced answer per
+-- account, so a plain condition cannot mean "the device I am on": a device
+-- condition is never said to hold or switched off, and each client adds
+-- the ones of its own kind to what holds (`conditions::device`).
+--
+-- `task_lists.requirementGroupsJSON` is what every task in the list
+-- requires, as a task's `requirementGroups` are stored: a JSON array of
+-- groups, every group to be met, any member of one meeting it, "!id" for a
+-- condition not holding; NULL for none. Its tasks, and the tasks in nested
+-- lists under it, add it to their own (`conditions::inherited`). It names
+-- conditions, which are each person's own, so in a shared list it is a
+-- personal column, as `task_metadata.planningJSON` is.
+--
+-- A client from before this drops both columns on pull: it treats a device
+-- condition as any other and checks a task against its own requirements.
+-- Written for the Rust core; the journal and outbox triggers are reinstalled after it.
+ALTER TABLE "task_conditions" ADD COLUMN "deviceKind" TEXT;
+-- statement
+ALTER TABLE "task_lists" ADD COLUMN "requirementGroupsJSON" TEXT;

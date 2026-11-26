@@ -31,7 +31,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
-use rusqlite::{OptionalExtension, Transaction, params};
+use rusqlite::{Transaction, params};
 
 use super::{LOCATION_CATEGORY, condition_sections, effective_category};
 use crate::CoreError;
@@ -72,16 +72,12 @@ pub fn set_condition_provides(
         if member == id {
             return Err(CoreError::InvalidCondition);
         }
-        let target: Option<(String, bool)> = transaction
-            .query_row(
-                "SELECT workspaceId, isArchived FROM task_conditions WHERE id = ?1",
-                [&member],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()?;
-        let usable = target.is_some_and(|(workspace, archived)| {
-            workspace == condition.workspace_id
-                && (!archived || condition.provides.contains(&member))
+        let target = rows::condition(transaction, &member)?;
+        // Nothing said about where you are puts a device in your hand.
+        let usable = target.is_some_and(|target| {
+            target.workspace_id == condition.workspace_id
+                && !super::is_device(&target)
+                && (!target.is_archived || condition.provides.contains(&member))
         });
         if !usable {
             return Err(CoreError::InvalidCondition);
@@ -209,6 +205,10 @@ pub struct ConditionHolding {
     pub condition_id: String,
     /// Said to hold directly: a place chosen, a box ticked.
     pub is_set: bool,
+    /// A device condition of this device's kind, which holds here by
+    /// itself (`conditions::device`).
+    #[uniffi(default = false)]
+    pub is_device: bool,
     /// The conditions said to hold that provide it, directly or through
     /// another, in the order the tab shows them: "from Home". Empty when
     /// nothing does.
@@ -266,6 +266,10 @@ impl<'a> Graph<'a> {
             let Some(condition) = self.live.get(id) else {
                 continue;
             };
+            // A device condition holds by the device alone.
+            if super::is_device(condition) {
+                continue;
+            }
             if !seen.insert(condition.id.as_str()) {
                 continue;
             }
@@ -289,15 +293,41 @@ impl<'a> Graph<'a> {
 }
 
 /// What holds when `set_ids` are said to hold and `off_ids` are switched off
-/// for now: every condition set, provided or switched off, in the tab's
-/// order (one the conditions do not include, after them). An override on a
-/// condition nothing provides any more is no part of it.
+/// for now, on this device: every condition set, provided or switched off,
+/// and the device conditions of the kind this process said it is
+/// ([`super::set_this_device_kind`]), in the tab's order (one the
+/// conditions do not include, after them). An override on a condition
+/// nothing provides any more is no part of it.
 pub fn holdings(
     conditions: &[ConditionRow],
     set_ids: &[String],
     off_ids: &[String],
 ) -> Vec<ConditionHolding> {
+    holdings_on(
+        conditions,
+        set_ids,
+        off_ids,
+        super::this_device_kind().as_deref(),
+    )
+}
+
+/// [`holdings`] on a device of kind `device` (none for no kind). A device
+/// condition in `set_ids` or `off_ids` is ignored: only the device decides
+/// whether one holds.
+pub fn holdings_on(
+    conditions: &[ConditionRow],
+    set_ids: &[String],
+    off_ids: &[String],
+    device: Option<&str>,
+) -> Vec<ConditionHolding> {
     let graph = Graph::new(conditions);
+    let set_ids = super::without_devices(conditions, set_ids);
+    let off_ids = super::without_devices(conditions, off_ids);
+    let here: BTreeSet<&str> = conditions
+        .iter()
+        .filter(|condition| super::holds_here(condition, device))
+        .map(|condition| condition.id.as_str())
+        .collect();
     let set: BTreeSet<&str> = set_ids.iter().map(String::as_str).collect();
     // A condition said to hold is not switched off, whatever provides it.
     let off: HashSet<&str> = off_ids
@@ -305,7 +335,7 @@ pub fn holdings(
         .map(String::as_str)
         .filter(|id| !set.contains(id))
         .collect();
-    let mut roots: Vec<&str> = set.iter().copied().collect();
+    let mut roots: Vec<&str> = set.union(&here).copied().collect();
     roots.sort_by_cached_key(|id| graph.place(id));
     let mut providers: HashMap<&str, Vec<String>> = HashMap::new();
     for root in &roots {
@@ -316,6 +346,7 @@ pub fn holdings(
     let mut ids: Vec<&str> = set
         .iter()
         .copied()
+        .chain(here.iter().copied())
         .chain(providers.keys().copied())
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -324,17 +355,19 @@ pub fn holdings(
     ids.into_iter()
         .map(|id| {
             let is_set = set.contains(id);
+            let is_device = here.contains(id);
             let provided_by: Vec<String> = providers
                 .remove(id)
                 .unwrap_or_default()
                 .into_iter()
                 .filter(|root| root != id)
                 .collect();
-            let is_off = !is_set && off.contains(id);
+            let is_off = !is_set && !is_device && off.contains(id);
             ConditionHolding {
                 condition_id: id.to_string(),
                 is_set,
-                holds: is_set || !is_off,
+                is_device,
+                holds: is_set || is_device || !is_off,
                 provided_by,
                 is_off,
             }
@@ -409,6 +442,13 @@ pub fn switched(
     condition_id: &str,
     on: Option<bool>,
 ) -> ConditionsSaid {
+    // Only the device in hand decides whether a device condition holds.
+    if conditions
+        .iter()
+        .any(|condition| condition.id == condition_id && super::is_device(condition))
+    {
+        return said.clone();
+    }
     let holds = holdings(conditions, &said.condition_ids, &said.off_ids)
         .into_iter()
         .any(|holding| holding.condition_id == condition_id && holding.holds);
@@ -459,11 +499,13 @@ pub fn switched(
     }
 }
 
-/// Whether a condition is a setting: something you say about your
-/// situation (a place, what you have with you) rather than a property a
-/// task needs. A place is one, and so is anything that provides something.
+/// Whether a condition is a setting: something about your situation (a
+/// place, what you have with you, the device in hand) rather than a
+/// property a task needs. A place is one, a device condition is one, and so
+/// is anything that provides something.
 pub fn is_setting(condition: &ConditionRow) -> bool {
     effective_category(condition).as_deref() == Some(LOCATION_CATEGORY)
+        || super::is_device(condition)
         || (!condition.is_archived && !condition.provides.is_empty())
 }
 

@@ -19,6 +19,7 @@ fn condition(id: &str, category: Option<&str>, provides: &[&str]) -> ConditionRo
         category: category.map(Into::into),
         sort_order: None,
         provides: provides.iter().map(|id| id.to_string()).collect(),
+        device_kind: None,
     }
 }
 

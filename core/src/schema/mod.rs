@@ -182,6 +182,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "v40_list_priority",
         include_str!("migrations/v40_list_priority.sql"),
     ),
+    (
+        "v41_device_and_list_conditions",
+        include_str!("migrations/v41_device_and_list_conditions.sql"),
+    ),
 ];
 
 /// Brings the database at `path` up to date, creating it if it does not

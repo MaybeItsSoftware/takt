@@ -165,6 +165,31 @@ pub fn save(
     Ok(true)
 }
 
+/// Takes a condition out of the ones each day starts with, when it becomes
+/// one no context can say holds (a device condition). Writes nothing when
+/// it was not among them.
+pub(crate) fn forget_condition(
+    transaction: &Transaction,
+    id: &str,
+    now_ms: i64,
+) -> Result<(), CoreError> {
+    let Some(json) = preference(transaction, PREF_CONDITIONS)? else {
+        return Ok(());
+    };
+    let ids = decode_strings(&json);
+    if !ids.iter().any(|known| known == id) {
+        return Ok(());
+    }
+    let kept: Vec<String> = ids.into_iter().filter(|known| known != id).collect();
+    crate::setup::set_preference(
+        transaction,
+        PREF_CONDITIONS,
+        Some(&swift_json_strings(&kept)),
+        now_ms,
+    )?;
+    Ok(())
+}
+
 /// Brings in an hour kept somewhere older (the Mac's daily log) when the
 /// account has none yet. False, writing nothing, when it already had one.
 pub fn adopt_hour(transaction: &Transaction, hour: i32, now_ms: i64) -> Result<bool, CoreError> {

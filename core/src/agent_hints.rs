@@ -237,6 +237,17 @@ fn build(tool: &str, input: &Map<String, Value>, hint: &mut Hint) -> Option<()> 
         "workspace_list_delete" => {
             hint.key("listDelete");
         }
+        "workspace_list_priority_set" => {
+            hint.words("in the sidebar,");
+            if input
+                .get("position")
+                .is_some_and(|position| !position.is_null())
+            {
+                hint.key("listPrioritise");
+            } else {
+                hint.key("listUnprioritise");
+            }
+        }
         "workspace_board_column_set" => {
             if text(input, "column_id").is_none() {
                 hint.key("planBoardNewColumn").typed(text(input, "title"));
@@ -254,6 +265,14 @@ fn build(tool: &str, input: &Map<String, Value>, hint: &mut Hint) -> Option<()> 
         }
         "workspace_task_conditions_set" => {
             hint.key("taskConditions").words("then tick what it needs");
+        }
+        "workspace_list_conditions_set" => {
+            hint.key("listSettings")
+                .words("on the list, then tick what its tasks need");
+        }
+        "workspace_condition_device_set" => {
+            hint.key("focusSetAvailable")
+                .words("then set the device on the condition");
         }
         "workspace_condition_provides_set" => {
             hint.key("conditionsProvides")
