@@ -374,12 +374,135 @@ pub fn tool_result_text(title: &str, payload: &Value) -> String {
     format!("{title}\n\n{body}")
 }
 
-/// The tool surface. The descriptions are what an assistant reads to decide
-/// whether to call one, so they carry as much weight as the schemas.
+/// The tool surface, each tool with its annotations: a title for people,
+/// and the hints a client uses to decide what to ask before calling it.
 ///
 /// `scripts/mcp_smoke_check.py` pins the count, which is the cheap half of
 /// noticing an accidental removal; `docs/mcp-server.md` lists them.
 pub fn tool_definitions() -> Vec<Value> {
+    declared_tools().into_iter().map(annotated).collect()
+}
+
+/// The writes that only add (a task, a note, a list, a link between two
+/// tasks): every other write changes or removes what is there, so the MCP
+/// spec's `destructiveHint` is true of it.
+const ADDITIVE_TOOLS: &[&str] = &[
+    "task_add",
+    "task_note_add",
+    "list_create",
+    "daily_add",
+    "workspace_task_add",
+    "workspace_task_blocker_add",
+    "workspace_task_commit",
+    "workspace_filter_list_create",
+    "workspace_folder_create",
+    "workspace_list_create",
+];
+
+/// A tool with its `annotations`. Reads come from the core's read list, as
+/// the agent panel's pre-allowing does; the Checkvist tools reach a service
+/// outside Takt, so only they are open-world.
+fn annotated(mut tool: Value) -> Value {
+    let name = tool["name"].as_str().unwrap_or_default().to_string();
+    let read = takt_core::agent_tools::READ_ONLY_TOOLS.contains(&name.as_str());
+    let checkvist = matches!(
+        name.as_str(),
+        "task_lists"
+            | "task_fetch"
+            | "task_search"
+            | "task_metadata"
+            | "task_add"
+            | "task_update"
+            | "task_note_add"
+            | "task_move"
+            | "task_reparent"
+            | "project_move"
+            | "task_complete"
+            | "task_reopen"
+            | "task_invalidate"
+            | "task_delete"
+            | "list_create"
+            | "task_matrix_set"
+    );
+    let mut annotations = json!({
+        "title": tool_title(&name).unwrap_or(&name),
+        "readOnlyHint": read,
+        "openWorldHint": checkvist,
+    });
+    if !read {
+        annotations["destructiveHint"] = json!(!ADDITIVE_TOOLS.contains(&name.as_str()));
+    }
+    tool["annotations"] = annotations;
+    tool
+}
+
+/// What a person sees for a tool in a client's list or approval prompt.
+fn tool_title(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "task_lists" => "List Checkvist lists",
+        "task_fetch" => "Fetch Checkvist tasks",
+        "task_add" => "Add a Checkvist task",
+        "task_update" => "Update a Checkvist task",
+        "task_complete" => "Complete a Checkvist task",
+        "task_reopen" => "Reopen a Checkvist task",
+        "task_invalidate" => "Invalidate a Checkvist task",
+        "task_delete" => "Delete a Checkvist task",
+        "task_move" => "Move a Checkvist task",
+        "task_reparent" => "Reparent a Checkvist task",
+        "project_move" => "Move a Checkvist project",
+        "task_note_add" => "Add a note to a Checkvist task",
+        "list_create" => "Create a Checkvist list",
+        "task_search" => "Search Checkvist tasks",
+        "daily_log_fetch" => "Read the day log",
+        "dailies_list" => "List dailies",
+        "task_metadata" => "Read a task's planning details",
+        "task_matrix_set" => "Place a task on the matrix",
+        "daily_add" => "Add a daily",
+        "daily_update" => "Update a daily",
+        "daily_tick" => "Tick a daily",
+        "focus_status" => "Read the focus timer",
+        "focus_history" => "Read focus history",
+        "workspace_tree" => "Read folders and lists",
+        "workspace_shared_lists" => "Read shared lists",
+        "workspace_tasks" => "Read tasks",
+        "workspace_task_add" => "Add a task",
+        "workspace_task_update" => "Update a task",
+        "workspace_task_move" => "Move a task",
+        "workspace_task_to_list" => "Turn a task into a list",
+        "workspace_task_delete" => "Delete a task",
+        "workspace_task_dependencies" => "Read a task's blockers",
+        "workspace_task_blocker_add" => "Add a blocker",
+        "workspace_task_blocker_remove" => "Remove a blocker",
+        "workspace_task_commit" => "Commit to a task as a habit",
+        "workspace_filter_lists" => "Read filter lists",
+        "workspace_filter_list_tasks" => "Read a filter list's tasks",
+        "workspace_filter_list_create" => "Create a filter list",
+        "workspace_filter_list_update" => "Update a filter list",
+        "workspace_filter_list_delete" => "Delete a filter list",
+        "workspace_folder_create" => "Create a folder",
+        "workspace_list_create" => "Create a list",
+        "workspace_list_move" => "Move a list",
+        "workspace_list_priority_set" => "Prioritise a list",
+        "workspace_list_delete" => "Delete a list",
+        "workspace_board_columns" => "Read board columns",
+        "workspace_board_column_set" => "Add or change a board column",
+        "workspace_board_column_delete" => "Delete a board column",
+        "agent_instructions_get" => "Read standing instructions",
+        "workspace_conditions" => "Read conditions",
+        "workspace_task_conditions_set" => "Set a task's conditions",
+        "workspace_list_conditions_set" => "Set a list's conditions",
+        "workspace_condition_device_set" => "Tie a condition to a device",
+        "workspace_condition_provides_set" => "Set what a condition provides",
+        "workspace_context_set" => "Say what holds now",
+        "workspace_day_start_set" => "Set how each day starts",
+        "agent_instructions_set" => "Save standing instructions",
+        _ => return None,
+    })
+}
+
+/// The tools as declared. The descriptions are what an assistant reads to
+/// decide whether to call one, so they carry as much weight as the schemas.
+fn declared_tools() -> Vec<Value> {
     let list_id = || json!({ "type": "string" });
     let with_task_id = json!({
         "type": "object",
@@ -1327,5 +1450,26 @@ mod tool_classification_tests {
             .map(|name| name.to_string())
             .collect();
         assert_eq!(declared, classified);
+    }
+
+    /// Every tool has a title and hints, and only writes that add are
+    /// marked as not destructive.
+    #[test]
+    fn every_tool_is_annotated() {
+        for tool in tool_definitions() {
+            let name = tool["name"].as_str().expect("a tool has a name");
+            let notes = &tool["annotations"];
+            assert!(super::tool_title(name).is_some(), "{name} has no title");
+            let read = notes["readOnlyHint"].as_bool().expect("readOnlyHint");
+            assert_eq!(read, READ_ONLY_TOOLS.contains(&name), "{name}");
+            if read {
+                assert!(notes.get("destructiveHint").is_none(), "{name}");
+            } else {
+                assert!(notes["destructiveHint"].is_boolean(), "{name}");
+            }
+        }
+        for name in super::ADDITIVE_TOOLS {
+            assert!(WRITE_TOOLS.contains(name), "{name} is not a write");
+        }
     }
 }
