@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  The consent step of connecting an AI assistant to Takt (docs/remote-mcp.md).
+  Supabase's OAuth 2.1 server sends the browser here with ?authorization_id=…
+  (the project's "Authorization path", relative to its Site URL). The user
+  signs in with their Takt account if they aren't already, sees which
+  assistant is asking, and allows or denies it; supabase-js then sends the
+  browser back to the assistant with a code or a refusal.
+-->
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Takt — Connect an assistant</title>
+<style>
+  :root { color-scheme: light dark; --paper: #f7f7f8; --raised: #ffffff; --ink: #1f2026; --muted: #55565b; --border: #dddddf; --accent: #007fff; --danger: #d62246; }
+  @media (prefers-color-scheme: dark) { :root { --paper: #19191d; --raised: #222227; --ink: #ececf0; --muted: #b7b7bb; --border: #323236; } }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 -apple-system, system-ui, Roboto, sans-serif; }
+  main { max-width: 26rem; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  .muted { color: var(--muted); }
+  .panel { background: var(--raised); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-top: 1.5rem; }
+  .panel > :first-child { margin-top: 0; } .panel > :last-child { margin-bottom: 0; }
+  button, input { font: inherit; }
+  button { display: block; width: 100%; min-height: 44px; margin: .5rem 0; padding: .55rem 1rem; border-radius: 6px; border: 1px solid var(--border); background: var(--raised); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .6; cursor: default; }
+  button.link { display: inline; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; color: inherit; text-decoration: underline; }
+  input { display: block; box-sizing: border-box; width: 100%; min-height: 44px; margin: .35rem 0; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); font-size: 16px; }
+  .or { display: flex; align-items: center; gap: .75rem; margin: 1rem 0; color: var(--muted); font-size: .85rem; }
+  .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+  ul { padding-left: 1.2rem; }
+  .error { color: var(--danger); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<h1>Connect an assistant</h1>
+<p class="muted" id="lede">Takt by Maybe It's Software</p>
+
+<div class="panel" id="loading"><p class="muted">One moment…</p></div>
+
+<div class="panel" id="missing" hidden>
+  <p>This page is part of connecting an AI assistant to your Takt account, and it was opened without a request to answer.</p>
+  <p class="muted">Start again from your assistant: add Takt as a connector there and it will bring you back here.</p>
+</div>
+
+<div class="panel" id="signin" hidden>
+  <p>Sign in with your Takt account to continue.</p>
+  <button type="button" data-provider="google">Continue with Google</button>
+  <button type="button" data-provider="apple">Continue with Apple</button>
+  <div class="or">or</div>
+  <form id="password-form">
+    <input type="email" name="email" autocomplete="email" placeholder="Email" required>
+    <input type="password" name="password" autocomplete="current-password" placeholder="Password" required>
+    <button type="submit">Sign in with email</button>
+  </form>
+</div>
+
+<div class="panel" id="consent" hidden>
+  <p><strong id="client-name">An assistant</strong> wants to use your Takt account.</p>
+  <p>It will be able to:</p>
+  <ul>
+    <li>see your folders, lists, tasks, conditions and agent instructions;</li>
+    <li>add, change, move, complete and delete them;</li>
+    <li>see your focus session and history.</li>
+  </ul>
+  <p class="muted">What it reads goes to the assistant's provider when it uses it. Remove the connector in the assistant, or sign this device out in Takt's Sync settings, to stop it. It needs Takt Sync.</p>
+  <button type="button" class="primary" id="allow">Allow</button>
+  <button type="button" id="deny">Don't allow</button>
+  <p class="muted">Signed in as <span id="who">you</span>. <button type="button" class="link" id="switch">Not you?</button></p>
+</div>
+
+<p class="error" id="problem" role="alert" hidden></p>
+<p class="muted"><a href="/privacy/">Privacy policy</a></p>
+</main>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.2";
+
+  // The project the apps sign in with; the publishable key is meant to ship.
+  const SUPABASE_URL = "https://rsckzmldfpfjdrvulwke.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_htC171zOquUGx7bBi8MrIQ_ZuIdqL5U";
+  // Kept across a Google or Apple round trip, so the redirect back is this
+  // page's bare address, one exact entry in the project's redirect list.
+  const PENDING = "takt.oauth.authorization_id";
+
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => {
+    for (const panel of ["loading", "missing", "signin", "consent"]) $(panel).hidden = panel !== id;
+  };
+  const fail = (message) => {
+    $("problem").textContent = message;
+    $("problem").hidden = false;
+  };
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { flowType: "pkce", detectSessionInUrl: true, persistSession: true },
+  });
+
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get("authorization_id");
+  if (fromUrl) sessionStorage.setItem(PENDING, fromUrl);
+  const authorizationId = fromUrl || sessionStorage.getItem(PENDING);
+  // A sign-in's code has been exchanged by now; keep the address clean.
+  if (params.has("code") || params.has("error")) {
+    if (params.get("error_description")) fail(params.get("error_description"));
+    history.replaceState(null, "", location.pathname + (authorizationId ? `?authorization_id=${encodeURIComponent(authorizationId)}` : ""));
+  }
+
+  async function start() {
+    if (!authorizationId) return show("missing");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return show("signin");
+
+    const { data, error } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+    if (error) {
+      sessionStorage.removeItem(PENDING);
+      show("missing");
+      return fail(`This request can't be answered: ${error.message}. Start again from your assistant.`);
+    }
+    // Already allowed before: straight back to the assistant.
+    if (data.redirect_url && !data.authorization_id) {
+      sessionStorage.removeItem(PENDING);
+      return location.assign(data.redirect_url);
+    }
+    $("client-name").textContent = data.client?.name || data.client?.client_name || "An assistant";
+    $("who").textContent = session.user?.email || data.user?.email || "you";
+    show("consent");
+  }
+
+  async function answer(approve) {
+    $("allow").disabled = $("deny").disabled = true;
+    const call = approve ? supabase.auth.oauth.approveAuthorization : supabase.auth.oauth.denyAuthorization;
+    // supabase-js sends the browser on to the assistant itself.
+    const { error } = await call(authorizationId);
+    if (error) {
+      $("allow").disabled = $("deny").disabled = false;
+      return fail(error.message);
+    }
+    sessionStorage.removeItem(PENDING);
+  }
+
+  $("allow").addEventListener("click", () => answer(true));
+  $("deny").addEventListener("click", () => answer(false));
+  $("switch").addEventListener("click", async () => {
+    await supabase.auth.signOut({ scope: "local" });
+    show("signin");
+  });
+  for (const button of document.querySelectorAll("[data-provider]")) {
+    button.addEventListener("click", async () => {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: button.dataset.provider,
+        options: { redirectTo: location.origin + location.pathname },
+      });
+      if (error) fail(error.message);
+    });
+  }
+  $("password-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(form.get("email")),
+      password: String(form.get("password")),
+    });
+    if (error) return fail(error.message);
+    $("problem").hidden = true;
+    start();
+  });
+
+  start().catch((error) => fail(error.message || String(error)));
+</script>
+</body>
+</html>
