@@ -71,28 +71,47 @@ impl App {
         );
     }
 
-    /// `.`: shows a folded task's subtasks.
+    /// `.`: shows a folded task's subtasks; on one already showing them,
+    /// the next layer down, a layer a press.
     pub fn grow_selected(&mut self) {
-        if let Some(id) = self.selected_task.clone()
-            && self.grow_on_board(&id)
-        {
+        let Some(id) = self.selected_task.clone() else {
+            return;
+        };
+        if self.grow_on_board(&id) {
             return;
         }
-        if let Some(id) = self.selected_task.clone()
-            && self.prefs.folded_tasks.remove(&id)
-        {
-            self.prefs.save();
-            self.layout_rows();
+        if !self.prefs.folded_tasks.remove(&id) {
+            let open = |app: &Self, id: &str| !app.prefs.folded_tasks.contains(id);
+            let layer = self.layer_to_open(&id, open);
+            if layer.is_empty() {
+                return;
+            }
+            for branch in layer {
+                self.prefs.folded_tasks.remove(&branch);
+            }
         }
+        self.prefs.save();
+        self.layout_rows();
     }
 
-    /// `,`: hides the task's subtasks, or those of the task it sits under.
+    /// `,`: hides the deepest open layer under the task, then the task's
+    /// own subtasks; on a task with none, those of the task it sits under.
     pub fn shrink_selected(&mut self) {
         let Some(id) = self.selected_task.clone() else {
             return;
         };
         if self.shrink_on_board(&id) {
             return;
+        }
+        if !self.prefs.folded_tasks.contains(&id) {
+            let open = |app: &Self, id: &str| !app.prefs.folded_tasks.contains(id);
+            let layer = self.layer_to_shut(&id, open);
+            if !layer.is_empty() {
+                self.prefs.folded_tasks.extend(layer);
+                self.prefs.save();
+                self.layout_rows();
+                return;
+            }
         }
         // The scope's rows, not the outline's: on the board a subtask row
         // drawn on a card is not one of the outline's.

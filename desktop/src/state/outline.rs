@@ -353,6 +353,38 @@ impl App {
         self.layout_rows();
     }
 
+    /// The subtasks of `id` that have subtasks of their own and are drawn
+    /// (finished ones are left out while those are hidden).
+    fn subtask_parents(&self, id: &str) -> Vec<String> {
+        let hide = self.prefs.hide_completed;
+        self.all_rows
+            .iter()
+            .filter(|row| row.has_children && row.task.parent_task_id.as_deref() == Some(id))
+            .filter(|row| {
+                !(hide && row.task.status != "open" && !self.lingering.contains(&row.task.id))
+            })
+            .map(|row| row.task.id.clone())
+            .collect()
+    }
+
+    /// The layer below an open `root` for `.` to open (see [`layer_to_open`]).
+    pub(super) fn layer_to_open(
+        &self,
+        root: &str,
+        open: impl Fn(&Self, &str) -> bool,
+    ) -> Vec<String> {
+        layer_to_open(root, |id| self.subtask_parents(id), |id| open(self, id))
+    }
+
+    /// The layer below an open `root` for `,` to shut (see [`layer_to_shut`]).
+    pub(super) fn layer_to_shut(
+        &self,
+        root: &str,
+        open: impl Fn(&Self, &str) -> bool,
+    ) -> Vec<String> {
+        layer_to_shut(root, |id| self.subtask_parents(id), |id| open(self, id))
+    }
+
     pub fn toggle_hide_completed(&mut self) {
         self.prefs.hide_completed = !self.prefs.hide_completed;
         self.prefs.save();
@@ -898,6 +930,52 @@ fn mark_parents(rows: &mut [OutlineRow]) {
     }
 }
 
+/// The layer under an open `root` for `.` to open: the shallowest one with
+/// a shut branch, reached through open ones. `branches` gives a task's
+/// subtasks that have subtasks. Empty when every branch under it is open.
+fn layer_to_open(
+    root: &str,
+    branches: impl Fn(&str) -> Vec<String>,
+    open: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    let mut seen = HashSet::from([root.to_string()]);
+    let mut layer = branches(root);
+    while !layer.is_empty() {
+        layer.retain(|id| seen.insert(id.clone()));
+        let shut: Vec<String> = layer.iter().filter(|id| !open(id)).cloned().collect();
+        if !shut.is_empty() {
+            return shut;
+        }
+        layer = layer.iter().flat_map(|id| branches(id)).collect();
+    }
+    Vec::new()
+}
+
+/// The layer under an open `root` for `,` to shut: its deepest open
+/// branches, reached through open ones. Empty when none under it is open,
+/// so `root` itself is next.
+fn layer_to_shut(
+    root: &str,
+    branches: impl Fn(&str) -> Vec<String>,
+    open: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    let mut seen = HashSet::from([root.to_string()]);
+    let mut deepest = Vec::new();
+    let mut layer: Vec<String> = branches(root).into_iter().filter(|id| open(id)).collect();
+    loop {
+        layer.retain(|id| seen.insert(id.clone()));
+        if layer.is_empty() {
+            return deepest;
+        }
+        let next = layer
+            .iter()
+            .flat_map(|id| branches(id))
+            .filter(|id| open(id))
+            .collect();
+        deepest = std::mem::replace(&mut layer, next);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -947,5 +1025,52 @@ mod tests {
             .flat_map(u32::to_le_bytes)
             .collect();
         assert_eq!(unpack_u32s(&bytes), [1, 70_000, u32::MAX]);
+    }
+
+    /// a ─ b ─ d ─ f
+    ///   └ c ─ e
+    fn tree(id: &str) -> Vec<String> {
+        let kids: &[&str] = match id {
+            "a" => &["b", "c"],
+            "b" => &["d"],
+            "c" => &["e"],
+            "d" => &["f"],
+            _ => &[],
+        };
+        // Only branches: f and e have no subtasks of their own.
+        kids.iter()
+            .filter(|k| !matches!(**k, "e" | "f"))
+            .map(|k| k.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn dot_opens_a_layer_a_press_and_comma_shuts_the_deepest_first() {
+        let mut open: HashSet<String> = HashSet::from(["a".to_string()]);
+        let grow = |open: &HashSet<String>| layer_to_open("a", tree, |id| open.contains(id));
+        let shrink = |open: &HashSet<String>| layer_to_shut("a", tree, |id| open.contains(id));
+
+        assert_eq!(grow(&open), ["b", "c"]);
+        open.extend(grow(&open));
+        assert_eq!(grow(&open), ["d"]);
+        open.extend(grow(&open));
+        assert!(grow(&open).is_empty(), "every branch is open");
+
+        assert_eq!(shrink(&open), ["d"]);
+        open.remove("d");
+        let mut layer = shrink(&open);
+        layer.sort();
+        assert_eq!(layer, ["b", "c"]);
+        for id in layer {
+            open.remove(&id);
+        }
+        assert!(shrink(&open).is_empty(), "the task itself is next");
+    }
+
+    #[test]
+    fn dot_opens_a_shut_branch_beside_an_open_one_first() {
+        let open: HashSet<String> = ["a", "b", "d"].map(String::from).into();
+        assert_eq!(layer_to_open("a", tree, |id| open.contains(id)), ["c"]);
+        assert_eq!(layer_to_shut("a", tree, |id| open.contains(id)), ["d"]);
     }
 }

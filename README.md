@@ -129,7 +129,7 @@ So none of it is reachable only by something you already have to know.
 | `]` / `[` | Open the task's subtasks / leave them |
 | `→` / `←` | In the outline, show a task's subtasks and step into them / hide them and step out — without opening the task. Elsewhere, open and leave it. At the top level of a list, `←` goes back to the list in the sidebar — opening the sidebar if it was closed, and closing it again once the keyboard leaves it |
 | `za` / `Cmd+←` / `Cmd+→` | Fold or unfold the task you are on (outline or board) / fold / unfold the whole outline |
-| `.` / `,` | Grow the task you are on to show its subtasks / shrink it (on a task with none, folds the one it sits under) — in the outline and on a board card or subtask row |
+| `.` / `,` | Grow the task you are on to show its subtasks, then the next layer a press at a time / shrink the deepest open layer, then the task (on a task with none, folds the one it sits under) — in the outline and on a board card or subtask row |
 | `l` / `h` | On the board, step into the card's subtask rows / back out onto the card (`Esc` too). Inside, `↑`/`↓` walk the rows and Space, `ee`, the inspector and folding act on the row you are on |
 | `Cmd+Shift+C` / `Cmd+Ctrl+C` | On the board, add a column / delete the one you are in (it asks where its tasks go) |
 | `Alt+Up` / `Alt+Down` | Move the task up or down past its neighbour: on the board, the card above or below in its column, or the row above or below on its card |

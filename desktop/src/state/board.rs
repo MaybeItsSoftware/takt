@@ -632,16 +632,23 @@ impl App {
             .any(|row| row.task.id == id && row.has_children)
     }
 
-    /// `.` on the board. On a card: opened to its subtasks. On a subtask row: opened to its own subtasks. False
-    /// when the selection is neither, for the outline's `.` to take.
+    /// `.` on the board. On a card: opened to its subtasks. On a subtask row: opened to its own subtasks. On
+    /// either once open: the next layer of rows under it. False when the
+    /// selection is neither, for the outline's `.` to take.
     pub fn grow_on_board(&mut self, id: &str) -> bool {
-        let changed = if self.is_board_card(id) {
+        let mut changed = if self.is_board_card(id) {
             self.prefs.folded_tasks.remove(id) | self.prefs.opened_cards.insert(id.to_string())
         } else if self.view_mode == ViewMode::Board && self.card_holding(id).is_some() {
             self.has_children(id) && self.prefs.opened_cards.insert(id.to_string())
         } else {
             return false;
         };
+        // Already open: the next layer of subtask rows under it.
+        if !changed && self.prefs.opened_cards.contains(id) {
+            let layer = self.layer_to_open(id, |app, id| app.prefs.opened_cards.contains(id));
+            changed = !layer.is_empty();
+            self.prefs.opened_cards.extend(layer);
+        }
         if changed {
             self.prefs.save();
             self.layout_rows();
@@ -649,10 +656,25 @@ impl App {
         true
     }
 
-    /// `,` on the board, the step back from `.`. On a card: shut. On an
-    /// opened subtask row: shut. On any other subtask row: the row or card
+    /// `,` on the board, the step back from `.`. On an open card or row
+    /// with open rows under it: the deepest layer of them shut. Then on a
+    /// card: shut. On an opened subtask row: shut. On any other subtask row: the row or card
     /// it sits under is shut, and the cursor goes to it.
     pub fn shrink_on_board(&mut self, id: &str) -> bool {
+        let on_board = self.is_board_card(id)
+            || (self.view_mode == ViewMode::Board && self.card_holding(id).is_some());
+        // Open with open rows under it: the deepest of them shut first.
+        if on_board && self.prefs.opened_cards.contains(id) {
+            let layer = self.layer_to_shut(id, |app, id| app.prefs.opened_cards.contains(id));
+            if !layer.is_empty() {
+                for row in &layer {
+                    self.prefs.opened_cards.remove(row);
+                }
+                self.prefs.save();
+                self.layout_rows();
+                return true;
+            }
+        }
         if self.is_board_card(id) {
             if self.prefs.opened_cards.remove(id) {
                 self.prefs.save();

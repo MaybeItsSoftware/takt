@@ -302,7 +302,9 @@ subtasks fold and unfold where they stand:
 - **`,` folds and `.` unfolds**, on the board as in the outline: `,` on a
   card hides its subtask rows, leaving "▸ N subtasks" on the card, and on a
   subtask row with none of its own folds the task it sits under, the cursor
-  going with it; `.` shows them again.
+  going with it; `.` shows them again. On a task or card already open,
+  `.` opens the next layer of subtasks under it, a layer a press, and `,`
+  shuts the deepest open layer first, so the task itself folds last.
 
 There is one set of folds, shared by the outline and the board, and it
 survives a relaunch. Going to a task from search or the done rail unfolds the
