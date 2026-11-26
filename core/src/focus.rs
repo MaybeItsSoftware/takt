@@ -83,6 +83,18 @@ pub struct Candidate {
     pub daily_remaining_seconds: Option<i64>,
     /// "dailyNotScheduled" or "dailyAlreadyMet" when its daily rules it out.
     pub daily_unavailable: Option<String>,
+    /// Its list's place among the prioritised lists, 1 the most important;
+    /// absent when the list is not prioritised.
+    #[uniffi(default = None)]
+    pub list_priority: Option<i64>,
+    /// How committed the column it stands in on its list's board is: 0 for
+    /// Today, then 1 for the stage nearest Today and so on leftwards, so
+    /// further right on the board is lower. A task in no column, or in one
+    /// that is not a stage (Waiting on, a rule column, one the board has
+    /// lost), stands with the first. Absent when the core did not read it
+    /// (a candidate a client built), and the stock board's order applies.
+    #[uniffi(default = None)]
+    pub column_rank: Option<i64>,
 }
 
 impl Candidate {
@@ -310,6 +322,8 @@ pub fn candidates(
             done_today: row.get(23)?,
         })
     })?;
+    let list_priorities = list_priorities(connection)?;
+    let mut column_ranks: HashMap<String, HashMap<String, i64>> = HashMap::new();
     let mut result = Vec::new();
     for row in rows {
         let row = row?;
@@ -357,6 +371,16 @@ pub fn candidates(
                 continue;
             }
         }
+        let column = row.column.or_else(|| inherited(&row.id));
+        if !column_ranks.contains_key(&row.list_id) {
+            column_ranks.insert(row.list_id.clone(), stage_ranks(connection, &row.list_id)?);
+        }
+        let stages = &column_ranks[&row.list_id];
+        let column_rank = Some(match column.as_deref() {
+            Some(crate::board_columns::TODAY_COLUMN_ID) => 0,
+            Some(id) if stages.contains_key(id) => stages[id],
+            _ => stages.values().copied().max().unwrap_or(1),
+        });
         result.push(Candidate {
             is_daily_due_today: row.daily_id.is_some() && daily_unavailable.is_none(),
             due_at_ms: millis(row.due_at.as_deref()),
@@ -365,7 +389,7 @@ pub fn candidates(
             matrix_importance: row.importance,
             priority: row.priority,
             estimate_seconds: row.estimate,
-            kanban_column: row.column.or_else(|| inherited(&row.id)),
+            kanban_column: column,
             focus_rank: row.rank,
             sort_order: row.sort_order,
             created_at_ms: millis(Some(&row.created_at)).unwrap_or(0),
@@ -380,11 +404,55 @@ pub fn candidates(
                 .and(row.daily_target)
                 .map(|target| (target - row.logged_today.unwrap_or(0)).max(0)),
             daily_unavailable,
+            list_priority: list_priorities.get(&row.list_id).copied(),
+            column_rank,
             id: row.id,
             title: row.title,
         });
     }
     Ok(result)
+}
+
+/// Each prioritised list's place, 1..n in its workspace, as
+/// [`crate::records::prioritised_lists`] numbers them.
+fn list_priorities(connection: &Connection) -> Result<HashMap<String, i64>, CoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, workspaceId FROM task_lists
+         WHERE priorityRank IS NOT NULL AND isArchived = 0 AND completedAt IS NULL
+         ORDER BY workspaceId, priorityRank, sortOrder, createdAt, id",
+    )?;
+    let mut result = HashMap::new();
+    let mut place: HashMap<String, i64> = HashMap::new();
+    for row in statement.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })? {
+        let (id, workspace) = row?;
+        let next = place.entry(workspace).or_insert(0);
+        *next += 1;
+        result.insert(id, *next);
+    }
+    Ok(result)
+}
+
+/// The column rank of each stage on a list's board other than Today: 1 for
+/// the one furthest right, counting up leftwards. See
+/// [`Candidate::column_rank`].
+fn stage_ranks(connection: &Connection, list_id: &str) -> Result<HashMap<String, i64>, CoreError> {
+    let (columns, _) = crate::board_columns::layout(connection, &format!("{list_id}/root"))?;
+    let stages: Vec<&str> = columns
+        .iter()
+        .filter(|column| {
+            crate::board_columns::is_stage(column)
+                && column.id != crate::board_columns::TODAY_COLUMN_ID
+        })
+        .map(|column| column.id.as_str())
+        .collect();
+    Ok(stages
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(index, id)| (id.to_string(), index as i64 + 1))
+        .collect())
 }
 
 struct Row {

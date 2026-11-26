@@ -383,6 +383,9 @@ pub fn save_list_settings(
             id
         ],
     )?;
+    if settings.is_archived {
+        drop_priority(transaction, id, now_ms)?;
+    }
     Ok(())
 }
 
@@ -620,6 +623,7 @@ pub fn delete_list(transaction: &Transaction, id: &str) -> Result<DeletedList, C
         [id],
         |row| row.get(0),
     )?;
+    drop_priority(transaction, id, crate::time::now_ms())?;
     transaction.execute("DELETE FROM task_lists WHERE id = ?1", [id])?;
     Ok(DeletedList {
         id: id.to_string(),
@@ -730,6 +734,116 @@ pub fn set_list_archived(
         "UPDATE task_lists SET isArchived = ?1, updatedAt = ?2 WHERE id = ?3",
         rusqlite::params![archived, stored(now_ms), id],
     )?;
+    if archived {
+        drop_priority(transaction, id, now_ms)?;
+    }
+    Ok(())
+}
+
+/// Puts a list among the prioritised lists at `position` (1 the most
+/// important), or takes it out of them with `None`. A position past the end
+/// puts it last, and one below 1 first; the others are renumbered 1..n
+/// around it, closing the gap it leaves or opening one where it goes, so
+/// the ranks stay contiguous. An archived or completed list cannot be
+/// prioritised; taking one out is always allowed.
+pub fn set_list_priority(
+    transaction: &Transaction,
+    id: &str,
+    position: Option<i64>,
+    now_ms: i64,
+) -> Result<(), CoreError> {
+    let (workspace_id, archived, completed): (String, bool, bool) = transaction
+        .query_row(
+            "SELECT workspaceId, isArchived, completedAt IS NOT NULL FROM task_lists WHERE id = ?1",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()?
+        .ok_or_else(|| CoreError::MissingList { id: id.to_string() })?;
+    if position.is_some() && (archived || completed) {
+        return Err(CoreError::ListCannotBePrioritised);
+    }
+    let mut order = prioritised(transaction, &workspace_id)?;
+    let current = order
+        .iter()
+        .position(|(list, _)| list == id)
+        .map(|index| order.remove(index).1);
+    if let Some(position) = position {
+        let index = (position.max(1) - 1).min(order.len() as i64) as usize;
+        order.insert(index, (id.to_string(), current.flatten()));
+    }
+    renumber(transaction, &order, now_ms)?;
+    if position.is_none() {
+        transaction.execute(
+            "UPDATE task_lists SET priorityRank = NULL, updatedAt = ?1
+             WHERE id = ?2 AND priorityRank IS NOT NULL",
+            rusqlite::params![stored(now_ms), id],
+        )?;
+    }
+    Ok(())
+}
+
+/// Drops a list's rank and closes the gap, when it is archived, completed
+/// or otherwise leaves the lists you work from. Every other workspace's
+/// prioritised lists are left alone.
+pub(crate) fn drop_priority(
+    transaction: &Transaction,
+    id: &str,
+    now_ms: i64,
+) -> Result<(), CoreError> {
+    let workspace_id: Option<String> = transaction
+        .query_row(
+            "SELECT workspaceId FROM task_lists WHERE id = ?1 AND priorityRank IS NOT NULL",
+            [id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(workspace_id) = workspace_id else {
+        return Ok(());
+    };
+    transaction.execute(
+        "UPDATE task_lists SET priorityRank = NULL, updatedAt = ?1 WHERE id = ?2",
+        rusqlite::params![stored(now_ms), id],
+    )?;
+    let order = prioritised(transaction, &workspace_id)?;
+    renumber(transaction, &order, now_ms)
+}
+
+/// A workspace's prioritised lists in order, each with its stored rank.
+/// Ties and gaps a sync merge left are ordered as `records` reads them.
+fn prioritised(
+    transaction: &Transaction,
+    workspace_id: &str,
+) -> Result<Vec<(String, Option<i64>)>, CoreError> {
+    let mut statement = transaction.prepare(
+        "SELECT id, priorityRank FROM task_lists
+         WHERE workspaceId = ?1 AND priorityRank IS NOT NULL
+           AND isArchived = 0 AND completedAt IS NULL
+         ORDER BY priorityRank, sortOrder, createdAt, id",
+    )?;
+    let rows = statement
+        .query_map([workspace_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Writes ranks 1..n in `order`, touching only the rows whose rank changes,
+/// so an edit records (and syncs) no more than it moved.
+fn renumber(
+    transaction: &Transaction,
+    order: &[(String, Option<i64>)],
+    now_ms: i64,
+) -> Result<(), CoreError> {
+    let now = stored(now_ms);
+    for (index, (id, rank)) in order.iter().enumerate() {
+        let wanted = index as i64 + 1;
+        if *rank != Some(wanted) {
+            transaction.execute(
+                "UPDATE task_lists SET priorityRank = ?1, updatedAt = ?2 WHERE id = ?3",
+                rusqlite::params![wanted, now, id],
+            )?;
+        }
+    }
     Ok(())
 }
 

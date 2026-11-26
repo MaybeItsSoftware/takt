@@ -171,13 +171,14 @@ final class WorkspaceListTreeTests: XCTestCase {
   /// A limited ladder is the full one's head, plus the day's tasks wherever
   /// they rank, in ladder order; the day and the blocked list are whole.
   func testALimitedLadderKeepsItsHeadAndTheDay() throws {
-    // Five tasks started two days ago, which ranks them ahead of a commitment
-    // without putting them in the day; the sixth is in Today, so it ranks last.
+    // Five tasks due tomorrow with more work than there is time for, which
+    // ranks them ahead of Today without putting them in the day; the sixth
+    // is in Today, so it ranks last.
     let now = Date.now
     var created: [WorkspaceTask] = []
     for index in 0..<5 {
       created.append(try store.createTask(
-        listId: list.id, title: "Task \(index)", startAt: now.addingTimeInterval(-2 * 86_400)))
+        listId: list.id, title: "Task \(index)", dueAt: now.addingTimeInterval(86_400), estimateSeconds: 3 * 86_400))
     }
     created.append(try store.createTask(
       listId: list.id, title: "Planned", kanbanColumn: NextUpSelector.todayColumnID))

@@ -22,6 +22,8 @@ pub enum CoreError {
     MissingFolder { id: String },
     #[error("The Inbox cannot be archived or deleted. You can rename it instead.")]
     SystemListIsPermanent,
+    #[error("An archived or completed list can't be prioritised. Restore it first.")]
+    ListCannotBePrioritised,
     #[error("A workspace item needs a name.")]
     EmptyName,
     #[error("A folder cannot go inside itself or one of its own folders.")]

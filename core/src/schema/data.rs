@@ -45,7 +45,8 @@ pub(super) fn finish(transaction: &Transaction, identifier: &str) -> Result<(), 
         | "v35_series_title"
         | "v36_task_agent_context"
         | "v38_task_authorship"
-        | "v39_open_ended_focus" => Ok(super::triggers::reinstall(transaction)?),
+        | "v39_open_ended_focus"
+        | "v40_list_priority" => Ok(super::triggers::reinstall(transaction)?),
         "v24_condition_categories" => {
             super::triggers::reinstall(transaction)?;
             file_places_under_location(transaction)

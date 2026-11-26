@@ -415,6 +415,9 @@ pub fn set_list_completed(
         "UPDATE task_lists SET completedAt = ?1, updatedAt = ?2 WHERE id = ?3",
         params![completed.then(|| now.clone()), now, id],
     )?;
+    if completed {
+        crate::lists::drop_priority(transaction, id, now_ms)?;
+    }
     Ok(())
 }
 

@@ -526,3 +526,114 @@ fn the_settings_sheets_save_what_changed_and_guard_the_tree_and_the_inbox() {
         .unwrap();
     assert_eq!((colour.as_deref(), folder), (Some("#FFAA00"), None));
 }
+
+fn priorities(connection: &Connection) -> Vec<(String, i64)> {
+    let mut statement = connection
+        .prepare("SELECT id, priorityRank FROM task_lists WHERE priorityRank IS NOT NULL ORDER BY priorityRank")
+        .unwrap();
+    statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
+}
+
+fn prioritise(connection: &mut Connection, id: &str, position: Option<i64>) {
+    journalled(connection, "Prioritise List", |tx| {
+        set_list_priority(tx, id, position, NOW)
+    })
+    .unwrap();
+}
+
+#[test]
+fn prioritising_inserts_moves_and_removes_keeping_ranks_contiguous() {
+    let mut connection = workspace();
+    let ranks = |c: &Connection| -> Vec<(String, i64)> { priorities(c) };
+    let named = |pairs: &[(&str, i64)]| -> Vec<(String, i64)> {
+        pairs
+            .iter()
+            .map(|(id, rank)| (id.to_string(), *rank))
+            .collect()
+    };
+    prioritise(&mut connection, "l", Some(1));
+    // Past the end is last.
+    prioritise(&mut connection, "deep", Some(99));
+    assert_eq!(ranks(&connection), named(&[("l", 1), ("deep", 2)]));
+    // Below 1 is first, and the rest move down.
+    prioritise(&mut connection, "inbox", Some(0));
+    assert_eq!(
+        ranks(&connection),
+        named(&[("inbox", 1), ("l", 2), ("deep", 3)])
+    );
+    // Moving within them shifts only what lies between.
+    prioritise(&mut connection, "deep", Some(1));
+    assert_eq!(
+        ranks(&connection),
+        named(&[("deep", 1), ("inbox", 2), ("l", 3)])
+    );
+    // Taking one out closes the gap.
+    prioritise(&mut connection, "inbox", None);
+    assert_eq!(ranks(&connection), named(&[("deep", 1), ("l", 2)]));
+    // Each was one step, and undo takes the last one back whole.
+    undo(&mut connection).unwrap();
+    assert_eq!(
+        ranks(&connection),
+        named(&[("deep", 1), ("inbox", 2), ("l", 3)])
+    );
+    // Putting a list where it already is changes nothing.
+    let before = steps(&connection);
+    let _ = journalled(&mut connection, "Remove List Priority", |tx| {
+        set_list_priority(tx, "inbox", Some(2), NOW)
+    });
+    assert_eq!(steps(&connection), before);
+}
+
+#[test]
+fn an_archived_list_cannot_be_prioritised_and_archiving_drops_its_rank() {
+    let mut connection = workspace();
+    prioritise(&mut connection, "l", Some(1));
+    prioritise(&mut connection, "deep", Some(2));
+    journalled(&mut connection, "Archive List", |tx| {
+        set_list_archived(tx, "l", true, NOW)
+    })
+    .unwrap();
+    assert_eq!(priorities(&connection), [("deep".to_string(), 1)]);
+    assert!(matches!(
+        journalled(&mut connection, "Prioritise List", |tx| {
+            set_list_priority(tx, "l", Some(1), NOW)
+        }),
+        Err(CoreError::ListCannotBePrioritised)
+    ));
+    // Restoring it does not bring the rank back; undoing the archive does.
+    undo(&mut connection).unwrap();
+    assert_eq!(
+        priorities(&connection),
+        [("l".to_string(), 1), ("deep".to_string(), 2)]
+    );
+    // Deleting one closes the gap too.
+    journalled(&mut connection, "Delete List", |tx| delete_list(tx, "l")).unwrap();
+    assert_eq!(priorities(&connection), [("deep".to_string(), 1)]);
+    assert!(matches!(
+        journalled(&mut connection, "Prioritise List", |tx| {
+            set_list_priority(tx, "gone", Some(1), NOW)
+        }),
+        Err(CoreError::MissingList { .. })
+    ));
+}
+
+#[test]
+fn the_prioritised_lists_read_in_order_with_any_merge_gap_closed() {
+    let connection = workspace();
+    connection
+        .execute_batch(
+            "UPDATE task_lists SET priorityRank = 5 WHERE id = 'l';
+                        UPDATE task_lists SET priorityRank = 2 WHERE id = 'deep';",
+        )
+        .unwrap();
+    let read = crate::records::prioritised_lists(&connection, "w").unwrap();
+    let read: Vec<(&str, Option<i64>)> = read
+        .iter()
+        .map(|list| (list.id.as_str(), list.priority_rank))
+        .collect();
+    assert_eq!(read, [("deep", Some(1)), ("l", Some(2))]);
+}

@@ -62,6 +62,10 @@ data class NextUpCandidate(
     val requiresSingleSitting: Boolean = false,
     val dailyRemainingSeconds: Int? = null,
     val dailyUnavailable: TaskUnavailableReason? = null,
+    /** Its list's place among the prioritised lists, 1 the most important. */
+    val listPriority: Int? = null,
+    /** How committed its board column is, 0 for Today; the core's `column_rank`. */
+    val columnRank: Int? = null,
 ) {
     val remainingSeconds: Int?
         get() {
@@ -269,6 +273,8 @@ internal val NextUpCandidate.core: uniffi.takt_core.Candidate
             TaskUnavailableReason.DailyAlreadyMet -> "dailyAlreadyMet"
             else -> null
         },
+        listPriority = listPriority?.toLong(),
+        columnRank = columnRank?.toLong(),
     )
 
 /** A candidate the core read from the workspace. */
@@ -297,6 +303,8 @@ fun NextUpCandidate(core: uniffi.takt_core.Candidate): NextUpCandidate = NextUpC
         "dailyAlreadyMet" -> TaskUnavailableReason.DailyAlreadyMet
         else -> null
     },
+    listPriority = core.listPriority?.toInt(),
+    columnRank = core.columnRank?.toInt(),
 )
 
 private val uniffi.takt_core.Unavailable.reason: TaskUnavailableReason

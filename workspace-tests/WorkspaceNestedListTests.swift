@@ -1,5 +1,6 @@
 import Foundation
 import TestSQLite
+import TaktCore
 import TaktWorkspace
 import XCTest
 
@@ -84,6 +85,22 @@ final class WorkspaceNestedListTests: XCTestCase {
     XCTAssertEqual(try store.actionableTasks(in: workspaceID).map(\.id), [child.id])
     try store.undo()
     XCTAssertNotNil(try store.task(id: parent.id)?.archivedAt)
+  }
+
+  func testAPrioritisedListLeadsItsColumnInNextUpAndCompletingItDropsTheRank() throws {
+    let other = try store.createList(workspaceId: workspaceID, name: "Volunteering")
+    let promo = try store.createTask(
+      listId: other.id, title: "Promo", startAt: Date.now.addingTimeInterval(-2 * 86_400))
+    let exam = try store.createTask(listId: list.id, title: "Revise")
+    try store.setListPriority(1, id: list.id)
+    XCTAssertEqual(try store.lists(in: workspaceID).first { $0.id == list.id }?.priorityRank, 1)
+    XCTAssertEqual(try store.nextUpCandidates().first { $0.id == exam.id }?.listPriority, 1)
+    let ranked = try store.nextUpSnapshot(workspaceId: workspaceID, context: FocusContext(), runningID: nil)
+      .ranking.ranked.map(\.id).filter { [exam.id, promo.id].contains($0) }
+    // The promo started two days ago, which used to put it first.
+    XCTAssertEqual(ranked, [exam.id, promo.id])
+    try store.setListCompleted(true, id: list.id)
+    XCTAssertNil(try store.lists(in: workspaceID).first { $0.id == list.id }?.priorityRank)
   }
 
   func testTopLevelListCanEndAndReopenWithoutLosingTasks() throws {

@@ -33,7 +33,8 @@ extension TaskList {
       sortOrder: Int(row.sortOrder), isArchived: row.isArchived,
       systemRole: row.systemRole.flatMap(TaskListRole.init(rawValue:)), visibleRootTaskId: row.visibleRootTaskId,
       completedAt: row.completedAtMs.map(Date.init(coreMilliseconds:)),
-      createdAt: Date(coreMilliseconds: row.createdAtMs), updatedAt: Date(coreMilliseconds: row.updatedAtMs))
+      createdAt: Date(coreMilliseconds: row.createdAtMs), updatedAt: Date(coreMilliseconds: row.updatedAtMs),
+      priorityRank: row.priorityRank.map { Int($0) })
   }
 }
 

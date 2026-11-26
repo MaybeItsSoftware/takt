@@ -338,6 +338,20 @@ shared columns, so they travel in the list's space. It reinstalls every
 journal and outbox trigger. A client older than v38 drops them on pull: it
 shows no authorship and offers a task assigned to someone else as anyone's.
 
+`v40_list_priority` adds `task_lists.priorityRank`: a prioritised list's
+place, 1 the most important, the prioritised lists of a workspace numbered
+1..n without gaps; NULL, as every list starts, is not prioritised. Up next
+ranks a task in a prioritised list ahead of others in the same board column.
+Each edit renumbers the lists whose rank changed, so two devices that each
+prioritised a list offline can merge to a tie or a gap; every reader orders
+by rank, then sidebar order, and numbers the result 1..n, and the next edit
+closes it up for good. Archiving, completing or deleting a list drops its
+rank. In a shared list it is a personal column, so it goes to the
+account's own space and other members never see it. It reinstalls every
+journal and outbox trigger. A client older than v40 drops the column on
+pull, as it drops any it does not have, shows no priorities and ranks Up
+next as it always did; its own edits to a list leave the rank alone.
+
 The following are not synced: the undo journal (`undo_control`, `change_log`), the FTS index
 (rebuilt by its own triggers as synced rows land), `grdb_migrations`, and the
 sync tables themselves. Day-log files stay per device. Theme *files* do
@@ -594,7 +608,7 @@ before this), or a shared list's. Design and reasoning are in
 its `tasks`, their `task_metadata`, `task_dependencies` between two of its
 tasks, and its `agent_instructions` (`list:<id>`). Nothing else. Their
 *personal columns* — `task_lists`: `workspaceId`, `folderId`, `sortOrder`,
-`visibleRootTaskId`; `task_metadata`: `matrixUrgency`, `matrixImportance`,
+`visibleRootTaskId`, `priorityRank`; `task_metadata`: `matrixUrgency`, `matrixImportance`,
 `matrixRank`, `kanbanColumn`, `focusRank`, `planningJSON`, `agentContext` —
 never go there. They go to the pusher's own space as a **companion row**,
 table `<table>#personal` with the same id, and a pull writes them over the

@@ -49,6 +49,11 @@ pub struct ListRow {
     pub completed_at_ms: Option<i64>,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
+    /// Its place among the prioritised lists, 1 the most important; absent
+    /// when it is not prioritised. As stored: [`prioritised_lists`] gives
+    /// the order with any gap or tie a merge left closed up.
+    #[uniffi(default = None)]
+    pub priority_rank: Option<i64>,
 }
 
 /// A row of `list_folders`. `ListFolder`.
@@ -206,6 +211,9 @@ impl ListRow {
             completed_at_ms: optional_ms(row, "completedAt")?,
             created_at_ms: required_ms(row, "createdAt")?,
             updated_at_ms: required_ms(row, "updatedAt")?,
+            // A database from before `v40_list_priority` (the CLI reads
+            // without migrating) has no ranks.
+            priority_rank: row.get("priorityRank").unwrap_or(None),
         })
     }
 }
@@ -283,6 +291,30 @@ pub fn lists(
         rusqlite::params![workspace_id, including_archived],
         ListRow::from_row,
     )
+}
+
+/// A workspace's prioritised lists, most important first, numbered 1..n
+/// whatever their stored ranks: two devices that each prioritised a list
+/// offline can leave a tie or a gap until the next edit closes it. Archived
+/// and completed lists are left out; archiving or completing one drops its
+/// rank, and this keeps one a merge brought back from showing.
+pub fn prioritised_lists(
+    connection: &Connection,
+    workspace_id: &str,
+) -> Result<Vec<ListRow>, CoreError> {
+    let mut lists = all(
+        connection,
+        "SELECT * FROM task_lists
+         WHERE workspaceId = ?1 AND priorityRank IS NOT NULL
+           AND isArchived = 0 AND completedAt IS NULL
+         ORDER BY priorityRank, sortOrder, createdAt, id",
+        [workspace_id],
+        ListRow::from_row,
+    )?;
+    for (index, list) in lists.iter_mut().enumerate() {
+        list.priority_rank = Some(index as i64 + 1);
+    }
+    Ok(lists)
 }
 
 /// One list, if it exists.

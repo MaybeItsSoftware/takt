@@ -59,6 +59,10 @@ public struct NextUpCandidate: Sendable, Equatable, Identifiable {
   public let requiresSingleSitting: Bool
   public let dailyRemainingSeconds: Int?
   public let dailyUnavailable: TaskUnavailableReason?
+  /// Its list's place among the prioritised lists, 1 the most important.
+  public let listPriority: Int?
+  /// How committed its board column is, 0 for Today: the core's `column_rank`.
+  public let columnRank: Int?
 
   public init(
     id: String, title: String, isDailyDueToday: Bool = false, dueAt: Date? = nil,
@@ -67,7 +71,8 @@ public struct NextUpCandidate: Sendable, Equatable, Identifiable {
     focusRank: Int? = nil, sortOrder: Int = 0, createdAt: Date = .distantPast,
     dueDate: String? = nil, requirementGroups: [[String]] = [], loggedSeconds: Int = 0,
     minimumBlockSeconds: Int? = nil, requiresSingleSitting: Bool = false,
-    dailyRemainingSeconds: Int? = nil, dailyUnavailable: TaskUnavailableReason? = nil
+    dailyRemainingSeconds: Int? = nil, dailyUnavailable: TaskUnavailableReason? = nil,
+    listPriority: Int? = nil, columnRank: Int? = nil
   ) {
     self.id = id; self.title = title; self.isDailyDueToday = isDailyDueToday
     self.dueAt = dueAt; self.startAt = startAt; self.matrixUrgency = matrixUrgency
@@ -78,6 +83,7 @@ public struct NextUpCandidate: Sendable, Equatable, Identifiable {
     self.loggedSeconds = loggedSeconds; self.minimumBlockSeconds = minimumBlockSeconds
     self.requiresSingleSitting = requiresSingleSitting; self.dailyRemainingSeconds = dailyRemainingSeconds
     self.dailyUnavailable = dailyUnavailable
+    self.listPriority = listPriority; self.columnRank = columnRank
   }
 
   public var remainingSeconds: Int? {

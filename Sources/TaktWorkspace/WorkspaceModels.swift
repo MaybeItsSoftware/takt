@@ -43,6 +43,10 @@ public struct TaskList: Codable, Identifiable, Sendable, Equatable {
   public var completedAt: Date?
   public let createdAt: Date
   public var updatedAt: Date
+  /// Its place among the prioritised lists, 1 the most important; nil when
+  /// it is not prioritised. As stored, so a sync merge can leave a tie or a
+  /// gap: `WorkspaceStructure.prioritisedLists` gives the order.
+  public var priorityRank: Int?
 
   public var isSystemList: Bool { systemRole != nil }
 }

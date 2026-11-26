@@ -55,7 +55,10 @@ final class TaskConditionsFocusTests: XCTestCase {
     XCTAssertTrue(evaluate([task]).ranked.isEmpty)
     XCTAssertEqual(evaluate([task]).nextEvaluationAt, task.startAt)
     let ready = NextUpCandidate(id: "ready", title: "Ready", startAt: now)
-    XCTAssertEqual(evaluate([NextUpCandidate(id: "daily", title: "Daily", isDailyDueToday: true), ready]).ranked.first?.id, "ready")
+    XCTAssertEqual(evaluate([NextUpCandidate(id: "plain", title: "Plain"), ready]).ranked.first?.id, "ready")
+    // A daily due today counts as Today, the column furthest right, and a
+    // start reached orders work only within a column.
+    XCTAssertEqual(evaluate([NextUpCandidate(id: "daily", title: "Daily", isDailyDueToday: true), ready]).ranked.first?.id, "daily")
   }
 
   func testProgressAndFinishModesHandleLongUnknownAndOneSittingWork() {

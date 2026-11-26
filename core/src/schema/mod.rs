@@ -178,6 +178,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "v39_open_ended_focus",
         include_str!("migrations/v39_open_ended_focus.sql"),
     ),
+    (
+        "v40_list_priority",
+        include_str!("migrations/v40_list_priority.sql"),
+    ),
 ];
 
 /// Brings the database at `path` up to date, creating it if it does not

@@ -49,6 +49,7 @@ final class WorkspaceMigrationTests: XCTestCase {
     "v37_shared_lists",
     "v38_task_authorship",
     "v39_open_ended_focus",
+    "v40_list_priority",
   ]
 
   private var directoryURL: URL!
@@ -123,7 +124,8 @@ final class WorkspaceMigrationTests: XCTestCase {
     try DatabaseQueue(path: url.path).write { db in
       try db.rollBackSyncMigration()
       for suffix in ["insert", "update", "delete"] {
-        try db.execute(sql: "DROP TRIGGER change_log_task_lists_\(suffix)")
+        // `rollBackSyncMigration` takes them off already, for `v40_list_priority`.
+        try db.execute(sql: "DROP TRIGGER IF EXISTS change_log_task_lists_\(suffix)")
       }
       try db.execute(sql: "ALTER TABLE task_lists DROP COLUMN visibleRootTaskId")
       try db.execute(sql: """

@@ -33,7 +33,8 @@ extension NextUpCandidate {
         case .dailyAlreadyMet: "dailyAlreadyMet"
         default: nil
         }
-      })
+      },
+      listPriority: listPriority.map { Int64($0) }, columnRank: columnRank.map { Int64($0) })
   }
 }
 
@@ -84,7 +85,8 @@ extension NextUpCandidate {
       requirementGroups: core.requirementGroups, loggedSeconds: Int(core.loggedSeconds),
       minimumBlockSeconds: core.minimumBlockSeconds.map { Int($0) },
       requiresSingleSitting: core.requiresSingleSitting,
-      dailyRemainingSeconds: core.dailyRemainingSeconds.map { Int($0) }, dailyUnavailable: unavailable)
+      dailyRemainingSeconds: core.dailyRemainingSeconds.map { Int($0) }, dailyUnavailable: unavailable,
+      listPriority: core.listPriority.map { Int($0) }, columnRank: core.columnRank.map { Int($0) })
   }
 }
 

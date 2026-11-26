@@ -1629,6 +1629,12 @@ impl CoreWorkspace {
         records::lists(&self.lock(), &workspace_id, including_archived)
     }
 
+    /// A workspace's prioritised lists, most important first, each with its
+    /// place (1..n) as `priority_rank`.
+    pub fn prioritised_lists(&self, workspace_id: String) -> Result<Vec<ListRow>, CoreError> {
+        records::prioritised_lists(&self.lock(), &workspace_id)
+    }
+
     /// One list, if it exists.
     pub fn list(&self, id: String) -> Result<Option<ListRow>, CoreError> {
         records::list(&self.lock(), &id)
@@ -1848,6 +1854,25 @@ impl CoreWorkspace {
     ) -> Result<(), CoreError> {
         journal::journalled(&mut self.lock(), "Archive List", |tx| {
             lists::set_list_archived(tx, &id, archived, now_ms)
+        })
+    }
+
+    /// Puts a list at `position` among the prioritised lists (1 the most
+    /// important; past the end, last), or takes it out of them with `None`,
+    /// as one step: "Prioritise List", or "Remove List Priority".
+    pub fn set_list_priority(
+        &self,
+        id: String,
+        position: Option<i64>,
+        now_ms: i64,
+    ) -> Result<(), CoreError> {
+        let label = if position.is_some() {
+            "Prioritise List"
+        } else {
+            "Remove List Priority"
+        };
+        journal::journalled(&mut self.lock(), label, |tx| {
+            lists::set_list_priority(tx, &id, position, now_ms)
         })
     }
 

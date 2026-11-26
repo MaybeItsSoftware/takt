@@ -211,6 +211,8 @@ fn candidate(id: &str, groups: Vec<Vec<String>>) -> Candidate {
         requires_single_sitting: false,
         daily_remaining_seconds: None,
         daily_unavailable: None,
+        list_priority: None,
+        column_rank: None,
     }
 }
 

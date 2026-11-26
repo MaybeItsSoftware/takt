@@ -1865,6 +1865,12 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func prepareSyncPush(limit: UInt32, wallMs: Int64) throws  -> SyncPushBatch?
     
     /**
+     * A workspace's prioritised lists, most important first, each with its
+     * place (1..n) as `priority_rank`.
+     */
+    func prioritisedLists(workspaceId: String) throws  -> [ListRow]
+    
+    /**
      * Resets a running block's clock after the system clock jumped.
      */
     func rebaseFocusClock(id: String, elapsedSeconds: Int64, nowMs: Int64) throws 
@@ -2038,6 +2044,13 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
      * Completes or reopens a standalone list.
      */
     func setListCompleted(id: String, completed: Bool, nowMs: Int64) throws 
+    
+    /**
+     * Puts a list at `position` among the prioritised lists (1 the most
+     * important; past the end, last), or takes it out of them with `None`,
+     * as one step: "Prioritise List", or "Remove List Priority".
+     */
+    func setListPriority(id: String, position: Int64?, nowMs: Int64) throws 
     
     /**
      * Places a task on the priority matrix as one "Move Task" step.
@@ -4743,6 +4756,20 @@ open func prepareSyncPush(limit: UInt32, wallMs: Int64)throws  -> SyncPushBatch?
 }
     
     /**
+     * A workspace's prioritised lists, most important first, each with its
+     * place (1..n) as `priority_rank`.
+     */
+open func prioritisedLists(workspaceId: String)throws  -> [ListRow]  {
+    return try  FfiConverterSequenceTypeListRow.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_prioritised_lists(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(workspaceId),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Resets a running block's clock after the system clock jumped.
      */
 open func rebaseFocusClock(id: String, elapsedSeconds: Int64, nowMs: Int64)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
@@ -5214,6 +5241,22 @@ open func setListCompleted(id: String, completed: Bool, nowMs: Int64)throws   {t
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterBool.lower(completed),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Puts a list at `position` among the prioritised lists (1 the most
+     * important; past the end, last), or takes it out of them with `None`,
+     * as one step: "Prioritise List", or "Remove List Priority".
+     */
+open func setListPriority(id: String, position: Int64?, nowMs: Int64)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_set_list_priority(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionInt64.lower(position),
         FfiConverterInt64.lower(nowMs),uniffiCallStatus
     )
 }
@@ -7003,13 +7046,39 @@ public struct Candidate: Equatable, Hashable {
      * "dailyNotScheduled" or "dailyAlreadyMet" when its daily rules it out.
      */
     public var dailyUnavailable: String?
+    /**
+     * Its list's place among the prioritised lists, 1 the most important;
+     * absent when the list is not prioritised.
+     */
+    public var listPriority: Int64?
+    /**
+     * How committed the column it stands in on its list's board is: 0 for
+     * Today, then 1 for the stage nearest Today and so on leftwards, so
+     * further right on the board is lower. A task in no column, or in one
+     * that is not a stage (Waiting on, a rule column, one the board has
+     * lost), stands with the first. Absent when the core did not read it
+     * (a candidate a client built), and the stock board's order applies.
+     */
+    public var columnRank: Int64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(id: String, title: String, isDailyDueToday: Bool, dueAtMs: Int64?, startAtMs: Int64?, matrixUrgency: Int64?, matrixImportance: Int64?, priority: Int64?, estimateSeconds: Int64?, kanbanColumn: String?, focusRank: Int64?, sortOrder: Int64, createdAtMs: Int64, dueDate: String?, requirementGroups: [[String]], loggedSeconds: Int64, minimumBlockSeconds: Int64?, requiresSingleSitting: Bool, dailyRemainingSeconds: Int64?, 
         /**
          * "dailyNotScheduled" or "dailyAlreadyMet" when its daily rules it out.
-         */dailyUnavailable: String?) {
+         */dailyUnavailable: String?, 
+        /**
+         * Its list's place among the prioritised lists, 1 the most important;
+         * absent when the list is not prioritised.
+         */listPriority: Int64? = nil, 
+        /**
+         * How committed the column it stands in on its list's board is: 0 for
+         * Today, then 1 for the stage nearest Today and so on leftwards, so
+         * further right on the board is lower. A task in no column, or in one
+         * that is not a stage (Waiting on, a rule column, one the board has
+         * lost), stands with the first. Absent when the core did not read it
+         * (a candidate a client built), and the stock board's order applies.
+         */columnRank: Int64? = nil) {
         self.id = id
         self.title = title
         self.isDailyDueToday = isDailyDueToday
@@ -7030,6 +7099,8 @@ public struct Candidate: Equatable, Hashable {
         self.requiresSingleSitting = requiresSingleSitting
         self.dailyRemainingSeconds = dailyRemainingSeconds
         self.dailyUnavailable = dailyUnavailable
+        self.listPriority = listPriority
+        self.columnRank = columnRank
     }
 
     
@@ -7067,7 +7138,9 @@ public struct FfiConverterTypeCandidate: FfiConverterRustBuffer {
                 minimumBlockSeconds: FfiConverterOptionInt64.read(from: &buf), 
                 requiresSingleSitting: FfiConverterBool.read(from: &buf), 
                 dailyRemainingSeconds: FfiConverterOptionInt64.read(from: &buf), 
-                dailyUnavailable: FfiConverterOptionString.read(from: &buf)
+                dailyUnavailable: FfiConverterOptionString.read(from: &buf), 
+                listPriority: FfiConverterOptionInt64.read(from: &buf), 
+                columnRank: FfiConverterOptionInt64.read(from: &buf)
         )
     }
 
@@ -7092,6 +7165,8 @@ public struct FfiConverterTypeCandidate: FfiConverterRustBuffer {
         FfiConverterBool.write(value.requiresSingleSitting, into: &buf)
         FfiConverterOptionInt64.write(value.dailyRemainingSeconds, into: &buf)
         FfiConverterOptionString.write(value.dailyUnavailable, into: &buf)
+        FfiConverterOptionInt64.write(value.listPriority, into: &buf)
+        FfiConverterOptionInt64.write(value.columnRank, into: &buf)
     }
 }
 
@@ -15770,13 +15845,24 @@ public struct ListRow: Equatable, Hashable {
     public var completedAtMs: Int64?
     public var createdAtMs: Int64
     public var updatedAtMs: Int64
+    /**
+     * Its place among the prioritised lists, 1 the most important; absent
+     * when it is not prioritised. As stored: [`prioritised_lists`] gives
+     * the order with any gap or tie a merge left closed up.
+     */
+    public var priorityRank: Int64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(id: String, workspaceId: String, folderId: String?, name: String, colorHex: String?, sortOrder: Int64, isArchived: Bool, 
         /**
          * "inbox" for the Inbox; absent for an ordinary list.
-         */systemRole: String?, visibleRootTaskId: String?, completedAtMs: Int64?, createdAtMs: Int64, updatedAtMs: Int64) {
+         */systemRole: String?, visibleRootTaskId: String?, completedAtMs: Int64?, createdAtMs: Int64, updatedAtMs: Int64, 
+        /**
+         * Its place among the prioritised lists, 1 the most important; absent
+         * when it is not prioritised. As stored: [`prioritised_lists`] gives
+         * the order with any gap or tie a merge left closed up.
+         */priorityRank: Int64? = nil) {
         self.id = id
         self.workspaceId = workspaceId
         self.folderId = folderId
@@ -15789,6 +15875,7 @@ public struct ListRow: Equatable, Hashable {
         self.completedAtMs = completedAtMs
         self.createdAtMs = createdAtMs
         self.updatedAtMs = updatedAtMs
+        self.priorityRank = priorityRank
     }
 
     
@@ -15818,7 +15905,8 @@ public struct FfiConverterTypeListRow: FfiConverterRustBuffer {
                 visibleRootTaskId: FfiConverterOptionString.read(from: &buf), 
                 completedAtMs: FfiConverterOptionInt64.read(from: &buf), 
                 createdAtMs: FfiConverterInt64.read(from: &buf), 
-                updatedAtMs: FfiConverterInt64.read(from: &buf)
+                updatedAtMs: FfiConverterInt64.read(from: &buf), 
+                priorityRank: FfiConverterOptionInt64.read(from: &buf)
         )
     }
 
@@ -15835,6 +15923,7 @@ public struct FfiConverterTypeListRow: FfiConverterRustBuffer {
         FfiConverterOptionInt64.write(value.completedAtMs, into: &buf)
         FfiConverterInt64.write(value.createdAtMs, into: &buf)
         FfiConverterInt64.write(value.updatedAtMs, into: &buf)
+        FfiConverterOptionInt64.write(value.priorityRank, into: &buf)
     }
 }
 
@@ -22244,6 +22333,7 @@ enum CoreError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
     case MissingFolder(id: String
     )
     case SystemListIsPermanent
+    case ListCannotBePrioritised
     case EmptyName
     case InvalidFolderMove
     case InvalidCondition
@@ -22345,46 +22435,47 @@ public struct FfiConverterTypeCoreError: FfiConverterRustBuffer {
             id: try FfiConverterString.read(from: &buf)
             )
         case 8: return .SystemListIsPermanent
-        case 9: return .EmptyName
-        case 10: return .InvalidFolderMove
-        case 11: return .InvalidCondition
-        case 12: return .InvalidStatus(
+        case 9: return .ListCannotBePrioritised
+        case 10: return .EmptyName
+        case 11: return .InvalidFolderMove
+        case 12: return .InvalidCondition
+        case 13: return .InvalidStatus(
             status: try FfiConverterString.read(from: &buf)
             )
-        case 13: return .InvalidSchedule
-        case 14: return .InvalidMinimum
-        case 15: return .EstimateRequired
-        case 16: return .InvalidDate
-        case 17: return .EditorConflict
-        case 18: return .InvalidVisibleRoot
-        case 19: return .DuplicateSourceId
-        case 20: return .NoActiveFocusTask
-        case 21: return .Unavailable
-        case 22: return .InvalidTaskMove
-        case 23: return .DependencyCycle
-        case 24: return .MissingFilterList(
+        case 14: return .InvalidSchedule
+        case 15: return .InvalidMinimum
+        case 16: return .EstimateRequired
+        case 17: return .InvalidDate
+        case 18: return .EditorConflict
+        case 19: return .InvalidVisibleRoot
+        case 20: return .DuplicateSourceId
+        case 21: return .NoActiveFocusTask
+        case 22: return .Unavailable
+        case 23: return .InvalidTaskMove
+        case 24: return .DependencyCycle
+        case 25: return .MissingFilterList(
             id: try FfiConverterString.read(from: &buf)
             )
-        case 25: return .InvalidFilter(
+        case 26: return .InvalidFilter(
             detail: try FfiConverterString.read(from: &buf)
             )
-        case 26: return .File(
+        case 27: return .File(
             detail: try FfiConverterString.read(from: &buf)
             )
-        case 27: return .ColumnRefused(
+        case 28: return .ColumnRefused(
             detail: try FfiConverterString.read(from: &buf)
             )
-        case 28: return .InvalidRecurrence(
+        case 29: return .InvalidRecurrence(
             rule: try FfiConverterString.read(from: &buf)
             )
-        case 29: return .Checkvist(
+        case 30: return .Checkvist(
             detail: try FfiConverterString.read(from: &buf)
             )
-        case 30: return .InvalidEstimate
-        case 31: return .InvalidFollowUpRepeat(
+        case 31: return .InvalidEstimate
+        case 32: return .InvalidFollowUpRepeat(
             days: try FfiConverterUInt32.read(from: &buf)
             )
-        case 32: return .GoogleCalendar(
+        case 33: return .GoogleCalendar(
             detail: try FfiConverterString.read(from: &buf)
             )
 
@@ -22438,108 +22529,112 @@ public struct FfiConverterTypeCoreError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(8))
         
         
-        case .EmptyName:
+        case .ListCannotBePrioritised:
             writeInt(&buf, Int32(9))
         
         
-        case .InvalidFolderMove:
+        case .EmptyName:
             writeInt(&buf, Int32(10))
         
         
-        case .InvalidCondition:
+        case .InvalidFolderMove:
             writeInt(&buf, Int32(11))
         
         
-        case let .InvalidStatus(status):
+        case .InvalidCondition:
             writeInt(&buf, Int32(12))
+        
+        
+        case let .InvalidStatus(status):
+            writeInt(&buf, Int32(13))
             FfiConverterString.write(status, into: &buf)
             
         
         case .InvalidSchedule:
-            writeInt(&buf, Int32(13))
-        
-        
-        case .InvalidMinimum:
             writeInt(&buf, Int32(14))
         
         
-        case .EstimateRequired:
+        case .InvalidMinimum:
             writeInt(&buf, Int32(15))
         
         
-        case .InvalidDate:
+        case .EstimateRequired:
             writeInt(&buf, Int32(16))
         
         
-        case .EditorConflict:
+        case .InvalidDate:
             writeInt(&buf, Int32(17))
         
         
-        case .InvalidVisibleRoot:
+        case .EditorConflict:
             writeInt(&buf, Int32(18))
         
         
-        case .DuplicateSourceId:
+        case .InvalidVisibleRoot:
             writeInt(&buf, Int32(19))
         
         
-        case .NoActiveFocusTask:
+        case .DuplicateSourceId:
             writeInt(&buf, Int32(20))
         
         
-        case .Unavailable:
+        case .NoActiveFocusTask:
             writeInt(&buf, Int32(21))
         
         
-        case .InvalidTaskMove:
+        case .Unavailable:
             writeInt(&buf, Int32(22))
         
         
-        case .DependencyCycle:
+        case .InvalidTaskMove:
             writeInt(&buf, Int32(23))
         
         
-        case let .MissingFilterList(id):
+        case .DependencyCycle:
             writeInt(&buf, Int32(24))
+        
+        
+        case let .MissingFilterList(id):
+            writeInt(&buf, Int32(25))
             FfiConverterString.write(id, into: &buf)
             
         
         case let .InvalidFilter(detail):
-            writeInt(&buf, Int32(25))
-            FfiConverterString.write(detail, into: &buf)
-            
-        
-        case let .File(detail):
             writeInt(&buf, Int32(26))
             FfiConverterString.write(detail, into: &buf)
             
         
-        case let .ColumnRefused(detail):
+        case let .File(detail):
             writeInt(&buf, Int32(27))
             FfiConverterString.write(detail, into: &buf)
             
         
-        case let .InvalidRecurrence(rule):
+        case let .ColumnRefused(detail):
             writeInt(&buf, Int32(28))
+            FfiConverterString.write(detail, into: &buf)
+            
+        
+        case let .InvalidRecurrence(rule):
+            writeInt(&buf, Int32(29))
             FfiConverterString.write(rule, into: &buf)
             
         
         case let .Checkvist(detail):
-            writeInt(&buf, Int32(29))
+            writeInt(&buf, Int32(30))
             FfiConverterString.write(detail, into: &buf)
             
         
         case .InvalidEstimate:
-            writeInt(&buf, Int32(30))
+            writeInt(&buf, Int32(31))
         
         
         case let .InvalidFollowUpRepeat(days):
-            writeInt(&buf, Int32(31))
+            writeInt(&buf, Int32(32))
             FfiConverterUInt32.write(days, into: &buf)
             
         
         case let .GoogleCalendar(detail):
-            writeInt(&buf, Int32(32))
+            writeInt(&buf, Int32(33))
             FfiConverterString.write(detail, into: &buf)
             
         }
@@ -34335,6 +34430,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_prepare_sync_push() != 32415) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_prioritised_lists() != 48253) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_rebase_focus_clock() != 28872) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -34429,6 +34527,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_list_completed() != 2328) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_set_list_priority() != 7909) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_matrix_position() != 2656) {

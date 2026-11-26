@@ -52,8 +52,15 @@ pub const PERSONAL_SUFFIX: &str = "#personal";
 /// The columns of a shared row that are one person's own.
 pub fn personal_columns(table: &str) -> &'static [&'static str] {
     match table {
-        // Where it sits in your sidebar, and the subtree you're focused on.
-        "task_lists" => &["workspaceId", "folderId", "sortOrder", "visibleRootTaskId"],
+        // Where it sits in your sidebar, the subtree you're focused on, and
+        // how much it matters to you.
+        "task_lists" => &[
+            "workspaceId",
+            "folderId",
+            "sortOrder",
+            "visibleRootTaskId",
+            "priorityRank",
+        ],
         // How you plan to work on it: the planning JSON names conditions,
         // which are each person's own.
         "task_metadata" => &[

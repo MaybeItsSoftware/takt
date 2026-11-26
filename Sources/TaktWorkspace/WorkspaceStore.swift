@@ -214,6 +214,16 @@ public final class WorkspaceStore: @unchecked Sendable {
     }
   }
 
+  /// Puts a list at `position` among the prioritised lists (1 the most
+  /// important; past the end, last), or takes it out of them with nil, as
+  /// one undo step. An archived or completed list cannot be prioritised.
+  /// The write is the Rust core's (`lists::set_list_priority`).
+  public func setListPriority(_ position: Int?, id: String, now: Date = .now) throws {
+    try coreWrite {
+      try core.setListPriority(id: id, position: position.map { Int64($0) }, nowMs: now.coreMilliseconds)
+    }
+  }
+
   /// Deletes a list and its tasks as one undo step; the Inbox is permanent.
   /// The write is the Rust core's (`lists::delete_list`).
   public func deleteList(id: String) throws {

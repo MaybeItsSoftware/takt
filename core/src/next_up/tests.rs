@@ -30,6 +30,8 @@ fn candidate(id: &str) -> Candidate {
         requires_single_sitting: false,
         daily_remaining_seconds: None,
         daily_unavailable: None,
+        list_priority: None,
+        column_rank: None,
     }
 }
 
@@ -252,6 +254,13 @@ fn a_card_sent_to_the_back_ends_the_day_too() {
 #[test]
 fn a_limited_ladder_keeps_its_head_and_the_days_tasks() {
     let connection = workspace();
+    // Today's tasks lead the rest, so three late tasks make a head of the
+    // ladder that the day's tasks fall outside.
+    connection
+        .execute_batch(
+            "UPDATE tasks SET dueAt = '2025-06-16 08:00:00.000' WHERE id IN ('t00', 't01', 't02');",
+        )
+        .unwrap();
     let context = FocusContext::default();
     let full = next_up(&connection, NOW, "UTC", &context, None, None).unwrap();
     assert_eq!(full.ranked.len(), 12);
@@ -267,7 +276,13 @@ fn a_limited_ladder_keeps_its_head_and_the_days_tasks() {
     assert_eq!(short.ranked_count, 12);
     assert_eq!(
         entries(&short.day_plan),
-        [("t10", "planned"), ("t11", "planned")]
+        [
+            ("t10", "planned"),
+            ("t11", "planned"),
+            ("t00", "overdue"),
+            ("t01", "overdue"),
+            ("t02", "overdue")
+        ]
     );
     // Everything else is the full read's, unchanged.
     assert_eq!(short.day_plan, full.day_plan);
@@ -344,4 +359,42 @@ fn a_card_arranged_by_hand_keeps_its_place_rather_than_its_subtasks() {
         entries(&read.day_plan),
         [("t10", "planned"), ("t11", "planned")]
     );
+}
+
+#[test]
+fn a_prioritised_lists_task_leads_its_column_but_not_today() {
+    let connection = workspace();
+    connection
+        .execute_batch(&format!(
+            "INSERT INTO task_lists (id, workspaceId, name, sortOrder, isArchived, createdAt, updatedAt, priorityRank)
+               VALUES ('exams', 'w', 'Exams', 1, 0, '{T}', '{T}', 1);
+             INSERT INTO tasks (id, listId, title, status, sortOrder, itemKind, createdAt, updatedAt)
+               VALUES ('revise', 'exams', 'Revise', 'open', 0, 'task', '{T}', '{T}');"
+        ))
+        .unwrap();
+    let read = next_up(
+        &connection,
+        NOW,
+        "UTC",
+        &FocusContext::default(),
+        None,
+        None,
+    )
+    .unwrap();
+    let ids: Vec<&str> = read
+        .ranked
+        .iter()
+        .map(|s| s.candidate.id.as_str())
+        .take(4)
+        .collect();
+    // Today's two first, then the prioritised list's backlog task ahead of
+    // the started backlog tasks of a list nobody prioritised.
+    assert_eq!(ids, ["t10", "t11", "revise", "t00"]);
+    let revise = read
+        .ranked
+        .iter()
+        .find(|s| s.candidate.id == "revise")
+        .unwrap();
+    assert_eq!(revise.candidate.list_priority, Some(1));
+    assert_eq!(revise.candidate.column_rank, Some(3));
 }

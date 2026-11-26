@@ -25,6 +25,8 @@ fn task(id: &str) -> Candidate {
         requires_single_sitting: false,
         daily_remaining_seconds: None,
         daily_unavailable: None,
+        list_priority: None,
+        column_rank: None,
     }
 }
 
@@ -206,4 +208,93 @@ fn negative_priorities_come_after_no_priority_with_minus_one_last() {
     );
     // A negative priority is no reason to be up next.
     assert_eq!(ranking.ranked[6].reason, "order");
+}
+
+fn in_list(id: &str, rank: Option<i64>) -> Candidate {
+    Candidate {
+        list_priority: rank,
+        ..task(id)
+    }
+}
+
+#[test]
+fn within_a_column_a_prioritised_list_beats_a_started_task_elsewhere() {
+    let started = Candidate {
+        start_at_ms: Some(NOW - 24 * HOUR),
+        ..in_list("started", None)
+    };
+    let exam = in_list("exam", Some(1));
+    let ranking = evaluate(&[started, exam], NOW, "UTC", &FocusContext::default());
+    assert_eq!(ids(&ranking), ["exam", "started"]);
+}
+
+#[test]
+fn the_first_prioritised_list_beats_the_second() {
+    let second = Candidate {
+        matrix_importance: Some(2),
+        ..in_list("second", Some(2))
+    };
+    let first = in_list("first", Some(1));
+    let ranking = evaluate(&[second, first], NOW, "UTC", &FocusContext::default());
+    assert_eq!(ids(&ranking), ["first", "second"]);
+}
+
+#[test]
+fn lateness_and_due_today_still_beat_list_priority() {
+    let late = Candidate {
+        due_at_ms: Some(NOW - HOUR),
+        ..in_list("late", None)
+    };
+    let due = Candidate {
+        due_at_ms: Some(NOW + 3 * HOUR),
+        ..in_list("due", None)
+    };
+    let today = Candidate {
+        kanban_column: Some("today".into()),
+        ..in_list("today", Some(1))
+    };
+    let ranking = evaluate(&[today, due, late], NOW, "UTC", &FocusContext::default());
+    assert_eq!(ids(&ranking), ["late", "due", "today"]);
+}
+
+#[test]
+fn a_column_further_right_beats_a_prioritised_list_further_left() {
+    let today = Candidate {
+        kanban_column: Some("today".into()),
+        ..in_list("today", None)
+    };
+    let daily = Candidate {
+        is_daily_due_today: true,
+        sort_order: 1,
+        ..in_list("daily", None)
+    };
+    let week = Candidate {
+        kanban_column: Some("this-week".into()),
+        ..in_list("week", None)
+    };
+    let backlog = in_list("backlog", Some(1));
+    let ranking = evaluate(
+        &[backlog, week, daily, today],
+        NOW,
+        "UTC",
+        &FocusContext::default(),
+    );
+    assert_eq!(ids(&ranking), ["today", "daily", "week", "backlog"]);
+}
+
+#[test]
+fn a_rank_on_the_lists_own_board_orders_the_columns() {
+    // A list whose board puts a column the stock board lacks just left of
+    // Today: the core reads it as 1, ahead of a stock board's backlog.
+    let custom = Candidate {
+        kanban_column: Some("doing".into()),
+        column_rank: Some(1),
+        ..in_list("custom", None)
+    };
+    let backlog = Candidate {
+        column_rank: Some(4),
+        ..in_list("backlog", Some(1))
+    };
+    let ranking = evaluate(&[backlog, custom], NOW, "UTC", &FocusContext::default());
+    assert_eq!(ids(&ranking), ["custom", "backlog"]);
 }

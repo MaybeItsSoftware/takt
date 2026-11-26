@@ -53,10 +53,10 @@ fn a_new_database_has_exactly_the_fixtures_schema() {
 fn every_migration_is_recorded_in_order_under_grdbs_identifiers() {
     let connection = migrated();
     assert_eq!(ledger(&connection), workspace_migrations());
-    assert_eq!(workspace_migrations().len(), 39);
+    assert_eq!(workspace_migrations().len(), 40);
     assert_eq!(
         workspace_migrations().last().map(String::as_str),
-        Some("v39_open_ended_focus")
+        Some("v40_list_priority")
     );
 }
 
@@ -69,7 +69,7 @@ fn migrating_again_applies_nothing_and_keeps_the_work() {
         )
         .unwrap();
     let before = dump_schema(&connection).unwrap();
-    assert_eq!(migrate(&mut connection).unwrap(), "v39_open_ended_focus");
+    assert_eq!(migrate(&mut connection).unwrap(), "v40_list_priority");
     assert_eq!(dump_schema(&connection).unwrap(), before);
     let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM workspaces", [], |row| row.get(0))
@@ -96,9 +96,9 @@ fn a_file_database_is_created_and_closed_again() {
     std::fs::create_dir_all(&directory).unwrap();
     let path = directory.join("workspace.sqlite");
     let latest = migrate_workspace(path.to_string_lossy().into_owned()).unwrap();
-    assert_eq!(latest, "v39_open_ended_focus");
+    assert_eq!(latest, "v40_list_priority");
     let reopened = Connection::open(&path).unwrap();
-    assert_eq!(ledger(&reopened).len(), 39);
+    assert_eq!(ledger(&reopened).len(), 40);
     std::fs::remove_dir_all(directory).unwrap();
 }
 
@@ -1057,6 +1057,29 @@ fn v39_marks_existing_blocks_as_lengths_and_syncs_the_timer_flag() {
         .unwrap();
     assert_eq!(
         count("SELECT COUNT(*) FROM sync_outbox WHERE changedJSON LIKE '%openEnded%'"),
+        1
+    );
+}
+
+#[test]
+fn v40_leaves_every_list_unprioritised_and_syncs_the_rank() {
+    let mut connection = migrated_through("v39_open_ended_focus");
+    seed_workspace(&connection);
+    seed_list(&connection, "l", "Exams", T0);
+    migrate_through(&mut connection, Some("v40_list_priority")).unwrap();
+    let count = |sql: &str| -> i64 { connection.query_row(sql, [], |row| row.get(0)).unwrap() };
+    assert_eq!(
+        count("SELECT COUNT(*) FROM task_lists WHERE priorityRank IS NULL"),
+        1
+    );
+    connection
+        .execute_batch(
+            "UPDATE sync_control SET recording = 1 WHERE id = 0;
+             UPDATE task_lists SET priorityRank = 1 WHERE id = 'l';",
+        )
+        .unwrap();
+    assert_eq!(
+        count("SELECT COUNT(*) FROM sync_outbox WHERE changedJSON LIKE '%priorityRank%'"),
         1
     );
 }

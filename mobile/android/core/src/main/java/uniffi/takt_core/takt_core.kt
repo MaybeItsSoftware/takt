@@ -1485,6 +1485,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_prepare_sync_push(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_prioritised_lists(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_rebase_focus_clock(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_reconcile_habits(
@@ -1548,6 +1550,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_list_archived(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_list_completed(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_set_list_priority(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_matrix_position(
     ): Int
@@ -2033,6 +2037,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_prepare_sync_push(`ptr`: Long,`limit`: Int,`wallMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_prioritised_lists(`ptr`: Long,`workspaceId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_rebase_focus_clock(`ptr`: Long,`id`: RustBuffer.ByValue,`elapsedSeconds`: Long,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_reconcile_habits(`ptr`: Long,`nowMs`: Long,`zone`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -2096,6 +2102,8 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_method_coreworkspace_set_list_archived(`ptr`: Long,`id`: RustBuffer.ByValue,`archived`: Byte,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_set_list_completed(`ptr`: Long,`id`: RustBuffer.ByValue,`completed`: Byte,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_takt_core_fn_method_coreworkspace_set_list_priority(`ptr`: Long,`id`: RustBuffer.ByValue,`position`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_set_matrix_position(`ptr`: Long,`id`: RustBuffer.ByValue,`urgency`: RustBuffer.ByValue,`importance`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -3957,6 +3965,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_prepare_sync_push() and 0xFFFF) != 32415) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_prioritised_lists() and 0xFFFF) != 48253) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_rebase_focus_clock() and 0xFFFF) != 28872) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -4051,6 +4062,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_list_completed() and 0xFFFF) != 2328) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_list_priority() and 0xFFFF) != 7909) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_matrix_position() and 0xFFFF) != 2656) {
@@ -6080,6 +6094,12 @@ public interface CoreWorkspaceInterface {
     fun `prepareSyncPush`(`limit`: kotlin.UInt, `wallMs`: kotlin.Long): SyncPushBatch?
     
     /**
+     * A workspace's prioritised lists, most important first, each with its
+     * place (1..n) as `priority_rank`.
+     */
+    fun `prioritisedLists`(`workspaceId`: kotlin.String): List<ListRow>
+    
+    /**
      * Resets a running block's clock after the system clock jumped.
      */
     fun `rebaseFocusClock`(`id`: kotlin.String, `elapsedSeconds`: kotlin.Long, `nowMs`: kotlin.Long)
@@ -6253,6 +6273,13 @@ public interface CoreWorkspaceInterface {
      * Completes or reopens a standalone list.
      */
     fun `setListCompleted`(`id`: kotlin.String, `completed`: kotlin.Boolean, `nowMs`: kotlin.Long)
+    
+    /**
+     * Puts a list at `position` among the prioritised lists (1 the most
+     * important; past the end, last), or takes it out of them with `None`,
+     * as one step: "Prioritise List", or "Remove List Priority".
+     */
+    fun `setListPriority`(`id`: kotlin.String, `position`: kotlin.Long?, `nowMs`: kotlin.Long)
     
     /**
      * Places a task on the priority matrix as one "Move Task" step.
@@ -9836,6 +9863,25 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 
     
     /**
+     * A workspace's prioritised lists, most important first, each with its
+     * place (1..n) as `priority_rank`.
+     */
+    @Throws(CoreException::class)override fun `prioritisedLists`(`workspaceId`: kotlin.String): List<ListRow> {
+            return FfiConverterSequenceTypeListRow.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_prioritised_lists(
+        it,
+        
+        FfiConverterString.lower(`workspaceId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Resets a running block's clock after the system clock jumped.
      */
     @Throws(CoreException::class)override fun `rebaseFocusClock`(`id`: kotlin.String, `elapsedSeconds`: kotlin.Long, `nowMs`: kotlin.Long)
@@ -10465,6 +10511,27 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
         
         FfiConverterString.lower(`id`),
         FfiConverterBoolean.lower(`completed`),
+        FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Puts a list at `position` among the prioritised lists (1 the most
+     * important; past the end, last), or takes it out of them with `None`,
+     * as one step: "Prioritise List", or "Remove List Priority".
+     */
+    @Throws(CoreException::class)override fun `setListPriority`(`id`: kotlin.String, `position`: kotlin.Long?, `nowMs`: kotlin.Long)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_set_list_priority(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalLong.lower(`position`),
         FfiConverterLong.lower(`nowMs`),_status)
 }
     }
@@ -12366,6 +12433,22 @@ data class Candidate (
      * "dailyNotScheduled" or "dailyAlreadyMet" when its daily rules it out.
      */
     var `dailyUnavailable`: kotlin.String?
+    , 
+    /**
+     * Its list's place among the prioritised lists, 1 the most important;
+     * absent when the list is not prioritised.
+     */
+    var `listPriority`: kotlin.Long? = null 
+    , 
+    /**
+     * How committed the column it stands in on its list's board is: 0 for
+     * Today, then 1 for the stage nearest Today and so on leftwards, so
+     * further right on the board is lower. A task in no column, or in one
+     * that is not a stage (Waiting on, a rule column, one the board has
+     * lost), stands with the first. Absent when the core did not read it
+     * (a candidate a client built), and the stock board's order applies.
+     */
+    var `columnRank`: kotlin.Long? = null 
     
 ){
     
@@ -12402,6 +12485,8 @@ public object FfiConverterTypeCandidate: FfiConverterRustBuffer<Candidate> {
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalLong.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
         )
     }
 
@@ -12425,7 +12510,9 @@ public object FfiConverterTypeCandidate: FfiConverterRustBuffer<Candidate> {
             FfiConverterOptionalLong.allocationSize(value.`minimumBlockSeconds`) +
             FfiConverterBoolean.allocationSize(value.`requiresSingleSitting`) +
             FfiConverterOptionalLong.allocationSize(value.`dailyRemainingSeconds`) +
-            FfiConverterOptionalString.allocationSize(value.`dailyUnavailable`)
+            FfiConverterOptionalString.allocationSize(value.`dailyUnavailable`) +
+            FfiConverterOptionalLong.allocationSize(value.`listPriority`) +
+            FfiConverterOptionalLong.allocationSize(value.`columnRank`)
     )
 
     override fun write(value: Candidate, buf: ByteBuffer) {
@@ -12449,6 +12536,8 @@ public object FfiConverterTypeCandidate: FfiConverterRustBuffer<Candidate> {
             FfiConverterBoolean.write(value.`requiresSingleSitting`, buf)
             FfiConverterOptionalLong.write(value.`dailyRemainingSeconds`, buf)
             FfiConverterOptionalString.write(value.`dailyUnavailable`, buf)
+            FfiConverterOptionalLong.write(value.`listPriority`, buf)
+            FfiConverterOptionalLong.write(value.`columnRank`, buf)
     }
 }
 
@@ -19100,6 +19189,13 @@ data class ListRow (
     var `createdAtMs`: kotlin.Long
     , 
     var `updatedAtMs`: kotlin.Long
+    , 
+    /**
+     * Its place among the prioritised lists, 1 the most important; absent
+     * when it is not prioritised. As stored: [`prioritised_lists`] gives
+     * the order with any gap or tie a merge left closed up.
+     */
+    var `priorityRank`: kotlin.Long? = null 
     
 ){
     
@@ -19128,6 +19224,7 @@ public object FfiConverterTypeListRow: FfiConverterRustBuffer<ListRow> {
             FfiConverterOptionalLong.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
         )
     }
 
@@ -19143,7 +19240,8 @@ public object FfiConverterTypeListRow: FfiConverterRustBuffer<ListRow> {
             FfiConverterOptionalString.allocationSize(value.`visibleRootTaskId`) +
             FfiConverterOptionalLong.allocationSize(value.`completedAtMs`) +
             FfiConverterLong.allocationSize(value.`createdAtMs`) +
-            FfiConverterLong.allocationSize(value.`updatedAtMs`)
+            FfiConverterLong.allocationSize(value.`updatedAtMs`) +
+            FfiConverterOptionalLong.allocationSize(value.`priorityRank`)
     )
 
     override fun write(value: ListRow, buf: ByteBuffer) {
@@ -19159,6 +19257,7 @@ public object FfiConverterTypeListRow: FfiConverterRustBuffer<ListRow> {
             FfiConverterOptionalLong.write(value.`completedAtMs`, buf)
             FfiConverterLong.write(value.`createdAtMs`, buf)
             FfiConverterLong.write(value.`updatedAtMs`, buf)
+            FfiConverterOptionalLong.write(value.`priorityRank`, buf)
     }
 }
 
@@ -24358,6 +24457,12 @@ sealed class CoreException: kotlin.Exception() {
             get() = ""
     }
     
+    class ListCannotBePrioritised(
+        ) : CoreException() {
+        override val message
+            get() = ""
+    }
+    
     class EmptyName(
         ) : CoreException() {
         override val message
@@ -24578,46 +24683,47 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 FfiConverterString.read(buf),
                 )
             8 -> CoreException.SystemListIsPermanent()
-            9 -> CoreException.EmptyName()
-            10 -> CoreException.InvalidFolderMove()
-            11 -> CoreException.InvalidCondition()
-            12 -> CoreException.InvalidStatus(
+            9 -> CoreException.ListCannotBePrioritised()
+            10 -> CoreException.EmptyName()
+            11 -> CoreException.InvalidFolderMove()
+            12 -> CoreException.InvalidCondition()
+            13 -> CoreException.InvalidStatus(
                 FfiConverterString.read(buf),
                 )
-            13 -> CoreException.InvalidSchedule()
-            14 -> CoreException.InvalidMinimum()
-            15 -> CoreException.EstimateRequired()
-            16 -> CoreException.InvalidDate()
-            17 -> CoreException.EditorConflict()
-            18 -> CoreException.InvalidVisibleRoot()
-            19 -> CoreException.DuplicateSourceId()
-            20 -> CoreException.NoActiveFocusTask()
-            21 -> CoreException.Unavailable()
-            22 -> CoreException.InvalidTaskMove()
-            23 -> CoreException.DependencyCycle()
-            24 -> CoreException.MissingFilterList(
+            14 -> CoreException.InvalidSchedule()
+            15 -> CoreException.InvalidMinimum()
+            16 -> CoreException.EstimateRequired()
+            17 -> CoreException.InvalidDate()
+            18 -> CoreException.EditorConflict()
+            19 -> CoreException.InvalidVisibleRoot()
+            20 -> CoreException.DuplicateSourceId()
+            21 -> CoreException.NoActiveFocusTask()
+            22 -> CoreException.Unavailable()
+            23 -> CoreException.InvalidTaskMove()
+            24 -> CoreException.DependencyCycle()
+            25 -> CoreException.MissingFilterList(
                 FfiConverterString.read(buf),
                 )
-            25 -> CoreException.InvalidFilter(
+            26 -> CoreException.InvalidFilter(
                 FfiConverterString.read(buf),
                 )
-            26 -> CoreException.File(
+            27 -> CoreException.File(
                 FfiConverterString.read(buf),
                 )
-            27 -> CoreException.ColumnRefused(
+            28 -> CoreException.ColumnRefused(
                 FfiConverterString.read(buf),
                 )
-            28 -> CoreException.InvalidRecurrence(
+            29 -> CoreException.InvalidRecurrence(
                 FfiConverterString.read(buf),
                 )
-            29 -> CoreException.Checkvist(
+            30 -> CoreException.Checkvist(
                 FfiConverterString.read(buf),
                 )
-            30 -> CoreException.InvalidEstimate()
-            31 -> CoreException.InvalidFollowUpRepeat(
+            31 -> CoreException.InvalidEstimate()
+            32 -> CoreException.InvalidFollowUpRepeat(
                 FfiConverterUInt.read(buf),
                 )
-            32 -> CoreException.GoogleCalendar(
+            33 -> CoreException.GoogleCalendar(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -24662,6 +24768,10 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 + FfiConverterString.allocationSize(value.`id`)
             )
             is CoreException.SystemListIsPermanent -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is CoreException.ListCannotBePrioritised -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -24814,108 +24924,112 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 buf.putInt(8)
                 Unit
             }
-            is CoreException.EmptyName -> {
+            is CoreException.ListCannotBePrioritised -> {
                 buf.putInt(9)
                 Unit
             }
-            is CoreException.InvalidFolderMove -> {
+            is CoreException.EmptyName -> {
                 buf.putInt(10)
                 Unit
             }
-            is CoreException.InvalidCondition -> {
+            is CoreException.InvalidFolderMove -> {
                 buf.putInt(11)
                 Unit
             }
-            is CoreException.InvalidStatus -> {
+            is CoreException.InvalidCondition -> {
                 buf.putInt(12)
+                Unit
+            }
+            is CoreException.InvalidStatus -> {
+                buf.putInt(13)
                 FfiConverterString.write(value.`status`, buf)
                 Unit
             }
             is CoreException.InvalidSchedule -> {
-                buf.putInt(13)
-                Unit
-            }
-            is CoreException.InvalidMinimum -> {
                 buf.putInt(14)
                 Unit
             }
-            is CoreException.EstimateRequired -> {
+            is CoreException.InvalidMinimum -> {
                 buf.putInt(15)
                 Unit
             }
-            is CoreException.InvalidDate -> {
+            is CoreException.EstimateRequired -> {
                 buf.putInt(16)
                 Unit
             }
-            is CoreException.EditorConflict -> {
+            is CoreException.InvalidDate -> {
                 buf.putInt(17)
                 Unit
             }
-            is CoreException.InvalidVisibleRoot -> {
+            is CoreException.EditorConflict -> {
                 buf.putInt(18)
                 Unit
             }
-            is CoreException.DuplicateSourceId -> {
+            is CoreException.InvalidVisibleRoot -> {
                 buf.putInt(19)
                 Unit
             }
-            is CoreException.NoActiveFocusTask -> {
+            is CoreException.DuplicateSourceId -> {
                 buf.putInt(20)
                 Unit
             }
-            is CoreException.Unavailable -> {
+            is CoreException.NoActiveFocusTask -> {
                 buf.putInt(21)
                 Unit
             }
-            is CoreException.InvalidTaskMove -> {
+            is CoreException.Unavailable -> {
                 buf.putInt(22)
                 Unit
             }
-            is CoreException.DependencyCycle -> {
+            is CoreException.InvalidTaskMove -> {
                 buf.putInt(23)
                 Unit
             }
-            is CoreException.MissingFilterList -> {
+            is CoreException.DependencyCycle -> {
                 buf.putInt(24)
+                Unit
+            }
+            is CoreException.MissingFilterList -> {
+                buf.putInt(25)
                 FfiConverterString.write(value.`id`, buf)
                 Unit
             }
             is CoreException.InvalidFilter -> {
-                buf.putInt(25)
-                FfiConverterString.write(value.`detail`, buf)
-                Unit
-            }
-            is CoreException.File -> {
                 buf.putInt(26)
                 FfiConverterString.write(value.`detail`, buf)
                 Unit
             }
-            is CoreException.ColumnRefused -> {
+            is CoreException.File -> {
                 buf.putInt(27)
                 FfiConverterString.write(value.`detail`, buf)
                 Unit
             }
-            is CoreException.InvalidRecurrence -> {
+            is CoreException.ColumnRefused -> {
                 buf.putInt(28)
+                FfiConverterString.write(value.`detail`, buf)
+                Unit
+            }
+            is CoreException.InvalidRecurrence -> {
+                buf.putInt(29)
                 FfiConverterString.write(value.`rule`, buf)
                 Unit
             }
             is CoreException.Checkvist -> {
-                buf.putInt(29)
+                buf.putInt(30)
                 FfiConverterString.write(value.`detail`, buf)
                 Unit
             }
             is CoreException.InvalidEstimate -> {
-                buf.putInt(30)
+                buf.putInt(31)
                 Unit
             }
             is CoreException.InvalidFollowUpRepeat -> {
-                buf.putInt(31)
+                buf.putInt(32)
                 FfiConverterUInt.write(value.`days`, buf)
                 Unit
             }
             is CoreException.GoogleCalendar -> {
-                buf.putInt(32)
+                buf.putInt(33)
                 FfiConverterString.write(value.`detail`, buf)
                 Unit
             }

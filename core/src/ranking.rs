@@ -3,8 +3,12 @@
 //!
 //! Availability is decided first. The available tasks are then ordered by a
 //! deterministic precedence: lateness and deadline risk before anything else,
-//! then commitments, importance, priority, nearness, urgency, age, size and
-//! position. Pins (a task's focus rank) place work within a tier but never
+//! then the board column (further right first, Today and dailies due today
+//! first of all), then the list's priority (prioritised lists in their
+//! order, the rest after), then conditions, a start, importance, priority,
+//! nearness, urgency, age, size and position. So a prioritised list leads
+//! within a column, never across one: its backlog stays behind anyone's
+//! Today. Pins (a task's focus rank) place work within a tier but never
 //! reverse lateness or deadline slack.
 
 use std::cmp::Ordering;
@@ -205,19 +209,19 @@ fn precedence(left: &Candidate, right: &Candidate, now_ms: i64, zone: Tz) -> Ord
         return lexicographic(&lhs, &rhs);
     }
     let secondary = |task: &Candidate| -> Vec<f64> {
-        let commitment =
-            task.is_daily_due_today || task.kanban_column.as_deref() == Some(TODAY_COLUMN);
         let days = effective_deadline(task, zone).map_or(f64::INFINITY, |due| {
             ((due - now_ms) as f64 / 1000.0 / 86_400.0).max(0.0)
         });
         vec![
+            column_rank(task) as f64,
+            // Unprioritised lists come after every prioritised one.
+            task.list_priority.map_or(f64::INFINITY, |rank| rank as f64),
             if task.requirement_groups.is_empty() {
                 1.0
             } else {
                 0.0
             },
             if task.start_at_ms.is_none() { 1.0 } else { 0.0 },
-            if commitment { 0.0 } else { 1.0 },
             -(task.matrix_importance.unwrap_or(0) as f64),
             // 1 is the most urgent, 4 the least; no priority comes after all
             // four, and -4 to -1 after that, -1 last.
@@ -239,6 +243,24 @@ fn precedence(left: &Candidate, right: &Candidate, now_ms: i64, zone: Tz) -> Ord
         left.id.cmp(&right.id)
     } else {
         lexicographic(&a, &b)
+    }
+}
+
+/// How committed a task's column is, further right on its board first:
+/// Today and a daily due today are 0, the commitments. A candidate the core
+/// read carries its rank on its own list's board; one a client built falls
+/// back on the stock board's order.
+fn column_rank(task: &Candidate) -> i64 {
+    if task.is_daily_due_today || task.kanban_column.as_deref() == Some(TODAY_COLUMN) {
+        return 0;
+    }
+    if let Some(rank) = task.column_rank {
+        return rank;
+    }
+    match task.kanban_column.as_deref() {
+        Some(crate::board_columns::THIS_WEEK_COLUMN_ID) => 1,
+        Some("in-progress") => 2,
+        _ => 3,
     }
 }
 

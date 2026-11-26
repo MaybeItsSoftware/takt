@@ -225,7 +225,7 @@ pub(crate) fn layout(
 
 /// A column that is a stage of work, so an entered task's position hides
 /// the ones before it: not Waiting on, not a rule column.
-fn is_stage(column: &BoardColumn) -> bool {
+pub(crate) fn is_stage(column: &BoardColumn) -> bool {
     column.rules.is_none() && column.id != WAITING_COLUMN_ID
 }
 
