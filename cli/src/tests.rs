@@ -705,6 +705,20 @@ fn subcommands_map_onto_the_tools_they_claim_to_be() {
 }
 
 #[test]
+fn prioritise_list_sends_a_position_or_null_and_needs_one_of_them() {
+    let (name, args) = resolved(&["priority", "ws", "prioritise-list", "L", "2"]);
+    assert_eq!(name, "workspace_list_priority_set");
+    assert_eq!(args["list_id"], json!("L"));
+    assert_eq!(args["position"], json!(2));
+    let (_, args) = resolved(&["priority", "ws", "prioritise-list", "L", "--remove"]);
+    assert_eq!(args["position"], Value::Null);
+    assert!(Cli::try_parse_from(["priority", "ws", "prioritise-list", "L"]).is_err());
+    assert!(
+        Cli::try_parse_from(["priority", "ws", "prioritise-list", "L", "1", "--remove"]).is_err()
+    );
+}
+
+#[test]
 fn update_sends_tags_including_an_empty_string_that_clears_them() {
     let (name, args) = resolved(&["priority", "update", "5", "--tags", "work,urgent"]);
     assert_eq!(name, "task_update");
@@ -795,6 +809,8 @@ const EVERY_SUBCOMMAND: &[&[&str]] = &[
     &["ws", "new-folder", "F"],
     &["ws", "new-list", "L"],
     &["ws", "move-list", "L"],
+    &["ws", "prioritise-list", "L", "1"],
+    &["ws", "prioritise-list", "L", "--remove"],
     &["ws", "rm-list", "L"],
     &["ws", "commit", "T", "-r", "weekdays"],
     &["ws", "columns"],
@@ -946,7 +962,7 @@ fn every_advertised_tool_is_actually_implemented() {
 }
 
 #[test]
-fn the_tool_surface_is_fifty_four_uniquely_named_tools() {
+fn the_tool_surface_is_fifty_five_uniquely_named_tools() {
     let definitions = tool_definitions();
     let mut names: Vec<&str> = definitions
         .iter()
@@ -956,7 +972,7 @@ fn the_tool_surface_is_fifty_four_uniquely_named_tools() {
     names.sort_unstable();
     names.dedup();
     assert_eq!(names.len(), total, "duplicate tool name");
-    assert_eq!(total, 54);
+    assert_eq!(total, 55);
 
     for definition in &definitions {
         assert!(

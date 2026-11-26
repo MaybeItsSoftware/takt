@@ -867,6 +867,30 @@ impl Tools {
                 ))
             }
 
+            "workspace_list_priority_set" => {
+                let list_id = required_string(arguments, "list_id")?;
+                let position = match arguments.get("position") {
+                    None => {
+                        return Err(ToolError::new(
+                            "position is required: a place among the prioritised lists, 1 the most important, or null to take the list out of them.",
+                        ));
+                    }
+                    Some(Value::Null) => None,
+                    Some(value) => Some(value.as_i64().ok_or_else(|| {
+                        ToolError::new("position must be a whole number, or null.")
+                    })?),
+                };
+                let title = if position.is_some() {
+                    "List prioritised"
+                } else {
+                    "List priority removed"
+                };
+                Ok(outcome(
+                    title,
+                    self.workspace.set_list_priority(&list_id, position)?,
+                ))
+            }
+
             "workspace_list_delete" => {
                 let list_id = required_string(arguments, "list_id")?;
                 Ok(outcome(

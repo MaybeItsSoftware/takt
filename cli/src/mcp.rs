@@ -999,6 +999,23 @@ fn workspace_tool_definitions() -> Vec<Value> {
             },
         }),
         json!({
+            "name": "workspace_list_priority_set",
+            "description": "Prioritise a local list, move it among the prioritised lists, or take it out of them. The prioritised lists are numbered 1..n, 1 the most important; position puts this one there and renumbers the rest around it, and a position past the end puts it last. null takes it out and closes the gap. Up next ranks a task in a prioritised list ahead of the others in the same board column, in this order. An archived or completed list cannot be prioritised. workspace_tree shows each list's priority_rank. Undoable from Takt's Undo menu.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "list_id": id("From workspace_tree."),
+                    "position": {
+                        "type": ["integer", "null"],
+                        "minimum": 1,
+                        "description": "Its place among the prioritised lists, 1 the most important. null to un-prioritise it.",
+                    },
+                },
+                "required": ["list_id", "position"],
+                "additionalProperties": false,
+            },
+        }),
+        json!({
             "name": "workspace_list_delete",
             "description": "Delete a local list and every task in it. The Inbox cannot be deleted. Undoable from Takt's Undo menu.",
             "inputSchema": {

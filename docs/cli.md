@@ -297,6 +297,8 @@ takt ws day-start --off                       # what holds carries over; bare da
 takt ws new-folder Computer Science
 takt ws new-list Revision --folder <FOLDER_ID>
 takt ws move-list <LIST_ID> --folder <FOLDER_ID>
+takt ws prioritise-list <LIST_ID> 1           # most important; Up next leads each column with it
+takt ws prioritise-list <LIST_ID> --remove    # no longer prioritised
 takt ws rm <TASK_ID>
 takt ws rm-list <LIST_ID>                     # the list and its tasks
 

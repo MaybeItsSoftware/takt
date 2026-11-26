@@ -66,6 +66,7 @@ pub const WRITE_TOOLS: &[&str] = &[
     "workspace_folder_create",
     "workspace_list_create",
     "workspace_list_move",
+    "workspace_list_priority_set",
     "workspace_list_delete",
     "workspace_board_column_set",
     "workspace_board_column_delete",

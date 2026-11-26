@@ -2391,3 +2391,67 @@ fn a_task_in_a_shared_list_is_assigned_and_says_who_did_it() {
     );
     assert!(tree["tasks"][0].get("assignee").is_none());
 }
+
+#[test]
+fn a_list_is_prioritised_moved_and_unprioritised_in_one_step_each() {
+    let fixture = Fixture::new();
+    let tree = fixture.call("workspace_tree", json!({}));
+    assert!(
+        tree["lists"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|list| list["priority_rank"].is_null())
+    );
+
+    fixture.call(
+        "workspace_list_priority_set",
+        json!({ "list_id": PROJECTS, "position": 1 }),
+    );
+    let set = fixture.call(
+        "workspace_list_priority_set",
+        json!({ "list_id": INBOX, "position": 1 }),
+    );
+    assert_eq!(set["list"]["priority_rank"], json!(1));
+    let order: Vec<&Value> = set["priorities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|list| &list["id"])
+        .collect();
+    assert_eq!(order, [&json!(INBOX), &json!(PROJECTS)]);
+    assert_eq!(fixture.journal().last().unwrap().0, "MCP: Prioritise List");
+
+    let tree = fixture.call("workspace_tree", json!({}));
+    let rank = |id: &str| {
+        tree["lists"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|list| list["id"] == json!(id))
+            .unwrap()["priority_rank"]
+            .clone()
+    };
+    assert_eq!(rank(INBOX), json!(1));
+    assert_eq!(rank(PROJECTS), json!(2));
+
+    let removed = fixture.call(
+        "workspace_list_priority_set",
+        json!({ "list_id": INBOX, "position": null }),
+    );
+    assert!(removed["list"]["priority_rank"].is_null());
+    assert_eq!(removed["priorities"][0]["id"], json!(PROJECTS));
+    assert_eq!(removed["priorities"][0]["priority_rank"], json!(1));
+    assert_eq!(
+        fixture.journal().last().unwrap().0,
+        "MCP: Remove List Priority"
+    );
+
+    // Leaving position out is refused rather than read as null.
+    assert!(
+        fixture
+            .try_call("workspace_list_priority_set", json!({ "list_id": INBOX }))
+            .unwrap_err()
+            .contains("position is required")
+    );
+}

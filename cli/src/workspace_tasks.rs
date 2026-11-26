@@ -101,6 +101,8 @@ const AUTHORSHIP_MIGRATION: &str = "v38_task_authorship";
 /// What adds `task_dependencies`. Before it, the dependency reads come back
 /// empty and the dependency writes are refused.
 const DEPENDENCIES_MIGRATION: &str = "v21_task_dependencies";
+/// The migration that added list priorities (`task_lists.priorityRank`).
+const LIST_PRIORITY_MIGRATION: &str = "v40_list_priority";
 
 /// One task row with the metadata the tools show beside it.
 struct TaskRow {
@@ -462,9 +464,11 @@ impl Workspace {
             },
         )?;
         let shared = shared_lists(&connection)?;
+        let priorities = list_priorities(&connection, &workspace.0)?;
         let mut lists = lists;
         for list in &mut lists {
             let id = list["id"].as_str().unwrap_or_default().to_owned();
+            list["priority_rank"] = json!(priorities.get(&id));
             list["shared"] = shared
                 .iter()
                 .find(|shared| shared.list_id == id)
@@ -1091,6 +1095,51 @@ impl Workspace {
         })
     }
 
+    /// `lists::set_list_priority`: puts a list at `position` among the
+    /// prioritised lists (1 the most important; past the end, last), or
+    /// takes it out of them with `None`. Answers with the list and the
+    /// prioritised lists in their new order.
+    pub fn set_list_priority(&self, list_id: &str, position: Option<i64>) -> Result<Value> {
+        let label = if position.is_some() {
+            "Prioritise List"
+        } else {
+            "Remove List Priority"
+        };
+        self.journalled(label, |tx, _now| {
+            require_list_priority(tx)?;
+            list_row(tx, list_id)?;
+            // The write is the Rust core's, shared with the apps.
+            takt_core::lists::set_list_priority(
+                tx,
+                list_id,
+                position,
+                Utc::now().timestamp_millis(),
+            )
+            .map_err(map_core_error)?;
+            let workspace = workspace_row(tx)?.0;
+            let ordered =
+                takt_core::records::prioritised_lists(tx, &workspace).map_err(map_core_error)?;
+            let mut list = list_row(tx, list_id)?.to_json();
+            list["priority_rank"] = json!(
+                ordered
+                    .iter()
+                    .find(|row| row.id == list_id)
+                    .and_then(|row| row.priority_rank)
+            );
+            let priorities: Vec<Value> = ordered
+                .iter()
+                .map(|row| {
+                    json!({
+                        "id": row.id,
+                        "name": row.name,
+                        "priority_rank": row.priority_rank,
+                    })
+                })
+                .collect();
+            Ok(json!({ "list": list, "priorities": priorities }))
+        })
+    }
+
     /// `WorkspaceStore.deleteList`. Its tasks go with it, by the schema's
     /// cascade, and all of it comes back on undo. The Inbox is refused.
     pub fn delete_list(&self, list_id: &str) -> Result<Value> {
@@ -1465,6 +1514,31 @@ fn require_dependencies(connection: &Connection) -> Result<()> {
         "This workspace predates task dependencies ({DEPENDENCIES_MIGRATION}). \
          Open an up-to-date Takt once to migrate it."
     )))
+}
+
+fn require_list_priority(connection: &Connection) -> Result<()> {
+    if has_migration(connection, LIST_PRIORITY_MIGRATION)? {
+        return Ok(());
+    }
+    Err(ToolError::new(format!(
+        "This workspace predates list priorities ({LIST_PRIORITY_MIGRATION}). \
+         Open an up-to-date Takt once to migrate it."
+    )))
+}
+
+/// Each prioritised list's place, 1 the most important. Empty for a
+/// workspace from before list priorities: the CLI reads without migrating.
+fn list_priorities(connection: &Connection, workspace_id: &str) -> Result<HashMap<String, i64>> {
+    if !has_migration(connection, LIST_PRIORITY_MIGRATION)? {
+        return Ok(HashMap::new());
+    }
+    Ok(
+        takt_core::records::prioritised_lists(connection, workspace_id)
+            .map_err(map_core_error)?
+            .into_iter()
+            .filter_map(|row| Some((row.id, row.priority_rank?)))
+            .collect(),
+    )
 }
 
 // -- values -------------------------------------------------------------------

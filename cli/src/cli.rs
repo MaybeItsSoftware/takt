@@ -583,6 +583,16 @@ pub enum WsCommand {
         #[arg(long, short = 'f', value_name = "FOLDER_ID")]
         folder: Option<String>,
     },
+    /// Prioritise a list at a position (1 the most important), move it
+    /// among the prioritised lists, or take it out of them with --remove.
+    PrioritiseList {
+        list_id: String,
+        #[arg(required_unless_present = "remove", conflicts_with = "remove")]
+        position: Option<i64>,
+        /// Take the list out of the prioritised lists.
+        #[arg(long)]
+        remove: bool,
+    },
     /// Delete a list and every task in it. Undoable from the app.
     RmList { list_id: String },
     /// A board's columns: a list's (by id), everything's, or the default.
@@ -1321,6 +1331,22 @@ fn resolve_workspace(
             insert_if_some(arguments, "folder_id", folder.as_deref());
             "workspace_list_move"
         }
+        WsCommand::PrioritiseList {
+            list_id,
+            position,
+            remove,
+        } => {
+            arguments.insert("list_id".into(), json!(list_id));
+            arguments.insert(
+                "position".into(),
+                if *remove {
+                    Value::Null
+                } else {
+                    json!(position)
+                },
+            );
+            "workspace_list_priority_set"
+        }
         WsCommand::RmList { list_id } => {
             arguments.insert("list_id".into(), json!(list_id));
             "workspace_list_delete"
@@ -1479,6 +1505,23 @@ pub fn render(tool: &str, outcome: &ToolOutcome, as_json: bool) {
         | "workspace_task_blocker_remove" => render_workspace_dependencies(payload),
         "workspace_conditions" => render_conditions(payload),
         "workspace_shared_lists" => render_shared_lists(payload),
+        "workspace_list_priority_set" => {
+            let priorities = payload["priorities"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            if priorities.is_empty() {
+                println!("  No prioritised lists.");
+            }
+            for list in priorities {
+                println!(
+                    "  {}. {}  {}",
+                    list["priority_rank"],
+                    text_of(&list["name"]),
+                    text_of(&list["id"])
+                );
+            }
+        }
         "workspace_condition_provides_set" => {
             let names: Vec<String> = payload["provides"]
                 .as_array()
@@ -1951,6 +1994,10 @@ fn render_folder(folder: &Value, depth: usize, folders: &[Value], lists: &[Value
 }
 
 fn render_workspace_list(list: &Value, depth: usize) {
+    let priority = list["priority_rank"]
+        .as_i64()
+        .map(|rank| format!(" (priority {rank})"))
+        .unwrap_or_default();
     let marks: String = [
         (list["system_role"] == json!("inbox"), " (inbox)"),
         (list["is_archived"] == json!(true), " (archived)"),
@@ -1966,7 +2013,7 @@ fn render_workspace_list(list: &Value, depth: usize) {
     .map(|(_, mark)| *mark)
     .collect();
     println!(
-        "{}{}{marks}  [{} open]  {}",
+        "{}{}{priority}{marks}  [{} open]  {}",
         "  ".repeat(depth),
         text_of(&list["name"]),
         list["open_task_count"],
