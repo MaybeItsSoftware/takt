@@ -104,6 +104,33 @@ final class WorkspaceConditionsTests: XCTestCase {
     XCTAssertEqual(try store.requiredConditionIDs(in: workspace.id), [], "a done task needs nothing")
   }
 
+  /// A device condition holds on a device of its kind by itself, under its
+  /// own heading first, and nothing said can switch it.
+  func testDeviceConditionHoldsOnlyOnItsKindAndCannotBeSwitched() throws {
+    // The kind is process-wide: put it back for the tests after this one.
+    let before = ConditionDeviceKind.thisDevice
+    defer { ConditionDeviceKind.setThisDevice(before) }
+    let laptop = try store.createCondition(workspaceId: workspace.id, name: "Laptop", category: nil, now: now)
+    XCTAssertTrue(try store.setConditionDeviceKind(id: laptop.id, kind: "laptop", now: now))
+    XCTAssertFalse(try store.setConditionDeviceKind(id: laptop.id, kind: "laptop", now: now))
+    let conditions = try store.conditions(in: workspace.id)
+    let marked = try XCTUnwrap(conditions.first { $0.id == laptop.id })
+    XCTAssertEqual(marked.device, .laptop)
+    XCTAssertEqual(TaskConditionSection.sections(conditions).first?.isDevice, true)
+    XCTAssertEqual(TaskConditionSection.sections(conditions).first?.conditions.map(\.id), [laptop.id])
+
+    ConditionDeviceKind.setThisDevice(.phone)
+    XCTAssertFalse(FocusConditionHoldings.held(conditions, set: [laptop.id], off: []).contains(laptop.id))
+    XCTAssertEqual(
+      FocusConditionHoldings.switching(laptop.id, on: true, in: conditions, set: [], off: []).set, [])
+    ConditionDeviceKind.setThisDevice(.laptop)
+    XCTAssertTrue(FocusConditionHoldings.held(conditions, set: [], off: []).contains(laptop.id))
+    XCTAssertEqual(FocusConditionHoldings.holdings(conditions, set: [], off: [laptop.id])[laptop.id]?.isDevice, true)
+
+    XCTAssertTrue(try store.setConditionDeviceKind(id: laptop.id, kind: nil, now: now))
+    XCTAssertNil(try store.conditions(in: workspace.id).first { $0.id == laptop.id }?.deviceKind)
+  }
+
   func testPlanningSaveAndUndoAreAtomicAndReopenRetainsAllFields() throws {
     let task = try task()
     let conditions = try store.conditions(in: workspace.id)

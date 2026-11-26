@@ -1267,9 +1267,19 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func hasManualFocusOrder() throws  -> Bool
     
     /**
+     * The lists a task inherits requirements from, outermost first.
+     */
+    func inheritedRequirements(taskId: String) throws  -> [InheritedRequirement]
+    
+    /**
      * Every saved board's columns.
      */
     func kanbanBoards() throws  -> [BoardBaseline]
+    
+    /**
+     * What a list, standalone or nested, requires of its tasks.
+     */
+    func listRequirementGroups(listId: String) throws  -> [[String]]
     
     /**
      * Seconds logged per task.
@@ -2020,6 +2030,13 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
     func setConditionCategory(id: String, category: String?, nowMs: Int64) throws 
     
     /**
+     * Makes a condition the device condition of `kind` ("laptop", "phone"
+     * or "tablet"), or with none an ordinary one again, as one "Edit
+     * Condition" step. False when it already was.
+     */
+    func setConditionDeviceKind(id: String, kind: String?, nowMs: Int64) throws  -> Bool
+    
+    /**
      * Sets what a condition provides, replacing what it did, as one "Edit
      * Condition" step. False when it already provided exactly that.
      */
@@ -2051,6 +2068,13 @@ public protocol CoreWorkspaceProtocol: AnyObject, Sendable {
      * as one step: "Prioritise List", or "Remove List Priority".
      */
     func setListPriority(id: String, position: Int64?, nowMs: Int64) throws 
+    
+    /**
+     * Sets what a list (standalone, or nested) requires of every task in
+     * it, as one "Edit Conditions" step. False when it already required
+     * exactly that.
+     */
+    func setListRequirements(listId: String, groups: [[String]], nowMs: Int64) throws  -> Bool
     
     /**
      * Places a task on the priority matrix as one "Move Task" step.
@@ -3166,6 +3190,19 @@ open func hasManualFocusOrder()throws  -> Bool  {
 }
     
     /**
+     * The lists a task inherits requirements from, outermost first.
+     */
+open func inheritedRequirements(taskId: String)throws  -> [InheritedRequirement]  {
+    return try  FfiConverterSequenceTypeInheritedRequirement.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_inherited_requirements(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(taskId),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Every saved board's columns.
      */
 open func kanbanBoards()throws  -> [BoardBaseline]  {
@@ -3173,6 +3210,19 @@ open func kanbanBoards()throws  -> [BoardBaseline]  {
         uniffiCallStatus in
     uniffi_takt_core_fn_method_coreworkspace_kanban_boards(
             self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * What a list, standalone or nested, requires of its tasks.
+     */
+open func listRequirementGroups(listId: String)throws  -> [[String]]  {
+    return try  FfiConverterSequenceSequenceString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_list_requirement_groups(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(listId),uniffiCallStatus
     )
 })
 }
@@ -5175,6 +5225,23 @@ open func setConditionCategory(id: String, category: String?, nowMs: Int64)throw
 }
     
     /**
+     * Makes a condition the device condition of `kind` ("laptop", "phone"
+     * or "tablet"), or with none an ordinary one again, as one "Edit
+     * Condition" step. False when it already was.
+     */
+open func setConditionDeviceKind(id: String, kind: String?, nowMs: Int64)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_set_condition_device_kind(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionString.lower(kind),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Sets what a condition provides, replacing what it did, as one "Edit
      * Condition" step. False when it already provided exactly that.
      */
@@ -5260,6 +5327,23 @@ open func setListPriority(id: String, position: Int64?, nowMs: Int64)throws   {t
         FfiConverterInt64.lower(nowMs),uniffiCallStatus
     )
 }
+}
+    
+    /**
+     * Sets what a list (standalone, or nested) requires of every task in
+     * it, as one "Edit Conditions" step. False when it already required
+     * exactly that.
+     */
+open func setListRequirements(listId: String, groups: [[String]], nowMs: Int64)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_method_coreworkspace_set_list_requirements(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(listId),
+        FfiConverterSequenceSequenceString.lower(groups),
+        FfiConverterInt64.lower(nowMs),uniffiCallStatus
+    )
+})
 }
     
     /**
@@ -7037,6 +7121,10 @@ public struct Candidate: Equatable, Hashable {
     public var sortOrder: Int64
     public var createdAtMs: Int64
     public var dueDate: String?
+    /**
+     * What it requires: its own groups and those it inherits from the lists
+     * it is in (`conditions::inherited`).
+     */
     public var requirementGroups: [[String]]
     public var loggedSeconds: Int64
     public var minimumBlockSeconds: Int64?
@@ -7063,7 +7151,11 @@ public struct Candidate: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, title: String, isDailyDueToday: Bool, dueAtMs: Int64?, startAtMs: Int64?, matrixUrgency: Int64?, matrixImportance: Int64?, priority: Int64?, estimateSeconds: Int64?, kanbanColumn: String?, focusRank: Int64?, sortOrder: Int64, createdAtMs: Int64, dueDate: String?, requirementGroups: [[String]], loggedSeconds: Int64, minimumBlockSeconds: Int64?, requiresSingleSitting: Bool, dailyRemainingSeconds: Int64?, 
+    public init(id: String, title: String, isDailyDueToday: Bool, dueAtMs: Int64?, startAtMs: Int64?, matrixUrgency: Int64?, matrixImportance: Int64?, priority: Int64?, estimateSeconds: Int64?, kanbanColumn: String?, focusRank: Int64?, sortOrder: Int64, createdAtMs: Int64, dueDate: String?, 
+        /**
+         * What it requires: its own groups and those it inherits from the lists
+         * it is in (`conditions::inherited`).
+         */requirementGroups: [[String]], loggedSeconds: Int64, minimumBlockSeconds: Int64?, requiresSingleSitting: Bool, dailyRemainingSeconds: Int64?, 
         /**
          * "dailyNotScheduled" or "dailyAlreadyMet" when its daily rules it out.
          */dailyUnavailable: String?, 
@@ -8249,6 +8341,11 @@ public struct ConditionHolding: Equatable, Hashable {
      */
     public var isSet: Bool
     /**
+     * A device condition of this device's kind, which holds here by
+     * itself (`conditions::device`).
+     */
+    public var isDevice: Bool
+    /**
      * The conditions said to hold that provide it, directly or through
      * another, in the order the tab shows them: "from Home". Empty when
      * nothing does.
@@ -8271,6 +8368,10 @@ public struct ConditionHolding: Equatable, Hashable {
          * Said to hold directly: a place chosen, a box ticked.
          */isSet: Bool, 
         /**
+         * A device condition of this device's kind, which holds here by
+         * itself (`conditions::device`).
+         */isDevice: Bool = false, 
+        /**
          * The conditions said to hold that provide it, directly or through
          * another, in the order the tab shows them: "from Home". Empty when
          * nothing does.
@@ -8284,6 +8385,7 @@ public struct ConditionHolding: Equatable, Hashable {
          */holds: Bool) {
         self.conditionId = conditionId
         self.isSet = isSet
+        self.isDevice = isDevice
         self.providedBy = providedBy
         self.isOff = isOff
         self.holds = holds
@@ -8307,6 +8409,7 @@ public struct FfiConverterTypeConditionHolding: FfiConverterRustBuffer {
             try ConditionHolding(
                 conditionId: FfiConverterString.read(from: &buf), 
                 isSet: FfiConverterBool.read(from: &buf), 
+                isDevice: FfiConverterBool.read(from: &buf), 
                 providedBy: FfiConverterSequenceString.read(from: &buf), 
                 isOff: FfiConverterBool.read(from: &buf), 
                 holds: FfiConverterBool.read(from: &buf)
@@ -8316,6 +8419,7 @@ public struct FfiConverterTypeConditionHolding: FfiConverterRustBuffer {
     public static func write(_ value: ConditionHolding, into buf: inout [UInt8]) {
         FfiConverterString.write(value.conditionId, into: &buf)
         FfiConverterBool.write(value.isSet, into: &buf)
+        FfiConverterBool.write(value.isDevice, into: &buf)
         FfiConverterSequenceString.write(value.providedBy, into: &buf)
         FfiConverterBool.write(value.isOff, into: &buf)
         FfiConverterBool.write(value.holds, into: &buf)
@@ -8367,6 +8471,12 @@ public struct ConditionRow: Equatable, Hashable {
      * nothing. See `conditions::provides`.
      */
     public var provides: [String]
+    /**
+     * "laptop", "phone" or "tablet" for a device condition, which holds on
+     * a device of that kind and nowhere else and is never said to hold;
+     * none for any other condition. See `conditions::device`.
+     */
+    public var deviceKind: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -8385,7 +8495,12 @@ public struct ConditionRow: Equatable, Hashable {
          * The conditions it switches on while it holds (Home: Floor space,
          * Desk), by id, sorted. Empty before v34 and for one that provides
          * nothing. See `conditions::provides`.
-         */provides: [String]) {
+         */provides: [String], 
+        /**
+         * "laptop", "phone" or "tablet" for a device condition, which holds on
+         * a device of that kind and nowhere else and is never said to hold;
+         * none for any other condition. See `conditions::device`.
+         */deviceKind: String? = nil) {
         self.id = id
         self.workspaceId = workspaceId
         self.name = name
@@ -8396,6 +8511,7 @@ public struct ConditionRow: Equatable, Hashable {
         self.category = category
         self.sortOrder = sortOrder
         self.provides = provides
+        self.deviceKind = deviceKind
     }
 
     
@@ -8423,7 +8539,8 @@ public struct FfiConverterTypeConditionRow: FfiConverterRustBuffer {
                 updatedAtMs: FfiConverterInt64.read(from: &buf), 
                 category: FfiConverterOptionString.read(from: &buf), 
                 sortOrder: FfiConverterOptionInt64.read(from: &buf), 
-                provides: FfiConverterSequenceString.read(from: &buf)
+                provides: FfiConverterSequenceString.read(from: &buf), 
+                deviceKind: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -8438,6 +8555,7 @@ public struct FfiConverterTypeConditionRow: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.category, into: &buf)
         FfiConverterOptionInt64.write(value.sortOrder, into: &buf)
         FfiConverterSequenceString.write(value.provides, into: &buf)
+        FfiConverterOptionString.write(value.deviceKind, into: &buf)
     }
 }
 
@@ -8481,6 +8599,12 @@ public struct ConditionSection: Equatable, Hashable {
      */
     public var isSetting: Bool
     /**
+     * Whether it is the Device heading: device conditions, which hold on a
+     * device of their kind by themselves and are never switched by hand.
+     * It comes first of all.
+     */
+    public var isDevice: Bool
+    /**
      * In the order they were given.
      */
     public var conditions: [ConditionRow]
@@ -8504,12 +8628,18 @@ public struct ConditionSection: Equatable, Hashable {
          * something ("Tools on hand"). Settings come first.
          */isSetting: Bool, 
         /**
+         * Whether it is the Device heading: device conditions, which hold on a
+         * device of their kind by themselves and are never switched by hand.
+         * It comes first of all.
+         */isDevice: Bool = false, 
+        /**
          * In the order they were given.
          */conditions: [ConditionRow]) {
         self.category = category
         self.title = title
         self.isExclusive = isExclusive
         self.isSetting = isSetting
+        self.isDevice = isDevice
         self.conditions = conditions
     }
 
@@ -8533,6 +8663,7 @@ public struct FfiConverterTypeConditionSection: FfiConverterRustBuffer {
                 title: FfiConverterString.read(from: &buf), 
                 isExclusive: FfiConverterBool.read(from: &buf), 
                 isSetting: FfiConverterBool.read(from: &buf), 
+                isDevice: FfiConverterBool.read(from: &buf), 
                 conditions: FfiConverterSequenceTypeConditionRow.read(from: &buf)
         )
     }
@@ -8542,6 +8673,7 @@ public struct FfiConverterTypeConditionSection: FfiConverterRustBuffer {
         FfiConverterString.write(value.title, into: &buf)
         FfiConverterBool.write(value.isExclusive, into: &buf)
         FfiConverterBool.write(value.isSetting, into: &buf)
+        FfiConverterBool.write(value.isDevice, into: &buf)
         FfiConverterSequenceTypeConditionRow.write(value.conditions, into: &buf)
     }
 }
@@ -15358,6 +15490,91 @@ public func FfiConverterTypeIncomingRow_lower(_ value: IncomingRow) -> RustBuffe
 
 
 /**
+ * One list a task inherits requirements from, and what they are.
+ */
+public struct InheritedRequirement: Equatable, Hashable {
+    /**
+     * The standalone list's id, or the nested list's task id.
+     */
+    public var listId: String
+    public var listName: String
+    /**
+     * Whether it is a nested list (a task record) rather than a standalone
+     * list.
+     */
+    public var isNested: Bool
+    /**
+     * Its groups, as a task's are kept.
+     */
+    public var groups: [[String]]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The standalone list's id, or the nested list's task id.
+         */listId: String, listName: String, 
+        /**
+         * Whether it is a nested list (a task record) rather than a standalone
+         * list.
+         */isNested: Bool, 
+        /**
+         * Its groups, as a task's are kept.
+         */groups: [[String]]) {
+        self.listId = listId
+        self.listName = listName
+        self.isNested = isNested
+        self.groups = groups
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension InheritedRequirement: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeInheritedRequirement: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InheritedRequirement {
+        return
+            try InheritedRequirement(
+                listId: FfiConverterString.read(from: &buf), 
+                listName: FfiConverterString.read(from: &buf), 
+                isNested: FfiConverterBool.read(from: &buf), 
+                groups: FfiConverterSequenceSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: InheritedRequirement, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.listId, into: &buf)
+        FfiConverterString.write(value.listName, into: &buf)
+        FfiConverterBool.write(value.isNested, into: &buf)
+        FfiConverterSequenceSequenceString.write(value.groups, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInheritedRequirement_lift(_ buf: RustBuffer) throws -> InheritedRequirement {
+    return try FfiConverterTypeInheritedRequirement.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInheritedRequirement_lower(_ value: InheritedRequirement) -> RustBuffer {
+    return FfiConverterTypeInheritedRequirement.lower(value)
+}
+
+
+/**
  * A key in the catalogue's spelling, taken apart for a toolkit's own key
  * type: its modifiers and the key itself (a character, or one of
  * [`KEY_NAMES`]).
@@ -15851,6 +16068,12 @@ public struct ListRow: Equatable, Hashable {
      * the order with any gap or tie a merge left closed up.
      */
     public var priorityRank: Int64?
+    /**
+     * What every task in it requires, as a task's requirement groups are
+     * kept: every group met, any member of one, "!id" for a condition not
+     * holding. Empty for none. See `conditions::inherited`.
+     */
+    public var requirementGroups: [[String]]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -15862,7 +16085,12 @@ public struct ListRow: Equatable, Hashable {
          * Its place among the prioritised lists, 1 the most important; absent
          * when it is not prioritised. As stored: [`prioritised_lists`] gives
          * the order with any gap or tie a merge left closed up.
-         */priorityRank: Int64? = nil) {
+         */priorityRank: Int64? = nil, 
+        /**
+         * What every task in it requires, as a task's requirement groups are
+         * kept: every group met, any member of one, "!id" for a condition not
+         * holding. Empty for none. See `conditions::inherited`.
+         */requirementGroups: [[String]] = []) {
         self.id = id
         self.workspaceId = workspaceId
         self.folderId = folderId
@@ -15876,6 +16104,7 @@ public struct ListRow: Equatable, Hashable {
         self.createdAtMs = createdAtMs
         self.updatedAtMs = updatedAtMs
         self.priorityRank = priorityRank
+        self.requirementGroups = requirementGroups
     }
 
     
@@ -15906,7 +16135,8 @@ public struct FfiConverterTypeListRow: FfiConverterRustBuffer {
                 completedAtMs: FfiConverterOptionInt64.read(from: &buf), 
                 createdAtMs: FfiConverterInt64.read(from: &buf), 
                 updatedAtMs: FfiConverterInt64.read(from: &buf), 
-                priorityRank: FfiConverterOptionInt64.read(from: &buf)
+                priorityRank: FfiConverterOptionInt64.read(from: &buf), 
+                requirementGroups: FfiConverterSequenceSequenceString.read(from: &buf)
         )
     }
 
@@ -15924,6 +16154,7 @@ public struct FfiConverterTypeListRow: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.createdAtMs, into: &buf)
         FfiConverterInt64.write(value.updatedAtMs, into: &buf)
         FfiConverterOptionInt64.write(value.priorityRank, into: &buf)
+        FfiConverterSequenceSequenceString.write(value.requirementGroups, into: &buf)
     }
 }
 
@@ -28920,6 +29151,31 @@ fileprivate struct FfiConverterSequenceTypeIncomingRow: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeInheritedRequirement: FfiConverterRustBuffer {
+    typealias SwiftType = [InheritedRequirement]
+
+    public static func write(_ value: [InheritedRequirement], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeInheritedRequirement.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [InheritedRequirement] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [InheritedRequirement]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeInheritedRequirement.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeKeymapBinding: FfiConverterRustBuffer {
     typealias SwiftType = [KeymapBinding]
 
@@ -30967,6 +31223,29 @@ public func conditionSections(conditions: [ConditionRow]) -> [ConditionSection] 
         uniffiCallStatus in
     uniffi_takt_core_fn_func_condition_sections(
         FfiConverterSequenceTypeConditionRow.lower(conditions),uniffiCallStatus
+    )
+})
+}
+/**
+ * Says what kind of device this process runs on — "laptop", "phone" or
+ * "tablet" — or none. Every client calls it once as it starts, before
+ * anything asks what holds; the device conditions of that kind then hold.
+ * An unknown kind is none.
+ */
+public func setThisDeviceKind(kind: String?)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_set_this_device_kind(
+        FfiConverterOptionString.lower(kind),uniffiCallStatus
+    )
+}
+}
+/**
+ * The kind of device this process said it runs on, if it has.
+ */
+public func thisDeviceKind() -> String?  {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_takt_core_fn_func_this_device_kind(uniffiCallStatus
     )
 })
 }
@@ -33362,6 +33641,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_func_condition_sections() != 6307) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_func_set_this_device_kind() != 15457) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_func_this_device_kind() != 27795) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_func_condition_waiting_counts() != 42654) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -34097,7 +34382,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_has_manual_focus_order() != 55087) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_inherited_requirements() != 18434) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_kanban_boards() != 3288) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_list_requirement_groups() != 33505) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_logged_work() != 12680) {
@@ -34514,6 +34805,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_takt_core_checksum_method_coreworkspace_set_condition_category() != 2912) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_takt_core_checksum_method_coreworkspace_set_condition_device_kind() != 49525) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_condition_provides() != 58619) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -34530,6 +34824,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_list_priority() != 7909) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_takt_core_checksum_method_coreworkspace_set_list_requirements() != 13297) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_takt_core_checksum_method_coreworkspace_set_matrix_position() != 2656) {

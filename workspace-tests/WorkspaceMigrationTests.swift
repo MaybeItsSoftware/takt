@@ -50,6 +50,7 @@ final class WorkspaceMigrationTests: XCTestCase {
     "v38_task_authorship",
     "v39_open_ended_focus",
     "v40_list_priority",
+    "v41_device_and_list_conditions",
   ]
 
   private var directoryURL: URL!

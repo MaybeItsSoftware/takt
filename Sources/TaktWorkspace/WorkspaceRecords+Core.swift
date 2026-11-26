@@ -34,7 +34,8 @@ extension TaskList {
       systemRole: row.systemRole.flatMap(TaskListRole.init(rawValue:)), visibleRootTaskId: row.visibleRootTaskId,
       completedAt: row.completedAtMs.map(Date.init(coreMilliseconds:)),
       createdAt: Date(coreMilliseconds: row.createdAtMs), updatedAt: Date(coreMilliseconds: row.updatedAtMs),
-      priorityRank: row.priorityRank.map { Int($0) })
+      priorityRank: row.priorityRank.map { Int($0) },
+      requirementGroups: row.requirementGroups.isEmpty ? nil : row.requirementGroups)
   }
 }
 

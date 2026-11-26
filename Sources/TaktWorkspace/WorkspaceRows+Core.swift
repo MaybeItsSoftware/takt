@@ -65,6 +65,7 @@ extension TaskCondition {
     category = row.category
     sortOrder = row.sortOrder.map(Int.init)
     provides = row.provides
+    deviceKind = row.deviceKind
   }
 
   /// The row the core's condition rules read.
@@ -72,7 +73,7 @@ extension TaskCondition {
     ConditionRow(
       id: id, workspaceId: workspaceId, name: name, isLocation: isLocation, isArchived: isArchived,
       createdAtMs: createdAt.coreMilliseconds, updatedAtMs: updatedAt.coreMilliseconds, category: category,
-      sortOrder: sortOrder.map(Int64.init), provides: provides)
+      sortOrder: sortOrder.map(Int64.init), provides: provides, deviceKind: deviceKind)
   }
 }
 

@@ -47,6 +47,10 @@ public struct TaskList: Codable, Identifiable, Sendable, Equatable {
   /// it is not prioritised. As stored, so a sync merge can leave a tie or a
   /// gap: `WorkspaceStructure.prioritisedLists` gives the order.
   public var priorityRank: Int?
+  /// What every task in it, and in the nested lists under it, requires, as
+  /// a task's requirement groups are kept; nil when it requires nothing.
+  /// The inheriting is the core's (`core/src/conditions/inherited.rs`).
+  public var requirementGroups: [[String]]?
 
   public var isSystemList: Bool { systemRole != nil }
 }

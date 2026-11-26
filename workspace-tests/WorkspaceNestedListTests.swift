@@ -103,6 +103,33 @@ final class WorkspaceNestedListTests: XCTestCase {
     XCTAssertNil(try store.lists(in: workspaceID).first { $0.id == list.id }?.priorityRank)
   }
 
+  /// A list's conditions pass down to the tasks in it and under a nested
+  /// list in it, and the task names where each came from.
+  func testListConditionsAreInheritedThroughNestedListsAndUndoable() throws {
+    let campus = try store.createCondition(workspaceId: workspaceID, name: "Campus", category: "Location")
+    let laptop = try store.createCondition(workspaceId: workspaceID, name: "Laptop", category: nil)
+    let nested = try store.createTask(listId: list.id, title: "Sailing")
+    try store.setItemKind(.list, for: nested.id)
+    let task = try store.createTask(listId: list.id, title: "Book boats", parentTaskId: nested.id)
+
+    XCTAssertTrue(try store.setListRequirements(listId: list.id, groups: [[campus.id]]))
+    XCTAssertFalse(try store.setListRequirements(listId: list.id, groups: [[campus.id]]))
+    XCTAssertTrue(try store.setListRequirements(listId: nested.id, groups: [[laptop.id]]))
+    XCTAssertEqual(try store.listRequirementGroups(listId: list.id), [[campus.id]])
+    XCTAssertEqual(try store.listRequirementGroups(listId: nested.id), [[laptop.id]])
+    XCTAssertEqual(try store.lists(in: workspaceID).first { $0.id == list.id }?.requirementGroups, [[campus.id]])
+
+    let inherited = try store.inheritedRequirements(taskId: task.id)
+    XCTAssertEqual(inherited.map(\.listName), [list.name, "Sailing"])
+    XCTAssertEqual(inherited.map(\.isNested), [false, true])
+    XCTAssertEqual(inherited.map(\.groups), [[[campus.id]], [[laptop.id]]])
+
+    XCTAssertEqual(try store.undo(), "Edit Conditions")
+    XCTAssertEqual(try store.inheritedRequirements(taskId: task.id).map(\.listName), [list.name])
+    XCTAssertTrue(try store.setListRequirements(listId: list.id, groups: []))
+    XCTAssertNil(try store.lists(in: workspaceID).first { $0.id == list.id }?.requirementGroups)
+  }
+
   func testTopLevelListCanEndAndReopenWithoutLosingTasks() throws {
     let task = try store.createTask(listId: list.id, title: "Annual handover")
     try store.setListCompleted(true, id: list.id)

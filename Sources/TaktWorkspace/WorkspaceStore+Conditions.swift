@@ -111,6 +111,41 @@ extension WorkspaceStore {
     }
   }
 
+  /// Marks a condition as the device condition of `kind` ("laptop", "phone"
+  /// or "tablet"), or with nil makes it an ordinary one again: the Rust
+  /// core's `conditions::device::set_condition_device`, one "Edit Condition"
+  /// step. Marking it takes it out of what is said to hold and of what
+  /// others provide, and stops it being a place. False when it already was.
+  @discardableResult
+  public func setConditionDeviceKind(id: String, kind: String?, now: Date = .now) throws -> Bool {
+    try coreWrite {
+      try core.setConditionDeviceKind(id: id, kind: kind, nowMs: now.coreMilliseconds)
+    }
+  }
+
+  /// What a list requires — a standalone list, or a nested list's task id —
+  /// as requirement groups; empty when nothing.
+  public func listRequirementGroups(listId: String) throws -> [[String]] {
+    try Self.mappingCoreErrors { try core.listRequirementGroups(listId: listId) }
+  }
+
+  /// Sets what a list requires, replacing what it did; every task in it, and
+  /// in the nested lists under it, inherits it. Empty requires nothing. The
+  /// Rust core's `conditions::inherited::set_list_requirements`, one "Edit
+  /// Conditions" step. False when it already required exactly that.
+  @discardableResult
+  public func setListRequirements(listId: String, groups: [[String]], now: Date = .now) throws -> Bool {
+    try coreWrite {
+      try core.setListRequirements(listId: listId, groups: groups, nowMs: now.coreMilliseconds)
+    }
+  }
+
+  /// The lists a task inherits requirements from, outermost first: its list,
+  /// then each nested list above it that requires anything.
+  public func inheritedRequirements(taskId: String) throws -> [TaskInheritedRequirement] {
+    try Self.mappingCoreErrors { try core.inheritedRequirements(taskId: taskId) }.map(TaskInheritedRequirement.init)
+  }
+
   /// Merges a condition into another: its tasks require the other, and it
   /// is archived. Returns how many tasks changed.
   @discardableResult
@@ -199,6 +234,27 @@ public struct SavedFocusContext: Equatable, Sendable {
   /// offered back. The core's `focus_context_in_force`.
   public func inForce(at now: Date) -> SavedFocusContext {
     SavedFocusContext(focusContextInForce(context: core, nowMs: now.coreMilliseconds))
+  }
+}
+
+/// One list a task inherits requirements from: read only on the task, set
+/// on the list.
+public struct TaskInheritedRequirement: Identifiable, Equatable, Sendable {
+  /// The standalone list's id, or the nested list's task id.
+  public let listID: String
+  public let listName: String
+  /// Whether it is a nested list (a task record) rather than a standalone one.
+  public let isNested: Bool
+  public let groups: [[String]]
+
+  public var id: String { listID }
+
+  public init(listID: String, listName: String, isNested: Bool, groups: [[String]]) {
+    self.listID = listID; self.listName = listName; self.isNested = isNested; self.groups = groups
+  }
+
+  init(_ core: InheritedRequirement) {
+    self.init(listID: core.listId, listName: core.listName, isNested: core.isNested, groups: core.groups)
   }
 }
 

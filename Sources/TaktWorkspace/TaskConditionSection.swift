@@ -16,6 +16,10 @@ public struct TaskConditionSection: Identifiable, Equatable, Sendable {
   /// switches on what tasks need — rather than properties: Location, and any
   /// heading a condition under which provides something. Settings come first.
   public let isSetting: Bool
+  /// Whether it is the Device heading, first of all: conditions that hold on
+  /// a device of their kind by themselves, so they are shown as holding here
+  /// or not rather than offered as something to switch.
+  public let isDevice: Bool
   public let conditions: [TaskCondition]
 
   public var id: String { category.map { "category.\($0)" } ?? "uncategorised" }
@@ -28,6 +32,7 @@ public struct TaskConditionSection: Identifiable, Equatable, Sendable {
     title = section.title
     isExclusive = section.isExclusive
     isSetting = section.isSetting
+    isDevice = section.isDevice
     conditions = section.conditions.map(TaskCondition.init)
   }
 

@@ -20,6 +20,13 @@ public struct TaskCondition: Codable, Identifiable, Equatable, Sendable {
   /// The conditions it switches on while it holds (Home: Floor space, Quiet),
   /// by id. What that makes hold is the core's (`condition_holdings`).
   public var provides: [String] = []
+  /// "laptop", "phone" or "tablet" for a device condition, nil for any
+  /// other. A device condition holds on a device of its kind by itself and
+  /// is never said to hold or switched off (`core/src/conditions/device.rs`).
+  public var deviceKind: String?
+
+  /// Whether it means the device in your hand rather than something you say.
+  public var isDevice: Bool { !(deviceKind ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
 }
 
 /// Stored alongside metadata so complete planning edits share one undo step.

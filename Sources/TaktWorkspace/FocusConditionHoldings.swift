@@ -13,6 +13,9 @@ public struct FocusConditionHolding: Equatable, Sendable {
   public let isOff: Bool
   /// Whether it holds: what every requirement is checked against.
   public let holds: Bool
+  /// Holds because it is the device condition of this device's kind, which
+  /// nothing said can switch (`core/src/conditions/device.rs`).
+  public let isDevice: Bool
 
   init(_ core: ConditionHolding) {
     conditionID = core.conditionId
@@ -20,6 +23,7 @@ public struct FocusConditionHolding: Equatable, Sendable {
     providedBy = core.providedBy
     isOff = core.isOff
     holds = core.holds
+    isDevice = core.isDevice
   }
 }
 
@@ -63,5 +67,36 @@ public enum FocusConditionHoldings {
   ) -> Set<String> {
     Set(focusContextKeptOverrides(
       conditions: conditions.map(\.core), previousIds: previous.sorted(), nextIds: next.sorted(), offIds: off.sorted()))
+  }
+}
+
+/// The kinds of device a device condition can mean, as the core stores them.
+public enum ConditionDeviceKind: String, CaseIterable, Identifiable, Sendable {
+  case laptop, phone, tablet
+
+  public var id: String { rawValue }
+
+  /// What a picker calls it.
+  public var title: String { rawValue.capitalized }
+
+  /// The kind this process said it runs on, if it has.
+  public static var thisDevice: ConditionDeviceKind? {
+    thisDeviceKind().flatMap(ConditionDeviceKind.init(rawValue:))
+  }
+
+  /// Says what kind of device this process runs on, so the device
+  /// conditions of that kind hold here. Process-wide and not stored: what
+  /// holds is synced, but the device in your hand is not, so every client
+  /// says it once at launch, before anything asks what holds.
+  public static func setThisDevice(_ kind: ConditionDeviceKind?) {
+    setThisDeviceKind(kind: kind?.rawValue)
+  }
+}
+
+extension TaskCondition {
+  /// The kind of device it means, when it is a device condition of a kind
+  /// this build knows.
+  public var device: ConditionDeviceKind? {
+    deviceKind.flatMap { ConditionDeviceKind(rawValue: $0.trimmingCharacters(in: .whitespaces).lowercased()) }
   }
 }
