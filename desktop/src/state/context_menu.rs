@@ -7,6 +7,11 @@
 use super::sidebar::RowKind;
 use super::{App, Region};
 
+/// A sidebar list's conditions, from its menu.
+const LIST_CONDITIONS: &str = "list-conditions";
+/// The device a condition means, from its menu.
+const CONDITION_DEVICE: &str = "condition-device";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MenuItem {
     pub title: String,
@@ -176,6 +181,9 @@ impl App {
                 entries.push(self.item("listRename", "Rename…"));
                 entries.push(self.item("listIcon", "Icon…"));
                 entries.push(self.item("listSettings", "List settings…"));
+                // Not a catalogue command: the list inspector's Needs row
+                // is its keyboard route.
+                entries.push(self.item(LIST_CONDITIONS, "Conditions for every task…"));
                 entries.push(self.item("listMoveUp", "Move up"));
                 entries.push(self.item("listMoveDown", "Move down"));
                 if let RowKind::List(id) = &row.kind {
@@ -217,6 +225,44 @@ impl App {
                 entries.pop();
             }
         }
+        self.context_menu = Some(ContextMenu {
+            x,
+            y,
+            entries,
+            index: None,
+        });
+    }
+
+    /// The menu for a condition in the Conditions tab, whose cursor moves to
+    /// it first so the tab's commands act on it. Its device kind has no key
+    /// of its own: Category… offers it too.
+    pub fn open_condition_menu(&mut self, condition_id: &str, x: f32, y: f32) {
+        let Some(condition) = self.condition(condition_id).cloned() else {
+            return;
+        };
+        self.conditions.cursor = Some(super::conditions::Row::Condition(condition.id.clone()));
+        self.region = Region::Conditions;
+        let mut entries = vec![
+            self.item("conditionsEdit", "Rename…"),
+            self.item("conditionsCategory", "Category…"),
+            self.item(CONDITION_DEVICE, "Device…"),
+        ];
+        if !takt_core::conditions::is_device(&condition) {
+            entries.push(self.item("conditionsProvides", "Provides…"));
+        }
+        entries.extend([
+            self.item("conditionsShowTasks", "Tasks that need it"),
+            self.item("conditionsMerge", "Merge into…"),
+            MenuEntry::Divider,
+            self.item(
+                "conditionsArchive",
+                if condition.is_archived {
+                    "Restore"
+                } else {
+                    "Archive"
+                },
+            ),
+        ]);
         self.context_menu = Some(ContextMenu {
             x,
             y,
@@ -471,6 +517,22 @@ impl App {
             return;
         }
         if action.starts_with("link-") && self.run_link_action(action) {
+            return;
+        }
+        if action == LIST_CONDITIONS {
+            if let Some(RowKind::List(id) | RowKind::NestedList(id)) =
+                self.sidebar_cursor_row().map(|row| row.kind.clone())
+            {
+                self.edit_list_conditions(&id);
+            }
+            return;
+        }
+        if action == CONDITION_DEVICE {
+            if let Some(id) = self.condition_cursor().condition_id() {
+                self.open_picker(super::pickers::Picker::DeviceKind {
+                    condition_id: id.to_string(),
+                });
+            }
             return;
         }
         if let Some(ix) = action.strip_prefix("open-link:") {

@@ -4,7 +4,8 @@
 
 use super::{MONO_FONT, Takt, Tokens};
 use crate::state::repeat::{RepeatEdit, RepeatField, UNITS};
-use gpui::{AnyElement, ClickEvent, Context, div, prelude::*, px};
+use crate::ui::zoom::px;
+use gpui::{AnyElement, ClickEvent, Context, div, prelude::*};
 
 impl Takt {
     fn repeat_clicked(&mut self, cx: &mut Context<Self>) {

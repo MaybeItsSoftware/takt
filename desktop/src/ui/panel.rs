@@ -29,11 +29,12 @@ use crate::state::App;
 use crate::state::focus::{FinderHit, FocusKind};
 use crate::text_field::{FieldKey, TextField};
 use crate::theme::Tokens;
+use crate::ui::zoom::px;
 use gpui::AnimationExt;
 use gpui::{
     AnyElement, App as GpuiApp, Bounds, Context, Corner, Entity, EntityInputHandler, FocusHandle,
     Focusable, KeyDownEvent, Pixels, UTF16Selection, WeakEntity, Window, WindowBounds, WindowKind,
-    WindowOptions, anchored, deferred, div, point, prelude::*, px, size,
+    WindowOptions, anchored, deferred, div, point, prelude::*, size,
 };
 use std::ops::Range;
 

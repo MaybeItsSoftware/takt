@@ -14,7 +14,13 @@ pub struct Prefs {
     pub view_mode: String,
     pub expanded_folders: HashSet<String>,
     pub folded_tasks: HashSet<String>,
+    /// On the board: cards opened past their preview to every subtask
+    /// (`.`), and subtask rows opened to their own subtasks, which are
+    /// otherwise kept shut.
+    pub opened_cards: HashSet<String>,
     pub sidebar_visible: bool,
+    /// ⌘+ / ⌘−: how large the window is drawn, 1.0 as designed.
+    pub zoom: f32,
     pub sidebar_width: f32,
     pub right_dock_visible: bool,
     pub right_dock_width: f32,
@@ -117,6 +123,8 @@ impl Default for Prefs {
             view_mode: "today".into(),
             expanded_folders: HashSet::new(),
             folded_tasks: HashSet::new(),
+            opened_cards: HashSet::new(),
+            zoom: 1.0,
             sidebar_visible: true,
             sidebar_width: 240.0,
             right_dock_visible: false,

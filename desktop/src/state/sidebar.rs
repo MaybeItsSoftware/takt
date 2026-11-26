@@ -19,13 +19,20 @@ pub enum RowKind {
     NestedList(String),
     Folder(String),
     FilterList(String),
-    /// The Priorities heading over the prioritised lists: a label, which
-    /// the cursor passes over.
-    PrioritiesHeading,
+    /// A section heading ("Priorities" over the prioritised lists,
+    /// "Lists" over the tree beneath them): a label, which the cursor
+    /// passes over.
+    Heading(&'static str),
 }
 
-/// The Priorities heading's row id.
-pub const PRIORITIES_HEADING: &str = "heading:priorities";
+/// A heading row, its id made from its label.
+fn heading(label: &'static str) -> SidebarRow {
+    SidebarRow {
+        id: format!("heading:{}", label.to_lowercase()),
+        kind: RowKind::Heading(label),
+        depth: 0,
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidebarRow {
@@ -220,7 +227,13 @@ impl App {
                         )
                 })
                 .unwrap_or(rows.len());
+            // Your own lists get a heading too, so the Priorities read as
+            // a section of their own rather than running into the tree.
+            let after = at + priorities.len();
             rows.splice(at..at, priorities);
+            if after < rows.len() {
+                rows.insert(after, heading("Lists"));
+            }
         }
         rows
     }
@@ -240,14 +253,7 @@ impl App {
             })
             .collect();
         if !rows.is_empty() {
-            rows.insert(
-                0,
-                SidebarRow {
-                    id: PRIORITIES_HEADING.into(),
-                    kind: RowKind::PrioritiesHeading,
-                    depth: 0,
-                },
-            );
+            rows.insert(0, heading("Priorities"));
         }
         rows
     }
@@ -337,10 +343,10 @@ impl App {
             }
         };
         let mut index = index;
-        // The cursor passes over the Priorities heading, onward the way it
-        // was going; down from the very top, or up past the head, it stops
-        // on the row beyond.
-        if self.sidebar_rows[index].kind == RowKind::PrioritiesHeading {
+        // The cursor passes over a heading, onward the way it was going;
+        // down from the very top, or up past the head, it stops on the row
+        // beyond.
+        if matches!(self.sidebar_rows[index].kind, RowKind::Heading(_)) {
             let upward = matches!(step, CursorStep::By(offset) if offset < 0);
             index = if upward && index > 0 {
                 index - 1
@@ -355,7 +361,7 @@ impl App {
     /// Selects what the row points at and puts the cursor on it.
     pub fn apply_sidebar_cursor(&mut self, row: &SidebarRow) {
         match &row.kind {
-            RowKind::PrioritiesHeading => return,
+            RowKind::Heading(_) => return,
             RowKind::Today => self.select_today(),
             RowKind::Everything => self.select_everything(),
             RowKind::List(id) => self.select_list(id),

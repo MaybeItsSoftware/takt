@@ -380,8 +380,11 @@ impl Takt {
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
-                    this.app
-                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    this.app.open_task_menu(
+                        &id,
+                        crate::ui::zoom::unzoom(e.position.x),
+                        crate::ui::zoom::unzoom(e.position.y),
+                    );
                     cx.stop_propagation();
                     cx.notify();
                 })

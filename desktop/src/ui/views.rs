@@ -3,6 +3,16 @@ use super::*;
 use crate::state::board::{CardPlace, CardRow};
 use crate::state::columns::ColumnName;
 
+/// A level of a card's subtask rows: how far each one steps in, its tree
+/// line running down the first few pixels of the step.
+const CARD_ROW_INDENT: f32 = 14.;
+/// Where in its step a level's tree line runs.
+const CARD_TREE_X: f32 = 4.;
+/// A card subtask row's height; its tree line turns at half of it.
+const CARD_ROW_HEIGHT: f32 = 20.;
+/// The chevron's column, at the right of a card's title and of its rows.
+const CARD_CHEVRON: f32 = 12.;
+
 mod matrix;
 
 impl Takt {
@@ -170,8 +180,11 @@ impl Takt {
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
-                    this.app
-                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    this.app.open_task_menu(
+                        &id,
+                        crate::ui::zoom::unzoom(e.position.x),
+                        crate::ui::zoom::unzoom(e.position.y),
+                    );
                     cx.stop_propagation();
                     cx.notify();
                 })
@@ -480,6 +493,11 @@ impl Takt {
         let marked = task.status != "open" || task.item_kind.as_deref() == Some("list");
         let inset = if marked { px(20.) } else { px(0.) };
         let (rows, total) = self.app.card_subtree(task);
+        // Whether the card is open (`.`): ▾ with its subtasks drawn, ▸ with
+        // them shut away. Only on the board, and only for a card with
+        // subtasks to open.
+        let chevron = (column.is_some() && (total > 0 || self.app.card_folded_count(task) > 0))
+            .then(|| self.app.prefs.opened_cards.contains(&task.id));
         // The cursor on one of its subtask rows: the card is still the one
         // the keyboard is in.
         let holds_cursor = self
@@ -530,8 +548,11 @@ impl Takt {
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
-                    this.app
-                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    this.app.open_task_menu(
+                        &id,
+                        crate::ui::zoom::unzoom(e.position.x),
+                        crate::ui::zoom::unzoom(e.position.y),
+                    );
                     cx.stop_propagation();
                     cx.notify();
                 })
@@ -568,7 +589,35 @@ impl Takt {
                     } else {
                         title_greyed(task, self.app.is_greyed(&task.id), t).into_any_element()
                     })
-                    .children(detail_chips(&self.app, task, t)),
+                    .children(detail_chips(&self.app, task, t))
+                    .when_some(chevron, |d, opened| {
+                        let id = task.id.clone();
+                        d.child(
+                            div()
+                                .id(gpui::SharedString::from(format!("card-open-{id}")))
+                                .flex_none()
+                                .ml_auto()
+                                .w(px(CARD_CHEVRON))
+                                .text_size(px(10.))
+                                .text_color(if opened { t.muted } else { t.placeholder })
+                                .hover(|d| d.text_color(t.text))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    this.app.selected_task = Some(id.clone());
+                                    this.app.region = Region::Tasks;
+                                    if let Some(column) = column {
+                                        this.app.board.column = column;
+                                    }
+                                    if opened {
+                                        this.app.shrink_on_board(&id);
+                                    } else {
+                                        this.app.grow_on_board(&id);
+                                    }
+                                    cx.notify();
+                                }))
+                                .child(if opened { "▾" } else { "▸" }),
+                        )
+                    }),
             )
             .when(list.is_some() || task.due_at_ms.is_some(), |d| {
                 d.child(
@@ -592,18 +641,20 @@ impl Takt {
                         .child(hint),
                 )
             })
-            .child(self.card_subtasks(task, rows, total, column, t, cx));
+            .child(self.card_subtasks(task, rows, column, t, cx));
         super::celebrate::celebrate(element, &task.id, celebrating, t)
     }
 
-    /// The card's subtree as compact rows: `└` marks, flush with the card's
-    /// title; a subtask filed in another column muted and naming it; a
-    /// folded card or row says what it keeps out of sight.
+    /// The card's subtasks as compact rows hung off a tree of hairlines
+    /// (├ └ │), each with a chevron at its right when it has subtasks of
+    /// its own (▸ shut, after their count; ▾ open). A subtask filed in
+    /// another column is muted and names it; a shut card says how many it
+    /// keeps out of sight. The chevrons and that count open on a click,
+    /// as `.` does.
     fn card_subtasks(
         &self,
         card: &TaskRow,
         rows: Vec<CardRow>,
-        total: usize,
         column: Option<usize>,
         t: Tokens,
         cx: &mut Context<Self>,
@@ -613,17 +664,24 @@ impl Takt {
             if hidden == 0 {
                 return div().into_any_element();
             }
+            let card_id = card.id.clone();
             return div()
+                .id(gpui::SharedString::from(format!("card-unfold-{card_id}")))
                 .pt_1()
                 .text_size(px(11.))
                 .text_color(t.placeholder)
+                .hover(|d| d.text_color(t.muted))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    cx.stop_propagation();
+                    this.app.grow_on_board(&card_id);
+                    cx.notify();
+                }))
                 .child(format!(
-                    "▸ {hidden} subtask{}",
+                    "{hidden} subtask{}",
                     if hidden == 1 { "" } else { "s" }
                 ))
                 .into_any_element();
         }
-        let more = total.saturating_sub(rows.len());
         div()
             .pt_1()
             .flex()
@@ -665,8 +723,8 @@ impl Takt {
                             }
                         })
                     })
-                    .pl(px(row.depth as f32 * 10.))
-                    .h(px(20.))
+                    .pl(px((row.depth + 1) as f32 * CARD_ROW_INDENT))
+                    .h(px(CARD_ROW_HEIGHT))
                     .flex()
                     .items_center()
                     .gap_1()
@@ -687,7 +745,45 @@ impl Takt {
                         }
                         cx.notify();
                     }))
-                    .child(div().flex_none().text_color(t.placeholder).child("└"))
+                    // The tree, drawn as hairlines so a long run of
+                    // siblings reads as one smooth line: │ for each level
+                    // above whose line runs on past this row, then this
+                    // row's own ├ (or └ when it is the last), turning in
+                    // towards the title.
+                    .children(row.rails.iter().enumerate().filter(|(_, on)| **on).map(
+                        |(level, _)| {
+                            div()
+                                .absolute()
+                                .top_0()
+                                .bottom_0()
+                                .left(px(level as f32 * CARD_ROW_INDENT + CARD_TREE_X))
+                                .w(px(1.))
+                                .bg(t.placeholder)
+                        },
+                    ))
+                    .child({
+                        let x = row.depth as f32 * CARD_ROW_INDENT + CARD_TREE_X;
+                        div()
+                            .absolute()
+                            .top_0()
+                            .left(px(x))
+                            .w(px(1.))
+                            .h(px(if row.last {
+                                CARD_ROW_HEIGHT / 2. + 0.5
+                            } else {
+                                CARD_ROW_HEIGHT
+                            }))
+                            .bg(t.placeholder)
+                    })
+                    .child(
+                        div()
+                            .absolute()
+                            .top(px(CARD_ROW_HEIGHT / 2.))
+                            .left(px(row.depth as f32 * CARD_ROW_INDENT + CARD_TREE_X))
+                            .w(px(CARD_ROW_INDENT - CARD_TREE_X - 3.))
+                            .h(px(1.))
+                            .bg(t.placeholder),
+                    )
                     .when(!status.is_empty(), |d| {
                         d.child(div().flex_none().child(status))
                     })
@@ -702,8 +798,15 @@ impl Takt {
                             .child(row.task.title.clone())
                             .into_any_element()
                     })
-                    .when(row.folded, |d| {
-                        d.child(div().flex_none().text_color(t.placeholder).child("▸"))
+                    .when(row.children > 0 && !row.open, |d| {
+                        d.child(
+                            div()
+                                .flex_none()
+                                .pl_1()
+                                .text_size(px(11.))
+                                .text_color(t.placeholder)
+                                .child(row.children.to_string()),
+                        )
                     })
                     .when_some(row.elsewhere, |d, column| {
                         d.child(
@@ -714,15 +817,32 @@ impl Takt {
                                 .child(format!("→ {column}")),
                         )
                     })
+                    // The chevron at the right, under the card's own, so
+                    // the tree on the left stays unbroken.
+                    .when(row.children > 0, |d| {
+                        let id = row.task.id.clone();
+                        d.child(
+                            div()
+                                .id(gpui::SharedString::from(format!("card-chevron-{id}")))
+                                .flex_none()
+                                .w(px(CARD_CHEVRON))
+                                .text_size(px(10.))
+                                .text_color(t.placeholder)
+                                .hover(|d| d.text_color(t.text))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    this.app.selected_task = Some(id.clone());
+                                    this.app.region = Region::Tasks;
+                                    if let Some(column) = column {
+                                        this.app.board.column = column;
+                                    }
+                                    this.app.toggle_on_board(&id);
+                                    cx.notify();
+                                }))
+                                .child(if row.open { "▾" } else { "▸" }),
+                        )
+                    })
             }))
-            .when(more > 0, |d| {
-                d.child(
-                    div()
-                        .text_size(px(11.))
-                        .text_color(t.placeholder)
-                        .child(format!("+{more} more")),
-                )
-            })
             .into_any_element()
     }
 
@@ -860,8 +980,11 @@ impl Takt {
             .on_mouse_down(gpui::MouseButton::Right, {
                 let id = id.clone();
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
-                    this.app
-                        .open_task_menu(&id, f32::from(e.position.x), f32::from(e.position.y));
+                    this.app.open_task_menu(
+                        &id,
+                        crate::ui::zoom::unzoom(e.position.x),
+                        crate::ui::zoom::unzoom(e.position.y),
+                    );
                     cx.stop_propagation();
                     cx.notify();
                 })

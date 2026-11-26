@@ -5,7 +5,8 @@
 use super::icons::icon;
 use super::{MONO_FONT, Takt, Tokens};
 use crate::state::log_edit::{LogEdit, PRESETS, minutes_text};
-use gpui::{AnyElement, ClickEvent, Context, div, prelude::*, px};
+use crate::ui::zoom::px;
+use gpui::{AnyElement, ClickEvent, Context, div, prelude::*};
 
 impl Takt {
     pub(super) fn log_panel(

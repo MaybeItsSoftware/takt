@@ -42,6 +42,14 @@ pub enum Picker {
     TaskConditions {
         task_id: String,
     },
+    /// The conditions every task in a standalone list needs; stays open.
+    ListConditions {
+        list_id: String,
+    },
+    /// Which kind of device a condition means, if any.
+    DeviceKind {
+        condition_id: String,
+    },
     /// What a condition switches on while it holds; stays open.
     Provides {
         condition_id: String,
@@ -70,7 +78,10 @@ impl Picker {
     pub fn stays_open(&self) -> bool {
         matches!(
             self,
-            Picker::TaskConditions { .. } | Picker::Provides { .. } | Picker::DayStart
+            Picker::TaskConditions { .. }
+                | Picker::ListConditions { .. }
+                | Picker::Provides { .. }
+                | Picker::DayStart
         )
     }
 }
@@ -115,6 +126,8 @@ pub enum Choice {
     NewRequirement(String),
     Provide(String),
     Category(Option<String>),
+    /// The device kind a condition means, or none.
+    DeviceKind(Option<String>),
     MergeInto(String),
     DayStartCondition(String),
     Theme(String),
@@ -233,9 +246,13 @@ impl App {
             Picker::Blocker { .. } => "Wait on a task, or type a new one…",
             Picker::Link { .. } => "Paste a web address or a file path…",
             Picker::Waiting { .. } => "Who, when to follow up, every n days…",
-            Picker::Icon { .. } => "An icon, or type an emoji…",
+            Picker::Icon { .. } => "An icon: search Google's by name, or type an emoji…",
             Picker::Place => "Where are you?",
             Picker::TaskConditions { .. } => "Conditions it needs: ↩ ticks, !name for not…",
+            Picker::ListConditions { .. } => {
+                "Conditions every task in it needs: ↩ ticks, !name for not…"
+            }
+            Picker::DeviceKind { .. } => "The device it means…",
             Picker::Provides { .. } => "What it provides while it holds…",
             Picker::Category { .. } => "File under a category, or type a new one…",
             Picker::Merge { .. } => "Merge into…",
@@ -273,6 +290,13 @@ impl App {
                 ranked(rows, query)
             }
             Picker::TaskConditions { task_id } => self.task_condition_rows(task_id, query),
+            Picker::ListConditions { list_id } => {
+                let groups = self.list_requirements(list_id);
+                self.requirement_rows(&groups, &[], query)
+            }
+            Picker::DeviceKind { condition_id } => {
+                ranked(self.device_kind_rows(condition_id, true), query)
+            }
             Picker::Provides { condition_id } => {
                 let provides = self
                     .condition(condition_id)
@@ -282,7 +306,13 @@ impl App {
                     .conditions
                     .all
                     .iter()
-                    .filter(|c| c.id != *condition_id && !c.is_archived)
+                    // Nothing said about where you are can put a device in
+                    // your hand, so a device condition is never provided.
+                    .filter(|c| {
+                        c.id != *condition_id
+                            && !c.is_archived
+                            && !takt_core::conditions::is_device(c)
+                    })
                     .map(|c| {
                         let on = provides.contains(&c.id);
                         row(
@@ -294,7 +324,7 @@ impl App {
                     .collect();
                 ranked(rows, query)
             }
-            Picker::Category { .. } => {
+            Picker::Category { condition_id } => {
                 let mut rows: Vec<Row> = Vec::new();
                 let typed = query.trim();
                 let categories =
@@ -314,6 +344,10 @@ impl App {
                         "Other",
                         Choice::Category(None),
                     )))
+                    // Device is a heading a kind of device files a
+                    // condition under, so it is chosen here as well as
+                    // from the condition's menu.
+                    .chain(self.device_kind_rows(condition_id, false))
                     .collect();
                 rows.extend(ranked(named, query));
                 rows
@@ -345,7 +379,9 @@ impl App {
                     .conditions
                     .all
                     .iter()
-                    .filter(|c| !c.is_archived)
+                    // A device condition holds by itself where it does, so
+                    // a day has no need to start with it.
+                    .filter(|c| !c.is_archived && !takt_core::conditions::is_device(c))
                     .map(|c| {
                         let on = starts.contains(&c.id);
                         row(
@@ -441,6 +477,20 @@ impl App {
                     })
                     .collect();
                 rows.extend(ranked(icons, query));
+                // Google's Material Symbols: a few to start, then any of
+                // the four thousand by name as it is typed.
+                let symbols = if typed.is_empty() {
+                    crate::material_symbols::SUGGESTED.to_vec()
+                } else {
+                    crate::material_symbols::search(typed, 80)
+                };
+                rows.extend(symbols.into_iter().map(|name| {
+                    row(
+                        crate::material_symbols::label(name),
+                        "Google",
+                        Choice::Icon(crate::material_symbols::pref_value(name)),
+                    )
+                }));
                 rows
             }
         }
@@ -673,12 +723,66 @@ impl App {
     }
 
     fn task_condition_rows(&self, task_id: &str, query: &str) -> Vec<Row> {
-        let planning = self
+        let groups = self
             .store
             .core
             .editor_snapshot(task_id.into())
             .ok()
-            .and_then(|s| s.planning);
+            .and_then(|s| s.planning)
+            .and_then(|p| p.requirement_groups)
+            .unwrap_or_default();
+        let inherited = self
+            .store
+            .core
+            .inherited_requirements(task_id.into())
+            .unwrap_or_default();
+        self.requirement_rows(&groups, &inherited, query)
+    }
+
+    /// A row for each kind of device a condition can mean, the one it means
+    /// marked, and (`with_none`, or when it is one) the way back to an
+    /// ordinary condition.
+    fn device_kind_rows(&self, condition_id: &str, with_none: bool) -> Vec<Row> {
+        use super::conditions::device_title;
+        let current = self
+            .condition(condition_id)
+            .and_then(|c| c.device_kind.clone())
+            .filter(|k| !k.trim().is_empty());
+        let mut rows = Vec::new();
+        if with_none || current.is_some() {
+            rows.push(row(
+                if current.is_none() {
+                    "☑ Not a device"
+                } else {
+                    "☐ Not a device"
+                },
+                "An ordinary condition, said to hold or not",
+                Choice::DeviceKind(None),
+            ));
+        }
+        for kind in takt_core::conditions::DEVICE_KINDS {
+            let on = current.as_deref() == Some(kind);
+            let title = device_title(Some(kind));
+            rows.push(row(
+                format!("{} Device: {title}", if on { "☑" } else { "☐" }),
+                format!("Holds by itself on a {}", title.to_lowercase()),
+                Choice::DeviceKind(Some(kind.to_string())),
+            ));
+        }
+        rows
+    }
+
+    /// The conditions to tick for what something needs, each marked by
+    /// what `groups` say of it. What it inherits from its lists is named
+    /// beside a condition it does not need itself, since ticking it here
+    /// would only repeat it.
+    fn requirement_rows(
+        &self,
+        groups: &[Vec<String>],
+        inherited: &[takt_core::conditions::InheritedRequirement],
+        query: &str,
+    ) -> Vec<Row> {
+        use super::conditions::requirement_in;
         let (negated, typed) = match query.trim().strip_prefix('!') {
             Some(rest) => (true, rest.trim()),
             None => (false, query.trim()),
@@ -702,14 +806,21 @@ impl App {
             .iter()
             .filter(|c| !c.is_archived)
             .map(|c| {
-                let mark = match self.task_requirement(planning.as_ref(), &c.id) {
+                let mark = match requirement_in(groups, &c.id) {
                     Some(true) => "☒ not",
                     Some(false) => "☑",
                     None => "☐",
                 };
+                let from = inherited
+                    .iter()
+                    .find(|i| requirement_in(&i.groups, &c.id).is_some())
+                    .filter(|_| mark == "☐")
+                    .map(|i| format!("from {}", i.list_name));
                 row(
                     format!("{mark} {}", c.name),
-                    takt_core::conditions::effective_category(c).unwrap_or_default(),
+                    from.unwrap_or_else(|| {
+                        takt_core::conditions::effective_category(c).unwrap_or_default()
+                    }),
                     Choice::Requirement {
                         condition_id: c.id.clone(),
                         negated,
@@ -733,6 +844,26 @@ impl App {
                     negated,
                 },
             ) => self.toggle_task_requirement(&task_id, &condition_id, negated),
+            (
+                Picker::ListConditions { list_id },
+                Choice::Requirement {
+                    condition_id,
+                    negated,
+                },
+            ) => self.toggle_list_requirement(&list_id, &condition_id, negated),
+            (Picker::ListConditions { list_id }, Choice::NewRequirement(name)) => {
+                let ws = self.store.workspace_id.clone();
+                if let Some(id) =
+                    self.write(|s| s.core.create_condition_in_category(ws, name, None, now))
+                {
+                    self.reload_conditions();
+                    self.toggle_list_requirement(&list_id, &id, false);
+                }
+            }
+            (
+                Picker::DeviceKind { condition_id } | Picker::Category { condition_id },
+                Choice::DeviceKind(kind),
+            ) => self.set_condition_device_kind(&condition_id, kind),
             (Picker::TaskConditions { task_id }, Choice::NewRequirement(name)) => {
                 let ws = self.store.workspace_id.clone();
                 if let Some(id) =

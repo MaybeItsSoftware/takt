@@ -4,9 +4,10 @@
 //! off the main thread, and kept for the session by address.
 
 use super::{Tokens, UI_FONT};
+use crate::ui::zoom::px;
 use gpui::{
     AnyView, App as GpuiApp, AppContext, Context, FontWeight, IntoElement, ObjectFit,
-    ParentElement, Render, SharedString, Styled, StyledImage, Window, div, img, px,
+    ParentElement, Render, SharedString, Styled, StyledImage, Window, div, img,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;

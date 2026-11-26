@@ -502,6 +502,19 @@ impl Takt {
                         }
                         cx.notify();
                     }))
+                    .when_some(row.condition_id().map(str::to_string), |d, id| {
+                        d.on_mouse_down(
+                            gpui::MouseButton::Right,
+                            cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
+                                this.app.open_condition_menu(
+                                    &id,
+                                    crate::ui::zoom::unzoom(e.position.x),
+                                    crate::ui::zoom::unzoom(e.position.y),
+                                );
+                                cx.notify();
+                            }),
+                        )
+                    })
                     .when_some(view.on, |d, on| {
                         d.child(
                             div()
@@ -893,8 +906,8 @@ impl Takt {
                         cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
                             this.app.open_link_menu(
                                 &menu_link,
-                                f32::from(e.position.x),
-                                f32::from(e.position.y),
+                                crate::ui::zoom::unzoom(e.position.x),
+                                crate::ui::zoom::unzoom(e.position.y),
                             );
                             cx.stop_propagation();
                             cx.notify();

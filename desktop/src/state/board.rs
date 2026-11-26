@@ -262,17 +262,32 @@ impl App {
     pub fn board_ids(&self) -> Vec<String> {
         match self.view_mode {
             ViewMode::Board => {
-                if let Some(id) = self.selected_task.as_deref()
-                    && let Some((column, card)) = self.card_holding(id)
-                    && column == self.board.column
-                {
-                    return self.card_row_ids(&card);
-                }
-                self.board
+                // An opened card's subtask rows stand between it and the
+                // next card, so `j` walks down through them; any other
+                // card is one step. The card the cursor is inside (`l`)
+                // is walked through too, to the cards either side.
+                let holding = self
+                    .selected_task
+                    .as_deref()
+                    .and_then(|id| self.card_holding(id))
+                    .filter(|(column, _)| *column == self.board.column)
+                    .map(|(_, card)| card.id);
+                let mut ids = Vec::new();
+                for card in self
+                    .board
                     .cards
                     .get(self.board.column)
-                    .map(|cards| cards.iter().map(|task| task.id.clone()).collect())
-                    .unwrap_or_default()
+                    .into_iter()
+                    .flatten()
+                {
+                    ids.push(card.id.clone());
+                    if self.prefs.opened_cards.contains(&card.id)
+                        || holding.as_ref() == Some(&card.id)
+                    {
+                        ids.extend(self.card_row_ids(card));
+                    }
+                }
+                ids
             }
             ViewMode::Matrix => self
                 .board
@@ -515,12 +530,19 @@ pub struct CardRow {
     pub depth: usize,
     /// The column it stands in as a card of its own, when that is another.
     pub elsewhere: Option<String>,
-    /// Its own subtasks are folded away (`,`), so none are drawn under it.
-    pub folded: bool,
+    /// How many subtasks it has of its own; none for a row filed in
+    /// another column, whose subtasks are that card's to draw.
+    pub children: usize,
+    /// Its subtasks are drawn under it (`.`); shut by default.
+    pub open: bool,
+    /// The last of its siblings: its tree line turns into it (└) and
+    /// stops, rather than running on past it (├).
+    pub last: bool,
+    /// For each level above it, whether that level's tree line runs on
+    /// past this row (│): it does while the ancestor at that level has a
+    /// sibling still to come.
+    pub rails: Vec<bool>,
 }
-
-/// How many subtask rows a card shows before "+N more".
-pub const CARD_SUBTASK_ROWS: usize = 6;
 
 impl App {
     fn card_columns(&self) -> std::collections::HashMap<&str, usize> {
@@ -532,64 +554,159 @@ impl App {
             .collect()
     }
 
-    /// A card's whole subtree, a compact row per task, and how many rows
-    /// there are in all. A subtask filed in another column keeps its row,
-    /// naming that column; its own subtasks are that card's to draw.
+    /// A card's subtasks as compact rows, and how many there are. A card
+    /// is shut (▸) until it is opened (`.`): then its first layer is
+    /// drawn, and a subtask's own only once that subtask is opened too.
+    /// Shut is shut: there is no part-way preview, so the chevron always
+    /// says whether the rows are there. A subtask filed in another column
+    /// keeps its row, naming that column.
     pub fn card_subtree(&self, card: &TaskRow) -> (Vec<CardRow>, usize) {
         let columns = self.card_columns();
         let own = columns.get(card.id.as_str()).copied();
+        let hide = self.prefs.hide_completed;
+        let shown =
+            |task: &TaskRow| !(hide && task.status != "open" && !self.lingering.contains(&task.id));
         let mut children: std::collections::HashMap<&str, Vec<&TaskRow>> = Default::default();
         for row in &self.all_rows {
-            if let Some(parent) = row.task.parent_task_id.as_deref() {
+            if let Some(parent) = row.task.parent_task_id.as_deref()
+                && shown(&row.task)
+            {
                 children.entry(parent).or_default().push(&row.task);
             }
         }
-        let hide = self.prefs.hide_completed;
-        let folded = &self.prefs.folded_tasks;
+        let opened = &self.prefs.opened_cards;
         let mut out = Vec::new();
-        if folded.contains(&card.id) {
+        if !opened.contains(&card.id) {
             return (out, 0);
         }
-        let mut stack: Vec<(&TaskRow, usize)> = children
-            .get(card.id.as_str())
-            .map(|kids| kids.iter().rev().map(|t| (*t, 0)).collect())
-            .unwrap_or_default();
-        while let Some((task, depth)) = stack.pop() {
-            if hide && task.status != "open" && !self.lingering.contains(&task.id) {
-                continue;
+        // Pushed in reverse so they pop in order, each knowing whether it
+        // is the last of its siblings and which lines run on beside it.
+        type Pending<'a> = Vec<(&'a TaskRow, usize, bool, Vec<bool>)>;
+        fn push<'a>(stack: &mut Pending<'a>, kids: &[&'a TaskRow], depth: usize, rails: Vec<bool>) {
+            for (ix, kid) in kids.iter().enumerate().rev() {
+                stack.push((*kid, depth, ix + 1 == kids.len(), rails.clone()));
             }
+        }
+        let mut stack = Vec::new();
+        if let Some(kids) = children.get(card.id.as_str()) {
+            push(&mut stack, kids, 0, Vec::new());
+        }
+        while let Some((task, depth, last, rails)) = stack.pop() {
             let elsewhere = columns
                 .get(task.id.as_str())
                 .filter(|ix| Some(**ix) != own)
                 .and_then(|ix| self.board.columns.get(*ix))
                 .map(|column| column.title.clone());
-            let filed_elsewhere = elsewhere.is_some();
-            let kids = children
-                .get(task.id.as_str())
-                .filter(|kids| !kids.is_empty());
-            let folded_away = kids.is_some() && folded.contains(&task.id);
+            let kids = match elsewhere {
+                Some(_) => &[][..],
+                None => children.get(task.id.as_str()).map_or(&[][..], |k| &k[..]),
+            };
+            let open = !kids.is_empty() && opened.contains(&task.id);
+            if open {
+                let mut below = rails.clone();
+                below.push(!last);
+                push(&mut stack, kids, depth + 1, below);
+            }
             out.push(CardRow {
                 task: task.clone(),
                 depth,
                 elsewhere,
-                folded: folded_away && !filed_elsewhere,
+                children: kids.len(),
+                open,
+                last,
+                rails,
             });
-            if filed_elsewhere || folded_away {
-                continue;
-            }
-            if let Some(kids) = children.get(task.id.as_str()) {
-                stack.extend(kids.iter().rev().map(|t| (*t, depth + 1)));
-            }
         }
         let total = out.len();
-        out.truncate(CARD_SUBTASK_ROWS);
         (out, total)
     }
 
-    /// How many subtasks a folded card keeps out of sight; none when the
-    /// card is not folded or has none.
+    /// Whether `id` is a card standing in one of the board's columns.
+    fn is_board_card(&self, id: &str) -> bool {
+        self.view_mode == ViewMode::Board && self.card_columns().contains_key(id)
+    }
+
+    fn has_children(&self, id: &str) -> bool {
+        self.all_rows
+            .iter()
+            .any(|row| row.task.id == id && row.has_children)
+    }
+
+    /// `.` on the board. On a card: opened to its subtasks. On a subtask row: opened to its own subtasks. False
+    /// when the selection is neither, for the outline's `.` to take.
+    pub fn grow_on_board(&mut self, id: &str) -> bool {
+        let changed = if self.is_board_card(id) {
+            self.prefs.folded_tasks.remove(id) | self.prefs.opened_cards.insert(id.to_string())
+        } else if self.view_mode == ViewMode::Board && self.card_holding(id).is_some() {
+            self.has_children(id) && self.prefs.opened_cards.insert(id.to_string())
+        } else {
+            return false;
+        };
+        if changed {
+            self.prefs.save();
+            self.layout_rows();
+        }
+        true
+    }
+
+    /// `,` on the board, the step back from `.`. On a card: shut. On an
+    /// opened subtask row: shut. On any other subtask row: the row or card
+    /// it sits under is shut, and the cursor goes to it.
+    pub fn shrink_on_board(&mut self, id: &str) -> bool {
+        if self.is_board_card(id) {
+            if self.prefs.opened_cards.remove(id) {
+                self.prefs.save();
+                self.layout_rows();
+            }
+            return true;
+        }
+        if self.view_mode != ViewMode::Board {
+            return false;
+        }
+        let Some((column, _)) = self.card_holding(id) else {
+            return false;
+        };
+        if self.prefs.opened_cards.remove(id) {
+            self.prefs.save();
+            self.layout_rows();
+            return true;
+        }
+        let Some(parent) = self
+            .all_rows
+            .iter()
+            .find(|row| row.task.id == id)
+            .and_then(|row| row.task.parent_task_id.clone())
+        else {
+            return true;
+        };
+        self.board.column = column;
+        self.selected_task = Some(parent.clone());
+        self.shrink_on_board(&parent)
+    }
+
+    /// `za` on a card or subtask row: opened or shut. False when the
+    /// selection is neither, for the outline's fold to take.
+    pub fn toggle_on_board(&mut self, id: &str) -> bool {
+        if !self.is_board_card(id)
+            && (self.view_mode != ViewMode::Board || self.card_holding(id).is_none())
+        {
+            return false;
+        }
+        if !self.prefs.opened_cards.remove(id) {
+            if !self.has_children(id) {
+                return true;
+            }
+            self.prefs.opened_cards.insert(id.to_string());
+        }
+        self.prefs.save();
+        self.layout_rows();
+        true
+    }
+
+    /// How many subtasks a shut card keeps out of sight; none when the
+    /// card is open or has none.
     pub fn card_folded_count(&self, card: &TaskRow) -> usize {
-        if !self.prefs.folded_tasks.contains(&card.id) {
+        if self.prefs.opened_cards.contains(&card.id) {
             return 0;
         }
         let hide = self.prefs.hide_completed;
@@ -651,8 +768,8 @@ impl App {
             .collect()
     }
 
-    /// `l` on a board card: the cursor onto its first subtask row, unfolding
-    /// the card first when it is folded.
+    /// `l` on a board card: the cursor onto its first subtask row, opening
+    /// the card first when it is shut.
     pub fn enter_card_rows(&mut self) {
         if self.view_mode != ViewMode::Board {
             return;
@@ -669,7 +786,7 @@ impl App {
         else {
             return;
         };
-        if self.prefs.folded_tasks.remove(&card.id) {
+        if self.prefs.opened_cards.insert(card.id.clone()) {
             self.prefs.save();
             self.layout_rows();
         }
@@ -677,6 +794,31 @@ impl App {
             Some(first) => self.selected_task = Some(first),
             None => self.message = Some("This card has no subtasks to step into.".into()),
         }
+    }
+
+    /// `←` on a subtask row: the cursor up to the row it sits under, or to
+    /// its card. False when the selection is not inside a card.
+    pub fn climb_card_row(&mut self) -> bool {
+        if self.view_mode != ViewMode::Board {
+            return false;
+        }
+        let Some(id) = self.selected_task.clone() else {
+            return false;
+        };
+        let Some((column, _)) = self.card_holding(&id) else {
+            return false;
+        };
+        let Some(parent) = self
+            .all_rows
+            .iter()
+            .find(|row| row.task.id == id)
+            .and_then(|row| row.task.parent_task_id.clone())
+        else {
+            return false;
+        };
+        self.board.column = column;
+        self.selected_task = Some(parent);
+        true
     }
 
     /// `h` (or `Esc`) on a subtask row: the cursor back onto its card. False

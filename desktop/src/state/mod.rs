@@ -357,8 +357,15 @@ pub struct App {
 
 impl App {
     pub fn open() -> Result<Self, String> {
+        // The Mac is a laptop, so the conditions marked as the laptop hold
+        // here by themselves. The core keeps this per process and every
+        // check of what holds reads it, so it is said before the workspace
+        // is opened and anything is ranked, and the smoke run, which opens
+        // the app the same way, says it too.
+        takt_core::conditions::set_this_device_kind(Some("laptop".into()));
         let store = Store::open()?;
         let prefs = Prefs::load();
+        crate::ui::zoom::set(prefs.zoom);
         let seen_version = store.core.data_version().unwrap_or_default();
         let sync = crate::sync::Sync::new(store.core.clone());
         let mut app = App {

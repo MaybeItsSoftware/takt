@@ -280,6 +280,9 @@ impl App {
             return;
         }
         let id = row.task.id.clone();
+        if self.toggle_on_board(&id) {
+            return;
+        }
         if !self.prefs.folded_tasks.remove(&id) {
             self.prefs.folded_tasks.insert(id);
         }
@@ -336,6 +339,9 @@ impl App {
             .filter(|row| row.has_children)
             .map(|row| row.task.id.clone())
             .collect();
+        if folded {
+            self.prefs.opened_cards.clear();
+        }
         for id in parents {
             if folded {
                 self.prefs.folded_tasks.insert(id);

@@ -7,8 +7,9 @@ use super::icons::icon;
 use super::{MONO_FONT, Takt, Tokens};
 use crate::state::date_edit::{DEFAULT_START, DateEdit, DateFocus, clock, parse_slot, today};
 use crate::state::inspector::parse_span;
+use crate::ui::zoom::px;
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
-use gpui::{AnyElement, ClickEvent, Context, div, prelude::*, px};
+use gpui::{AnyElement, ClickEvent, Context, div, prelude::*};
 
 /// The Monday on or before the first of `day`'s month: where the grid
 /// starts.

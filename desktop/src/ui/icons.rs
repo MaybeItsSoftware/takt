@@ -3,7 +3,8 @@
 //! `icons/<name>.svg`. GPUI paints an SVG as a mask in the element's text
 //! colour, so each is drawn in one opaque stroke.
 
-use gpui::{SharedString, Styled, px, svg};
+use crate::ui::zoom::px;
+use gpui::{SharedString, Styled, svg};
 use std::borrow::Cow;
 
 pub struct Assets;
@@ -289,6 +290,32 @@ pub fn icon(name: &'static str, size: f32) -> gpui::Svg {
         .path(SharedString::from(format!("icons/{name}.svg")))
         .size(px(size))
         .flex_none()
+}
+
+/// An icon a row wears by choice: a Google symbol drawn from the bundled
+/// font, or an emoji as text, centred in a `size`-point square.
+pub fn chosen_icon(value: &str, size: f32, color: gpui::Hsla) -> gpui::AnyElement {
+    use gpui::{IntoElement, ParentElement, div};
+    let square = div()
+        .w(px(size))
+        .h(px(size))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color);
+    match crate::material_symbols::glyph(value) {
+        Some(glyph) => square
+            .font_family(crate::material_symbols::FONT_FAMILY)
+            .text_size(px(size))
+            .line_height(px(size))
+            .child(SharedString::from(glyph.to_string()))
+            .into_any_element(),
+        None => square
+            .text_size(px(size - 3.))
+            .child(SharedString::from(value.to_string()))
+            .into_any_element(),
+    }
 }
 
 #[cfg(test)]

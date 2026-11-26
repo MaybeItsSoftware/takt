@@ -110,6 +110,8 @@ impl Stop {
                 | "priority"
                 | "tags"
                 | "conditions"
+                | "inherited-conditions"
+                | "list-conditions"
                 | "blockers"
                 | "waiting"
         )
@@ -123,7 +125,8 @@ impl Stop {
             "start" => "calendar-clock",
             "due" => "calendar",
             "due.exact" => "clock",
-            "conditions" => "sliders",
+            "conditions" | "list-conditions" => "sliders",
+            "inherited-conditions" => "corner-down-right",
             "estimate" => "hourglass",
             "minimum-block" => "timer",
             "single-sitting" => "armchair",
@@ -635,6 +638,42 @@ impl App {
                 );
             }
         }
+        // What it needs, by name, and under it what it needs because of the
+        // lists it is in: each is checked as its own are, but is set on the
+        // list, so the row only says so.
+        if let Some(at) = stops.iter().position(|s| s.id == "conditions") {
+            if let Some(groups) = snapshot
+                .planning
+                .as_ref()
+                .and_then(|p| p.requirement_groups.as_ref())
+                .filter(|g| !g.is_empty())
+            {
+                stops[at].value = self.describe_requirements(groups);
+            }
+            let inherited = self
+                .store
+                .core
+                .inherited_requirements(task.id.clone())
+                .unwrap_or_default();
+            if !inherited.is_empty() {
+                let said = inherited
+                    .iter()
+                    .map(|i| {
+                        format!(
+                            "{} \u{2014} from {}",
+                            self.describe_requirements(&i.groups),
+                            i.list_name
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                stops.insert(
+                    at + 1,
+                    Stop::new("inherited-conditions", "From lists", StopKind::Action)
+                        .value(Some(said), ""),
+                );
+            }
+        }
         // The commitment it has, or carries, in place of the offer to make one.
         let commitment = self.commitment_of(&task.id);
         if let Some(stop) = stops.iter_mut().find(|s| s.id == "commit")
@@ -645,6 +684,25 @@ impl App {
             stop.value = format!("{} · {} · x stops it", c.title, c.rule);
         }
         stops
+    }
+
+    /// Return or `x` on what a task inherits: it is the list's to change, so
+    /// say where.
+    fn say_inherited_conditions(&mut self, task_id: &str) {
+        let names: Vec<String> = self
+            .store
+            .core
+            .inherited_requirements(task_id.into())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|i| i.list_name)
+            .collect();
+        if !names.is_empty() {
+            self.message = Some(format!(
+                "Every task in {} needs these: change them on the list, from its inspector or its menu in the sidebar.",
+                names.join(" and ")
+            ));
+        }
     }
 
     /// The commitment a task carries, or its first.
@@ -817,6 +875,7 @@ impl App {
                 }
             }
             "conditions" => self.run("taskConditions", None),
+            "inherited-conditions" => self.say_inherited_conditions(&task.id),
             "links" => self.begin_add_link(),
             "notes-editor" => self.open_notes_editor(),
             "move" => self.run("taskMove", None),
@@ -908,6 +967,11 @@ impl App {
             "links" => self.edit_selected(|edit| edit.metadata.external_links.clear()),
             "daily" => self.edit_selected(|edit| edit.daily_progress = false),
             "conditions" => self.edit_planning(|planning| planning.requirement_groups = None),
+            "inherited-conditions" => {
+                if let Some(id) = self.selected_task.clone() {
+                    self.say_inherited_conditions(&id);
+                }
+            }
             "due.exact" if self.inspected().is_some_and(|s| s.due_at_ms.is_some()) => {
                 self.toggle_inspector_stop("due.exact");
             }

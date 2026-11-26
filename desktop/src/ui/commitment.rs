@@ -10,7 +10,8 @@ use crate::state::commitment_form::{
 };
 use crate::state::date_edit::today;
 use crate::text_field::FieldKey;
-use gpui::{AnyElement, ClickEvent, Context, SharedString, div, prelude::*, px};
+use crate::ui::zoom::px;
+use gpui::{AnyElement, ClickEvent, Context, SharedString, div, prelude::*};
 
 impl Takt {
     /// A key while the form is open. On the title row the field takes what

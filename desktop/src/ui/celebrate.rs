@@ -4,9 +4,10 @@
 
 use super::Tokens;
 use crate::state::celebration::Style;
+use crate::ui::zoom::px;
 use gpui::{
     Animation, AnimationExt, AnyElement, Div, Hsla, IntoElement, ParentElement, Stateful, Styled,
-    canvas, div, fill, point, px, relative, size,
+    canvas, div, fill, point, relative, size,
 };
 use std::time::Duration;
 

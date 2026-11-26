@@ -16,9 +16,10 @@ use crate::state::Editing;
 use crate::state::plugins::{GOOGLE_ACCOUNT, GOOGLE_SWITCH, Plugin};
 use crate::state::settings::{self as page, Control, SettingRow, SettingsMenu};
 use crate::text_field::{FieldKey, TextField};
+use crate::ui::zoom::px;
 use gpui::{
     AnyElement, ClickEvent, Context, Corner, FontWeight, IntoElement, ParentElement, SharedString,
-    Styled, anchored, deferred, div, point, prelude::*, px,
+    Styled, anchored, deferred, div, point, prelude::*,
 };
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};

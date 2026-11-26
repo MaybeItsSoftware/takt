@@ -282,8 +282,12 @@ impl App {
             }
             "motionBoardColumn" => {
                 let back = key.contains("left") || key == "h";
+                // Back from a subtask row climbs to the task it sits
+                // under, as `←` does in the outline; only from the card
+                // itself does it leave for another column.
                 // Past the first column is the sidebar, as it is from Today.
-                if back && self.board.column == 0 {
+                if back && self.climb_card_row() {
+                } else if back && self.board.column == 0 {
                     self.focus_region(Region::Sidebar);
                 } else {
                     self.move_board_column(if back { -1 } else { 1 });

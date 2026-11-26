@@ -145,8 +145,22 @@ impl App {
             );
         }
         stops.push(
-            Stop::new("container-icon", "Icon", StopKind::Action)
-                .value(self.prefs.icons.get(id).cloned(), "Choose an icon"),
+            Stop::new("container-icon", "Icon", StopKind::Action).value(
+                self.prefs
+                    .icons
+                    .get(id)
+                    .map(|icon| crate::material_symbols::describe(icon)),
+                "Choose an icon",
+            ),
+        );
+        // What every task in it needs, on top of its own: Return ticks
+        // them in the conditions picker, `x` takes them all off.
+        let needs = list.requirement_groups.clone();
+        stops.push(
+            Stop::new("list-conditions", "Needs", StopKind::Action).value(
+                (!needs.is_empty()).then(|| self.describe_requirements(&needs)),
+                "Nothing: each task needs only its own",
+            ),
         );
         if !self.prefs.ai_off {
             stops.push(
@@ -250,8 +264,13 @@ impl App {
                     "None: top level",
                 )
                 .grouped(),
-            Stop::new("container-icon", "Icon", StopKind::Action)
-                .value(self.prefs.icons.get(id).cloned(), "Choose an icon"),
+            Stop::new("container-icon", "Icon", StopKind::Action).value(
+                self.prefs
+                    .icons
+                    .get(id)
+                    .map(|icon| crate::material_symbols::describe(icon)),
+                "Choose an icon",
+            ),
         ]
     }
 
@@ -399,6 +418,10 @@ impl App {
         match (stop, subject) {
             ("container-icon", _) => self.begin_icon_pick(),
             ("container-settings", _) => self.begin_list_settings(),
+            ("list-conditions", Subject::List(id)) => {
+                let id = id.clone();
+                self.edit_list_conditions(&id);
+            }
             ("list-sharing", Subject::List(id)) => {
                 if self.shared_list(id).is_some() {
                     self.run("listMembers", None);
@@ -457,6 +480,10 @@ impl App {
     pub(super) fn clear_container_stop(&mut self, subject: &Subject, stop: &str) {
         match (stop, subject) {
             ("container-folder", _) => self.set_container_folder(subject, None),
+            ("list-conditions", Subject::List(id)) => {
+                let id = id.clone();
+                self.set_list_requirements(&id, Vec::new());
+            }
             ("list-context", Subject::List(id)) => {
                 let id = id.clone();
                 self.set_list_context(&id, "");

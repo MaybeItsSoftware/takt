@@ -15,10 +15,11 @@ use super::Takt;
 use crate::platform::window_move;
 use crate::state::focus::reading;
 use crate::theme::Tokens;
+use crate::ui::zoom::px;
 use gpui::{
     App as GpuiApp, Bounds, Context, DispatchPhase, Entity, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, Pixels, WeakEntity, Window, WindowBounds, WindowKind,
-    WindowOptions, canvas, div, point, prelude::*, px, size,
+    WindowOptions, canvas, div, point, prelude::*, size,
 };
 
 pub const WIDTH: f32 = 300.;

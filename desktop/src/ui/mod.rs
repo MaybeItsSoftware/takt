@@ -23,6 +23,7 @@ mod settings;
 mod sync_page;
 mod views;
 mod widgets;
+pub mod zoom;
 
 use crate::keys::{Press, spell};
 use crate::overlay::{self, OverlayState};
@@ -38,12 +39,13 @@ use crate::theme::Tokens;
 use gpui::{
     AnyElement, App as GpuiApp, Bounds, ClickEvent, ClipboardItem, Context, EntityInputHandler,
     FocusHandle, Focusable, FontWeight, Hsla, KeyDownEvent, Pixels, ScrollStrategy, SharedString,
-    UTF16Selection, UniformListScrollHandle, WeakEntity, Window, div, prelude::*, px, uniform_list,
+    UTF16Selection, UniformListScrollHandle, WeakEntity, Window, div, prelude::*, uniform_list,
 };
 use std::ops::Range;
 use std::time::{Duration, Instant};
 use takt_core::records::TaskRow;
 use widgets::*;
+use zoom::px;
 
 const UI_FONT: &str = "IBM Plex Sans";
 const MONO_FONT: &str = "Lilex";
@@ -825,6 +827,25 @@ impl Takt {
             cx.quit();
             return;
         }
+        // ⌘+ / ⌘= and ⌘−: the whole window larger or smaller, kept across
+        // launches. Not in the keymap's catalogue: it is the Mac window's
+        // own, as ⌘Q and ⌘W are, and no other app of Takt's draws it.
+        if keystroke.modifiers.platform
+            && !keystroke.modifiers.control
+            && matches!(keystroke.key.as_str(), "=" | "+" | "-" | "_")
+        {
+            let by = if matches!(keystroke.key.as_str(), "-" | "_") {
+                -1
+            } else {
+                1
+            };
+            let zoom = zoom::step(by);
+            self.app.prefs.zoom = zoom;
+            self.app.prefs.save();
+            self.app.message = Some(format!("Zoom {:.0}%", zoom * 100.));
+            cx.refresh_windows();
+            return;
+        }
         if keystroke.modifiers.platform && keystroke.key == "," && self.app.editing.is_none() {
             self.open_settings_page();
             self.open_requested_windows(cx);
@@ -1601,7 +1622,7 @@ impl Takt {
         match kind {
             RowKind::Today => "Today".into(),
             RowKind::Everything => "Everything".into(),
-            RowKind::PrioritiesHeading => "Priorities".into(),
+            RowKind::Heading(label) => (*label).into(),
             RowKind::List(id) => self
                 .app
                 .list(id)
@@ -1745,6 +1766,8 @@ impl Takt {
 
 impl Render for Takt {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Text sized in rems (the toolkit's defaults) zooms with the rest.
+        window.set_rem_size(px(16.));
         let t = Tokens::of(
             &self.app.theme(),
             window.appearance(),
@@ -1775,14 +1798,14 @@ impl Render for Takt {
             // wherever it goes, and is kept once it is let go.
             .on_drag_move(
                 cx.listener(|this, e: &gpui::DragMoveEvent<DockEdge>, window, cx| {
-                    let x = f32::from(e.event.position.x);
+                    let x = crate::ui::zoom::unzoom(e.event.position.x);
                     let edge = *e.drag(cx);
                     let p = &mut this.app.prefs;
                     let (width, wanted) = match edge {
                         DockEdge::Left => (&mut p.sidebar_width, x.clamp(SIDEBAR_MIN, SIDEBAR_MAX)),
                         DockEdge::Right => (
                             &mut p.right_dock_width,
-                            (f32::from(window.viewport_size().width) - x)
+                            (crate::ui::zoom::unzoom(window.viewport_size().width) - x)
                                 .clamp(RIGHT_DOCK_MIN, RIGHT_DOCK_MAX),
                         ),
                     };
@@ -1845,8 +1868,8 @@ impl Render for Takt {
                                                 cx.listener(
                                                     |this, e: &gpui::MouseDownEvent, _, cx| {
                                                         this.app.open_pane_menu(
-                                                            f32::from(e.position.x),
-                                                            f32::from(e.position.y),
+                                                            crate::ui::zoom::unzoom(e.position.x),
+                                                            crate::ui::zoom::unzoom(e.position.y),
                                                         );
                                                         cx.notify();
                                                     },

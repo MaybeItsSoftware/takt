@@ -7,9 +7,10 @@
 use super::icons::icon;
 use super::{Takt, Tokens};
 use crate::state::settings::SettingRow;
+use crate::ui::zoom::px;
 use gpui::{
     AnyElement, ClickEvent, Context, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    SharedString, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+    SharedString, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder,
 };
 
 /// The group the page's own rows are in; the shared lists follow as rows.

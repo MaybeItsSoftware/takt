@@ -74,6 +74,11 @@ impl App {
     /// `.`: shows a folded task's subtasks.
     pub fn grow_selected(&mut self) {
         if let Some(id) = self.selected_task.clone()
+            && self.grow_on_board(&id)
+        {
+            return;
+        }
+        if let Some(id) = self.selected_task.clone()
             && self.prefs.folded_tasks.remove(&id)
         {
             self.prefs.save();
@@ -86,6 +91,9 @@ impl App {
         let Some(id) = self.selected_task.clone() else {
             return;
         };
+        if self.shrink_on_board(&id) {
+            return;
+        }
         // The scope's rows, not the outline's: on the board a subtask row
         // drawn on a card is not one of the outline's.
         let row = self.all_rows.iter().find(|row| row.task.id == id).cloned();

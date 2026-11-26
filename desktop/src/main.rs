@@ -11,6 +11,7 @@ extern crate objc;
 
 mod google;
 mod keys;
+mod material_symbols;
 mod overlay;
 mod platform;
 mod state;
@@ -34,6 +35,7 @@ fn load_fonts(cx: &App) {
         Cow::Borrowed(include_bytes!("../../shared/fonts/IBMPlexSans-Italic.ttf")),
         Cow::Borrowed(include_bytes!("../../shared/fonts/Lilex-Regular.ttf")),
         Cow::Borrowed(include_bytes!("../../shared/fonts/Lilex-Medium.ttf")),
+        Cow::Borrowed(material_symbols::FONT),
     ];
     if let Err(error) = cx.text_system().add_fonts(fonts) {
         eprintln!("takt-desktop: could not load the bundled fonts: {error}");
@@ -303,6 +305,14 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
         }
         if mode == "board" {
             let cards: Vec<_> = app.board.cards.iter().flatten().cloned().collect();
+            // Every card shut, as a card is until it is opened.
+            app.prefs.opened_cards.clear();
+            let shut = cards.iter().all(|card| app.card_subtree(card).0.is_empty());
+            report.push(format!("cards shut by default {shut}"));
+            // Then all open, to count and walk their rows.
+            for card in &cards {
+                app.prefs.opened_cards.insert(card.id.clone());
+            }
             let (mut rows, mut elsewhere, mut hints) = (0, 0, 0);
             for card in &cards {
                 let (subtree, _) = app.card_subtree(card);
@@ -331,12 +341,92 @@ fn smoke_test(app: &mut state::App, window: &mut gpui::Window, launched: Instant
                 app.selected_task = Some(card.id.clone());
                 app.run("motionBoardIntoCard", Some("l"));
                 let into = app.selected_task.as_deref() == ids.first().map(String::as_str)
-                    && app.visible_ids() == ids;
+                    && app.visible_ids().windows(ids.len()).any(|run| run == ids);
                 app.run("motionSelectNext", Some("j"));
                 let along = app.selected_task.as_deref() == ids.get(1).map(String::as_str);
                 app.run("motionBoardOutOfCard", Some("h"));
                 let out = app.selected_task.as_deref() == Some(card.id.as_str());
                 report.push(format!("card rows: into {into}, along {along}, out {out}"));
+            }
+            // `.` opens a card past its preview to every first-layer
+            // subtask, then a subtask to its own; `,` steps back down to a
+            // folded card, the cursor climbing with it.
+            let tall = app
+                .board
+                .cards
+                .iter()
+                .enumerate()
+                .find_map(|(column, cards)| {
+                    cards
+                        .iter()
+                        .find(|card| app.card_subtree(card).0.iter().any(|r| r.children > 0))
+                        .map(|card| (column, card.clone()))
+                });
+            if let Some((column, card)) = tall {
+                app.board.column = column;
+                app.selected_task = Some(card.id.clone());
+                app.prefs.opened_cards.remove(&card.id);
+                app.run("planGrowTask", Some("."));
+                let (rows, total) = app.card_subtree(&card);
+                let whole = rows.len() == total && rows.iter().all(|r| r.depth == 0);
+                // Opened, `j` from the card walks its rows, then on.
+                let ids = app.card_row_ids(&card);
+                app.run("motionSelectNext", Some("j"));
+                let mut walk = app.selected_task.as_deref() == ids.first().map(String::as_str);
+                for _ in 1..ids.len() {
+                    app.run("motionSelectNext", Some("j"));
+                }
+                walk &= app.selected_task.as_deref() == ids.last().map(String::as_str);
+                app.run("motionSelectNext", Some("j"));
+                let next_card = app.board.cards[column]
+                    .iter()
+                    .position(|c| c.id == card.id)
+                    .and_then(|ix| app.board.cards[column].get(ix + 1))
+                    .map(|c| c.id.clone());
+                walk &= next_card.is_none() || app.selected_task == next_card;
+                app.selected_task = Some(card.id.clone());
+                let parent = rows
+                    .iter()
+                    .find(|r| r.children > 0 && r.elsewhere.is_none());
+                let nested = parent.map(|row| {
+                    app.selected_task = Some(row.task.id.clone());
+                    app.run("planGrowTask", Some("."));
+                    let shown = app
+                        .card_subtree(&card)
+                        .0
+                        .iter()
+                        .filter(|r| r.depth == 1)
+                        .count();
+                    // From a subtask of its: `,` shuts the row and the
+                    // cursor climbs to it.
+                    if let Some(kid) = app.card_row_ids(&card).into_iter().find(|id| {
+                        app.all_rows.iter().any(|r| {
+                            r.task.id == *id && r.task.parent_task_id.as_ref() == Some(&row.task.id)
+                        })
+                    }) {
+                        app.selected_task = Some(kid);
+                    }
+                    // `←` from it climbs to the row, not out of the card.
+                    let kid = app.selected_task.clone();
+                    app.run("motionBoardColumn", Some("left"));
+                    let climbs = app.selected_task.as_deref() == Some(row.task.id.as_str());
+                    app.selected_task = kid;
+                    app.run("planShrinkTask", Some("comma"));
+                    let shut = climbs
+                        && app.selected_task.as_deref() == Some(row.task.id.as_str())
+                        && app.card_subtree(&card).0.iter().all(|r| r.depth == 0);
+                    (shown == row.children, shut)
+                });
+                // One `,` on the card shuts it: no rows left drawn.
+                app.selected_task = Some(card.id.clone());
+                app.run("planShrinkTask", Some("comma"));
+                let shut = app.card_subtree(&card).0.is_empty();
+                // Shut, `j` from the card goes straight to the next.
+                app.run("motionSelectNext", Some("j"));
+                let skip = next_card.is_none() || app.selected_task == next_card;
+                report.push(format!(
+                    "card ladder: whole {whole}, walk {walk}, nested {nested:?}, shut in one {shut}, skip {skip}"
+                ));
             }
         }
     }

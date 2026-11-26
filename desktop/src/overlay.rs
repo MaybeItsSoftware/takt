@@ -130,7 +130,7 @@ pub fn apply(app: &mut App, pick: Pick) {
                 (None, RowKind::FilterList(id)) => app.select_filter_list(&id),
                 (None, RowKind::Everything) => app.select_everything(),
                 (None, RowKind::Today) => app.select_today(),
-                (None, RowKind::PrioritiesHeading) => {}
+                (None, RowKind::Heading(_)) => {}
             }
             app.sidebar_cursor = None;
             app.enter_tasks_from_sidebar();

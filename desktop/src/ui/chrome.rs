@@ -119,8 +119,8 @@ impl Takt {
                 cx.listener(|this, e: &gpui::MouseDownEvent, _, cx| {
                     cx.stop_propagation();
                     this.app.open_account_menu(
-                        f32::from(e.position.x) - 200.,
-                        f32::from(e.position.y) + 14.,
+                        crate::ui::zoom::unzoom(e.position.x) - 200.,
+                        crate::ui::zoom::unzoom(e.position.y) + 14.,
                     );
                     cx.notify();
                 }),
@@ -349,25 +349,35 @@ impl Takt {
                 .field_row(t, "Name", row.depth as f32 * SIDEBAR_INDENT, true)
                 .into_any_element();
         }
-        if row.kind == RowKind::PrioritiesHeading {
-            // A heading, as Zed sets one over a group of its panel's rows:
-            // small, muted, not a row the cursor or a click lands on.
+        if let RowKind::Heading(label) = row.kind {
+            // A section heading: the label, then a hairline running on to
+            // the edge. The sidebar's rows are all one height, so there is
+            // no extra space to put round it; set in the row's middle (a
+            // touch low, nearer the rows it heads), the gaps above and below
+            // come out even. Not a row the cursor or a click lands on.
             return div()
                 .id(("sidebar-row", ix))
                 .h(px(ROW_HEIGHT))
                 .w_full()
                 .pl(px(SIDEBAR_INSET))
-                .pr_3()
+                .pr(px(12.))
+                .pt(px(4.))
                 .flex()
-                .items_end()
-                .pb(px(2.))
-                .text_size(px(11.))
-                .text_color(t.placeholder)
-                .child("Priorities")
+                .items_center()
+                .gap_2()
+                .child(
+                    div()
+                        .flex_none()
+                        .text_size(px(11.))
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(t.muted)
+                        .child(label),
+                )
+                .child(div().flex_1().h(px(1.)).bg(t.border_variant))
                 .into_any_element();
         }
         let (icon, count) = match &row.kind {
-            RowKind::PrioritiesHeading => ("list", None),
+            RowKind::Heading(_) => ("list", None),
             RowKind::Today => ("sun", None),
             RowKind::Everything => ("infinity", None),
             RowKind::List(id) => (
@@ -449,8 +459,8 @@ impl Takt {
                 cx.listener(move |this, e: &gpui::MouseDownEvent, _, cx| {
                     this.app.open_sidebar_menu(
                         &row_id,
-                        f32::from(e.position.x),
-                        f32::from(e.position.y),
+                        crate::ui::zoom::unzoom(e.position.x),
+                        crate::ui::zoom::unzoom(e.position.y),
                     );
                     this.after_change(cx);
                     cx.stop_propagation();
@@ -464,15 +474,7 @@ impl Takt {
                 cx.notify();
             }))
             .child(match custom {
-                Some(glyph) => div()
-                    .w(px(16.))
-                    .flex_none()
-                    .flex()
-                    .justify_center()
-                    .text_size(px(13.))
-                    .text_color(t.muted)
-                    .child(SharedString::from(glyph))
-                    .into_any_element(),
+                Some(glyph) => super::icons::chosen_icon(&glyph, 16., t.muted),
                 None => super::icons::icon(icon, 16.)
                     .text_color(t.muted)
                     .into_any_element(),
@@ -800,7 +802,10 @@ impl Takt {
                     })
                     .on_click(cx.listener(|this, e: &ClickEvent, _, cx| {
                         let at = e.position();
-                        this.app.open_history_menu(f32::from(at.x), f32::from(at.y));
+                        this.app.open_history_menu(
+                            crate::ui::zoom::unzoom(at.x),
+                            crate::ui::zoom::unzoom(at.y),
+                        );
                         this.after_change(cx);
                         cx.notify();
                     })),
@@ -886,6 +891,24 @@ impl Takt {
                                                     .gap_2()
                                                     .rounded(px(4.))
                                                     .when(ix == selected, |d| d.bg(t.selected))
+                                                    .when_some(
+                                                        match &item.pick {
+                                                            crate::overlay::Pick::Choice(
+                                                                _,
+                                                                crate::state::pickers::Choice::Icon(value),
+                                                            ) if crate::material_symbols::glyph(value)
+                                                                .is_some() =>
+                                                            {
+                                                                Some(value.clone())
+                                                            }
+                                                            _ => None,
+                                                        },
+                                                        |d, value| {
+                                                            d.child(super::icons::chosen_icon(
+                                                                &value, 18., t.text,
+                                                            ))
+                                                        },
+                                                    )
                                                     .child(
                                                         div()
                                                             .flex_1()
@@ -1235,8 +1258,14 @@ impl Takt {
             })
             .sum::<f32>()
             + 10.;
-        let x = menu.x.min(f32::from(viewport.width) - WIDTH - 8.).max(4.);
-        let y = menu.y.min(f32::from(viewport.height) - height - 8.).max(4.);
+        let x = menu
+            .x
+            .min(crate::ui::zoom::unzoom(viewport.width) - WIDTH - 8.)
+            .max(4.);
+        let y = menu
+            .y
+            .min(crate::ui::zoom::unzoom(viewport.height) - height - 8.)
+            .max(4.);
         let rows = menu
             .entries
             .iter()

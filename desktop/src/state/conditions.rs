@@ -6,12 +6,20 @@
 //! What holds, what a setting provides, the sections and their order, the
 //! day's start: all the core's. The cursor's rows and the steps `←`/`→`
 //! take are the Mac's, here (`ConditionsPaneLayout`/`Steps` in TaktCore).
+//!
+//! A device condition (Laptop) holds by itself on a device of its kind, so
+//! the tab lists those under Device with whether this Mac is one, and never
+//! lets them be switched. What a list requires of its tasks is set here too,
+//! with the picker a task's conditions use, and the core adds it to every
+//! task in the list wherever requirements are checked.
 
 use super::store::now_ms;
 use super::{App, Editing, Region};
 use std::collections::HashSet;
 use takt_core::conditions::{ConditionHolding, ConditionsSaid};
-use takt_core::conditions::{ConditionSection, available_condition_sections, condition_sections};
+use takt_core::conditions::{
+    ConditionSection, available_condition_sections, condition_sections, is_device,
+};
 use takt_core::day_start::DayStartSettings;
 use takt_core::focus_context::StoredFocusContext;
 use takt_core::rows::ConditionRow;
@@ -249,6 +257,24 @@ impl App {
         self.conditions.all.iter().find(|c| c.id == id)
     }
 
+    /// Whether `id` is a device condition, which holds by itself on a
+    /// device of its kind and can never be said to hold or switched off.
+    pub fn is_device_condition(&self, id: &str) -> bool {
+        self.condition(id).is_some_and(is_device)
+    }
+
+    /// The live device conditions, in the order the Device heading lists
+    /// them. All of them, not just those something needs: they say what
+    /// this Mac counts as, which is worth seeing whether or not it matters
+    /// yet.
+    pub fn device_conditions(&self) -> Vec<ConditionRow> {
+        self.live_sections()
+            .into_iter()
+            .filter(|s| s.is_device)
+            .flat_map(|s| s.conditions)
+            .collect()
+    }
+
     pub fn places(&self) -> Vec<ConditionRow> {
         self.selectable_conditions()
             .into_iter()
@@ -327,9 +353,14 @@ impl App {
             rows.push(Row::FinishOnly);
         }
         rows.extend(
+            self.device_conditions()
+                .into_iter()
+                .map(|c| Row::Available(c.id)),
+        );
+        rows.extend(
             self.selectable_conditions()
                 .into_iter()
-                .filter(|c| !c.is_location)
+                .filter(|c| !c.is_location && !is_device(c))
                 .map(|c| Row::Available(c.id)),
         );
         rows.push(Row::Expiry);
@@ -437,6 +468,25 @@ impl App {
     }
 
     pub fn toggle_condition(&mut self, id: &str, on: Option<bool>) {
+        if let Some(condition) = self.condition(id).filter(|c| is_device(c)) {
+            // The core would leave it as it is anyway; saying why is kinder
+            // than a box that does not tick.
+            let kind = device_title(condition.device_kind.as_deref());
+            self.message = Some(if self.holding(id).is_some_and(|h| h.holds) {
+                format!(
+                    "{} holds because this Mac is a {}; it can't be switched off.",
+                    condition.name,
+                    kind.to_lowercase()
+                )
+            } else {
+                format!(
+                    "{} holds only on a {}; it can't be switched on here.",
+                    condition.name,
+                    kind.to_lowercase()
+                )
+            });
+            return;
+        }
         let said = ConditionsSaid {
             condition_ids: self.conditions.context.condition_ids.clone(),
             off_ids: self.conditions.context.off_ids.clone(),
@@ -532,6 +582,15 @@ impl App {
                 let mut context = self.conditions.context.clone();
                 context.expires_at_ms = stop.at(now);
                 self.save_context(context);
+            }
+            // A device condition has nothing to adjust: `←` goes back to
+            // the tasks as from any such row, and `→` says why.
+            Row::Available(id) if self.is_device_condition(&id) => {
+                if by < 0 {
+                    self.region = Region::Tasks;
+                } else {
+                    self.toggle_condition(&id, Some(true));
+                }
             }
             Row::Available(id) => {
                 let holds = self.holding(&id).is_some_and(|h| h.holds);
@@ -711,6 +770,10 @@ impl App {
                 }
                 Row::DayStartConditions => self.open_picker(super::pickers::Picker::DayStart),
                 Row::Folded(_) | Row::Archived => self.run_conditions("conditionsFold", ""),
+                // Says why a device condition does not switch.
+                Row::Available(id) | Row::Condition(id) if self.is_device_condition(&id) => {
+                    self.toggle_condition(&id, None);
+                }
                 Row::Available(id) | Row::Condition(id)
                     if self.selectable_conditions().iter().any(|c| c.id == id) =>
                 {
@@ -880,23 +943,12 @@ impl App {
     /// Ticks a condition the task needs, or (negated) needs not to hold;
     /// again takes it off.
     pub fn toggle_task_requirement(&mut self, task_id: &str, condition_id: &str, negated: bool) {
-        let member = takt_core::conditions::requirement_member(condition_id.into(), negated);
         let previous = self.selected_task.clone();
         self.selected_task = Some(task_id.into());
         self.edit_selected(|edit| {
             let mut planning = edit.planning.clone().unwrap_or_default();
-            let mut groups = planning.requirement_groups.clone().unwrap_or_default();
-            let before = groups.len();
-            groups.retain(|group| {
-                !group.iter().any(|m| {
-                    takt_core::conditions::requirement_condition_id(m.clone()) == condition_id
-                }) || group.len() > 1
-            });
-            let had = groups.len() != before;
-            if !had {
-                groups.push(vec![member]);
-            }
-            planning.requirement_groups = Some(groups);
+            let groups = planning.requirement_groups.clone().unwrap_or_default();
+            planning.requirement_groups = Some(toggled_requirement(groups, condition_id, negated));
             edit.planning = planning.normalized();
         });
         self.selected_task = previous;
@@ -904,25 +956,208 @@ impl App {
         self.reload_today();
     }
 
-    /// The requirement a task has on a condition: none, needs, needs not.
-    pub fn task_requirement(
-        &self,
-        planning: Option<&takt_core::editor::Planning>,
-        id: &str,
-    ) -> Option<bool> {
-        planning?
-            .requirement_groups
-            .as_ref()?
+    /// Groups named as the tab names their conditions.
+    pub fn describe_requirements(&self, groups: &[Vec<String>]) -> String {
+        describe_requirements(groups, |id| {
+            self.condition(id)
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| "a condition".into())
+        })
+    }
+
+    /// What a standalone list requires of every task in it, as held in
+    /// memory.
+    pub fn list_requirements(&self, list_id: &str) -> Vec<Vec<String>> {
+        self.list(list_id)
+            .map(|l| l.requirement_groups.clone())
+            .unwrap_or_default()
+    }
+
+    /// The list's conditions, from its inspector or its menu. A nested list
+    /// is a task, and what it passes down is its own requirements, so it
+    /// gets the task's picker; a standalone list gets its own.
+    pub fn edit_list_conditions(&mut self, list_id: &str) {
+        self.reload_conditions();
+        if self.list(list_id).is_some() {
+            self.open_picker(super::pickers::Picker::ListConditions {
+                list_id: list_id.into(),
+            });
+        } else {
+            self.open_picker(super::pickers::Picker::TaskConditions {
+                task_id: list_id.into(),
+            });
+        }
+    }
+
+    /// Ticks a condition every task in a standalone list needs, or takes it
+    /// off, as a task's picker does for the task.
+    pub fn toggle_list_requirement(&mut self, list_id: &str, condition_id: &str, negated: bool) {
+        let groups = toggled_requirement(self.list_requirements(list_id), condition_id, negated);
+        self.set_list_requirements(list_id, groups);
+    }
+
+    /// Saves what a standalone list requires. The write patches the list
+    /// held in memory rather than rereading the sidebar; what it changes
+    /// downstream (what is held back, Up next, the counts in the tab) is
+    /// the core's to work out, read again as after any condition edit.
+    pub fn set_list_requirements(&mut self, list_id: &str, groups: Vec<Vec<String>>) {
+        let now = now_ms();
+        let id = list_id.to_string();
+        let saved = groups.clone();
+        if self
+            .write(|s| s.core.set_list_requirements(id, saved, now))
+            .is_none()
+        {
+            return;
+        }
+        if let Some(list) = self.lists.iter_mut().find(|l| l.id == list_id) {
+            list.requirement_groups = groups;
+        }
+        self.reload_conditions();
+        self.reload_today();
+    }
+
+    /// Marks a condition as the one meaning a laptop, a phone or a tablet,
+    /// or (none) makes it an ordinary condition again.
+    pub fn set_condition_device_kind(&mut self, condition_id: &str, kind: Option<String>) {
+        let now = now_ms();
+        let id = condition_id.to_string();
+        let said = kind.clone();
+        let Some(changed) = self.write(|s| s.core.set_condition_device_kind(id, said, now)) else {
+            return;
+        };
+        if !changed {
+            return;
+        }
+        let name = self
+            .condition(condition_id)
+            .map(|c| c.name.clone())
+            .unwrap_or_default();
+        self.message = Some(match kind.as_deref() {
+            Some(kind) => format!(
+                "{name} now holds on a {} by itself, and nowhere else.",
+                device_title(Some(kind)).to_lowercase()
+            ),
+            None => format!("{name} is an ordinary condition again."),
+        });
+        self.reload_conditions();
+        self.reload_today();
+    }
+}
+
+/// The requirement `groups` make on a condition: none, needs, needs not.
+pub fn requirement_in(groups: &[Vec<String>], id: &str) -> Option<bool> {
+    groups
+        .iter()
+        .flatten()
+        .find(|m| takt_core::conditions::requirement_condition_id((*m).clone()) == id)
+        .map(|m| takt_core::conditions::requirement_is_negated(m.clone()))
+}
+
+/// `groups` with a condition ticked, or, when a group of its own already
+/// names it, taken off again. A group that offers it as one of several
+/// choices is left alone.
+pub fn toggled_requirement(
+    mut groups: Vec<Vec<String>>,
+    condition_id: &str,
+    negated: bool,
+) -> Vec<Vec<String>> {
+    let before = groups.len();
+    groups.retain(|group| {
+        !group
             .iter()
-            .flatten()
-            .find(|m| takt_core::conditions::requirement_condition_id((*m).clone()) == id)
-            .map(|m| takt_core::conditions::requirement_is_negated(m.clone()))
+            .any(|m| takt_core::conditions::requirement_condition_id(m.clone()) == condition_id)
+            || group.len() > 1
+    });
+    if groups.len() == before {
+        groups.push(vec![takt_core::conditions::requirement_member(
+            condition_id.into(),
+            negated,
+        )]);
+    }
+    groups
+}
+
+/// Groups as a sentence: each group's choices joined by "or", the groups
+/// by commas, a negated one as "not". "Campus or Library, not Tired".
+pub fn describe_requirements(groups: &[Vec<String>], name: impl Fn(&str) -> String) -> String {
+    groups
+        .iter()
+        .map(|group| {
+            group
+                .iter()
+                .map(|m| {
+                    let id = takt_core::conditions::requirement_condition_id(m.clone());
+                    if takt_core::conditions::requirement_is_negated(m.clone()) {
+                        format!("not {}", name(&id))
+                    } else {
+                        name(&id)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" or ")
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// A device kind as a person reads it.
+pub fn device_title(kind: Option<&str>) -> String {
+    match kind.map(str::trim) {
+        Some("laptop") => "Laptop".into(),
+        Some("phone") => "Phone".into(),
+        Some("tablet") => "Tablet".into(),
+        Some(other) if !other.is_empty() => {
+            let mut chars = other.chars();
+            chars
+                .next()
+                .map(|c| c.to_uppercase().chain(chars).collect())
+                .unwrap_or_default()
+        }
+        _ => "Device".into(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_requirement_ticks_on_and_off_and_leaves_a_choice_alone() {
+        let groups = toggled_requirement(Vec::new(), "campus", false);
+        assert_eq!(groups, vec![vec!["campus".to_string()]]);
+        assert_eq!(requirement_in(&groups, "campus"), Some(false));
+        assert!(toggled_requirement(groups, "campus", false).is_empty());
+        let either = vec![vec!["campus".to_string(), "library".to_string()]];
+        let ticked = toggled_requirement(either.clone(), "campus", true);
+        assert_eq!(ticked.len(), 2, "the choice stays, and a group is added");
+        assert_eq!(ticked[0], either[0]);
+    }
+
+    #[test]
+    fn requirements_read_as_a_sentence() {
+        let groups = vec![
+            vec!["campus".to_string(), "library".to_string()],
+            vec![takt_core::conditions::requirement_member(
+                "tired".into(),
+                true,
+            )],
+        ];
+        let said = describe_requirements(&groups, |id| {
+            let mut c = id.chars();
+            c.next()
+                .map(|f| f.to_uppercase().chain(c).collect())
+                .unwrap_or_default()
+        });
+        assert_eq!(said, "Campus or Library, not Tired");
+    }
+
+    #[test]
+    fn device_kinds_have_their_names() {
+        assert_eq!(device_title(Some("laptop")), "Laptop");
+        assert_eq!(device_title(Some("watch")), "Watch");
+        assert_eq!(device_title(None), "Device");
+    }
 
     #[test]
     fn minutes_step_by_quarters_and_none_sits_below() {
@@ -973,6 +1208,7 @@ impl App {
         let live = self.live_sections();
         let mut started: HashSet<String> = HashSet::new();
         let mut first_available = true;
+        let mut first_device = true;
         let mut archived_heading = false;
         self.condition_rows()
             .into_iter()
@@ -1012,6 +1248,26 @@ impl App {
                         } else {
                             "Progress on anything".into()
                         };
+                    }
+                    Row::Available(id) if self.is_device_condition(id) => {
+                        if first_device {
+                            view.heading = Some("Device".into());
+                            first_device = false;
+                        }
+                        let holds = holds(id).is_some_and(|h| h.holds);
+                        view.on = Some(holds);
+                        view.label = name(id);
+                        view.value = if holds {
+                            "This device".into()
+                        } else {
+                            format!(
+                                "Not this device · {}",
+                                device_title(
+                                    self.condition(id).and_then(|c| c.device_kind.as_deref())
+                                )
+                            )
+                        };
+                        view.dim = !holds;
                     }
                     Row::Available(id) => {
                         if first_available {
@@ -1122,6 +1378,9 @@ impl App {
                             .map(|c| c.provides.iter().map(|p| name(p)).collect::<Vec<_>>())
                             .unwrap_or_default();
                         let mut parts = Vec::new();
+                        if let Some(c) = condition.filter(|c| is_device(c)) {
+                            parts.push(device_title(c.device_kind.as_deref()));
+                        }
                         if used > 0 {
                             parts.push(format!("{used} task{}", if used == 1 { "" } else { "s" }));
                         }

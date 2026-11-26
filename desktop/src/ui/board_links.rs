@@ -17,8 +17,9 @@
 //! paints, which is after every element has been laid out. Nothing here
 //! moves a card.
 
+use crate::ui::zoom::px;
 use gpui::{
-    Bounds, ContentMask, Hsla, IntoElement, PathBuilder, Pixels, Point, Styled, canvas, point, px,
+    Bounds, ContentMask, Hsla, IntoElement, PathBuilder, Pixels, Point, Styled, canvas, point,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
