@@ -1,6 +1,7 @@
 package uk.co.maybeitsadam.takt.data.workspace
 
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -484,4 +485,45 @@ class WorkspaceConditionsTest {
         assertEquals("Schedule Task", store.redoableLabel())
     }
 
+    /**
+     * A device condition holds on a device of its kind without being said,
+     * heads the conditions under Device, and holds nowhere else. The kind is
+     * the process's, so it is put back for the tests that follow.
+     */
+    @Test
+    fun aDeviceConditionHoldsOnlyOnThatKindOfDevice() = fixture {
+        val campus = store.conditions(workspace.id).first { it.name == "Campus" }
+        val tablet = store.createCondition(workspace.id, "Tablet", null, now)
+        assertTrue(store.setConditionDeviceKind(tablet.id, "tablet", now))
+        val all = store.conditions(workspace.id)
+        assertEquals("tablet", all.first { it.id == tablet.id }.deviceKind)
+        uniffi.takt_core.setThisDeviceKind("tablet")
+        try {
+            val holdings = ConditionHoldings.holdings(all, setOf(campus.id), emptySet())
+            assertTrue(holdings.getValue(tablet.id).isDevice)
+            assertEquals("this device", ConditionHoldings.note(holdings[tablet.id], all))
+            assertTrue(tablet.id in ConditionHoldings.held(all, setOf(campus.id), emptySet()))
+            val device = ConditionGroups.all(all).first()
+            assertTrue(device.isDevice)
+            assertEquals(listOf(tablet.id), device.conditions.map { it.id })
+        } finally {
+            uniffi.takt_core.setThisDeviceKind(null)
+        }
+        assertTrue(tablet.id !in ConditionHoldings.held(all, setOf(campus.id), emptySet()))
+    }
+
+    /** What a list requires, every task in it needs as well as its own. */
+    @Test
+    fun aListsRequirementsAreInheritedByItsTasks() = fixture {
+        val campus = store.conditions(workspace.id).first { it.name == "Campus" }
+        val revise = task("Revise")
+        assertTrue(store.setListRequirements(inbox.id, listOf(listOf(campus.id)), now))
+        assertEquals(listOf(listOf(campus.id)), store.observeListRequirements(inbox.id).first())
+        assertEquals(listOf(listOf(campus.id)), store.lists(workspace.id).first { it.id == inbox.id }.requirementGroups)
+        val inherited = store.observeInheritedRequirements(revise.id).first()
+        assertEquals(listOf(inbox.id), inherited.map { it.listId })
+        assertEquals(listOf(listOf(campus.id)), store.nextUpCandidates(now = now).first { it.id == revise.id }.requirementGroups)
+        assertTrue(store.setListRequirements(inbox.id, emptyList(), now))
+        assertTrue(store.observeInheritedRequirements(revise.id).first().isEmpty())
+    }
 }

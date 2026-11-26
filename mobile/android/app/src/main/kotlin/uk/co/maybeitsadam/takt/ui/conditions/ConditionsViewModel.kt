@@ -65,8 +65,12 @@ data class ConditionsState(
     /** What "where you are" offers: what an open task needs, and whatever is on. The core's rule. */
     val available: List<ConditionGroup> get() = ConditionGroups.available(conditions, usage.keys, holdings.keys)
 
-    /** What a condition's row says beside it: "from Home", "off for now", or nothing. */
+    /**
+     * What a condition's row says beside it: "this device" or "not this
+     * device" for a device condition, "from Home", "off for now", or nothing.
+     */
     fun note(id: String): String? = ConditionHoldings.note(holdings[id], conditions)
+        ?: if (conditions.firstOrNull { it.id == id }?.isDevice == true) "not this device" else null
 
     fun name(id: String): String = conditions.firstOrNull { it.id == id }?.name ?: "Missing condition"
 }
@@ -111,6 +115,9 @@ class ConditionsViewModel(private val container: AppContainer) : ViewModel() {
      * as Focus's chips.
      */
     fun toggleNow(condition: TaskCondition) {
+        // A device condition holds by itself on its kind of device; the core
+        // would ignore saying it, so nothing is saved.
+        if (condition.isDevice) return
         val current = state.value
         val next = ConditionHoldings.switching(current.conditions, current.selected, current.off, condition.id)
         saveContext { it.copy(conditionIds = next.conditionIds, offIds = next.offIds, suggestedIds = emptyList()) }
@@ -133,6 +140,11 @@ class ConditionsViewModel(private val container: AppContainer) : ViewModel() {
             container.undo.performNow { repo -> made = repo.createCondition(container.awaitSession().workspace.id, trimmed, null) }
             made?.let(then)
         }
+    }
+
+    /** Marks [condition] as meaning a kind of device ("laptop", "phone", "tablet"), or none: one undo step. */
+    fun setDeviceKind(condition: TaskCondition, kind: String?) {
+        container.undo.perform { it.setConditionDeviceKind(condition.id, kind) }
     }
 
     /** Saves the context into the workspace, changed by [change]. Not an undo step. */

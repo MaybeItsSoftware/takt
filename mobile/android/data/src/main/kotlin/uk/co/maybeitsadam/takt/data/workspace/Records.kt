@@ -116,6 +116,7 @@ internal fun Row.toCondition() = TaskCondition(
     id = string("id"), workspaceId = string("workspaceId"), name = string("name"), isLocation = bool("isLocation"),
     isArchived = bool("isArchived"), createdAt = instant("createdAt"), updatedAt = instant("updatedAt"),
     category = stringOrNull("category"),
+    deviceKind = if ("deviceKind" in columnNames) stringOrNull("deviceKind") else null,
 )
 
 internal fun Row.toWorkBlock() = FocusWorkBlock(
@@ -148,7 +149,7 @@ internal fun ListRow.toList() = TaskList(
     sortOrder = sortOrder.toInt(), isArchived = isArchived, systemRole = TaskListRole.of(systemRole),
     visibleRootTaskId = visibleRootTaskId, completedAt = completedAtMs?.instant(),
     createdAt = createdAtMs.instant(), updatedAt = updatedAtMs.instant(),
-    priorityRank = priorityRank?.toInt(),
+    priorityRank = priorityRank?.toInt(), requirementGroups = requirementGroups,
 )
 
 internal fun TaskRow.toTask() = WorkspaceTask(
@@ -177,13 +178,13 @@ internal fun DayDaily.toItem() = DailyItem(daily.toDaily(), task.toTask(), contr
 internal fun ConditionRow.toCondition() = TaskCondition(
     id = id, workspaceId = workspaceId, name = name, isLocation = isLocation, isArchived = isArchived,
     createdAt = createdAtMs.instant(), updatedAt = updatedAtMs.instant(), category = category,
-    sortOrder = sortOrder, provides = provides,
+    sortOrder = sortOrder, provides = provides, deviceKind = deviceKind,
 )
 
 internal fun TaskCondition.toRow() = ConditionRow(
     id = id, workspaceId = workspaceId, name = name, isLocation = isLocation, isArchived = isArchived,
     createdAtMs = createdAt.toEpochMilli(), updatedAtMs = updatedAt.toEpochMilli(), category = category,
-    sortOrder = sortOrder, provides = provides,
+    sortOrder = sortOrder, provides = provides, deviceKind = deviceKind,
 )
 
 internal fun MetadataRow.toMetadata() = TaskMetadata(

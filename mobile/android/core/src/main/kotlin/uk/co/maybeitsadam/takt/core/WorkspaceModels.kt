@@ -55,6 +55,12 @@ data class TaskList(
      * it is not prioritised. As stored: [prioritised] gives the order.
      */
     val priorityRank: Int? = null,
+    /**
+     * The conditions it requires, as a task keeps them (an AND of OR-groups,
+     * "!id" for must not hold). Every task in it, and in the nested lists
+     * under it, inherits them (`conditions/inherited.rs`).
+     */
+    val requirementGroups: List<List<String>> = emptyList(),
 ) {
     val isSystemList: Boolean get() = systemRole != null
 
@@ -424,7 +430,15 @@ data class TaskCondition(
     val sortOrder: Long? = null,
     /** The conditions it switches on while it holds (Home: Floor space, Desk), by id. */
     val provides: List<String> = emptyList(),
-)
+    /**
+     * The kind of device it means ("laptop", "phone", "tablet"), or null for
+     * an ordinary condition. A device condition is never said to hold: it
+     * holds on a device of its kind and nowhere else (`conditions/device.rs`).
+     */
+    val deviceKind: String? = null,
+) {
+    val isDevice: Boolean get() = !deviceKind.isNullOrBlank()
+}
 
 data class FocusWorkBlock(
     val id: String,

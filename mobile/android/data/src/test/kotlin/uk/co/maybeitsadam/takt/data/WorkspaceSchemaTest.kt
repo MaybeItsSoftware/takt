@@ -61,7 +61,7 @@ class WorkspaceSchemaTest {
             assertTrue("missing: ${expected - present}", present.containsAll(expected))
 
             val migrations = workspace.database.read { it.strings("SELECT identifier FROM grdb_migrations") }
-            assertEquals(40, migrations.size)
+            assertEquals(41, migrations.size)
             assertTrue("v17_sync" in migrations)
             assertTrue("v18_themes_and_preferences" in migrations)
             assertTrue("v19_habit_options" in migrations)
@@ -86,6 +86,7 @@ class WorkspaceSchemaTest {
             assertTrue("v38_task_authorship" in migrations)
             assertTrue("v39_open_ended_focus" in migrations)
             assertTrue("v40_list_priority" in migrations)
+            assertTrue("v41_device_and_list_conditions" in migrations)
             assertEquals(listOf(0L to 0L), workspace.database.read { db ->
                 db.query("SELECT recording, applying FROM sync_control") { it.long("recording") to it.long("applying") }
             })
@@ -113,7 +114,22 @@ class WorkspaceSchemaTest {
     // install that lacks one migration lacks every later one too, since they
     // only ever apply in order, so each rewind takes the later ones off first.
 
+    private fun rewindV41(connection: SQLiteConnection) {
+        // The journal's and the outbox's list and condition triggers name the
+        // new columns, so they come off first; v41 reinstalls them.
+        for (table in listOf("task_lists", "task_conditions")) {
+            for (op in listOf("insert", "update", "delete")) {
+                connection.execSQL("DROP TRIGGER IF EXISTS change_log_${table}_$op")
+                connection.execSQL("DROP TRIGGER IF EXISTS sync_outbox_${table}_$op")
+            }
+        }
+        connection.execSQL("ALTER TABLE task_conditions DROP COLUMN deviceKind")
+        connection.execSQL("ALTER TABLE task_lists DROP COLUMN requirementGroupsJSON")
+        connection.execSQL("DELETE FROM grdb_migrations WHERE identifier = 'v41_device_and_list_conditions'")
+    }
+
     private fun rewindV40(connection: SQLiteConnection) {
+        rewindV41(connection)
         // The journal's and the outbox's list triggers name the new column,
         // so they come off first; v40 reinstalls them.
         for (op in listOf("insert", "update", "delete")) {
@@ -394,8 +410,8 @@ class WorkspaceSchemaTest {
         try {
             assertEquals(expected, upgraded.read { schema(it) })
             val migrations = upgraded.read { it.strings("SELECT identifier FROM grdb_migrations") }
-            assertEquals(40, migrations.size)
-            assertEquals(40, migrations.toSet().size)
+            assertEquals(41, migrations.size)
+            assertEquals(41, migrations.toSet().size)
         } finally {
             upgraded.close()
             dir.deleteRecursively()
@@ -405,6 +421,14 @@ class WorkspaceSchemaTest {
     /** A v25 database takes `stacksMissedFrom` on `dailies`. */
     @Test
     fun aV25DatabaseUpgradesToTheFixture() = assertUpgradesToTheFixture("v25", ::rewindV26)
+
+    /**
+     * A v40 database takes `deviceKind` on conditions and
+     * `requirementGroupsJSON` on lists: no condition a device, no list
+     * requiring anything.
+     */
+    @Test
+    fun aV40DatabaseUpgradesToTheFixture() = assertUpgradesToTheFixture("v40", ::rewindV41)
 
     /** A v39 database takes `priorityRank` on lists, every list unprioritised. */
     @Test

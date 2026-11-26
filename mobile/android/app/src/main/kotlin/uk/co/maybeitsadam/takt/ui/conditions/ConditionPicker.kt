@@ -17,6 +17,11 @@ data class ConditionPickerRow(
     val isExclusive: Boolean,
     /** Its category, shown only while searching, when the rows leave their headings. */
     val category: String?,
+    /**
+     * Shown but not ticked by hand: a device condition while saying what
+     * holds, since it holds by itself on a device of its kind and nowhere else.
+     */
+    val isFixed: Boolean = false,
 )
 
 /** Rows under one heading; a null title is the flat list of matches while searching. */
@@ -52,6 +57,9 @@ object ConditionPicker {
      * @param all every condition, for "is that name taken?".
      * @param exclusiveRadio whether Location rows are drawn as radios: only
      *   when saying where you are, where a place replaces the last.
+     * @param devicesFixed whether the Device heading's rows are shown without
+     *   a toggle: when saying where you are, which says nothing about them.
+     *   A task can still require one, so the requirement pickers leave it off.
      */
     fun list(
         offered: List<ConditionGroup>,
@@ -60,13 +68,16 @@ object ConditionPicker {
         query: String,
         isOn: (String) -> Boolean,
         exclusiveRadio: Boolean,
+        devicesFixed: Boolean = false,
     ): ConditionPickerList {
         val needle = query.trim()
         if (needle.isEmpty()) {
             val sections = offered.filter { it.conditions.isNotEmpty() }.map { group ->
                 ConditionPickerSection(
                     group.title,
-                    group.conditions.map { ConditionPickerRow(it, isOn(it.id), exclusiveRadio && group.isExclusive, null) },
+                    group.conditions.map {
+                        ConditionPickerRow(it, isOn(it.id), exclusiveRadio && group.isExclusive, null, devicesFixed && group.isDevice)
+                    },
                 )
             }
             return ConditionPickerList(sections, newName = null, isSearching = false)
@@ -77,7 +88,7 @@ object ConditionPicker {
         val candidates = ordered.map { (condition, group) -> PaletteCandidate(condition.name, group.title, emptyList(), 0) }
         val rows = paletteRank(needle, candidates).map { index ->
             val (condition, group) = ordered[index.toInt()]
-            ConditionPickerRow(condition, isOn(condition.id), exclusiveRadio && group.isExclusive, group.title)
+            ConditionPickerRow(condition, isOn(condition.id), exclusiveRadio && group.isExclusive, group.title, devicesFixed && group.isDevice)
         }
         val taken = all.any { it.name.equals(needle, ignoreCase = true) }
         return ConditionPickerList(

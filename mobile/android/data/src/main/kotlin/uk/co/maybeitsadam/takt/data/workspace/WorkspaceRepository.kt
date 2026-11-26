@@ -230,6 +230,31 @@ class WorkspaceRepository(
         coreWrite { it.setListPriority(id, position?.toLong(), now.toEpochMilli()) }
     }
 
+    /**
+     * Sets what a list requires — a standalone list's id, or a nested list's
+     * task id — in the same groups a task keeps, as one undo step; every task
+     * in it and in the lists nested under it inherits them. Empty requires
+     * nothing. The Rust core's `conditions::inherited::set_list_requirements`.
+     * False when it already required exactly that.
+     */
+    suspend fun setListRequirements(listId: String, groups: List<List<String>>, now: Instant = now()): Boolean =
+        coreWrite { it.setListRequirements(listId, groups, now.toEpochMilli()) }
+
+    /**
+     * What a list requires of every task in it, standalone or nested, again
+     * whenever a list or a nested list's plan changes.
+     */
+    fun observeListRequirements(listId: String): Flow<List<List<String>>> =
+        database.observe(setOf("task_lists", "task_metadata")) { it.core.listRequirementGroups(listId) }
+
+    /**
+     * The lists a task inherits requirements from, outermost first — its
+     * list, then each nested list above it that requires anything — again
+     * whenever one changes or the task moves.
+     */
+    fun observeInheritedRequirements(taskId: String): Flow<List<uniffi.takt_core.InheritedRequirement>> =
+        database.observe(setOf("tasks", "task_lists", "task_metadata")) { it.core.inheritedRequirements(taskId) }
+
     /** Deletes a list and its tasks as one undo step; the Inbox is permanent. The Rust core's `lists::delete_list`. */
     suspend fun deleteList(id: String) {
         coreWrite { it.deleteList(id) }
@@ -709,6 +734,17 @@ class WorkspaceRepository(
      */
     suspend fun setConditionProvides(id: String, provides: List<String>, now: Instant = now()): Boolean =
         coreWrite { it.setConditionProvides(id, provides, now.toEpochMilli()) }
+
+    /**
+     * Marks a condition as meaning a kind of device ("laptop", "phone",
+     * "tablet"), or with null makes it an ordinary condition again: the Rust
+     * core's `conditions::device::set_condition_device`, one "Edit Condition"
+     * step. Marking it takes it out of what is said to hold and of what
+     * others provide, since it now holds by itself on a device of its kind.
+     * False when it already was that.
+     */
+    suspend fun setConditionDeviceKind(id: String, kind: String?, now: Instant = now()): Boolean =
+        coreWrite { it.setConditionDeviceKind(id, kind, now.toEpochMilli()) }
 
     /** Files a condition under a category, or none: the Rust core's `conditions::set_condition_category`. */
     suspend fun setConditionCategory(id: String, category: String?, now: Instant = now()) {

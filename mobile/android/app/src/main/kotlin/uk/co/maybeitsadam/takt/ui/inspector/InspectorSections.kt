@@ -506,6 +506,22 @@ private fun ConditionsSection(
         val needs = groups.joinToString(" and ") { group ->
             group.joinToString(" or ") { TaskRequirement.label(it, around::conditionName) }
         }
+        // What its lists require, which it needs as well as its own: shown
+        // here so the task's needs read whole, but changed on the list.
+        for (from in around.inherited) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Metrics.xs),
+                verticalArrangement = Arrangement.spacedBy(Metrics.xs),
+                itemVerticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.testTag("inspector_inherited_${from.listId}"),
+            ) {
+                from.groups.forEachIndexed { index, group ->
+                    if (index > 0) Text("and", style = TaktTheme.type.small, color = colors.mutedText)
+                    Tag(group.joinToString(" or ") { TaskRequirement.label(it, around::conditionName) }, color = colors.mutedText)
+                }
+                Text("from ${from.listName}", style = TaktTheme.type.small, color = colors.mutedText)
+            }
+        }
         Disclosure(
             key = "inspector.conditions",
             tag = "inspector_conditions_toggle",
@@ -513,7 +529,7 @@ private fun ConditionsSection(
             header = {
                 FieldLabel("Needs", Modifier.weight(1f))
                 Text(
-                    needs.ifEmpty { "Anytime, anywhere" }, style = TaktTheme.type.body,
+                    needs.ifEmpty { if (around.inherited.isEmpty()) "Anytime, anywhere" else "Only what its lists need" }, style = TaktTheme.type.body,
                     color = if (needs.isEmpty()) colors.mutedText else colors.ink,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(2f, fill = false),
                 )

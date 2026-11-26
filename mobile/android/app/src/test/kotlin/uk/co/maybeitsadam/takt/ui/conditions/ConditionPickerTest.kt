@@ -43,6 +43,22 @@ class ConditionPickerTest {
         assertFalse(RequirementToggle.requires("mat", groups))
     }
 
+    /**
+     * A device condition heads the list under Device. Saying where you are,
+     * it cannot be ticked; a task can still require it, so there it can.
+     */
+    @Test
+    fun aDeviceConditionIsFixedOnlyWhenSayingWhereYouAre() {
+        val pad = condition("pad", "iPad", "Equipment").copy(deviceKind = "tablet")
+        val live = listOf(home, laptop, pad)
+        val saying = ConditionPicker.list(ConditionGroups.all(live), live, live, "", isOn = { false }, exclusiveRadio = true, devicesFixed = true)
+        assertEquals("Device", saying.sections.first().title)
+        assertTrue(saying.sections.first().rows.single().isFixed)
+        assertFalse(saying.sections.drop(1).flatMap { it.rows }.any { it.isFixed })
+        val requiring = ConditionPicker.list(ConditionGroups.all(live), live, live, "", isOn = { false }, exclusiveRadio = false)
+        assertFalse(requiring.sections.flatMap { it.rows }.any { it.isFixed })
+    }
+
     @Test
     fun withNothingTypedTheRowsSitUnderTheCoresHeadings() {
         val live = all.filter { !it.isArchived }

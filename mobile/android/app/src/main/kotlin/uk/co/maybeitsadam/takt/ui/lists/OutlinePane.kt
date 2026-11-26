@@ -324,7 +324,9 @@ private fun OutlineRowView(
                 } else {
                     Spacer(Modifier.width(FOLD_COLUMN))
                 }
-                CelebratedCheck(row.status, row.isList, row.title, celebration) { actions.toggleComplete(row.id) }
+                // No square on an open row: a list reads as the Mac's, and
+                // the swipe right is what completes it, as on Today.
+                CelebratedCheck(row.status, row.isList, row.title, celebration, showsBox = false) { actions.toggleComplete(row.id) }
                 TaskTitle(
                     row.title, row.status, celebration,
                     maxLines = 1,

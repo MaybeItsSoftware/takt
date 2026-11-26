@@ -16,6 +16,11 @@ data class ConditionGroup(
     /** A setting rather than a property: Location, or a category whose conditions provide others. */
     val isSetting: Boolean = isExclusive,
     val conditions: List<TaskCondition>,
+    /**
+     * The Device heading: conditions that hold on a device of their kind, so
+     * nobody says they hold and they cannot be ticked on or off.
+     */
+    val isDevice: Boolean = false,
 )
 
 /**
@@ -54,6 +59,7 @@ object ConditionGroups {
                 title = section.title,
                 isExclusive = section.isExclusive,
                 isSetting = section.isSetting,
+                isDevice = section.isDevice,
                 conditions = section.conditions.mapNotNull { byId[it.id] },
             )
         }
@@ -91,9 +97,10 @@ object ConditionHoldings {
         conditions.map { it.toRow() }, ConditionsSaid(said.sorted(), off.sorted()), conditionId, on,
     )
 
-    /** What a condition's row says beside it: "from Home", "off for now", or nothing. */
+    /** What a condition's row says beside it: "this device", "from Home", "off for now", or nothing. */
     fun note(holding: ConditionHolding?, conditions: List<TaskCondition>): String? = when {
         holding == null -> null
+        holding.isDevice -> "this device"
         holding.isOff -> "off for now"
         !holding.isSet && holding.providedBy.isNotEmpty() ->
             "from " + holding.providedBy.joinToString(", ") { id -> conditions.firstOrNull { it.id == id }?.name ?: id }

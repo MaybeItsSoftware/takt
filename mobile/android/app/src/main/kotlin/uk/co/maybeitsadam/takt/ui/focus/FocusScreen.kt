@@ -67,6 +67,7 @@ import uk.co.maybeitsadam.takt.data.workspace.ConditionHoldings
 import uk.co.maybeitsadam.takt.ui.commands.KeyCommand
 import uk.co.maybeitsadam.takt.ui.commands.PaletteCommand
 import uk.co.maybeitsadam.takt.ui.commands.RegisterCommands
+import uk.co.maybeitsadam.takt.ui.conditions.ConditionDevicesSheet
 import uk.co.maybeitsadam.takt.ui.conditions.NowConditionsSheet
 import uk.co.maybeitsadam.takt.ui.components.Card
 import uk.co.maybeitsadam.takt.ui.components.EmptyState
@@ -277,6 +278,7 @@ private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
 private fun ContextControls(state: FocusUiState, context: FocusContextState, vm: FocusViewModel) {
     var addingCondition by rememberSaveable { mutableStateOf(false) }
     var choosing by rememberSaveable { mutableStateOf(false) }
+    var devices by rememberSaveable { mutableStateOf(false) }
     var customMinutes by rememberSaveable { mutableStateOf(false) }
     var pickingUntil by rememberSaveable { mutableStateOf(false) }
     // Every condition said, provided or off for now stays offered, so it can
@@ -302,6 +304,8 @@ private fun ContextControls(state: FocusUiState, context: FocusContextState, vm:
             // Every condition in one sheet, searched, for when the chips are many.
             Tag("All…", leading = Icons.Filled.Search, onClick = { choosing = true }, modifier = Modifier.testTag("focus_conditions_all"))
             Tag("New condition", leading = Icons.Filled.Add, onClick = { addingCondition = true })
+            // Which conditions mean a kind of device: Laptop, Phone, Tablet.
+            Tag("Devices…", onClick = { devices = true }, modifier = Modifier.testTag("focus_conditions_devices"))
         }
         // Only what an open task needs, under its category: a condition nothing
         // waits on changes nothing, so it is not asked about.
@@ -314,7 +318,11 @@ private fun ContextControls(state: FocusUiState, context: FocusContextState, vm:
             ) {
                 for (condition in group.conditions) {
                     val on = condition.id in context.held
+                    // A device condition holds by itself on its kind of
+                    // device, so its chip says whether this is one and
+                    // cannot be tapped.
                     val note = ConditionHoldings.note(context.holdings[condition.id], state.conditions)
+                        ?: if (condition.isDevice) "not this device" else null
                     Tag(
                         condition.name,
                         color = if (on) TaktTheme.colors.primary else TaktTheme.colors.mutedText,
@@ -323,7 +331,7 @@ private fun ContextControls(state: FocusUiState, context: FocusContextState, vm:
                         modifier = Modifier
                             .testTag("focus_condition_${condition.name}")
                             .semantics { if (note != null) stateDescription = note },
-                        onClick = { vm.toggleCondition(condition) },
+                        onClick = if (group.isDevice) null else ({ vm.toggleCondition(condition) }),
                     )
                 }
             }
@@ -373,6 +381,7 @@ private fun ContextControls(state: FocusUiState, context: FocusContextState, vm:
     Hairline()
 
     if (choosing) NowConditionsSheet(onDismiss = { choosing = false })
+    if (devices) ConditionDevicesSheet(onDismiss = { devices = false })
     if (addingCondition) {
         NewConditionDialog(
             categories = remember(state.conditions) { ConditionGroups.categories(state.conditions) },

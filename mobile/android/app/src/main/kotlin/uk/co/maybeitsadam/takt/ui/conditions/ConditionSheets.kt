@@ -86,7 +86,9 @@ fun NowConditionsBar(modifier: Modifier = Modifier) {
     val vm = conditionsViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf(false) }
+    var devices by rememberSaveable { mutableStateOf(false) }
     if (sheet) NowConditionsSheet(onDismiss = { sheet = false })
+    if (devices) ConditionDevicesSheet(onDismiss = { devices = false })
     if (!state.isLoaded) return
     val colors = TaktTheme.colors
     // No conditions yet: still a row, so there is somewhere to start.
@@ -119,6 +121,7 @@ fun NowConditionsBar(modifier: Modifier = Modifier) {
             query = "",
             isOn = { it in state.held },
             exclusiveRadio = true,
+            devicesFixed = true,
         )
     }
     Column(modifier) {
@@ -151,6 +154,7 @@ fun NowConditionsBar(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Tag("Search or add…", color = colors.primary, onClick = { sheet = true }, modifier = Modifier.testTag("now_conditions_more"))
+                Tag("Devices…", color = colors.mutedText, onClick = { devices = true }, modifier = Modifier.testTag("now_conditions_devices"))
                 if (state.selected.isNotEmpty() || state.off.isNotEmpty()) {
                     Tag("Clear", color = colors.mutedText, onClick = vm::clearNow, modifier = Modifier.testTag("now_conditions_clear_inline"))
                 }
@@ -207,6 +211,7 @@ fun NowConditionsSheet(onDismiss: () -> Unit) {
             query = query,
             isOn = { it in state.held },
             exclusiveRadio = true,
+            devicesFixed = true,
         )
     }
     val colors = TaktTheme.colors
@@ -274,6 +279,8 @@ fun TaskConditionsSheet(
     groups: List<List<String>>?,
     onGroupsChange: ((List<List<String>>?) -> List<List<String>>?) -> Unit,
     onDismiss: () -> Unit,
+    title: String = "Needs",
+    tag: String = "task_conditions_sheet",
 ) {
     val vm = conditionsViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -297,9 +304,9 @@ fun TaskConditionsSheet(
     }
     fun negated(id: String) = RequirementToggle.requirement(id, groups)?.isNegated == true
     ConditionPickerSheet(
-        title = "Needs",
+        title = title,
         subtitle = ConditionPicker.requirementSummary(groups, state::name),
-        tag = "task_conditions_sheet",
+        tag = tag,
         query = query,
         onQueryChange = { query = it },
         offeredCount = offeredConditions.size,
@@ -388,7 +395,7 @@ fun TaskConditionsInline(
  * 48dp toggle.
  */
 @Composable
-private fun ConditionPickerSheet(
+internal fun ConditionPickerSheet(
     title: String,
     tag: String,
     query: String,
@@ -534,13 +541,21 @@ private fun ConditionRow(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = Metrics.touchTarget)
-                .toggleable(value = row.isOn, role = if (row.isExclusive) Role.RadioButton else Role.Checkbox, onValueChange = { onToggle() })
+                .then(
+                    // A fixed row reads as one line, its state in the detail
+                    // ("this device"), and offers nothing to tap.
+                    if (row.isFixed) {
+                        Modifier.semantics(mergeDescendants = true) {}
+                    } else {
+                        Modifier.toggleable(value = row.isOn, role = if (row.isExclusive) Role.RadioButton else Role.Checkbox, onValueChange = { onToggle() })
+                    },
+                )
                 .padding(horizontal = Metrics.lg, vertical = Metrics.xs)
                 .testTag("condition_row_${condition.name}"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Metrics.md),
         ) {
-            Indicator(row.isOn, round = row.isExclusive)
+            Indicator(row.isOn, round = row.isExclusive, fixed = row.isFixed)
             Column(Modifier.weight(1f)) {
                 Text(
                     label,
@@ -565,17 +580,22 @@ private fun ConditionRow(
     }
 }
 
-/** A 20dp box, or a round radio for a place: filled azure with a tick when on, a hairline when not. */
+/**
+ * A 20dp box, or a round radio for a place: filled azure with a tick when on,
+ * a hairline when not. A fixed one (a device condition) is muted, so it does
+ * not look like something to tap.
+ */
 @Composable
-private fun Indicator(on: Boolean, round: Boolean) {
+private fun Indicator(on: Boolean, round: Boolean, fixed: Boolean = false) {
     val colors = TaktTheme.colors
     val shape = if (round) Metrics.pill else Metrics.control
+    val fill = if (fixed) colors.mutedText else colors.primary
     Box(
         Modifier
             .size(22.dp)
             .clip(shape)
-            .background(if (on) colors.primary else colors.raised)
-            .border(BorderStroke(Metrics.hairline, if (on) colors.primary else colors.inputBorder), shape),
+            .background(if (on) fill else colors.raised)
+            .border(BorderStroke(Metrics.hairline, if (on) fill else colors.inputBorder), shape),
         contentAlignment = Alignment.Center,
     ) {
         if (on) {

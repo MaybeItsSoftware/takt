@@ -72,6 +72,8 @@ internal fun CelebratedCheck(
     isList: Boolean,
     title: String,
     celebration: CelebrationStyle,
+    /** An open task's square; off in a list's rows, where a swipe completes it. */
+    showsBox: Boolean = true,
     onToggle: () -> Unit,
 ) {
     val spark = remember { Animatable(0f) }
@@ -105,7 +107,13 @@ internal fun CelebratedCheck(
             }
         },
     ) {
-        TaskCheck(status, isList = isList, label = title, onToggle = onToggle)
+        TaskCheck(
+            status, isList = isList, label = title, showsBox = showsBox,
+            // Without the square the column only ever holds ≡ or ✕, so it
+            // narrows to them and the title sits near the edge.
+            width = if (showsBox) 28.dp else 16.dp,
+            onToggle = onToggle,
+        )
     }
 }
 

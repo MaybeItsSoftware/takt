@@ -426,6 +426,8 @@ fun TaskCheck(
     /** The task's title, so the action reads "Complete Write report" to TalkBack and tests. */
     label: String? = null,
     width: Dp = 28.dp,
+    /** An open task's square; off where a swipe completes the row instead. */
+    showsBox: Boolean = true,
     onToggle: () -> Unit,
 ) {
     val verb = when (status) {
@@ -446,7 +448,7 @@ fun TaskCheck(
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        TaskBox(status, isList = isList, size = size)
+        TaskBox(status, isList = isList, size = size, showsBox = showsBox)
     }
 }
 
@@ -458,13 +460,14 @@ fun TaskCheck(
  * one affordance a phone without a keyboard needs to finish it.
  */
 @Composable
-fun TaskBox(status: TaskStatus, isList: Boolean = false, size: Dp = Metrics.statusMark) {
+fun TaskBox(status: TaskStatus, isList: Boolean = false, size: Dp = Metrics.statusMark, showsBox: Boolean = true) {
     val colors = TaktTheme.colors
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         when {
             status == TaskStatus.CANCELLED -> Text("✕", style = TaktTheme.type.secondary, color = colors.dimText, maxLines = 1)
             status == TaskStatus.COMPLETED -> Unit
             isList -> Text("≡", style = TaktTheme.type.secondary, color = colors.mutedText, maxLines = 1)
+            !showsBox -> Unit
             else -> Box(
                 Modifier
                     .size(size * (12f / 14f))

@@ -51,6 +51,7 @@ import uk.co.maybeitsadam.takt.data.workspace.WorkspaceStoreException
 import uk.co.maybeitsadam.takt.data.workspace.observeTaskInspectorFacts
 import uk.co.maybeitsadam.takt.data.workspace.recurrenceClash
 import uk.co.maybeitsadam.takt.data.workspace.setWaiting
+import uniffi.takt_core.InheritedRequirement
 
 /** Everything around the draft: the task row, its list, the catalogues, its placement. */
 @Immutable
@@ -62,6 +63,11 @@ data class InspectorSurroundings(
     val facts: TaskInspectorFacts = TaskInspectorFacts(),
     /** What it waits on and what waits on it. */
     val dependencies: TaskDependencies = TaskDependencies(),
+    /**
+     * The lists it inherits requirements from, outermost first, with what
+     * each requires: shown with its own, but edited on the list.
+     */
+    val inherited: ImmutableList<InheritedRequirement> = persistentListOf(),
 ) {
     fun conditionName(id: String): String = conditions.firstOrNull { it.id == id }?.name ?: "Missing condition"
 }
@@ -96,8 +102,12 @@ class TaskInspectorViewModel(private val container: AppContainer) : ViewModel() 
         } else {
             container.withSession { session ->
                 val repo = session.repository
-                val listName = combine(repo.observeTask(id), repo.observeLists(session.workspace.id, includingArchived = true)) { task, lists ->
-                    task to (lists.firstOrNull { it.id == task?.listId }?.name ?: "")
+                val listName = combine(
+                    repo.observeTask(id),
+                    repo.observeLists(session.workspace.id, includingArchived = true),
+                    repo.observeInheritedRequirements(id),
+                ) { task, lists, inherited ->
+                    Triple(task, lists.firstOrNull { it.id == task?.listId }?.name ?: "", inherited)
                 }
                 // The board the task is a card on, as the core resolves it: its own
                 // layout, else its list's, the default or the stock five. Rule
@@ -114,7 +124,7 @@ class TaskInspectorViewModel(private val container: AppContainer) : ViewModel() 
                     boardColumns,
                     repo.observeTaskInspectorFacts(id),
                     repo.observeTaskDependencies(id),
-                ) { (task, name), conditions, filedColumns, facts, dependencies ->
+                ) { (task, name, inherited), conditions, filedColumns, facts, dependencies ->
                     val columns = filedColumns.ifEmpty { WorkspaceKanbanColumn.blitzitDefaults }
                     InspectorSurroundings(
                         task = task,
@@ -123,6 +133,7 @@ class TaskInspectorViewModel(private val container: AppContainer) : ViewModel() 
                         boardColumns = columns.toImmutableList(),
                         facts = facts,
                         dependencies = dependencies,
+                        inherited = inherited.toImmutableList(),
                     )
                 }
             }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -45,6 +46,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.Color
+import uk.co.maybeitsadam.takt.ui.conditions.ListConditionsSheet
 import uk.co.maybeitsadam.takt.ui.components.Hairline
 import uk.co.maybeitsadam.takt.ui.navigation.Tab
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -89,6 +91,8 @@ private sealed interface ListsDialog {
     data class MoveList(val id: String, val name: String, val folderId: String?) : ListsDialog
     data class MoveFolder(val id: String, val name: String, val parentId: String?) : ListsDialog
     data class Share(val id: String, val name: String) : ListsDialog
+    /** What every task in a list needs: a standalone list's id, or a nested list's task id. */
+    data class Conditions(val id: String, val name: String) : ListsDialog
 }
 
 /**
@@ -354,6 +358,10 @@ private fun TreeRowView(
                         menu = false
                         vm.setNestedPinned(row.taskId, !row.isPinned)
                     })
+                    PMenuItem("Conditions…", Icons.Filled.LocationOn, onClick = {
+                        menu = false
+                        show(ListsDialog.Conditions(row.taskId, row.title))
+                    })
                     PMenuItem("Archive nested list", PIcons.Archive, onClick = {
                         menu = false
                         vm.setNestedArchived(row.taskId, true)
@@ -477,11 +485,14 @@ private fun ListMenu(row: TreeRow.ListRow, isShared: Boolean, vm: ListsViewModel
     if (row.isInbox) {
         PriorityMenu(row, vm, close)
         PMenuDivider()
+        PMenuItem("Conditions…", Icons.Filled.LocationOn, onClick = run { show(ListsDialog.Conditions(row.id, row.name)) })
         PMenuItem("The Inbox is permanent", enabled = false, onClick = close)
         return
     }
     PMenuItem("Rename…", Icons.Filled.Edit, onClick = run { show(ListsDialog.RenameList(row.id, row.name)) })
     PMenuItem("Move to folder…", PIcons.Folder, onClick = run { show(ListsDialog.MoveList(row.id, row.name, row.folderId)) })
+    // Conditions every task in it needs, on top of its own: "Revision" needs Campus or the Library.
+    PMenuItem("Conditions…", Icons.Filled.LocationOn, onClick = run { show(ListsDialog.Conditions(row.id, row.name)) })
     PMenuItem("Move up", Icons.Filled.KeyboardArrowUp, enabled = row.canMoveUp, onClick = run { vm.moveListBy(row.id, -1) })
     PMenuItem("Move down", Icons.Filled.KeyboardArrowDown, enabled = row.canMoveDown, onClick = run { vm.moveListBy(row.id, 1) })
     PMenuDivider()
@@ -561,5 +572,6 @@ private fun ListsDialogHost(dialog: ListsDialog?, vm: ListsViewModel, folders: I
             vm.moveFolderTo(dialog.id, it.id)
         }
         is ListsDialog.Share -> SharedListSheet(dialog.id, dialog.name, onDismiss = dismiss)
+        is ListsDialog.Conditions -> ListConditionsSheet(dialog.id, dialog.name, onDismiss = dismiss)
     }
 }

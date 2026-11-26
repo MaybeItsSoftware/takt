@@ -773,6 +773,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_func_condition_sections(
     ): Int
+    external fun uniffi_takt_core_checksum_func_set_this_device_kind(
+    ): Int
+    external fun uniffi_takt_core_checksum_func_this_device_kind(
+    ): Int
     external fun uniffi_takt_core_checksum_func_condition_waiting_counts(
     ): Int
     external fun uniffi_takt_core_checksum_func_condition_holdings(
@@ -1263,7 +1267,11 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_has_manual_focus_order(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_inherited_requirements(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_kanban_boards(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_list_requirement_groups(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_logged_work(
     ): Int
@@ -1541,6 +1549,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_condition_category(
     ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_set_condition_device_kind(
+    ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_condition_provides(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_item_kind(
@@ -1552,6 +1562,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_list_completed(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_list_priority(
+    ): Int
+    external fun uniffi_takt_core_checksum_method_coreworkspace_set_list_requirements(
     ): Int
     external fun uniffi_takt_core_checksum_method_coreworkspace_set_matrix_position(
     ): Int
@@ -1815,7 +1827,11 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_has_manual_focus_order(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
+    external fun uniffi_takt_core_fn_method_coreworkspace_inherited_requirements(`ptr`: Long,`taskId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_kanban_boards(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_method_coreworkspace_list_requirement_groups(`ptr`: Long,`listId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_logged_work(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2093,6 +2109,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_method_coreworkspace_set_condition_category(`ptr`: Long,`id`: RustBuffer.ByValue,`category`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_takt_core_fn_method_coreworkspace_set_condition_device_kind(`ptr`: Long,`id`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_set_condition_provides(`ptr`: Long,`id`: RustBuffer.ByValue,`providedIds`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_set_item_kind(`ptr`: Long,`id`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -2105,6 +2123,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_set_list_priority(`ptr`: Long,`id`: RustBuffer.ByValue,`position`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_takt_core_fn_method_coreworkspace_set_list_requirements(`ptr`: Long,`listId`: RustBuffer.ByValue,`groups`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_takt_core_fn_method_coreworkspace_set_matrix_position(`ptr`: Long,`id`: RustBuffer.ByValue,`urgency`: RustBuffer.ByValue,`importance`: RustBuffer.ByValue,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_takt_core_fn_method_coreworkspace_set_nested_list_archived(`ptr`: Long,`id`: RustBuffer.ByValue,`archived`: Byte,`nowMs`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -2280,6 +2300,10 @@ internal object UniffiLib {
     external fun uniffi_takt_core_fn_func_condition_section_title(`condition`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_condition_sections(`conditions`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_takt_core_fn_func_set_this_device_kind(`kind`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_takt_core_fn_func_this_device_kind(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_takt_core_fn_func_condition_waiting_counts(`missing`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2895,6 +2919,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_condition_sections() and 0xFFFF) != 6307) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_set_this_device_kind() and 0xFFFF) != 15457) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_func_this_device_kind() and 0xFFFF) != 27795) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_func_condition_waiting_counts() and 0xFFFF) != 42654) {
@@ -3632,7 +3662,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_has_manual_focus_order() and 0xFFFF) != 55087) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_inherited_requirements() and 0xFFFF) != 18434) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_kanban_boards() and 0xFFFF) != 3288) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_list_requirement_groups() and 0xFFFF) != 33505) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_logged_work() and 0xFFFF) != 12680) {
@@ -4049,6 +4085,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_condition_category() and 0xFFFF) != 2912) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_condition_device_kind() and 0xFFFF) != 49525) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_condition_provides() and 0xFFFF) != 58619) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -4065,6 +4104,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_list_priority() and 0xFFFF) != 7909) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_list_requirements() and 0xFFFF) != 13297) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_takt_core_checksum_method_coreworkspace_set_matrix_position() and 0xFFFF) != 2656) {
@@ -5496,9 +5538,19 @@ public interface CoreWorkspaceInterface {
     fun `hasManualFocusOrder`(): kotlin.Boolean
     
     /**
+     * The lists a task inherits requirements from, outermost first.
+     */
+    fun `inheritedRequirements`(`taskId`: kotlin.String): List<InheritedRequirement>
+    
+    /**
      * Every saved board's columns.
      */
     fun `kanbanBoards`(): List<BoardBaseline>
+    
+    /**
+     * What a list, standalone or nested, requires of its tasks.
+     */
+    fun `listRequirementGroups`(`listId`: kotlin.String): List<List<kotlin.String>>
     
     /**
      * Seconds logged per task.
@@ -6249,6 +6301,13 @@ public interface CoreWorkspaceInterface {
     fun `setConditionCategory`(`id`: kotlin.String, `category`: kotlin.String?, `nowMs`: kotlin.Long)
     
     /**
+     * Makes a condition the device condition of `kind` ("laptop", "phone"
+     * or "tablet"), or with none an ordinary one again, as one "Edit
+     * Condition" step. False when it already was.
+     */
+    fun `setConditionDeviceKind`(`id`: kotlin.String, `kind`: kotlin.String?, `nowMs`: kotlin.Long): kotlin.Boolean
+    
+    /**
      * Sets what a condition provides, replacing what it did, as one "Edit
      * Condition" step. False when it already provided exactly that.
      */
@@ -6280,6 +6339,13 @@ public interface CoreWorkspaceInterface {
      * as one step: "Prioritise List", or "Remove List Priority".
      */
     fun `setListPriority`(`id`: kotlin.String, `position`: kotlin.Long?, `nowMs`: kotlin.Long)
+    
+    /**
+     * Sets what a list (standalone, or nested) requires of every task in
+     * it, as one "Edit Conditions" step. False when it already required
+     * exactly that.
+     */
+    fun `setListRequirements`(`listId`: kotlin.String, `groups`: List<List<kotlin.String>>, `nowMs`: kotlin.Long): kotlin.Boolean
     
     /**
      * Places a task on the priority matrix as one "Move Task" step.
@@ -7718,6 +7784,24 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 
     
     /**
+     * The lists a task inherits requirements from, outermost first.
+     */
+    @Throws(CoreException::class)override fun `inheritedRequirements`(`taskId`: kotlin.String): List<InheritedRequirement> {
+            return FfiConverterSequenceTypeInheritedRequirement.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_inherited_requirements(
+        it,
+        
+        FfiConverterString.lower(`taskId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Every saved board's columns.
      */
     @Throws(CoreException::class)override fun `kanbanBoards`(): List<BoardBaseline> {
@@ -7727,6 +7811,24 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
     UniffiLib.uniffi_takt_core_fn_method_coreworkspace_kanban_boards(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * What a list, standalone or nested, requires of its tasks.
+     */
+    @Throws(CoreException::class)override fun `listRequirementGroups`(`listId`: kotlin.String): List<List<kotlin.String>> {
+            return FfiConverterSequenceSequenceString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_list_requirement_groups(
+        it,
+        
+        FfiConverterString.lower(`listId`),_status)
 }
     }
     )
@@ -10422,6 +10524,28 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 
     
     /**
+     * Makes a condition the device condition of `kind` ("laptop", "phone"
+     * or "tablet"), or with none an ordinary one again, as one "Edit
+     * Condition" step. False when it already was.
+     */
+    @Throws(CoreException::class)override fun `setConditionDeviceKind`(`id`: kotlin.String, `kind`: kotlin.String?, `nowMs`: kotlin.Long): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_set_condition_device_kind(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalString.lower(`kind`),
+        FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Sets what a condition provides, replacing what it did, as one "Edit
      * Condition" step. False when it already provided exactly that.
      */
@@ -10536,6 +10660,28 @@ open class CoreWorkspace: Disposable, AutoCloseable, CoreWorkspaceInterface
 }
     }
     
+    
+
+    
+    /**
+     * Sets what a list (standalone, or nested) requires of every task in
+     * it, as one "Edit Conditions" step. False when it already required
+     * exactly that.
+     */
+    @Throws(CoreException::class)override fun `setListRequirements`(`listId`: kotlin.String, `groups`: List<List<kotlin.String>>, `nowMs`: kotlin.Long): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_takt_core_fn_method_coreworkspace_set_list_requirements(
+        it,
+        
+        FfiConverterString.lower(`listId`),
+        FfiConverterSequenceSequenceString.lower(`groups`),
+        FfiConverterLong.lower(`nowMs`),_status)
+}
+    }
+    )
+    }
     
 
     
@@ -12419,6 +12565,10 @@ data class Candidate (
     , 
     var `dueDate`: kotlin.String?
     , 
+    /**
+     * What it requires: its own groups and those it inherits from the lists
+     * it is in (`conditions::inherited`).
+     */
     var `requirementGroups`: List<List<kotlin.String>>
     , 
     var `loggedSeconds`: kotlin.Long
@@ -13351,6 +13501,12 @@ data class ConditionHolding (
     var `isSet`: kotlin.Boolean
     , 
     /**
+     * A device condition of this device's kind, which holds here by
+     * itself (`conditions::device`).
+     */
+    var `isDevice`: kotlin.Boolean = false 
+    , 
+    /**
      * The conditions said to hold that provide it, directly or through
      * another, in the order the tab shows them: "from Home". Empty when
      * nothing does.
@@ -13385,6 +13541,7 @@ public object FfiConverterTypeConditionHolding: FfiConverterRustBuffer<Condition
         return ConditionHolding(
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
@@ -13394,6 +13551,7 @@ public object FfiConverterTypeConditionHolding: FfiConverterRustBuffer<Condition
     override fun allocationSize(value: ConditionHolding) = (
             FfiConverterString.allocationSize(value.`conditionId`) +
             FfiConverterBoolean.allocationSize(value.`isSet`) +
+            FfiConverterBoolean.allocationSize(value.`isDevice`) +
             FfiConverterSequenceString.allocationSize(value.`providedBy`) +
             FfiConverterBoolean.allocationSize(value.`isOff`) +
             FfiConverterBoolean.allocationSize(value.`holds`)
@@ -13402,6 +13560,7 @@ public object FfiConverterTypeConditionHolding: FfiConverterRustBuffer<Condition
     override fun write(value: ConditionHolding, buf: ByteBuffer) {
             FfiConverterString.write(value.`conditionId`, buf)
             FfiConverterBoolean.write(value.`isSet`, buf)
+            FfiConverterBoolean.write(value.`isDevice`, buf)
             FfiConverterSequenceString.write(value.`providedBy`, buf)
             FfiConverterBoolean.write(value.`isOff`, buf)
             FfiConverterBoolean.write(value.`holds`, buf)
@@ -13448,6 +13607,13 @@ data class ConditionRow (
      * nothing. See `conditions::provides`.
      */
     var `provides`: List<kotlin.String>
+    , 
+    /**
+     * "laptop", "phone" or "tablet" for a device condition, which holds on
+     * a device of that kind and nowhere else and is never said to hold;
+     * none for any other condition. See `conditions::device`.
+     */
+    var `deviceKind`: kotlin.String? = null 
     
 ){
     
@@ -13474,6 +13640,7 @@ public object FfiConverterTypeConditionRow: FfiConverterRustBuffer<ConditionRow>
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalLong.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -13487,7 +13654,8 @@ public object FfiConverterTypeConditionRow: FfiConverterRustBuffer<ConditionRow>
             FfiConverterLong.allocationSize(value.`updatedAtMs`) +
             FfiConverterOptionalString.allocationSize(value.`category`) +
             FfiConverterOptionalLong.allocationSize(value.`sortOrder`) +
-            FfiConverterSequenceString.allocationSize(value.`provides`)
+            FfiConverterSequenceString.allocationSize(value.`provides`) +
+            FfiConverterOptionalString.allocationSize(value.`deviceKind`)
     )
 
     override fun write(value: ConditionRow, buf: ByteBuffer) {
@@ -13501,6 +13669,7 @@ public object FfiConverterTypeConditionRow: FfiConverterRustBuffer<ConditionRow>
             FfiConverterOptionalString.write(value.`category`, buf)
             FfiConverterOptionalLong.write(value.`sortOrder`, buf)
             FfiConverterSequenceString.write(value.`provides`, buf)
+            FfiConverterOptionalString.write(value.`deviceKind`, buf)
     }
 }
 
@@ -13534,6 +13703,13 @@ data class ConditionSection (
     var `isSetting`: kotlin.Boolean
     , 
     /**
+     * Whether it is the Device heading: device conditions, which hold on a
+     * device of their kind by themselves and are never switched by hand.
+     * It comes first of all.
+     */
+    var `isDevice`: kotlin.Boolean = false 
+    , 
+    /**
      * In the order they were given.
      */
     var `conditions`: List<ConditionRow>
@@ -13557,6 +13733,7 @@ public object FfiConverterTypeConditionSection: FfiConverterRustBuffer<Condition
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterSequenceTypeConditionRow.read(buf),
         )
     }
@@ -13566,6 +13743,7 @@ public object FfiConverterTypeConditionSection: FfiConverterRustBuffer<Condition
             FfiConverterString.allocationSize(value.`title`) +
             FfiConverterBoolean.allocationSize(value.`isExclusive`) +
             FfiConverterBoolean.allocationSize(value.`isSetting`) +
+            FfiConverterBoolean.allocationSize(value.`isDevice`) +
             FfiConverterSequenceTypeConditionRow.allocationSize(value.`conditions`)
     )
 
@@ -13574,6 +13752,7 @@ public object FfiConverterTypeConditionSection: FfiConverterRustBuffer<Condition
             FfiConverterString.write(value.`title`, buf)
             FfiConverterBoolean.write(value.`isExclusive`, buf)
             FfiConverterBoolean.write(value.`isSetting`, buf)
+            FfiConverterBoolean.write(value.`isDevice`, buf)
             FfiConverterSequenceTypeConditionRow.write(value.`conditions`, buf)
     }
 }
@@ -18804,6 +18983,67 @@ public object FfiConverterTypeIncomingRow: FfiConverterRustBuffer<IncomingRow> {
 
 
 /**
+ * One list a task inherits requirements from, and what they are.
+ */
+data class InheritedRequirement (
+    /**
+     * The standalone list's id, or the nested list's task id.
+     */
+    var `listId`: kotlin.String
+    , 
+    var `listName`: kotlin.String
+    , 
+    /**
+     * Whether it is a nested list (a task record) rather than a standalone
+     * list.
+     */
+    var `isNested`: kotlin.Boolean
+    , 
+    /**
+     * Its groups, as a task's are kept.
+     */
+    var `groups`: List<List<kotlin.String>>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeInheritedRequirement: FfiConverterRustBuffer<InheritedRequirement> {
+    override fun read(buf: ByteBuffer): InheritedRequirement {
+        return InheritedRequirement(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: InheritedRequirement) = (
+            FfiConverterString.allocationSize(value.`listId`) +
+            FfiConverterString.allocationSize(value.`listName`) +
+            FfiConverterBoolean.allocationSize(value.`isNested`) +
+            FfiConverterSequenceSequenceString.allocationSize(value.`groups`)
+    )
+
+    override fun write(value: InheritedRequirement, buf: ByteBuffer) {
+            FfiConverterString.write(value.`listId`, buf)
+            FfiConverterString.write(value.`listName`, buf)
+            FfiConverterBoolean.write(value.`isNested`, buf)
+            FfiConverterSequenceSequenceString.write(value.`groups`, buf)
+    }
+}
+
+
+
+/**
  * A key in the catalogue's spelling, taken apart for a toolkit's own key
  * type: its modifiers and the key itself (a character, or one of
  * [`KEY_NAMES`]).
@@ -19196,6 +19436,13 @@ data class ListRow (
      * the order with any gap or tie a merge left closed up.
      */
     var `priorityRank`: kotlin.Long? = null 
+    , 
+    /**
+     * What every task in it requires, as a task's requirement groups are
+     * kept: every group met, any member of one, "!id" for a condition not
+     * holding. Empty for none. See `conditions::inherited`.
+     */
+    var `requirementGroups`: List<List<kotlin.String>> = listOf() 
     
 ){
     
@@ -19225,6 +19472,7 @@ public object FfiConverterTypeListRow: FfiConverterRustBuffer<ListRow> {
             FfiConverterLong.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterOptionalLong.read(buf),
+            FfiConverterSequenceSequenceString.read(buf),
         )
     }
 
@@ -19241,7 +19489,8 @@ public object FfiConverterTypeListRow: FfiConverterRustBuffer<ListRow> {
             FfiConverterOptionalLong.allocationSize(value.`completedAtMs`) +
             FfiConverterLong.allocationSize(value.`createdAtMs`) +
             FfiConverterLong.allocationSize(value.`updatedAtMs`) +
-            FfiConverterOptionalLong.allocationSize(value.`priorityRank`)
+            FfiConverterOptionalLong.allocationSize(value.`priorityRank`) +
+            FfiConverterSequenceSequenceString.allocationSize(value.`requirementGroups`)
     )
 
     override fun write(value: ListRow, buf: ByteBuffer) {
@@ -19258,6 +19507,7 @@ public object FfiConverterTypeListRow: FfiConverterRustBuffer<ListRow> {
             FfiConverterLong.write(value.`createdAtMs`, buf)
             FfiConverterLong.write(value.`updatedAtMs`, buf)
             FfiConverterOptionalLong.write(value.`priorityRank`, buf)
+            FfiConverterSequenceSequenceString.write(value.`requirementGroups`, buf)
     }
 }
 
@@ -32211,6 +32461,34 @@ public object FfiConverterSequenceTypeIncomingRow: FfiConverterRustBuffer<List<I
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeInheritedRequirement: FfiConverterRustBuffer<List<InheritedRequirement>> {
+    override fun read(buf: ByteBuffer): List<InheritedRequirement> {
+        val len = buf.getInt()
+        return List<InheritedRequirement>(len) {
+            FfiConverterTypeInheritedRequirement.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<InheritedRequirement>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeInheritedRequirement.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<InheritedRequirement>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeInheritedRequirement.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeKeymapBinding: FfiConverterRustBuffer<List<KeymapBinding>> {
     override fun read(buf: ByteBuffer): List<KeymapBinding> {
         val len = buf.getInt()
@@ -34610,6 +34888,35 @@ public object FfiConverterMapStringTypeSyncValue: FfiConverterRustBuffer<Map<kot
     
         
         FfiConverterSequenceTypeConditionRow.lower(`conditions`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Says what kind of device this process runs on — "laptop", "phone" or
+         * "tablet" — or none. Every client calls it once as it starts, before
+         * anything asks what holds; the device conditions of that kind then hold.
+         * An unknown kind is none.
+         */ fun `setThisDeviceKind`(`kind`: kotlin.String?)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_set_this_device_kind(
+    
+        
+        FfiConverterOptionalString.lower(`kind`),_status)
+}
+    
+    
+
+        /**
+         * The kind of device this process said it runs on, if it has.
+         */ fun `thisDeviceKind`(): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_takt_core_fn_func_this_device_kind(
+    
+        _status)
 }
     )
     }

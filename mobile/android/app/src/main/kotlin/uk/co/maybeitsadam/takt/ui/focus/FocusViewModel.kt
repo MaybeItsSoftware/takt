@@ -257,6 +257,8 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
      * are the core's, shared with the Mac and iPhone.
      */
     fun toggleCondition(condition: TaskCondition) {
+        // A device condition holds by itself on its kind of device: nothing to say.
+        if (condition.isDevice) return
         val current = contextState.value
         val next = ConditionHoldings.switching(allConditions.value, current.selected, current.off, condition.id)
         saveContext { it.copy(conditionIds = next.conditionIds, offIds = next.offIds, suggestedIds = emptyList()) }
