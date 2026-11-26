@@ -264,7 +264,7 @@ private fun BlockedLabelRow(label: OutlineEntry.BlockedLabel, modifier: Modifier
         modifier = modifier
             .background(rowFill)
             .padding(
-                start = Metrics.xs + Metrics.indent * label.depth + 32.dp + Metrics.touchTarget,
+                start = Metrics.xs + Metrics.indent * label.depth + 32.dp - FOLD_COLUMN + Metrics.touchTarget,
                 end = Metrics.lg,
                 top = Metrics.sm,
                 bottom = Metrics.xxs,
@@ -296,7 +296,7 @@ private fun OutlineRowView(
         modifier = modifier,
     ) {
         val colors = TaktTheme.colors
-        // The Mac's row: [indent][▸][mark][title, truncated][chips], the
+        // The Mac's row: [indent][mark][title, truncated][chips][▸][handle], the
         // selection a box at radius 4 in the selection colour with the focus
         // outline. The row is a finger tall; only the selection is painted.
         Box(Modifier.background(rowFill)) {
@@ -319,11 +319,6 @@ private fun OutlineRowView(
                     .padding(start = Metrics.indent * row.depth),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (row.hasChildren) {
-                    FoldChevron(row.title, row.isFolded, onToggle = { actions.toggleFold(row.id) })
-                } else {
-                    Spacer(Modifier.width(FOLD_COLUMN))
-                }
                 // No square on an open row: a list reads as the Mac's, and
                 // the swipe right is what completes it, as on Today.
                 CelebratedCheck(row.status, row.isList, row.title, celebration, showsBox = false) { actions.toggleComplete(row.id) }
@@ -334,6 +329,13 @@ private fun OutlineRowView(
                     modifier = Modifier.weight(1f, fill = true),
                 )
                 RowMarkers(row, Modifier.padding(start = Metrics.sm).heightIn(min = 24.dp))
+                // The fold sits at the end, just before the reorder handle,
+                // so a row without children loses no width at its start.
+                if (row.hasChildren) {
+                    FoldChevron(row.title, row.isFolded, onToggle = { actions.toggleFold(row.id) })
+                } else {
+                    Spacer(Modifier.width(FOLD_COLUMN))
+                }
                 Box(
                     dragHandle
                         .width(32.dp)

@@ -338,10 +338,11 @@ struct OutlineRowView: View, Equatable {
       && lhs.starts == rhs.starts && lhs.waiting == rhs.waiting
   }
 
-  /// Where the status mark starts: past the indent, the fold arrow and the
-  /// gap after it. The Mac's `2 + depth × 18`, then 10, then 4.
+  /// Where the status mark starts: past the indent, the Mac's
+  /// `2 + depth × 18`. The fold arrow is at the row's end, so a top-level
+  /// row starts at the margin.
   static func markInset(depth: Int, theme: Theme) -> CGFloat {
-    theme.mac(2) + CGFloat(depth) * theme.mac.indent + theme.mac.disclosure + theme.mac(4)
+    theme.mac(2) + CGFloat(depth) * theme.mac.indent
   }
 
   /// Where the title starts, inside its selection box.
@@ -349,15 +350,14 @@ struct OutlineRowView: View, Equatable {
     markInset(depth: depth, theme: theme) + theme.mac.mark + theme.mac(6)
   }
 
-  /// The Mac's outline row (`views::outline_row`): the indent, a 10 fold
-  /// arrow in dim text, 4, the 12 status mark, then the title and its chips
-  /// in a box at radius 4 that is the selection. The painted row is 26 Mac
-  /// pixels; the list row round it is the touch target.
+  /// The Mac's outline row (`views::outline_row`): the indent, the 12 status
+  /// mark, then the title and its chips in a box at radius 4 that is the
+  /// selection, and last the fold arrow in dim text, just before where the
+  /// reorder handle sits. The painted row is 26 Mac pixels; the list row
+  /// round it is the touch target.
   var body: some View {
     HStack(spacing: 0) {
       Color.clear.frame(width: theme.mac(2) + CGFloat(row.depth) * theme.mac.indent, height: 1)
-      disclosure
-      Color.clear.frame(width: theme.mac(4), height: 1)
       Button {
         model.completeCelebrating(row.id)
       } label: {
@@ -404,6 +404,8 @@ struct OutlineRowView: View, Equatable {
       .padding(.trailing, theme.mac(12))
       .frame(height: theme.mac.row)
       .rowSelection(isSelected, focused: isPad)
+      Color.clear.frame(width: theme.mac(4), height: 1)
+      disclosure
     }
     .celebrationRow(row.id)
   }
